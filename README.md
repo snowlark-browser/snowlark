@@ -64,6 +64,13 @@ target\iter\snowlark-cli.exe --eval "document.title"
 rules the code follows. [ARCHITECTURE.md](ARCHITECTURE.md) describes the crates and the main design decisions;
 `docs/` has the design documents of single areas.
 
+## Use of AI
+
+Snowlark is developed with AI coding assistants, mainly Anthropic's Claude. They write most of the code and
+do much of the debugging, testing and benchmarking, directed by the project's maintainer. Every change has to
+pass the same checks whoever wrote it: the unit tests, the web-platform-tests gate, and the micro and
+Speedometer benchmarks for anything that can move performance. The browser itself has no built-in AI features.
+
 ## Reporting a problem
 
 Open an [issue](https://github.com/snowlark-browser/snowlark/issues) with the page address, what you

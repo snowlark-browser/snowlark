@@ -192,3 +192,5 @@ describes the micro benchmarks (`bench/micro`, `tools/micro-bench/run.py`), the 
 - Say in the pull request what you ran: the crates' tests, the WPT areas with their counts before and after,
   and the benchmark numbers for anything that can move performance.
 - By contributing you agree that your contribution is licensed under the Mozilla Public License 2.0.
+- Contributions written with AI assistants are welcome, as most of Snowlark's own code is. You are responsible for
+  what you submit: say that an assistant was used, and run the same checks as for any other change.
