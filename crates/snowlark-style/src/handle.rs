@@ -1129,6 +1129,11 @@ impl<'a> TElement for StyleElement<'a> {
     }
 
     #[inline]
+    fn has_unshared_presentational_hints(&self) -> bool {
+        self.slot().has(bits::HINTS_UNSHARED)
+    }
+
+    #[inline]
     fn local_name(&self) -> &LocalName {
         self.dom().local_name(self.node_id())
     }

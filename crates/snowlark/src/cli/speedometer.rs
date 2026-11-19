@@ -31,6 +31,10 @@
 //! cores of a hybrid processor; `--cpu N` runs the page's thread on logical processor N alone, at a
 //! raised priority, and the process's other threads off N's core (`tools/speedometer/quick_ab.py`
 //! gives two builds the two hyperthreads of one core). See `docs/perf-counters.md`.
+//!
+//! `SNOWLARK_SPEEDOMETER_MARKS=1` prints, after every event loop turn, the runner's performance marks
+//! made in it (`[turn]` lines, stderr): with `SNOWLARK_PROFILE`'s `[render]` lines,
+//! `tools/vs-chrome/restyled_steps.py` counts the restyled elements of each step's scored window.
 
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -161,6 +165,29 @@ impl SuiteCycles {
             out.push_str("\n\n");
         }
         out
+    }
+}
+
+/// `SNOWLARK_SPEEDOMETER_MARKS=1`: after every event loop turn, a `[turn]` line on stderr with the
+/// runner's performance marks made in that turn, so the `[render]` lines of `SNOWLARK_PROFILE` (printed
+/// during the turn) can be split into scored windows (`<Suite>.<Step>-start` to `-async-end`) and the rest.
+struct MarkLog {
+    seen: usize,
+}
+
+impl MarkLog {
+    fn turn(&mut self, page: &mut Page) {
+        let js = format!(
+            "(() => {{ const m = performance.getEntriesByType('mark'); const o = [m.length]; \
+             for (let i = {}; i < m.length; i++) o.push(m[i].name); return o.join(' '); }})()",
+            self.seen
+        );
+        let Ok(text) = page.eval(&js, "<speedometer-harness>") else {
+            return;
+        };
+        let (count, names) = text.split_once(' ').unwrap_or((&text, ""));
+        self.seen = count.parse().unwrap_or(self.seen);
+        eprintln!("[turn] {names}");
     }
 }
 
@@ -434,10 +461,15 @@ pub fn run(args: &[String]) -> i32 {
         mark: Cycles::now(),
         ..Default::default()
     });
+    let mut marks =
+        std::env::var_os("SNOWLARK_SPEEDOMETER_MARKS").map(|_| MarkLog { seen: 0 });
     while start.elapsed() < timeout {
         page.run_until(Instant::now() + Duration::from_millis(100), |p| {
             if let Some(c) = cycles.as_mut() {
                 c.charge(p);
+            }
+            if let Some(m) = marks.as_mut() {
+                m.turn(p);
             }
             false
         });
@@ -450,6 +482,9 @@ pub fn run(args: &[String]) -> i32 {
             let ran = page.turn();
             if let Some(c) = cycles.as_mut() {
                 c.charge(&mut page);
+            }
+            if let Some(m) = marks.as_mut() {
+                m.turn(&mut page);
             }
             if !ran {
                 break;

@@ -1,0 +1,36 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/todo-items-append-remove-100</title>
+<!-- 100 todo items built with createElement, each appended to a list in the document on its own, then each removed with removeChild, unstyled in between: a li with a div holding a checkbox, a label and a button. TodoMVC-JavaScript-ES6-Webpack and jQuery's Adding100Items and DeletingAllItems. -->
+<body>
+<section class="main"><ul class="todo-list" id="list"></ul></section>
+<script src="../resources/runner.js"></script>
+<script>
+const list = document.getElementById('list');
+let seen = 0;
+MicroBench.run({
+  run() {
+    for (let i = 0; i < 100; i++) {
+      const li = document.createElement('li');
+      li.dataset.id = i;
+      const view = document.createElement('div');
+      view.className = 'view';
+      const toggle = document.createElement('input');
+      toggle.className = 'toggle';
+      toggle.type = 'checkbox';
+      const label = document.createElement('label');
+      label.textContent = 'Something to do ' + i;
+      const destroy = document.createElement('button');
+      destroy.className = 'destroy';
+      view.append(toggle, label, destroy);
+      li.appendChild(view);
+      list.appendChild(li);
+    }
+    seen = list.childElementCount;
+    while (list.lastChild) list.removeChild(list.lastChild);
+  },
+  check() {
+    return seen === 100 && list.childElementCount === 0;
+  },
+});
+</script>

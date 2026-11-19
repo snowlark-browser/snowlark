@@ -320,10 +320,21 @@ struct HintBlocks {
     /// ([`svg_key_text`]), compared with an element's attributes on a hit.
     svg: FxHashMap<u64, SmallVec<[KeptSvgBlock; 1]>>,
     svg_len: usize,
-    /// The blocks of SVG attribute sets seen once, by hash (no key text): given to the second
-    /// element with the same declarations, and then kept in `svg`.
-    svg_seen: FxHashMap<u64, Arc<Locked<PropertyDeclarationBlock>>>,
+    /// The blocks of SVG attribute sets seen once, by hash (no key text), with the element they
+    /// were built for: given to the second element with the same declarations, and then kept in
+    /// `svg`.
+    svg_seen: FxHashMap<u64, (NodeId, Arc<Locked<PropertyDeclarationBlock>>)>,
+    /// The element whose block, its own until now, the last [`HintBlocks::svg_block`] gave to
+    /// another element (see [`StyleEngine::note_hints_shared`]).
+    shared_first: Option<(NodeId, Arc<Locked<PropertyDeclarationBlock>>)>,
     values: HintValues,
+}
+
+/// An element's presentational hints as one block, from [`StyleEngine::hints_cache`].
+struct Hints {
+    block: Option<Arc<Locked<PropertyDeclarationBlock>>>,
+    /// The block was built for this element and no other element holds it.
+    unshared: bool,
 }
 
 /// A kept SVG hint block with its key text ([`svg_key_text`]).
@@ -421,6 +432,7 @@ impl HintBlocks {
             self.svg.clear();
             self.svg_len = 0;
             self.svg_seen.clear();
+            self.shared_first = None;
             self.values = HintValues::default();
             self.lock = Some(lock.clone());
             url.clone_into(&mut self.url);
@@ -445,17 +457,24 @@ impl HintBlocks {
         url: &UrlExtraData,
         quirks_mode: QuirksMode,
         lock: &SharedRwLock,
-    ) -> Option<Arc<Locked<PropertyDeclarationBlock>>> {
+    ) -> Hints {
+        let shared = |block| Hints {
+            block: Some(block),
+            unshared: false,
+        };
         let mut list = SmallVec::new();
         crate::hints::svg_presentation_list(dom, id, &mut list);
         if list.is_empty() && lang.is_none() {
-            return None;
+            return Hints {
+                block: None,
+                unshared: false,
+            };
         }
         let lang = lang.as_deref();
         let hash = svg_key_hash(&list, lang);
         if let Some(entries) = self.svg.get(&hash) {
             if let Some((_, block)) = entries.iter().find(|(k, _)| svg_key_is(k, &list, lang)) {
-                return Some(block.clone());
+                return shared(block.clone());
             }
         }
         let mut block = PropertyDeclarationBlock::new();
@@ -470,7 +489,7 @@ impl HintBlocks {
                 Importance::Normal,
             );
         }
-        if let Some(first) = self.svg_seen.remove(&hash) {
+        if let Some((first_id, first)) = self.svg_seen.remove(&hash) {
             // The second element with these attributes (or a hash collision): the first one's
             // block for both when its declarations are these, kept from now on.
             let same = {
@@ -478,6 +497,7 @@ impl HintBlocks {
                 first.read_with(&guard).declarations() == block.declarations()
             };
             let kept = if same {
+                self.shared_first = Some((first_id, first.clone()));
                 first
             } else {
                 Arc::new(lock.wrap(block))
@@ -491,14 +511,19 @@ impl HintBlocks {
                 .or_default()
                 .push((svg_key_text(&list, lang), kept.clone()));
             self.svg_len += 1;
-            return Some(kept);
+            // (a block kept in `svg` can be given to any later element: not unshared even when
+            // it is new, from a collision)
+            return shared(kept);
         }
         let block = Arc::new(lock.wrap(block));
         if self.svg_seen.len() >= Self::MAX_SVG_SEEN {
             self.svg_seen.clear();
         }
-        self.svg_seen.insert(hash, block.clone());
-        Some(block)
+        self.svg_seen.insert(hash, (id, block.clone()));
+        Hints {
+            block: Some(block),
+            unshared: true,
+        }
     }
 
     /// Adds to `block` the declarations of a presentation attribute that sets `property` and has the
@@ -1667,12 +1692,7 @@ impl StyleEngine {
 
     /// The element's presentational hints, parsed: elements whose hints have the same text share
     /// one block ([`HintBlocks`]).
-    fn hints_cache(
-        &self,
-        dom: &Dom,
-        lock: &SharedRwLock,
-        id: NodeId,
-    ) -> Option<Arc<Locked<PropertyDeclarationBlock>>> {
+    fn hints_cache(&self, dom: &Dom, lock: &SharedRwLock, id: NodeId) -> Hints {
         let quirks_mode = self.stylist.quirks_mode();
         let lang = crate::hints::content_language_hint(dom, id);
         if *dom.namespace(id) == ns!(svg) {
@@ -1680,6 +1700,22 @@ impl StyleEngine {
             blocks.validate(lock, &self.url_string, quirks_mode);
             return blocks.svg_block(dom, id, lang, &self.url, quirks_mode, lock);
         }
+        Hints {
+            block: self.html_hints(dom, lock, id, lang, quirks_mode),
+            unshared: false,
+        }
+    }
+
+    /// An HTML element's presentational hints as one block, shared by the elements whose hints
+    /// have the same text.
+    fn html_hints(
+        &self,
+        dom: &Dom,
+        lock: &SharedRwLock,
+        id: NodeId,
+        lang: Option<String>,
+        quirks_mode: QuirksMode,
+    ) -> Option<Arc<Locked<PropertyDeclarationBlock>>> {
         let css = crate::hints::presentational_hints(dom, id, quirks_mode == QuirksMode::Quirks);
         // (the language, which no author CSS can set, keys the cache after a NUL)
         let key = match (&css, &lang) {
@@ -1712,14 +1748,36 @@ impl StyleEngine {
         Some(block)
     }
 
-    fn attr_cache(&self, dom: &Dom, lock: &SharedRwLock, id: NodeId) -> AttrCache {
-        AttrCache {
+    /// The element's [`AttrCache`], and whether its hints' block is its own alone
+    /// ([`bits::HINTS_UNSHARED`]).
+    fn attr_cache(&self, dom: &Dom, lock: &SharedRwLock, id: NodeId) -> (AttrCache, bool) {
+        let hints = self.hints_cache(dom, lock, id);
+        let cache = AttrCache {
             id: id_attribute(dom, id),
             classes: tokens(dom.presented_attr(id, &local_name!("class"))),
             parts: tokens(dom.attr(id, &ns!(), &local_name!("part"))),
             exportparts: part_mappings(exportparts_attribute(dom, id)),
             style_attribute: self.style_attribute_cache(dom, lock, id),
-            hints: self.hints_cache(dom, lock, id),
+            hints: hints.block,
+        };
+        (cache, hints.unshared)
+    }
+
+    /// After a hints lookup: an element whose block that lookup gave to another element is no
+    /// longer alone with it.
+    fn note_hints_shared(&self, data: &StyleData) {
+        let Some((first, block)) = self.hint_blocks.borrow_mut().shared_first.take() else {
+            return;
+        };
+        if let Some(slot) = data.slot(first) {
+            if slot
+                .attrs
+                .hints
+                .as_ref()
+                .is_some_and(|b| Arc::ptr_eq(b, &block))
+            {
+                slot.clear(bits::HINTS_UNSHARED);
+            }
         }
     }
 
@@ -1797,9 +1855,18 @@ impl StyleEngine {
                 // parses its hints, when it is inserted)
                 continue;
             }
-            let hints = self.hints_cache(dom, &data.lock, id);
+            let Hints {
+                block: hints,
+                unshared,
+            } = self.hints_cache(dom, &data.lock, id);
+            self.note_hints_shared(data);
             let slot = data.slot_mut(id).expect("prepared");
             slot.clear(bits::HINTS_DIRTY);
+            if unshared {
+                slot.set(bits::HINTS_UNSHARED);
+            } else {
+                slot.clear(bits::HINTS_UNSHARED);
+            }
             // (the same block is the same declarations: nothing to restyle)
             let changed = match (&slot.attrs.hints, &hints) {
                 (Some(old), Some(new)) => !Arc::ptr_eq(old, new),
@@ -1830,7 +1897,8 @@ impl StyleEngine {
         // assignment, computed after its preparation, gives it those it has now)
         data.set_slotted_nodes(id, Vec::new());
         self.note_meta(dom, id);
-        let cache = self.attr_cache(dom, &data.lock, id);
+        let (cache, unshared) = self.attr_cache(dom, &data.lock, id);
+        self.note_hints_shared(data);
         let state = derived_state(dom, id);
         let slot = data.slot_mut(id).expect("prepared");
         slot.reset_data();
@@ -1839,7 +1907,13 @@ impl StyleEngine {
         slot.containing_shadow = containing_shadow;
         slot.assigned_slot = None;
         let flags = slot.flags.get_mut();
-        *flags &= !(bits::SELECTOR_FLAGS | bits::UNPREPARED_DESCENDANTS | bits::HINTS_DIRTY);
+        *flags &= !(bits::SELECTOR_FLAGS
+            | bits::UNPREPARED_DESCENDANTS
+            | bits::HINTS_DIRTY
+            | bits::HINTS_UNSHARED);
+        if unshared {
+            *flags |= bits::HINTS_UNSHARED;
+        }
     }
 
     /// Prepares the descendants of the elements inserted since the last restyle whose preparation
@@ -1923,14 +1997,16 @@ impl StyleEngine {
         }
     }
 
-    /// Whether `root` (an entry of `deferred`) still waits for its descendants' preparation.
+    /// Whether `root` (an entry of `deferred`) still waits for its descendants' preparation (or,
+    /// with no slot, for its own too).
     fn is_deferred(&self, dom: &Dom, data: &StyleData, root: NodeId) -> bool {
         dom.is_alive(root)
             && dom.is_connected(root)
             && dom.node_document(root) == self.document
+            && dom.is_element(root)
             && data
                 .slot(root)
-                .is_some_and(|s| s.has(bits::UNPREPARED_DESCENDANTS))
+                .is_none_or(|s| s.has(bits::UNPREPARED_DESCENDANTS))
     }
 
     /// Prepares `element` alone if it is in a subtree whose preparation waits for the next restyle
@@ -1946,14 +2022,20 @@ impl StyleEngine {
         {
             return;
         }
-        let waiting = dom.ancestors(element).any(|a| {
+        // A connected element of this document without a slot waits: inside a subtree whose
+        // root's descendants wait (the root has the flag, or no slot when it waits whole), or as
+        // such a root itself, whose descendants still wait once it is prepared alone.
+        let inside = dom.ancestors(element).any(|a| {
             data.slot(a)
-                .is_some_and(|s| s.has(bits::UNPREPARED_DESCENDANTS))
+                .map_or(dom.is_element(a), |s| s.has(bits::UNPREPARED_DESCENDANTS))
         });
-        if waiting {
-            data.reserve(dom.arena_len());
-            let shadow = containing_shadow(dom, element);
-            self.prepare_element(dom, data, element, shadow);
+        data.reserve(dom.arena_len());
+        let shadow = containing_shadow(dom, element);
+        self.prepare_element(dom, data, element, shadow);
+        if !inside {
+            if let Some(slot) = data.slot(element) {
+                slot.set(bits::UNPREPARED_DESCENDANTS);
+            }
         }
     }
 
@@ -2115,7 +2197,8 @@ impl StyleEngine {
                 if data.slot(cell).is_none() {
                     continue;
                 }
-                let cache = self.attr_cache(dom, &data.lock, cell);
+                // (an HTML cell: its hints are never [`bits::HINTS_UNSHARED`])
+                let (cache, _) = self.attr_cache(dom, &data.lock, cell);
                 data.slot_mut(cell).expect("slot").attrs = cache;
                 add_hint(data, cell, RestyleHint::RESTYLE_SELF);
                 mark_ancestors_dirty(dom, data, cell);
@@ -2304,14 +2387,27 @@ impl StyleEngine {
         data.reserve(dom.arena_len());
         self.sync_url(dom);
         if dom.is_element(node) {
-            if dom.first_child(node).is_some() && self.can_defer_descendants(dom, data, node) {
-                // Only the element itself now; its descendants at the next restyle, if it is still
-                // in the document then (`prepare_deferred`). Until then nothing reads their slots:
-                // invalidation skips elements without one, and they are styled from scratch.
-                let shadow = containing_shadow(dom, node);
-                self.prepare_element(dom, data, node, shadow);
-                if let Some(slot) = data.slot(node) {
-                    slot.set(bits::UNPREPARED_DESCENDANTS);
+            // A new element (never prepared: no slot) that is not a host's child (whose slot holds
+            // its assigned slot) waits whole, itself included: a subtree inserted and removed
+            // again before the next restyle (a list rebuilt on every change) costs nothing here:
+            // the insertion only marks it for the next style update.
+            let whole = data.slot(node).is_none()
+                && dom
+                    .parent(node)
+                    .is_some_and(|p| dom.shadow_root(p).is_none());
+            if (whole || dom.first_child(node).is_some())
+                && self.can_defer_descendants(dom, data, node)
+            {
+                // Its descendants (and the element itself when `whole`) at the next restyle, if it
+                // is still in the document then (`prepare_deferred`). Until then nothing reads
+                // their slots: invalidation skips elements without one, and they are styled from
+                // scratch.
+                if !whole {
+                    let shadow = containing_shadow(dom, node);
+                    self.prepare_element(dom, data, node, shadow);
+                    if let Some(slot) = data.slot(node) {
+                        slot.set(bits::UNPREPARED_DESCENDANTS);
+                    }
                 }
                 self.deferred.push(node);
                 self.pending_work += 1;
@@ -2434,6 +2530,10 @@ impl StyleEngine {
                     slot.assigned_slot = None;
                     clear_list = slot.slotted_list.is_some();
                 }
+            } else if dom.is_element(id) {
+                // (never prepared: inserted whole since the last restyle, so its descendants
+                // have no slots either, or out of the document since it was made)
+                descendants_unprepared = true;
             }
             if clear_list {
                 data.set_slotted_nodes(id, Vec::new());

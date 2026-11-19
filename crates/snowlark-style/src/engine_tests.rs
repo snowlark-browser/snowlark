@@ -88,8 +88,8 @@ fn an_inserted_subtree_waits_for_the_restyle_while_shadow_trees_exist() {
     let li = p.dom.first_child(ul).unwrap();
     let span = p.dom.first_child(li).unwrap();
     assert!(
-        p.data.slot(li).is_some(),
-        "the inserted element is prepared"
+        p.data.slot(li).is_none(),
+        "the new inserted element waits for the restyle with its subtree"
     );
     assert!(
         p.data.slot(span).is_none(),
@@ -99,9 +99,62 @@ fn an_inserted_subtree_waits_for_the_restyle_while_shadow_trees_exist() {
     // and the restyle prepares what stayed.
     p.dom.set_inner_html(ul, "<li><span>b</span></li>").unwrap();
     p.process();
+    assert!(p.data.slot(li).is_none() && p.data.slot(span).is_none());
+    p.restyle();
+    let li = p.dom.first_child(ul).unwrap();
+    let span = p.dom.first_child(li).unwrap();
+    assert_eq!(p.value_of(span, "color"), "rgb(0, 0, 255)");
+    assert!(p.data.slot(li).is_some());
+}
+
+/// An element prepared before (here moved within the document) is prepared at its insertion, its
+/// descendants later; a host's new child too, whose slot holds the slot it is assigned to.
+#[test]
+fn a_moved_element_and_a_hosts_child_are_prepared_at_their_insertion() {
+    let mut p = Page::new(
+        "<style>li span { color: rgb(0, 0, 255) }</style>\
+         <ul id=a><li><span>x</span></li></ul><ul id=b></ul><div id=h></div>",
+    );
+    let li = p.dom.first_child(p.q("#a")).unwrap();
+    let span = p.dom.first_child(li).unwrap();
+    p.dom.append_child(p.q("#b"), li).unwrap();
+    p.process();
+    assert!(p.data.slot(li).unwrap().has(bits::UNPREPARED_DESCENDANTS));
+    let host = p.q("#h");
+    let shadow = p
+        .dom
+        .attach_shadow(host, ShadowRootInit::new(ShadowRootMode::Open))
+        .unwrap();
+    p.engine.shadow_root_attached(&p.dom, &mut p.data, host);
+    p.dom.set_inner_html(shadow, "<slot></slot>").unwrap();
+    p.restyle();
+    p.dom.set_inner_html(host, "<p><span>y</span></p>").unwrap();
+    p.process();
+    let child = p.dom.first_child(host).unwrap();
+    let slot = p.dom.first_child(shadow).unwrap();
+    assert_eq!(p.data.slot(child).unwrap().assigned_slot, Some(slot));
+    p.restyle();
+    assert_eq!(p.value_of(span, "color"), "rgb(0, 0, 255)");
+    assert!(p.data.styles(p.dom.first_child(child).unwrap()).is_some());
+}
+
+/// Page-owned state set on an element whose preparation waits whole (a checked box just inserted)
+/// prepares it alone to keep the state; its descendants still wait, and the restyle keeps the state.
+#[test]
+fn state_set_on_a_waiting_root_is_kept_and_its_descendants_still_wait() {
+    let mut p = Page::new("<style>li:checked span { color: rgb(0, 0, 255) }</style><ul></ul>");
+    let ul = p.q("ul");
+    p.dom.set_inner_html(ul, "<li><span>a</span></li>").unwrap();
+    p.process();
+    let li = p.dom.first_child(ul).unwrap();
+    let span = p.dom.first_child(li).unwrap();
+    assert!(p.data.slot(li).is_none());
+    assert!(p
+        .engine
+        .set_state(&p.dom, &mut p.data, li, ElementState::CHECKED, true));
+    assert!(p.data.slot(li).unwrap().has(bits::UNPREPARED_DESCENDANTS));
     assert!(p.data.slot(span).is_none());
     p.restyle();
-    let span = p.dom.first_child(p.dom.first_child(ul).unwrap()).unwrap();
     assert_eq!(p.value_of(span, "color"), "rgb(0, 0, 255)");
 }
 
@@ -139,10 +192,9 @@ fn slots_inserted_into_a_shadow_tree_are_assigned_when_their_subtree_is_prepared
     p.dom.append_child(shadow, wrapper).unwrap();
     p.process();
     let section = p.dom.first_child(wrapper).unwrap();
-    assert!(p.data.slot(wrapper).is_some());
     assert!(
-        p.data.slot(section).is_none(),
-        "the inserted element's descendants wait for the restyle"
+        p.data.slot(wrapper).is_none() && p.data.slot(section).is_none(),
+        "the new inserted element waits for the restyle with its descendants"
     );
     p.restyle();
     // (what layout builds the slot's boxes from)
@@ -362,6 +414,43 @@ fn svg_hint_blocks_are_kept_from_the_second_element_with_the_same_attributes() {
     );
     assert_eq!(p.value_of(f, "y"), "2px");
     assert_eq!(p.value_of(e, "y"), "2px");
+}
+
+/// An element whose hint block no other element holds is marked so (the style sharing cache is
+/// not searched for it); the mark goes when a later element is given the block, and the two
+/// share their style again in a restyle where the later one comes first in the tree.
+#[test]
+fn svg_hint_blocks_held_by_one_element_are_marked_until_shared() {
+    let mut p = Page::new(
+        "<style>svg.k rect { stroke: red }</style>\
+         <svg><rect id=a y=1></rect><rect id=b y=2></rect></svg>",
+    );
+    let unshared = |p: &Page, id| p.data.slot(id).unwrap().has(bits::HINTS_UNSHARED);
+    let (a, b, svg) = (p.q("#a"), p.q("#b"), p.q("svg"));
+    assert!(
+        unshared(&p, a) && unshared(&p, b),
+        "attributes of their own"
+    );
+    // (c, with b's attributes, goes before b: b built the block, c is styled first)
+    let c = p
+        .dom
+        .create_element_ns(p.doc, Some("http://www.w3.org/2000/svg"), "rect", None)
+        .unwrap();
+    p.dom.set_attribute(c, "y", "2").unwrap();
+    p.dom.insert_before(svg, c, Some(b)).unwrap();
+    p.restyle();
+    assert!(!unshared(&p, c), "the first one's block");
+    assert!(!unshared(&p, b), "its block is c's now");
+    assert!(unshared(&p, a));
+    p.dom.set_attribute(svg, "class", "k").unwrap();
+    p.restyle();
+    let style = |p: &Page, id| p.data.slot(id).unwrap().primary.clone().unwrap();
+    assert!(
+        Arc::ptr_eq(&style(&p, b), &style(&p, c)),
+        "b shares c's style"
+    );
+    assert_eq!(p.value_of(b, "stroke"), "rgb(255, 0, 0)");
+    assert_eq!(p.value_of(a, "y"), "1px");
 }
 
 /// The key of an SVG hint block is compared with an element's attributes in place: each property

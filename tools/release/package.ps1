@@ -73,6 +73,27 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
 Copy-Item $exe (Join-Path $stage 'snowlark.exe')
 
+# Code signing, when SNOWLARK_SIGN_CERT names a code-signing certificate (its SHA-1 thumbprint) in the
+# user's certificate store; a cloud or smart-card key may ask its owner to approve. The signature is
+# SHA-256 with an RFC 3161 timestamp (SNOWLARK_SIGN_TIMESTAMP, Certum's by default), and is verified.
+$signCert = Get-DevSetting 'SNOWLARK_SIGN_CERT'
+if ($signCert) {
+    $timestamp = Get-DevSetting 'SNOWLARK_SIGN_TIMESTAMP' 'http://time.certum.pl'
+    $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName | Select-Object -Last 1
+    if (-not $signtool) { throw 'signtool.exe not found (install the Windows SDK)' }
+    $signed = Join-Path $stage 'snowlark.exe'
+    $ErrorActionPreference = 'Continue'
+    & $signtool.FullName sign /sha1 $signCert /fd sha256 /tr $timestamp /td sha256 /d 'Snowlark' /du 'https://snowlark.org' $signed
+    $code = $LASTEXITCODE
+    if ($code -eq 0) { & $signtool.FullName verify /pa $signed | Out-Null; $code = $LASTEXITCODE }
+    $ErrorActionPreference = 'Stop'
+    if ($code -ne 0) { throw "signing or verifying $signed failed ($code)" }
+    "signed:  $((Get-AuthenticodeSignature $signed).SignerCertificate.Subject)"
+} else {
+    'signed:  no (set SNOWLARK_SIGN_CERT to sign)'
+}
+
 if (-not $env:CARGO_HOME) { $env:CARGO_HOME = Get-CargoHome }
 $ErrorActionPreference = 'Continue'
 python "$root\tools\release\notices.py" (Join-Path $stage 'THIRD-PARTY-NOTICES.txt')

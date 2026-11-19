@@ -286,13 +286,14 @@ impl Engine {
             ) {
                 return;
             }
+            // (a definition's name is a valid custom element name, which has a hyphen: an element
+            // without an `is` value whose local name has none matches no definition)
+            let is = dom.is_value(el);
+            if is.is_none() && !e.name().local.contains('-') {
+                return;
+            }
             let doc = dom.node_document(el);
-            self.look_up_definition(
-                doc,
-                &e.name().ns,
-                &e.name().local,
-                dom.is_value(el).map(|v| &**v),
-            )
+            self.look_up_definition(doc, &e.name().ns, &e.name().local, is.map(|v| &**v))
         };
         if let Some(def) = def {
             self.enqueue_upgrade(cx, el, def);

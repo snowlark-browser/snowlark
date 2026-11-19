@@ -963,6 +963,14 @@ pub trait TElement:
     ) where
         V: Push<ApplicableDeclarationBlock>;
 
+    /// Snowlark patch 68: whether the declaration block of this element's presentational hints
+    /// is held by no other element. Blocks compare by identity, so no style sharing candidate
+    /// can have the same hints (nor the same rule node), and the sharing cache is not searched.
+    #[inline]
+    fn has_unshared_presentational_hints(&self) -> bool {
+        false
+    }
+
     /// Generate the proper applicable declarations due to view transition dynamic rules, and
     /// insert them into `rules`.
     /// https://drafts.csswg.org/css-view-transitions-1/#document-dynamic-view-transition-style-sheet

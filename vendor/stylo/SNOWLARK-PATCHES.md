@@ -373,6 +373,13 @@ the source; `git log -p vendor/stylo` shows the diff.
    its validation data. The cached class lists and presentational hints are compared before the checks
    that query both elements again per candidate (state, link, shadow roots, slots, animations, id rules,
    style attribute); the checks are all required, so their order changes no outcome.
+68. **No sharing lookup for presentational hints of an element's own** (`dom.rs`
+   `TElement::has_unshared_presentational_hints`, `sharing/mod.rs` `share_style_if_possible`,
+   `lookup_by_rules`): hint blocks compare by identity, and an SVG chart's shapes each have a block no
+   other element holds (their own `d`, `x`, `y`), yet every one tested the 25-31 candidates of the cache
+   at its depth. The embedder says when an element's block is its alone; neither lookup is made for it
+   (it is still inserted, for an element given its block later). No style changes: a lookup that
+   cannot hit is skipped.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

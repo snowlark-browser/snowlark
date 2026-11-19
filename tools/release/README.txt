@@ -16,8 +16,8 @@ Running it
 
 Unzip the folder anywhere and start snowlark.exe. There is no installer.
 
-The program is not signed yet, so Windows SmartScreen may show "Windows protected your PC" the
-first time. Choose "More info", then "Run anyway".
+Windows SmartScreen may show "Windows protected your PC" the first time, while a new build earns
+its reputation. Choose "More info", then "Run anyway".
 
 Settings, history and bookmarks are at snowlark://settings, snowlark://history and
 snowlark://bookmarks. The open source software in Snowlark is listed at snowlark://credits.

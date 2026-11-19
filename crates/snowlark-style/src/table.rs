@@ -46,6 +46,10 @@ pub(crate) mod bits {
     /// An attribute that can change the presentational hints changed since they were parsed: they
     /// are parsed again at the next restyle (see `StyleEngine::flush_dirty_hints`).
     pub const HINTS_DIRTY: u32 = 1 << 21;
+    /// The presentational hints' block was built for this element and no other element holds it
+    /// (an SVG element whose attributes no element had): no style sharing candidate can have the
+    /// same hints (`TElement::has_unshared_presentational_hints`).
+    pub const HINTS_UNSHARED: u32 = 1 << 22;
 }
 
 /// What an element's attributes say, parsed once per attribute change instead of on every selector match.

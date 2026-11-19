@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/todo-list-innerhtml-100</title>
+<!-- A 100-item todo list set with innerHTML into a list in the document, then emptied the same way, unstyled in between: each item a li with a div holding a checkbox, a label and a button. TodoMVC-JavaScript-ES5, which renders its list by innerHTML on every change. -->
+<body>
+<section class="main"><ul class="todo-list" id="list"></ul></section>
+<script src="../resources/runner.js"></script>
+<script>
+const list = document.getElementById('list');
+let html = '';
+for (let i = 0; i < 100; i++) {
+  html += '<li data-id="' + i + '" class="" data-priority="' + (4 - (i % 5)) + '">'
+    + '<div class="view"><input class="toggle" type="checkbox"><label>Something to do ' + i + '</label>'
+    + '<button class="destroy"></button></div></li>';
+}
+let seen = 0;
+MicroBench.run({
+  run() {
+    list.innerHTML = html;
+    seen = list.childElementCount;
+    list.innerHTML = '';
+  },
+  check() {
+    return seen === 100 && list.childElementCount === 0;
+  },
+});
+</script>

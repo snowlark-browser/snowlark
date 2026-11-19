@@ -52,7 +52,8 @@ default `<dev dir>\speedometer-3.1`), served by `tools/speedometer/mirror_server
   final check of a claimed gain.
 - `python tools/vs-chrome/speedometer.py --out <dir> [--trace]` runs the same copy in headless Chrome, and
   `tools/vs-chrome/split_chrome.py` and `split_style.py` split both engines' scored time by layer and suite, to
-  see where the time goes.
+  see where the time goes. `restyled_steps.py` counts the restyled elements of each step's scored window, ours
+  (a `--speedometer` run with `SNOWLARK_PROFILE=1` and `SNOWLARK_SPEEDOMETER_MARKS=1`) beside the trace's.
 
 ## Profiling
 
