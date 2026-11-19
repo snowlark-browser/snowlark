@@ -1,0 +1,24 @@
+<!doctype html>
+<title>Frames</title>
+<style>
+  body { font: 15px 'Segoe UI', sans-serif; margin: 16px; background: #f4f6fa; }
+  iframe { background: white; margin: 4px; vertical-align: top; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+</style>
+<h1>Nested, srcdoc and cross-origin frames</h1>
+<p id=log>load events: </p>
+<iframe id=same src="iframe-a.html" width=320 height=200></iframe>
+<iframe id=cross width=260 height=200></iframe>
+<iframe id=doc srcdoc="<body style='background:#e8f5e9;font:14px sans-serif'><b>srcdoc</b> frame<br><input placeholder='type here'>"
+  style="width:200px;height:120px;border:3px dashed #2e7d32"></iframe>
+<iframe id=blank style="width:80px;height:80px"></iframe>
+<object data="iframe-nested.html" type="text/html" width=200 height=90 style="border:1px solid #888"></object>
+<script>
+  // The cross-origin frame: the same server reached through another host name.
+  const cross = document.getElementById('cross');
+  const u = new URL('iframe-cross.html', location.href);
+  u.hostname = u.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+  cross.src = u.href;
+  for (const f of document.querySelectorAll('iframe, object'))
+    f.addEventListener('load', () => document.getElementById('log').textContent += ' ' + (f.id || f.localName));
+</script>

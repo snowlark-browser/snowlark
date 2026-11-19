@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>style/svg-insert-styled-200</title>
+<!-- Insert an SVG chart of 200 rects and 200 paths with presentation attributes, read a computed style, remove it (React-Stockcharts-SVG, Charts-observable-plot: SVG presentation hints). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+const NS = 'http://www.w3.org/2000/svg';
+let svg, last;
+let k = 0;
+MicroBench.run({
+  setup() {
+    svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', '800');
+    svg.setAttribute('height', '200');
+    for (let i = 0; i < 200; i++) {
+      const g = document.createElementNS(NS, 'g');
+      g.setAttribute('transform', 'translate(' + i * 4 + ',0)');
+      const r = document.createElementNS(NS, 'rect');
+      r.setAttribute('x', '0');
+      r.setAttribute('y', String(200 - (i % 50) * 4));
+      r.setAttribute('width', '3');
+      r.setAttribute('height', String((i % 50) * 4));
+      r.setAttribute('fill', i % 2 ? '#36c' : '#c63');
+      r.setAttribute('stroke', 'none');
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', 'M0,' + (i % 37) + 'L1.5,' + (i % 41 + 10) + 'L3,' + (i % 43));
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', '#000');
+      p.setAttribute('stroke-width', '1');
+      g.appendChild(r);
+      g.appendChild(p);
+      svg.appendChild(g);
+    }
+    last = svg.lastChild.lastChild;
+  },
+  run() {
+    k++;
+    host.appendChild(svg);
+    getComputedStyle(last).strokeWidth;
+    host.removeChild(svg);
+  },
+  check() {
+    return k > 0 && !svg.isConnected;
+  },
+});
+</script>

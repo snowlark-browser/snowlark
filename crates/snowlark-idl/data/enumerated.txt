@@ -1,0 +1,46 @@
+# Enumerated attributes (HTML §2.3.3): IDL attributes that reflect a content attribute limited to only known
+# values. The IDL does not carry their keywords (they are in the HTML Standard's attribute tables), so they
+# are listed here; the generator reflects them through Reflect. Reference: the C# engine's dom.js table.
+#
+# Format: Interface.attribute content-attribute | keywords | missing value default | invalid value default
+# A keyword "a=b" is a non-canonical keyword a that maps to b; "=b" is the empty string mapping to b.
+# Defaults: a keyword, "empty" for the empty string, or "null" (no default: the getter returns null).
+
+HTMLElement.dir dir | ltr rtl auto | empty | empty
+HTMLElement.enterKeyHint enterkeyhint | enter done go next previous search send | empty | empty
+HTMLElement.inputMode inputmode | none text tel url email numeric decimal search | empty | empty
+HTMLElement.popover popover | auto manual hint =auto | null | manual
+HTMLButtonElement.popoverTargetAction popovertargetaction | toggle show hide | toggle | toggle
+HTMLInputElement.popoverTargetAction popovertargetaction | toggle show hide | toggle | toggle
+HTMLAnchorElement.referrerPolicy referrerpolicy | =  no-referrer no-referrer-when-downgrade same-origin origin strict-origin origin-when-cross-origin strict-origin-when-cross-origin unsafe-url | empty | empty
+HTMLAreaElement.referrerPolicy referrerpolicy | = no-referrer no-referrer-when-downgrade same-origin origin strict-origin origin-when-cross-origin strict-origin-when-cross-origin unsafe-url | empty | empty
+HTMLImageElement.crossOrigin crossorigin | anonymous use-credentials =anonymous | null | anonymous
+HTMLImageElement.referrerPolicy referrerpolicy | = no-referrer no-referrer-when-downgrade same-origin origin strict-origin origin-when-cross-origin strict-origin-when-cross-origin unsafe-url | empty | empty
+HTMLImageElement.decoding decoding | sync async auto | auto | auto
+HTMLImageElement.loading loading | lazy eager | eager | eager
+HTMLImageElement.fetchPriority fetchpriority | high low auto | auto | auto
+HTMLIFrameElement.referrerPolicy referrerpolicy | = no-referrer no-referrer-when-downgrade same-origin origin strict-origin origin-when-cross-origin strict-origin-when-cross-origin unsafe-url | empty | empty
+HTMLIFrameElement.loading loading | lazy eager | eager | eager
+HTMLMediaElement.crossOrigin crossorigin | anonymous use-credentials =anonymous | null | anonymous
+HTMLMediaElement.preload preload | none metadata auto =auto | metadata | metadata
+HTMLTrackElement.kind kind | subtitles captions descriptions chapters metadata | subtitles | metadata
+HTMLFormElement.autocomplete autocomplete | on off | on | on
+HTMLFormElement.enctype enctype | application/x-www-form-urlencoded multipart/form-data text/plain | application/x-www-form-urlencoded | application/x-www-form-urlencoded
+HTMLFormElement.encoding enctype | application/x-www-form-urlencoded multipart/form-data text/plain | application/x-www-form-urlencoded | application/x-www-form-urlencoded
+HTMLFormElement.method method | get post dialog | get | get
+HTMLInputElement.formEnctype formenctype | application/x-www-form-urlencoded multipart/form-data text/plain | empty | application/x-www-form-urlencoded
+HTMLInputElement.formMethod formmethod | get post | empty | get
+HTMLInputElement.type type | hidden text search tel url email password date month week time datetime-local number range color checkbox radio file submit image reset button | text | text
+HTMLButtonElement.formEnctype formenctype | application/x-www-form-urlencoded multipart/form-data text/plain | empty | application/x-www-form-urlencoded
+HTMLButtonElement.formMethod formmethod | get post dialog | empty | get
+# (HTMLButtonElement.type is not here: its missing and invalid state, Auto, is the Button state when the
+# button has a command or commandfor attribute; the engine's getter has it)
+HTMLLinkElement.crossOrigin crossorigin | anonymous use-credentials =anonymous | null | anonymous
+HTMLLinkElement.as as | fetch audio document embed font image manifest object report script sharedworker style track video worker xslt | empty | empty
+HTMLLinkElement.referrerPolicy referrerpolicy | = no-referrer no-referrer-when-downgrade same-origin origin strict-origin origin-when-cross-origin strict-origin-when-cross-origin unsafe-url | empty | empty
+HTMLLinkElement.fetchPriority fetchpriority | high low auto | auto | auto
+HTMLScriptElement.crossOrigin crossorigin | anonymous use-credentials =anonymous | null | anonymous
+HTMLScriptElement.referrerPolicy referrerpolicy | = no-referrer no-referrer-when-downgrade same-origin origin strict-origin origin-when-cross-origin strict-origin-when-cross-origin unsafe-url | empty | empty
+HTMLScriptElement.fetchPriority fetchpriority | high low auto | auto | auto
+HTMLTableCellElement.scope scope | row col rowgroup colgroup | empty | empty
+HTMLTemplateElement.shadowRootMode shadowrootmode | open closed | empty | empty

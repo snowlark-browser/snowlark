@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>bindings/collection-get-all-500</title>
+<!-- Set a 100-item list's innerHTML (500 elements), then copy getElementsByTagName('*') into an array by index: jQuery's .html() cleaning its old content (TodoMVC-jQuery). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+const html = MicroBench.repeat(100, (i) =>
+  '<li><div class="view"><input class="toggle" type="checkbox"><label>Item ' + i +
+  '</label><button class="destroy"></button></div></li>');
+let copied = 0;
+MicroBench.run({
+  run() {
+    host.innerHTML = html;
+    const all = host.getElementsByTagName('*');
+    const out = [];
+    for (let i = 0, n = +all.length; i < n; i++) out[i] = all[i];
+    copied = out.length;
+  },
+  check() {
+    return copied === 500;
+  },
+});
+</script>

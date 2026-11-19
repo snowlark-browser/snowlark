@@ -1,0 +1,28 @@
+[package]
+name = "snowlark-js"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+# A PGO training build: V8 compiled with profile instrumentation (`docs/v8-speed.md`), whose profile
+# `write_pgo_profile` writes before the process exits.
+pgo-train = []
+
+[dependencies]
+v8 = { workspace = true }
+serde_json = "1"
+sha2 = "0.10"
+# The C runtime's heap functions are defined on mimalloc (`crt_heap.rs`).
+libmimalloc-sys = { version = "0.1", default-features = false }
+
+[dependencies.windows]
+version = "0.62"
+features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Kernel",
+    "Win32_System_Memory",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+]

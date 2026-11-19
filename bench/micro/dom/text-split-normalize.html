@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/text-split-normalize</title>
+<!-- Split a text node in a paragraph at 20 places, then normalize() it back (the editors' text edits). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const p = document.createElement('p');
+document.getElementById('host').appendChild(p);
+const text = 'The quick brown fox jumps over the lazy dog. '.repeat(10);
+MicroBench.run({
+  run() {
+    p.textContent = text;
+    let node = p.firstChild;
+    for (let i = 0; i < 20; i++) node = node.splitText(20);
+    p.normalize();
+  },
+  check() { return p.childNodes.length === 1; },
+});
+</script>

@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>forms/rebuild-todo-list-100</title>
+<!-- Replace a 100-item TodoMVC list (a checkbox, a label, a button and a text field each) with innerHTML (the jQuery app's render()). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const ul = document.createElement('ul');
+ul.className = 'todo-list';
+document.getElementById('host').appendChild(ul);
+const html = MicroBench.repeat(100, (i) => '<li data-id="' + i + '"><div class="view"><input class="toggle" type="checkbox"' + (i % 3 ? '' : ' checked') + '><label>Item ' + i + '</label><button class="destroy"></button></div><input class="edit" value="Item ' + i + '"></li>');
+MicroBench.run({
+  run() { ul.innerHTML = html; },
+  check() { return ul.children.length === 100; },
+});
+</script>

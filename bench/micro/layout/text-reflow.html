@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>layout/text-reflow</title>
+<!-- Change the width of a 2,000-word paragraph, then read its height. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const p = document.createElement('p');
+p.textContent = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore '.repeat(130);
+document.getElementById('host').appendChild(p);
+let wide = false;
+MicroBench.run({
+  run() {
+    wide = !wide;
+    p.style.width = wide ? '700px' : '500px';
+    MicroBench.flush(p);
+  },
+});
+</script>

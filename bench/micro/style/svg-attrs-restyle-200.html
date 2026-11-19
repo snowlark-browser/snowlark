@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>style/svg-attrs-restyle-200</title>
+<!-- Set the y, height and d presentation attributes of 200 bars and 200 paths of a chart, read a computed style (React-Stockcharts-SVG, Charts-observable-plot: a chart redrawn by attribute). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+const NS = 'http://www.w3.org/2000/svg';
+const rects = [], paths = [];
+let k = 0;
+MicroBench.run({
+  setup() {
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', '800');
+    svg.setAttribute('height', '200');
+    for (let i = 0; i < 200; i++) {
+      const r = document.createElementNS(NS, 'rect');
+      r.setAttribute('x', String(i * 4));
+      r.setAttribute('width', '3');
+      r.setAttribute('fill', i % 2 ? '#36c' : '#c63');
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', '#000');
+      svg.appendChild(r);
+      svg.appendChild(p);
+      rects.push(r);
+      paths.push(p);
+    }
+    host.appendChild(svg);
+  },
+  run() {
+    k++;
+    for (let i = 0; i < 200; i++) {
+      const h = (i * 7 + k) % 50 * 4;
+      rects[i].setAttribute('y', String(200 - h));
+      rects[i].setAttribute('height', String(h));
+      paths[i].setAttribute('d', 'M' + i * 4 + ',' + (200 - h) + 'L' + (i * 4 + 3) + ',' + (200 - h + (k % 5)));
+    }
+    getComputedStyle(paths[199]).d;
+  },
+  check() {
+    return k > 0 && rects[0].hasAttribute('height');
+  },
+});
+</script>

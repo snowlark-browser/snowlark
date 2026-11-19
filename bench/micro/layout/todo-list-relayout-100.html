@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>layout/todo-list-relayout-100</title>
+<!-- Lay out a 100-item todo list again after its width changes: the per-box layout cost of the small TodoMVC suites (no restyle of the items). -->
+<style>
+body { font: 14px "Helvetica Neue", Helvetica, Arial, sans-serif; line-height: 1.4em; }
+#host { width: 550px; }
+.todo-list { margin: 0; padding: 0; list-style: none; }
+.todo-list li { position: relative; font-size: 24px; border-bottom: 1px solid #ededed; }
+.todo-list li .toggle { text-align: center; width: 40px; height: auto; position: absolute; top: 0; bottom: 0; margin: auto 0; border: none; appearance: none; opacity: 0; }
+.todo-list li label { word-break: break-all; padding: 15px 15px 15px 60px; display: block; line-height: 1.2; transition: color 0.4s; font-weight: 400; color: #484848; }
+.todo-list li .destroy { display: none; position: absolute; top: 0; right: 10px; bottom: 0; width: 40px; height: 40px; margin: auto 0; font-size: 30px; color: #949494; }
+.todo-list li:hover .destroy { display: block; }
+.todo-list li .edit { display: none; }
+.footer { padding: 10px 15px; height: 20px; text-align: center; font-size: 15px; border-top: 1px solid #e6e6e6; }
+.todo-count { float: left; text-align: left; }
+.filters { margin: 0; padding: 0; list-style: none; position: absolute; right: 0; left: 0; }
+.filters li { display: inline; }
+.filters li a { color: inherit; margin: 3px; padding: 3px 7px; text-decoration: none; border: 1px solid transparent; border-radius: 3px; }
+</style>
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<section class="main"><ul class="todo-list">' +
+  MicroBench.repeat(100, (i) => '<li><div class="view"><input class="toggle" type="checkbox"><label>Something to do ' + i +
+    '</label><button class="destroy"></button></div><input class="edit" value="Something to do ' + i + '"></li>') +
+  '</ul></section><footer class="footer"><span class="todo-count"><strong>100</strong> items left</span>' +
+  '<ul class="filters"><li><a href="#/" class="selected">All</a></li><li><a href="#/active">Active</a></li>' +
+  '<li><a href="#/completed">Completed</a></li></ul></footer>';
+let wide = false;
+MicroBench.run({
+  run() {
+    wide = !wide;
+    host.style.width = wide ? '551px' : '550px';
+    MicroBench.flush(host);
+  },
+  check() {
+    return host.querySelectorAll('li label')[99].offsetHeight > 0;
+  },
+});
+</script>

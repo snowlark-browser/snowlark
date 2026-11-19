@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>parser/inner-html-table-50</title>
+<!-- Replace a table body with innerHTML: 50 rows of 5 cells. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+document.getElementById('host').innerHTML = '<table><tbody></tbody></table>';
+const tbody = document.querySelector('tbody');
+const html = MicroBench.repeat(50, (r) => '<tr>' + MicroBench.repeat(5, (c) => '<td>' + r + ':' + c + '</td>') + '</tr>');
+MicroBench.run({
+  run() { tbody.innerHTML = html; },
+  check() { return tbody.rows.length === 50; },
+});
+</script>

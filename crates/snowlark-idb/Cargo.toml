@@ -1,0 +1,14 @@
+[package]
+name = "snowlark-idb"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Indexed Database API storage for Snowlark: keys, key ranges and key paths, databases with their object stores and indexes, the connection queues and transaction scheduler shared by every event loop, and the on-disk log"
+
+[dependencies]
+crc32fast = "1"
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+postcard = { version = "1", default-features = false, features = ["use-std"] }

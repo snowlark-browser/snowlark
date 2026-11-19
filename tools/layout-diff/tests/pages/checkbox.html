@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>checkbox next to text</title>
+<!-- A checkbox followed by text in a line. In Chrome the checkbox's bottom border edge sits on
+     the text baseline (its 3px bottom margin hangs below); Snowlark puts the bottom margin edge there, so
+     the box is raised against the text. The 24px line shows it as a position change of the input. -->
+<style>
+  body { font: 16px/1.5 Arial, sans-serif; margin: 20px; }
+  p { margin: 0 0 12px; }
+  .big { font-size: 24px; line-height: normal; }
+</style>
+</head>
+<body>
+<h1>Settings</h1>
+<p>Plain text before any control, laid out the same in both engines.</p>
+<p class="big"><label><input type="checkbox" checked> Block third-party cookies</label></p>
+<p><label><input type="checkbox"> Send Do Not Track</label></p>
+</body>
+</html>

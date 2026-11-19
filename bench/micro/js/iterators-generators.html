@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/iterators-generators</title>
+<!-- for-of over generators and a custom iterable, Array.from and spread of them, 1,000 values (the iteration protocol); no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+function* range(n) { for (let i = 0; i < n; i++) yield i; }
+function* evens(it) { for (const v of it) if ((v & 1) === 0) yield v; }
+class Ring {
+  constructor(n) { this.n = n; }
+  [Symbol.iterator]() { let i = 0; const n = this.n; return { next: () => (i < n ? { value: i++, done: false } : { value: undefined, done: true }) }; }
+}
+const ring = new Ring(1000);
+let sink = 0;
+MicroBench.run({
+  run() {
+    let s = 0;
+    for (const v of evens(range(1000))) s += v;
+    for (const v of ring) s += v;
+    s += Array.from(range(200)).length + [...ring].length;
+    sink += s;
+  },
+  check() { return sink > 0; },
+});
+</script>

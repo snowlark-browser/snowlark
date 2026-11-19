@@ -1,0 +1,25 @@
+[package]
+name = "snowlark-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The Snowlark browser window: tabs on their own threads, chrome drawn by us, DirectComposition compositing"
+
+[dependencies]
+snowlark-blocker = { path = "../snowlark-blocker" }
+snowlark-dom = { path = "../snowlark-dom" }
+snowlark-idb = { path = "../snowlark-idb" }
+snowlark-ipc = { path = "../snowlark-ipc" }
+snowlark-js = { path = "../snowlark-js" }
+snowlark-media = { path = "../snowlark-media" }
+snowlark-net = { path = "../snowlark-net" }
+snowlark-paint = { path = "../snowlark-paint" }
+snowlark-tab = { path = "../snowlark-tab" }
+snowlark-page = { path = "../snowlark-page" }
+base64 = "0.22"
+flate2 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+postcard = { version = "1", default-features = false, features = ["use-std"] }

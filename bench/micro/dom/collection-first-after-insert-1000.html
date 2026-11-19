@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/collection-first-after-insert-1000</title>
+<!-- Insert and remove a node, then read the first item of document.getElementsByTagName('div') in a 1000-element document, 20 times. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(1000, (i) => '<div>' + i + '</div>');
+const divs = document.getElementsByTagName('div');
+const extra = document.createElement('b');
+let first = null;
+MicroBench.run({
+  run() {
+    for (let i = 0; i < 20; i++) {
+      host.appendChild(extra);
+      first = divs[0];
+      host.removeChild(extra);
+    }
+  },
+  check() {
+    return first === host;
+  },
+});
+</script>

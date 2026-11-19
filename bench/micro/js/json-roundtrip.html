@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/json-roundtrip</title>
+<!-- JSON.parse and JSON.stringify of a 25 KB list of 200 records (as TodoMVC's storage does); no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+const records = Array.from({ length: 200 }, (_, i) => ({
+  id: 'id-' + i, title: 'Something to do number ' + i, completed: i % 3 === 0,
+  tags: ['a' + (i % 4), 'b' + (i % 7)], meta: { created: 1700000000000 + i, order: i },
+}));
+const text = JSON.stringify(records);
+let sink = 0;
+MicroBench.run({
+  run() {
+    const parsed = JSON.parse(text);
+    parsed[5].completed = !parsed[5].completed;
+    const out = JSON.stringify(parsed);
+    sink += out.length + parsed.length;
+  },
+  check() { return sink > 0 && text.length > 20000; },
+});
+</script>

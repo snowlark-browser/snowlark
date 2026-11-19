@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>events/dispatch-bubble-deep</title>
+<!-- Dispatch a bubbling click at an element 20 levels deep, with listeners on 10 ancestors; 10 dispatches. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+let node = host;
+const chain = [];
+for (let i = 0; i < 20; i++) {
+  const d = document.createElement('div');
+  node.appendChild(d);
+  node = d;
+  chain.push(d);
+}
+let calls = 0;
+for (let i = 0; i < 20; i += 2) chain[i].addEventListener('click', (e) => { calls++; });
+const target = chain[19];
+MicroBench.run({
+  run() {
+    for (let i = 0; i < 10; i++) target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  },
+  check() { return calls > 0; },
+});
+</script>

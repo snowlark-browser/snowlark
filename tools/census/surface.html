@@ -1,0 +1,51 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>census surface</title>
+<!-- Served by run.py on 127.0.0.1 (a secure context, like the sites). Enumerates the window's
+     surface, then a dedicated worker's (a blob worker, then a URL worker if blob workers fail), and
+     POSTs {window, worker} as JSON to /result?engine=<name>. -->
+<script src="surface.js"></script>
+<script>
+(async () => {
+  const engine = new URLSearchParams(location.search).get("engine") || "unknown";
+  const result = { window: null, worker: null, workerError: null };
+  try {
+    result.window = censusSurface();
+  } catch (e) {
+    result.windowError = String(e && e.stack || e);
+  }
+  const source = await (await fetch("surface.js")).text();
+  const body = source + "\npostMessage(JSON.stringify(censusSurface()));\n";
+  const runWorker = (url) => new Promise((resolve, reject) => {
+    let w;
+    try {
+      w = new Worker(url);
+    } catch (e) {
+      reject(e);
+      return;
+    }
+    const timer = setTimeout(() => reject(new Error("worker timed out")), 10000);
+    w.onmessage = (ev) => { clearTimeout(timer); w.terminate(); resolve(JSON.parse(ev.data)); };
+    w.onerror = (ev) => { clearTimeout(timer); reject(new Error("worker error: " + (ev.message || ""))); };
+  });
+  try {
+    result.worker = await runWorker(URL.createObjectURL(new Blob([body], { type: "text/javascript" })));
+    result.workerVia = "blob";
+  } catch (e) {
+    result.workerError = "blob: " + String(e && e.message || e);
+    try {
+      result.worker = await runWorker("surface-worker.js");
+      result.workerVia = "url";
+    } catch (e2) {
+      result.workerError += "; url: " + String(e2 && e2.message || e2);
+    }
+  }
+  await fetch("/result?engine=" + encodeURIComponent(engine), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(result),
+  });
+  document.title = "census done";
+  window.__censusDone = true;
+})();
+</script>

@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>parser/domparser-100</title>
+<!-- DOMParser.parseFromString of a document with 100 rows. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const html = '<!doctype html><html><head><title>x</title></head><body>' + MicroBench.repeat(100, (i) => '<div class="row"><span class="a">Item ' + i + '</span><a href="#">link</a></div>') + '</body></html>';
+const parser = new DOMParser();
+let doc;
+MicroBench.run({
+  run() { doc = parser.parseFromString(html, 'text/html'); },
+  check() { return doc.body.childElementCount === 100; },
+});
+</script>

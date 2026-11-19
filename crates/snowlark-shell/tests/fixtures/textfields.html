@@ -1,0 +1,18 @@
+<!doctype html>
+<title>Text fields</title>
+<style>body { font: 15px 'Segoe UI', sans-serif; margin: 24px } input, textarea { font: 16px 'Segoe UI', sans-serif; margin: 6px 0 16px }</style>
+<label>Short field<br><input id=a value="The quick brown fox jumps over the lazy dog" size=50></label><br>
+<label>Narrow field (scrolls with the caret)<br><input id=b value="A long value that does not fit: 0123456789 abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ" style="width:220px"></label><br>
+<label>Password<br><input id=p type=password value="secret value"></label><br>
+<label>Textarea<br><textarea id=t rows=4 cols=40>First line of the textarea
+second line with more words in it
+third</textarea></label>
+<p id=s>selection:</p>
+<script>
+  for (const e of document.querySelectorAll('input, textarea'))
+    e.addEventListener('select', () => {}), setInterval(() => {
+      const f = document.activeElement;
+      if (f && 'selectionStart' in f) document.getElementById('s').textContent =
+        `selection: ${f.id} ${f.selectionStart}..${f.selectionEnd} ${f.selectionDirection}`;
+    }, 200);
+</script>

@@ -1,0 +1,10 @@
+<!doctype html>
+<body style="margin:8px;background:#ede7f6;font:14px 'Segoe UI',sans-serif">
+<b>Cross-origin frame</b><br>origin: <span id=o></span><br>
+parent readable: <span id=p></span>
+<script>
+  document.getElementById('o').textContent = location.origin;
+  let readable;
+  try { readable = String(parent.document.title); } catch (e) { readable = 'no (' + e.name + ')'; }
+  document.getElementById('p').textContent = readable;
+</script>

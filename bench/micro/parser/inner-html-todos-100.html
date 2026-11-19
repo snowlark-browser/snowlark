@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>parser/inner-html-todos-100</title>
+<!-- Replace a list's content with innerHTML: 100 todo items as TodoMVC-jQuery's template renders them (its render()). -->
+<body>
+<ul id="host" class="todo-list"></ul>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+const html = MicroBench.repeat(100, (i) =>
+  '\n            <li class="' + (i % 3 ? '' : ' completed') + '" data-id="' + (1700000000000 + i) + '" data-priority="' + (i % 4) + '">\n' +
+  '                <div class="view">\n' +
+  '                    <input class="toggle" type="checkbox" ' + (i % 3 ? '' : 'checked') + '>\n' +
+  '                    <label>Something to do ' + i + '</label>\n' +
+  '                    <button class="destroy"></button>\n' +
+  '                </div>\n' +
+  '                <input class="edit" value="Something to do ' + i + '">\n' +
+  '            </li>\n        ');
+MicroBench.run({
+  run() { host.innerHTML = html; },
+  check() { return host.childElementCount === 100; },
+});
+</script>

@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/allocation</title>
+<!-- Allocate 5,000 short-lived objects, arrays and closures and keep 1 in 50 (young-generation allocation and scavenges); no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+const kept = new Array(100);
+let slot = 0, sink = 0;
+MicroBench.run({
+  run() {
+    let s = 0;
+    for (let i = 0; i < 5000; i++) {
+      const o = { i, list: [i, i + 1, i + 2], f: () => i, name: 'n' + (i & 255) };
+      s += o.list.length + o.f();
+      if (i % 50 === 0) { kept[slot] = o; slot = (slot + 1) % kept.length; }
+    }
+    sink += s;
+  },
+  check() { return sink > 0; },
+});
+</script>

@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>style/transition-toggle-layout-20</title>
+<!-- Toggle a class that starts transform transitions (transition: all) on 20 elements, then read layout: NewsSite's menu toggle. -->
+<style>
+.icon span { display: block; position: absolute; width: 20px; height: 2px; transition: all .3s ease; }
+.on .icon span:first-child { transform: translate(calc(4px * 2)) rotate(-35deg); }
+.on .icon span:nth-child(2) { transform: translate(calc(6px * -1)) rotate(215deg); }
+.icon { position: relative; display: inline-block; width: 24px; height: 24px; }
+</style>
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(10, () => '<span class="icon"><span></span><span></span></span>');
+const spans = host.querySelectorAll('.icon span');
+let h = 0;
+MicroBench.run({
+  run() {
+    host.classList.toggle('on');
+    h = MicroBench.flush(host);
+  },
+  check() {
+    return spans.length === 20 && getComputedStyle(spans[0]).transitionProperty === 'all';
+  },
+});
+</script>

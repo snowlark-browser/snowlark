@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/clone-deep-500</title>
+<!-- cloneNode(true) of a detached 100-item subtree of about 500 nodes. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const tpl = document.createElement('ul');
+tpl.innerHTML = MicroBench.repeat(100, (i) => '<li class="item"><a href="#">Item ' + i + '</a></li>');
+let keep;
+MicroBench.run({
+  run() { keep = tpl.cloneNode(true); },
+  check() { return keep.childNodes.length === 100; },
+});
+</script>

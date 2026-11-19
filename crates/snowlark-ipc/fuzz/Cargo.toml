@@ -1,0 +1,22 @@
+# The decoder fuzz target of snowlark-ipc. Its own workspace, because it builds with coverage flags:
+#   $env:RUSTFLAGS = '-Cinstrument-coverage -Cdebug-assertions=on -Coverflow-checks=on'
+#   .\dev.ps1 build --release --target x86_64-pc-windows-msvc --manifest-path crates/snowlark-ipc/fuzz/Cargo.toml
+#   $env:LLVM_PROFILE_FILE = 'NUL'
+#   crates/snowlark-ipc/fuzz/target/x86_64-pc-windows-msvc/release/ipc-fuzz.exe --secs 3600 2>NUL
+# (`--target` keeps the flags off build scripts. `-Cpasses=sancov-module`, the usual way, fails in LLVM here:
+# "Associative COMDAT symbol does not exist".)
+[package]
+name = "ipc-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+snowlark-ipc = { path = ".." }
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+debug = 1
+panic = "unwind"

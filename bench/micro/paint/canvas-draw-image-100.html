@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>paint/canvas-draw-image-100</title>
+<!-- drawImage of a 64x64 canvas 100 times, then getImageData of one pixel. -->
+<body>
+<canvas id="c" width="512" height="512"></canvas>
+<script src="../resources/runner.js"></script>
+<script>
+const ctx = document.getElementById('c').getContext('2d');
+const src = document.createElement('canvas');
+src.width = src.height = 64;
+const sctx = src.getContext('2d');
+sctx.fillStyle = '#c63';
+sctx.fillRect(0, 0, 64, 64);
+sctx.fillStyle = '#36c';
+sctx.fillRect(16, 16, 32, 32);
+MicroBench.run({
+  run() {
+    for (let i = 0; i < 100; i++) ctx.drawImage(src, (i * 37) % 448, (i * 53) % 448);
+    ctx.getImageData(0, 0, 1, 1);
+  },
+});
+</script>

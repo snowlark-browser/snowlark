@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>forms/validity-read-100</title>
+<!-- Set the value of 100 required inputs and read validity.valid of each. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<form>' + MicroBench.repeat(100, (i) => '<input required name="f' + i + '" minlength="2">') + '</form>';
+const inputs = Array.from(host.querySelectorAll('input'));
+let k = 0, n = 0;
+MicroBench.run({
+  run() {
+    k++;
+    for (let i = 0; i < inputs.length; i++) {
+      inputs[i].value = (k + i) % 3 ? 'ok' + i : '';
+      if (inputs[i].validity.valid) n++;
+    }
+  },
+});
+</script>

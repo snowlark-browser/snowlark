@@ -1,0 +1,10 @@
+[package]
+name = "snowlark-idl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Web IDL parser, linker and V8 bindings generator for Snowlark"
+
+[[bin]]
+name = "snowlark-idl"
+path = "src/main.rs"

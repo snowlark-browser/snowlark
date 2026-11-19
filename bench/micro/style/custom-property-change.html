@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>style/custom-property-change</title>
+<!-- Change a custom property on the root that 300 elements' colors use, then read a computed style. -->
+<style>:root { --accent: blue; } .item span { color: var(--accent); border-color: var(--accent); }</style>
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<div class="item"><span class="label">Item ' + i + '</span><span class="meta">m</span></div>');
+const last = host.lastElementChild.firstElementChild;
+let k = 0;
+MicroBench.run({
+  run() {
+    k++;
+    document.documentElement.style.setProperty('--accent', k % 2 ? 'red' : 'blue');
+    getComputedStyle(last).color;
+  },
+});
+</script>

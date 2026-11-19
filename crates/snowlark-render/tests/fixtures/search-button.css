@@ -1,0 +1,43 @@
+/* A hand-written stand-in for the search form styles of en.wikipedia.org's Vector 2022 skin: design
+   tokens as custom properties with fallbacks, a button whose colours apply through `:enabled` and
+   transition over 0.1s. See README.md. */
+:root {
+  --background-color-interactive-subtle: #f8f9fa;
+  --background-color-interactive-subtle--hover: #eaecf0;
+  --color-neutral: #404244;
+  --border-color-interactive: #72777d;
+  --font-size-medium: 1rem;
+}
+.cdx-search-input--has-end-button {
+  display: flex;
+}
+.cdx-text-input__input {
+  box-sizing: border-box;
+  min-height: 32px;
+  width: 300px;
+}
+.cdx-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 32px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 2px;
+  padding-right: 11px;
+  padding-left: 11px;
+  font-family: inherit;
+  font-size: var(--font-size-medium, 1rem);
+  font-weight: 700;
+  transition-property: background-color, color, border-color, box-shadow;
+  transition-duration: 0.1s;
+}
+.cdx-button:enabled {
+  background-color: var(--background-color-interactive-subtle, #f8f9fa);
+  color: var(--color-neutral, #404244);
+  border-color: var(--border-color-interactive, #72777d);
+}
+.cdx-button:enabled:hover {
+  background-color: var(--background-color-interactive-subtle--hover, #eaecf0);
+}

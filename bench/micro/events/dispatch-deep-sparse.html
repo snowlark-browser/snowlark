@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>events/dispatch-deep-sparse</title>
+<!-- Dispatch bubbling click and input events at an element 80 levels deep, with listeners only on it and on
+     the body (the event paths of the TodoMVC Complex DOM suites: long paths, few listeners); 10 of each. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+let node = host;
+for (let i = 0; i < 80; i++) {
+  const d = document.createElement(i % 3 ? 'div' : 'section');
+  d.className = 'level';
+  node.appendChild(d);
+  node = d;
+}
+const target = node;
+let calls = 0;
+target.addEventListener('click', () => { calls++; });
+document.body.addEventListener('click', () => { calls++; });
+document.body.addEventListener('input', () => { calls++; }, true);
+MicroBench.run({
+  run() {
+    for (let i = 0; i < 10; i++) {
+      target.click();
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  },
+  check() { return calls > 0; },
+});
+</script>

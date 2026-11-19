@@ -1,0 +1,103 @@
+{
+ "subtests": {
+  "/FileAPI/file/File-lastModified.html": [
+   "lastModified defaults to the time of construction"
+  ],
+  "/css/css-animations/event-dispatch.tentative.html": [
+   "After -> Active"
+  ],
+  "/css/css-cascade/layer-media-query.html": [
+   "B1 Basic import",
+   "B2 Basic import",
+   "C4 Reordering"
+  ],
+  "/css/cssom/cssimportrule-sheet-identity.html": [
+   "CSSImportRule has different sheets even if referencing the same URL"
+  ],
+  "/navigation-timing/test-document-open.html": [
+   "domContentLoadedEventEnd is the same after document open.",
+   "domContentLoadedEventStart is the same after document open.",
+   "loadEventEnd is the same after document open.",
+   "loadEventStart is the same after document open."
+  ],
+  "/web-animations/timing-model/timelines/update-and-send-events.html": [
+   "Playback events with the same timeline retain the order in which they arequeued",
+   "Sorts finish events by composite order"
+  ],
+  "/xhr/formdata/append.any.html": [
+   "testFormDataAppendEmptyBlob"
+  ]
+ },
+ "reftests": [],
+ "built": "2026-11-17",
+ "from": [
+  "l3-base-1.jsonl",
+  "l3-base-2.jsonl",
+  "l3-base-3.jsonl",
+  "lost-base-1.jsonl",
+  "lost-base-2.jsonl",
+  "lost-base-3.jsonl",
+  "rp-base-0.jsonl",
+  "rp-base-1.jsonl",
+  "rp-base-2.jsonl",
+  "rp-base-3.jsonl",
+  "rp-base-4.jsonl",
+  "rp-base-5.jsonl",
+  "rp-base-6.jsonl",
+  "rp-base-7.jsonl",
+  "rp-base-8.jsonl",
+  "rp-base-9.jsonl",
+  "l3-branch-1.jsonl",
+  "l3-branch-2.jsonl",
+  "l3-branch-3.jsonl",
+  "lost-branch-1.jsonl",
+  "lost-branch-2.jsonl",
+  "lost-branch-3.jsonl",
+  "rp-branch-0.jsonl",
+  "rp-branch-1.jsonl",
+  "rp-branch-2.jsonl",
+  "rp-branch-3.jsonl",
+  "rp-branch-4.jsonl",
+  "rp-branch-5.jsonl",
+  "rp-branch-6.jsonl",
+  "rp-branch-7.jsonl",
+  "rp-branch-8.jsonl",
+  "rp-branch-9.jsonl",
+  "rb-repeat-r1.jsonl",
+  "rb-repeat-r2.jsonl",
+  "rb-repeat-r3.jsonl",
+  "ytl-lmq-repeat2-r1.jsonl",
+  "ytl-lmq-repeat2-r2.jsonl",
+  "ytl-lmq-repeat2-r3.jsonl",
+  "m5s1-flake-r1.jsonl",
+  "m5s1-flake-r2.jsonl",
+  "m5s1-flake-r3.jsonl",
+  "m5s1-flake-before-r1.jsonl",
+  "m5s1-flake-before-r2.jsonl",
+  "m5s1-flake-before-r3.jsonl",
+  "cm-flake-r1.jsonl",
+  "cm-flake-r2.jsonl",
+  "cm-flake-r3.jsonl",
+  "t8-lmq-r1.jsonl",
+  "t8-lmq-r2.jsonl",
+  "t8-lmq-r3.jsonl",
+  "scrub2-po-r1.jsonl",
+  "scrub2-po-r2.jsonl",
+  "scrub2-po-r3.jsonl",
+  "scrub2-po-r4.jsonl",
+  "scrub2-po-r5.jsonl",
+  "m7n1-cq-r1.jsonl",
+  "m7n1-cq-r2.jsonl",
+  "m7n1-cq-r3.jsonl",
+  "q-e4-fontmatch-r1.jsonl",
+  "q-e4-fontmatch-r2.jsonl",
+  "q-e4-fontmatch-r3.jsonl",
+  "q-e9-font-r1.jsonl",
+  "q-e9-font-r2.jsonl",
+  "q-e9-font-r3.jsonl",
+  "q-e9-calc-r1.jsonl",
+  "q-e9-calc-r2.jsonl",
+  "q-e9-calc-r3.jsonl"
+ ],
+ "note": "Subtests and reftests whose result differed across runs of one binary; the gate reports their losses apart."
+}

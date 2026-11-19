@@ -1,0 +1,32 @@
+[package]
+name = "snowlark-style"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autotests = false
+description = "The Snowlark style system: stylo's DOM traits over snowlark-dom, stylesheets, the Stylist, restyle"
+
+[dependencies]
+unicode-bidi = "0.3"
+snowlark-dom = { path = "../snowlark-dom" }
+stylo = "0.22"
+stylo_atoms = "0.22"
+stylo_dom = "0.22"
+stylo_traits = "0.22"
+stylo_static_prefs = "0.22"
+selectors = "0.41"
+cssparser = "0.38"
+servo_arc = "0.5"
+euclid = "0.22"
+app_units = "0.7"
+atomic_refcell = "0.1"
+url = "2.5"
+smallvec = "1.13"
+rayon = "1"
+rustc-hash = "2"
+
+[dev-dependencies]
+
+[[test]]
+name = "it"
+path = "tests/it.rs"

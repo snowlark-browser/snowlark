@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>portrait video card</title>
+<!-- Reduced from a video site (2026-11-01): a portrait poster in a card whose maximum size
+     comes from a custom property using container query units. Chrome caps the poster at 540px tall
+     (and narrows it to keep the 720:1280 ratio); without cqw support, var(--card-max) is invalid at
+     computed-value time, max-height becomes none and width auto, so the card is twice as tall. -->
+<style>
+  body { font: 16px/1.5 Arial, sans-serif; margin: 0; }
+  .feed { width: 648px; margin: 24px auto; }
+  article { border: 1px solid #ddd; border-radius: 12px; padding: 12px; margin-bottom: 16px; }
+  h2 { font-size: 20px; margin: 0 0 8px; }
+  .card-media { --card-max: min(540px, 100cqw); position: relative; display: flex; align-items: center;
+    justify-content: center; margin-top: 10px; max-height: var(--card-max); overflow: hidden;
+    border-radius: 14px; background: #000; }
+  .card-media-picture { display: block; max-width: 100%; max-height: var(--card-max); }
+  .card-media.is-sized .card-media-picture { aspect-ratio: var(--media-w) / var(--media-h);
+    width: min(100%, calc(var(--card-max) * var(--media-w) / var(--media-h))); height: auto; }
+  footer { color: #666; }
+</style>
+</head>
+<body>
+<div class="feed">
+  <article>
+    <h2>A portrait video</h2>
+    <div class="card-media is-video is-sized" style="--media-w: 720; --media-h: 1280">
+      <img class="card-media-picture" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='1280'%3E%3Crect width='720' height='1280' fill='%23446'/%3E%3C/svg%3E">
+    </div>
+  </article>
+  <footer>Below the card.</footer>
+</div>
+</body>
+</html>

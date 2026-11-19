@@ -1,0 +1,106 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/custom-element-add-20</title>
+<!-- 20 autonomous custom elements made, set up and inserted, then removed: each constructor clones a template into
+     an open shadow root with adopted style sheets, three observed attributes are set before and one after insertion,
+     and the connected/disconnected callbacks add and remove listeners. TodoMVC-WebComponents' Adding100Items. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+const template = document.createElement('template');
+template.innerHTML = `
+    <li class="todo-item">
+        <div class="display-todo">
+            <label for="toggle-todo" class="toggle-todo-label visually-hidden">Toggle Todo</label>
+            <input id="toggle-todo" class="toggle-todo-input" type="checkbox" />
+            <span class="todo-item-text truncate-singleline" tabindex="0">Placeholder Text</span>
+            <button class="remove-todo-button" title="Remove Todo"></button>
+        </div>
+        <div class="edit-todo-container">
+            <label for="edit-todo" class="edit-todo-label visually-hidden">Edit todo</label>
+            <input id="edit-todo" class="edit-todo-input" />
+        </div>
+    </li>
+`;
+const sheetA = new CSSStyleSheet();
+sheetA.replaceSync(':host { display: block; } .visually-hidden { position: absolute; clip: rect(0 0 0 0); }');
+const sheetB = new CSSStyleSheet();
+sheetB.replaceSync(':host(:last-child) > .todo-item { border-bottom: none; } .todo-item { position: relative; }');
+
+let connected = 0;
+class BenchItem extends HTMLElement {
+  static get observedAttributes() { return ['itemid', 'itemtitle', 'itemcompleted']; }
+  constructor() {
+    super();
+    this.itemid = '';
+    this.itemtitle = 'Todo Item';
+    this.itemcompleted = 'false';
+    const node = document.importNode(template.content, true);
+    this.item = node.querySelector('.todo-item');
+    this.toggleInput = node.querySelector('.toggle-todo-input');
+    this.todoText = node.querySelector('.todo-item-text');
+    this.todoButton = node.querySelector('.remove-todo-button');
+    this.editInput = node.querySelector('.edit-todo-input');
+    this.shadow = this.attachShadow({ mode: 'open' });
+    this.setAttribute('dir', document.dir || 'ltr');
+    this.shadow.adoptedStyleSheets = [sheetA, sheetB];
+    this.shadow.append(node);
+    this.onToggle = this.onToggle.bind(this);
+    this.onRemove = this.onRemove.bind(this);
+  }
+  onToggle() {}
+  onRemove() {}
+  update(...args) {
+    args.forEach((a) => {
+      switch (a) {
+        case 'itemid': this.item.id = `todo-item-${this.itemid}`; break;
+        case 'itemtitle': this.todoText.textContent = this.itemtitle; this.editInput.value = this.itemtitle; break;
+        case 'itemcompleted': this.toggleInput.checked = this.itemcompleted === 'true'; break;
+      }
+    });
+  }
+  attributeChangedCallback(name, oldValue, newValue) {
+    if (oldValue === newValue) return;
+    this[name] = newValue;
+    if (this.isConnected) this.update(name);
+  }
+  connectedCallback() {
+    connected++;
+    this.update('itemid', 'itemtitle', 'itemcompleted');
+    this.toggleInput.addEventListener('change', this.onToggle);
+    this.todoButton.addEventListener('click', this.onRemove);
+  }
+  disconnectedCallback() {
+    this.toggleInput.removeEventListener('change', this.onToggle);
+    this.todoButton.removeEventListener('click', this.onRemove);
+  }
+}
+customElements.define('bench-item', BenchItem);
+
+let list;
+MicroBench.run({
+  setup() {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = host.attachShadow({ mode: 'open' });
+    list = document.createElement('ul');
+    root.append(list);
+  },
+  run() {
+    const made = [];
+    for (let i = 0; i < 20; i++) {
+      const el = new BenchItem();
+      el.setAttribute('itemid', 'id' + i);
+      el.setAttribute('itemtitle', 'Something to do ' + i);
+      el.setAttribute('itemcompleted', false);
+      list.append(el);
+      el.setAttribute('data-priority', 4 - (i % 5));
+      made.push(el);
+    }
+    for (const el of made) el.remove();
+  },
+  check() {
+    return connected > 0 && list.childNodes.length === 0;
+  },
+});
+</script>

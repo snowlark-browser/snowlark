@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/insert-before-100</title>
+<!-- Insert 100 items one by one at the start of a list in the document, then empty it. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const ul = document.createElement('ul');
+document.getElementById('host').appendChild(ul);
+MicroBench.run({
+  run() {
+    for (let i = 0; i < 100; i++) {
+      const li = document.createElement('li');
+      li.textContent = 'Item ' + i;
+      ul.insertBefore(li, ul.firstChild);
+    }
+    ul.textContent = '';
+  },
+});
+</script>

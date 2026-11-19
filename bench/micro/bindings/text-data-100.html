@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>bindings/text-data-100</title>
+<!-- Read and write the data of 100 text nodes (the editors' text updates). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<span>text ' + i + '</span>');
+const texts = Array.from(host.children).map((s) => s.firstChild);
+let k = 0;
+MicroBench.run({
+  run() {
+    k++;
+    for (const t of texts) t.data = t.data.length > 12 ? 'text' : t.data + (k & 7);
+  },
+});
+</script>

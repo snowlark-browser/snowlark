@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>forms/append-controls-100</title>
+<!-- Create 100 inputs (text and checkbox) in a form, insert the form, remove it. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+MicroBench.run({
+  run() {
+    const form = document.createElement('form');
+    for (let i = 0; i < 100; i++) {
+      const input = document.createElement('input');
+      input.type = i % 2 ? 'text' : 'checkbox';
+      input.name = 'f' + i;
+      form.appendChild(input);
+    }
+    host.appendChild(form);
+    host.removeChild(form);
+  },
+});
+</script>

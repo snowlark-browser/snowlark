@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/remove-each-100</title>
+<!-- Insert a 100-item list (each item a few nodes), then remove its items one by one with removeChild. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+const proto = document.createElement('li');
+proto.innerHTML = '<div class="view"><span class="a">x</span><span class="b">y</span></div>';
+MicroBench.run({
+  run() {
+    const ul = document.createElement('ul');
+    for (let i = 0; i < 100; i++) ul.appendChild(proto.cloneNode(true));
+    host.appendChild(ul);
+    while (ul.lastChild) ul.removeChild(ul.lastChild);
+    host.removeChild(ul);
+  },
+});
+</script>

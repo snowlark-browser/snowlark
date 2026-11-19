@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>events/add-remove-listener-100</title>
+<!-- addEventListener and removeEventListener of 100 listeners on 100 elements. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<button>b' + i + '</button>');
+const els = Array.from(host.children);
+const fns = els.map(() => function () {});
+MicroBench.run({
+  run() {
+    for (let i = 0; i < els.length; i++) els[i].addEventListener('click', fns[i]);
+    for (let i = 0; i < els.length; i++) els[i].removeEventListener('click', fns[i]);
+  },
+});
+</script>

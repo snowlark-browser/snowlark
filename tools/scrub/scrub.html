@@ -1,0 +1,157 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>scrub: loading</title>
+<!--
+A page shaped like a video player's seek bar, for timing a drag across it (tools/scrub/run.py).
+Query switches: novideo (a dark box instead of the video), preview (a frame preview over the whole
+player while dragging), left (the fill and thumb move by width and left instead of transforms),
+paused (the video stays paused). Every second the title reports the last second's counts:
+pm (pointermoves), raf (animation frames), ms (the listener's time), gap (the 95th percentile of the
+intervals between animation frames, ms), mv (frames in which the thumb moved).
+-->
+<style>
+  html, body { margin: 0; background: #0f0f0f; overflow: hidden; }
+  #player { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: #000; }
+  #player video, #player .novideo { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .novideo { background: linear-gradient(135deg, #234, #423); }
+  .gradient { position: absolute; left: 0; right: 0; bottom: 0; height: 200px;
+              background: linear-gradient(transparent, rgba(0, 0, 0, 0.7)); pointer-events: none; }
+  .bar { position: absolute; left: 12px; right: 12px; bottom: 48px; height: 16px; cursor: pointer; }
+  .rail { position: absolute; left: 0; right: 0; top: 6px; height: 5px; background: rgba(255,255,255,.3); }
+  .fill { position: absolute; left: 0; top: 0; height: 100%; width: 100%; background: #f03;
+          transform-origin: 0 0; }
+  .hover { position: absolute; left: 0; top: 0; height: 100%; width: 100%; background: rgba(255,255,255,.5);
+           transform-origin: 0 0; }
+  .thumb { position: absolute; left: 0; top: -4px; width: 13px; height: 13px; margin-left: -6.5px;
+           border-radius: 50%; background: #f03; }
+  .tip { position: absolute; bottom: 72px; left: 0; width: 160px; pointer-events: none; }
+  .tip .cell { width: 160px; height: 90px; border: 2px solid #fff; border-radius: 8px; }
+  .tip .time { color: #fff; font: 500 14px Roboto, Arial, sans-serif; text-align: center; padding-top: 6px;
+               text-shadow: 0 0 2px #000; }
+  .preview { position: absolute; inset: 0; display: none; pointer-events: none; }
+  .controls { position: absolute; left: 12px; bottom: 6px; color: #fff; font: 14px Roboto, Arial, sans-serif; }
+  .controls span { display: inline-block; width: 36px; height: 36px; margin-right: 8px; border-radius: 4px;
+                   background: rgba(255,255,255,.15); vertical-align: middle; }
+</style>
+<div id="player">
+  <div class="gradient"></div>
+  <div class="preview"></div>
+  <div class="tip"><div class="cell"></div><div class="time">0:00</div></div>
+  <div class="bar"><div class="rail"><div class="hover"></div><div class="fill"></div><div class="thumb"></div></div></div>
+  <div class="controls"><span></span><span></span><span></span><b class="clock">0:00 / 10:00</b></div>
+</div>
+<script>
+const q = new URLSearchParams(location.search);
+const player = document.getElementById('player');
+const useLeft = q.has('left');
+if (q.has('novideo')) {
+  const d = document.createElement('div');
+  d.className = 'novideo';
+  player.prepend(d);
+} else {
+  const v = document.createElement('video');
+  v.muted = true;
+  v.loop = true;
+  v.playsInline = true;
+  v.src = q.get('src') || 'movie.mp4';
+  player.prepend(v);
+  if (!q.has('paused')) v.play().catch(() => {});
+}
+
+// A storyboard sheet: 10 x 10 cells of 160 x 90, each a different colour with its number.
+const sheet = document.createElement('canvas');
+sheet.width = 1600;
+sheet.height = 900;
+const g = sheet.getContext('2d');
+for (let i = 0; i < 100; i++) {
+  const x = (i % 10) * 160, y = Math.floor(i / 10) * 90;
+  g.fillStyle = `hsl(${i * 37 % 360} 60% 40%)`;
+  g.fillRect(x, y, 160, 90);
+  g.fillStyle = '#fff';
+  g.font = '40px sans-serif';
+  g.fillText(String(i), x + 50, y + 60);
+}
+const sheetUrl = sheet.toDataURL('image/png');
+const cell = document.querySelector('.tip .cell');
+cell.style.backgroundImage = `url(${sheetUrl})`;
+cell.style.backgroundSize = '1600px 900px';
+const preview = document.querySelector('.preview');
+preview.style.backgroundImage = `url(${sheetUrl})`;
+preview.style.backgroundSize = '12800px 7200px';
+
+const bar = document.querySelector('.bar');
+const fill = document.querySelector('.fill');
+const hover = document.querySelector('.hover');
+const thumb = document.querySelector('.thumb');
+const tip = document.querySelector('.tip');
+const time = document.querySelector('.tip .time');
+const clock = document.querySelector('.clock');
+let dragging = false;
+let lastX = -1, movedX = -1, at = 'none';
+const s = { pm: 0, raf: 0, ms: 0, mv: 0, gaps: [] };
+
+function fmt(t) {
+  const m = Math.floor(t / 60), sec = Math.floor(t % 60);
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+function update(e) {
+  const t0 = performance.now();
+  s.pm++;
+  const r = bar.getBoundingClientRect(); // (a layout read, as the player's listener makes)
+  const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const x = f * r.width;
+  const cellIndex = Math.min(99, Math.floor(f * 100));
+  const pos = `-${(cellIndex % 10) * 160}px -${Math.floor(cellIndex / 10) * 90}px`;
+  if (useLeft) {
+    hover.style.width = `${x}px`;
+    hover.style.transform = '';
+    if (dragging) { fill.style.width = `${x}px`; fill.style.transform = ''; thumb.style.left = `${x}px`; }
+    tip.style.left = `${Math.min(r.width - 160, Math.max(0, x - 80)) + 12}px`;
+  } else {
+    hover.style.transform = `scaleX(${f})`;
+    if (dragging) { fill.style.transform = `scaleX(${f})`; thumb.style.transform = `translateX(${x}px)`; }
+    tip.style.transform = `translateX(${Math.min(r.width - 160, Math.max(0, x - 80)) + 12}px)`;
+  }
+  cell.style.backgroundPosition = pos;
+  time.textContent = fmt(f * 600);
+  if (dragging) {
+    clock.textContent = `${fmt(f * 600)} / 10:00`;
+    if (q.has('preview')) {
+      preview.style.display = 'block';
+      preview.style.backgroundPosition = `-${(cellIndex % 10) * 1280}px -${Math.floor(cellIndex / 10) * 720}px`;
+    }
+  }
+  lastX = x;
+  at = `${Math.round(e.clientX)},${Math.round(e.clientY)}`;
+  s.ms += performance.now() - t0;
+}
+
+bar.addEventListener('pointerdown', (e) => { dragging = true; update(e); e.preventDefault(); });
+document.addEventListener('pointermove', update);
+document.addEventListener('pointerup', () => { dragging = false; preview.style.display = 'none'; });
+
+let lastFrame = 0;
+function frame(now) {
+  s.raf++;
+  if (lastFrame) s.gaps.push(now - lastFrame);
+  lastFrame = now;
+  if (lastX !== movedX) { s.mv++; movedX = lastX; }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// The bar's middle in window client coordinates for the driver: "bar=<x0>,<x1>,<y>" until the first move.
+const br = bar.getBoundingClientRect();
+const where = `bar=${Math.round(br.left)},${Math.round(br.right)},${Math.round(br.top + br.height / 2)}`;
+let seconds = 0;
+setInterval(() => {
+  seconds++;
+  const gaps = s.gaps.sort((a, b) => a - b);
+  const p95 = gaps.length ? gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * 0.95))] : 0;
+  const line = `scrub t=${seconds} pm=${s.pm} raf=${s.raf} mv=${s.mv} ms=${s.ms.toFixed(1)} gap=${p95.toFixed(1)} dpr=${devicePixelRatio} at=${at} ${where} vt=${(document.querySelector('video') || {}).currentTime || 0} vs=${(() => { const v = document.querySelector('video'); return v ? `${v.readyState}/${v.networkState}/${v.error ? v.error.code : 0}/${v.paused}` : 'none'; })()}`;
+  document.title = line;
+  window.scrubLog = (window.scrubLog || []).concat([line]);
+  s.pm = 0; s.raf = 0; s.ms = 0; s.mv = 0; s.gaps = [];
+}, 1000);
+</script>

@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>bindings/style-getter-100</title>
+<!-- 100 reads of element.style (a [SameObject] attribute, its object kept on the wrapper) on 100
+     elements, no style change: what frameworks pay to reach an element's inline style. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+const els = [];
+let n = 0;
+MicroBench.run({
+  setup() {
+    for (let i = 0; i < 100; i++) {
+      const d = document.createElement('div');
+      document.body.appendChild(d);
+      els.push(d);
+      d.style;
+    }
+  },
+  run() {
+    for (let i = 0; i < els.length; i++) {
+      if (els[i].style) n++;
+    }
+  },
+  check() {
+    return n > 0;
+  },
+});
+</script>

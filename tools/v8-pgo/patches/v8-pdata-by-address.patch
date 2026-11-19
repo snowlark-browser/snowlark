@@ -1,0 +1,69 @@
+diff --git a/v8/src/snapshot/embedded/platform-embedded-file-writer-win.cc b/v8/src/snapshot/embedded/platform-embedded-file-writer-win.cc
+index 08adc77d..62f70f8d 100644
+--- a/v8/src/snapshot/embedded/platform-embedded-file-writer-win.cc
++++ b/v8/src/snapshot/embedded/platform-embedded-file-writer-win.cc
+@@ -115,9 +115,22 @@ void EmitUnwindData(PlatformEmbeddedFileWriterWin* w,
+   w->StartPdataSection();
+   {
+     static_assert(Builtins::kAllBuiltinsAreIsolateIndependent);
+-    Address prev_builtin_end_offset = 0;
++    // The entries must be sorted by address and must not overlap (MSVC's
++    // linker refuses the object otherwise, LNK1223). With builtins reordering
++    // the blob lays builtins out in profile order rather than id order, so
++    // walk them by their start in the blob.
++    std::vector<Builtin> builtins_by_address;
+     for (Builtin builtin = Builtins::kFirst; builtin <= Builtins::kLast;
+          ++builtin) {
++      builtins_by_address.push_back(builtin);
++    }
++    std::stable_sort(builtins_by_address.begin(), builtins_by_address.end(),
++                     [blob](Builtin a, Builtin b) {
++                       return blob->InstructionStartOf(a) <
++                              blob->InstructionStartOf(b);
++                     });
++    Address prev_builtin_end_offset = 0;
++    for (Builtin builtin : builtins_by_address) {
+       const int builtin_index = static_cast<int>(builtin);
+       // Some builtins are leaf functions from the point of view of Win64 stack
+       // walking: they do not move the stack pointer and do not require a PDATA
+@@ -127,6 +140,14 @@ void EmitUnwindData(PlatformEmbeddedFileWriterWin* w,
+       uint64_t builtin_start_offset = blob->InstructionStartOf(builtin) -
+                                       reinterpret_cast<Address>(blob->code());
+       uint32_t builtin_size = blob->InstructionSizeOf(builtin);
++      // The start of an entry for code before a frame is set up: a few bytes
++      // before the builtin (see below), never before the blob (the first
++      // builtin by address need not have a frame) or the previous builtin.
++      const uint64_t prefixed_start = std::max<uint64_t>(
++          prev_builtin_end_offset,
++          builtin_start_offset >= win64_unwindinfo::kRbpPrefixLength
++              ? builtin_start_offset - win64_unwindinfo::kRbpPrefixLength
++              : 0);
+ 
+       const std::vector<int>& xdata_desc =
+           unwind_infos[builtin_index].fp_offsets();
+@@ -138,11 +159,9 @@ void EmitUnwindData(PlatformEmbeddedFileWriterWin* w,
+         // with a 'push rbp' we need to specify the start RVA in the PDATA entry
+         // a few bytes before the beginning of the function, if it does not
+         // overlap the end of the previous builtin.
+-        WriteUnwindInfoEntry(
+-            w, unwind_info_symbol, embedded_blob_data_symbol,
+-            std::max(prev_builtin_end_offset,
+-                     builtin_start_offset - win64_unwindinfo::kRbpPrefixLength),
+-            builtin_start_offset + builtin_size);
++        WriteUnwindInfoEntry(w, unwind_info_symbol, embedded_blob_data_symbol,
++                             prefixed_start,
++                             builtin_start_offset + builtin_size);
+       } else {
+         // Some builtins have one or more "push rbp - mov rbp, rsp" sequences,
+         // but not necessarily at the beginning of the function. In this case
+@@ -152,9 +171,7 @@ void EmitUnwindData(PlatformEmbeddedFileWriterWin* w,
+         // first 'push rbp', like in the case above.
+         if (xdata_desc[0] > 0) {
+           WriteUnwindInfoEntry(w, unwind_info_symbol, embedded_blob_data_symbol,
+-                               std::max(prev_builtin_end_offset,
+-                                        builtin_start_offset -
+-                                            win64_unwindinfo::kRbpPrefixLength),
++                               prefixed_start,
+                                builtin_start_offset + xdata_desc[0]);
+         }
+ 

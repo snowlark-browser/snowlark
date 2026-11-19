@@ -1,0 +1,4 @@
+# The prebuilt V8 static library is built against the static C runtime; match it so the linker doesn't
+# mix libcmt and msvcrt (LNK4098).
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

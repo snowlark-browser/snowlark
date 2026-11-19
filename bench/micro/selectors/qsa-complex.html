@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>selectors/qsa-complex</title>
+<!-- querySelectorAll with child combinators, :not, :nth-child and an attribute value. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<div class="container"><ul class="list">' + MicroBench.repeat(100, (i) => '<li class="item' + (i % 7 ? '' : ' hidden') + '"><div class="view"><span class="label" data-k="' + (i % 3 ? 'x' : 'y') + '">Item ' + i + '</span><a class="link" href="#">go</a></div></li>') + '</ul><p class="needle">end</p></div>';
+let r;
+MicroBench.run({
+  run() { r = host.querySelectorAll('ul > li:not(.hidden):nth-child(2n+1) span[data-k="x"]'); },
+  check() { return r.length > 10; },
+});
+</script>

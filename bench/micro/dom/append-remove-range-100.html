@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/append-remove-range-100</title>
+<!-- append-remove-100 while a live Range is elsewhere in the page (a selection, or one an editor left: Charts-observable-plot after Editor-CodeMirror): insertions into a parent no range is in. -->
+<body>
+<div id="host"></div>
+<p id="other">text</p>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+let range;
+MicroBench.run({
+  setup() {
+    range = document.createRange();
+    range.selectNodeContents(document.getElementById('other'));
+  },
+  run() {
+    const ul = document.createElement('ul');
+    for (let i = 0; i < 100; i++) {
+      const li = document.createElement('li');
+      li.className = 'item';
+      li.appendChild(document.createTextNode('Item ' + i));
+      ul.appendChild(li);
+    }
+    host.appendChild(ul);
+    host.removeChild(ul);
+  },
+  check() {
+    return range.startContainer.id === 'other' && range.endOffset === 1;
+  },
+});
+</script>

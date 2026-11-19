@@ -1,0 +1,7 @@
+# html5lib cases snowlark-dom is known to fail, as "<file>: <escaped data>[ (fragment in <ctx>)] 	# reason".
+scripted_adoption01: <p><b id="A"><script>document.getElementById("A").id = "B"</script></p>TEXT</b> 	# runs a script: needs the page layer (scripted_*.dat run with scripts in WPT)
+scripted_ark: <p><font size=4><font size=4><font size=4><script>document.getElementsByTagName("font")[2].setAttribute("size", "5");</script><font size=4><p>X 	# runs a script: needs the page layer (scripted_*.dat run with scripts in WPT)
+scripted_foster01: <table><tr><script>var t=document.querySelector('table');document.documentElement.remove();document.appendChild(t)</script><b> 	# runs a script: needs the page layer (scripted_*.dat run with scripts in WPT)
+scripted_foster01: <table><tr><script>var t=document.querySelector('table');document.documentElement.remove();document.appendChild(t)</script>FOSTERTEXT 	# runs a script: needs the page layer (scripted_*.dat run with scripts in WPT)
+scripted_webkit01: 1<script>document.write("2")</script>3 	# runs a script: needs the page layer (scripted_*.dat run with scripts in WPT)
+scripted_webkit01: 1<script>document.write("<script>document.write('2')</scr"+ "ipt><script>document.write('3')</scr" + "ipt>")</script>4 	# runs a script: needs the page layer (scripted_*.dat run with scripts in WPT)

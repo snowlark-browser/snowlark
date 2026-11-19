@@ -1,0 +1,10 @@
+<!doctype html>
+<body style="margin:8px;background:#fff3e0;font:14px 'Segoe UI',sans-serif">
+<b>Same-origin frame</b> (scroll me)
+<ol>
+  <li>one</li><li>two</li><li>three</li><li>four</li><li>five</li><li>six</li><li>seven</li><li>eight</li>
+  <li>nine</li><li>ten</li><li>eleven</li><li>twelve</li>
+</ol>
+<iframe src="iframe-nested.html" style="width:220px;height:70px;border:2px solid #e65100"></iframe>
+<p><a href="iframe-nested.html">navigate this frame</a></p>
+<script>document.body.addEventListener('click', e => { if (e.target.localName === 'li') e.target.style.background = '#ffcc80'; });</script>

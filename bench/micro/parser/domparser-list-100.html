@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>parser/domparser-list-100</title>
+<!-- DOMParser.parseFromString of a list of 100 items with no doctype, html, head or body of its
+     own, and its body's children moved into the page (TodoMVC's vanilla views re-render so). -->
+<body>
+<ul id="host"></ul>
+<script src="../resources/runner.js"></script>
+<script>
+const html = MicroBench.repeat(100, (i) => '<li data-id="' + i + '" class=""><div class="view"><input class="toggle" type="checkbox"><label>Item ' + i + '</label><button class="destroy"></button></div></li>');
+const host = document.getElementById('host');
+MicroBench.run({
+  run() {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    host.replaceChildren(...doc.body.childNodes);
+  },
+  check() { return host.childElementCount === 100; },
+});
+</script>

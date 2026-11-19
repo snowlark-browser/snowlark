@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/megamorphic</title>
+<!-- Read and write a property of objects of 64 shapes at one site, and keyed reads with computed names (megamorphic caches); no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+const objs = [];
+for (let i = 0; i < 640; i++) {
+  const o = {};
+  o['p' + (i % 64)] = i;
+  o.value = i;
+  objs.push(o);
+}
+const names = Array.from({ length: 16 }, (_, i) => 'k' + i);
+const bag = {};
+for (const n of names) bag[n] = n.length;
+let sink = 0;
+MicroBench.run({
+  run() {
+    let s = 0;
+    for (let k = 0; k < 4; k++) {
+      for (let i = 0; i < objs.length; i++) {
+        const o = objs[i];
+        s += o.value;
+        o.value = (o.value + 1) | 0;
+        s += bag[names[i & 15]];
+      }
+    }
+    sink += s;
+  },
+  check() { return sink > 0; },
+});
+</script>

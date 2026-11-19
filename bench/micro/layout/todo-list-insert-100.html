@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>layout/todo-list-insert-100</title>
+<!-- Insert 100 built todo items into a list in place of the 100 shown, and lay it out: style, boxes and first layout of new items, as the small TodoMVC suites' Adding100Items does (no parsing: both sets are built ahead). -->
+<style>
+body { font: 14px "Helvetica Neue", Helvetica, Arial, sans-serif; line-height: 1.4em; }
+#host { width: 550px; }
+.todo-list { margin: 0; padding: 0; list-style: none; }
+.todo-list li { position: relative; font-size: 24px; border-bottom: 1px solid #ededed; }
+.todo-list li .toggle { text-align: center; width: 40px; height: auto; position: absolute; top: 0; bottom: 0; margin: auto 0; border: none; appearance: none; opacity: 0; }
+.todo-list li label { word-break: break-all; padding: 15px 15px 15px 60px; display: block; line-height: 1.2; transition: color 0.4s; font-weight: 400; color: #484848; }
+.todo-list li .destroy { display: none; position: absolute; top: 0; right: 10px; bottom: 0; width: 40px; height: 40px; margin: auto 0; font-size: 30px; color: #949494; }
+.todo-list li:hover .destroy { display: block; }
+.todo-list li .edit { display: none; }
+</style>
+<body>
+<div id="host"><section class="main"><ul class="todo-list"></ul></section></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+const list = host.querySelector('.todo-list');
+function build(tag) {
+  const t = document.createElement('template');
+  t.innerHTML = MicroBench.repeat(100, (i) => '<li><div class="view"><input class="toggle" type="checkbox"><label>Something to do ' +
+    tag + i + '</label><button class="destroy"></button></div><input class="edit" value="Something to do ' + tag + i + '"></li>');
+  return Array.from(document.adoptNode(t.content).children);
+}
+const sets = [build('a'), build('b')];
+let shown = 0;
+for (const li of sets[0]) list.appendChild(li);
+MicroBench.flush(host);
+MicroBench.run({
+  run() {
+    for (const li of sets[shown]) li.remove();
+    shown ^= 1;
+    for (const li of sets[shown]) list.appendChild(li);
+    MicroBench.flush(host);
+  },
+  check() {
+    return list.children.length === 100 && list.lastElementChild.querySelector('label').offsetHeight > 0;
+  },
+});
+</script>

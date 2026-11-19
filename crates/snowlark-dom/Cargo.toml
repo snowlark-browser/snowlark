@@ -1,0 +1,14 @@
+[package]
+name = "snowlark-dom"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The Snowlark DOM: arena nodes per document, html5ever tree builder, DOM Standard mutation algorithms"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+html5ever = "0.40"
+smallvec = { version = "1.13", features = ["union", "const_generics"] }
+rustc-hash = "2"
+encoding_rs = "0.8"
+arrayvec = "0.7"

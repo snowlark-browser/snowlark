@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>parser/insert-adjacent-html-20</title>
+<!-- insertAdjacentHTML('beforeend') of 20 rows, then empty the container. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+const html = MicroBench.repeat(20, (i) => '<div class="row"><span>Item ' + i + '</span><a href="#">link</a></div>');
+MicroBench.run({
+  run() {
+    host.insertAdjacentHTML('beforeend', html);
+    host.textContent = '';
+  },
+});
+</script>

@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>parser/inner-html-divs-100</title>
+<!-- Replace a container's content with innerHTML: 100 rows of a span and a link. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+const html = MicroBench.repeat(100, (i) => '<div class="row"><span class="a">Item ' + i + '</span><a href="#">link</a></div>');
+MicroBench.run({
+  run() { host.innerHTML = html; },
+  check() { return host.childElementCount === 100; },
+});
+</script>

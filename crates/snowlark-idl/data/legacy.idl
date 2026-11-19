@@ -1,0 +1,28 @@
+// Members no specification defines that every engine still exposes and sites depend on, with the
+// engine whose definition Snowlark follows. The behaviour is in the engine; this is only their IDL.
+
+// Chromium third_party/blink/renderer/core/events/wheel_event.idl and wheel_event_init.idl: the
+// pre-standard wheel deltas (multiples of 120 per wheel notch, positive away from the user).
+partial interface WheelEvent {
+  readonly attribute long wheelDeltaX;
+  readonly attribute long wheelDeltaY;
+  readonly attribute long wheelDelta;
+};
+
+partial dictionary WheelEventInit {
+  long wheelDeltaX = 0;
+  long wheelDeltaY = 0;
+};
+
+// Chromium third_party/blink/renderer/core/frame/navigator_do_not_track.idl: the Tracking
+// Preference Expression's `doNotTrack` (the W3C note), null unless the user set the preference.
+partial interface Navigator {
+  readonly attribute DOMString? doNotTrack;
+};
+
+// HTML §3.1.1 (The Document object) defines `HTMLDocument` only as a Window property whose value is
+// the `Document` interface object. Every engine instead ships it as an empty interface: HTML
+// documents get it, so it sits between them and `Document.prototype`, and their class string is
+// "HTMLDocument". Sites test for it by name and by prototype; this follows the engines.
+[Exposed=Window]
+interface HTMLDocument : Document {};

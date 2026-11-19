@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>forms/invalid-pseudo-style</title>
+<!-- Toggle the value of 20 required inputs styled with :invalid and :valid, then read a computed style. -->
+<style>input:invalid { color: rgb(255, 0, 0); } input:valid { color: rgb(0, 128, 0); } form:invalid { padding: 1px; }</style>
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<form>' + MicroBench.repeat(20, (i) => '<input required name="f' + i + '">') + '</form>';
+const inputs = Array.from(host.querySelectorAll('input'));
+let k = 0, c = '';
+MicroBench.run({
+  run() {
+    k++;
+    for (const i of inputs) i.value = k & 1 ? 'x' : '';
+    c = getComputedStyle(inputs[19]).color;
+  },
+  check() { return c !== ''; },
+});
+</script>

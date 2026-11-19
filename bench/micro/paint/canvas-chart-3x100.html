@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>paint/canvas-chart-3x100</title>
+<!-- A time series chart as Perf-Dashboard draws one: 10 grid lines, then for each of 3 series a 100-point line
+     and a filled circle per point, then getImageData of one pixel. -->
+<body>
+<canvas id="c" width="600" height="300"></canvas>
+<script src="../resources/runner.js"></script>
+<script>
+const ctx = document.getElementById('c').getContext('2d');
+const series = [];
+for (let s = 0; s < 3; s++) {
+  const points = [];
+  for (let i = 0; i < 100; i++) {
+    points.push({ x: 10 + i * 5.8, y: 150 + Math.sin(i / 7 + s) * 90 + s * 10 });
+  }
+  series.push(points);
+}
+const colors = ['#36c', '#c63', '#3a6'];
+MicroBench.run({
+  run() {
+    ctx.clearRect(0, 0, 600, 300);
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 10; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, i * 30 + 0.5);
+      ctx.lineTo(600, i * 30 + 0.5);
+      ctx.stroke();
+    }
+    for (let s = 0; s < 3; s++) {
+      ctx.strokeStyle = colors[s];
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const p of series[s]) ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.fillStyle = colors[s];
+      for (const p of series[s]) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+    ctx.getImageData(0, 0, 1, 1);
+  },
+});
+</script>

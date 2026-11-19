@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>forms/value-set-100</title>
+<!-- Set value of 100 text fields in the document (TodoMVC's edit fields). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<input class="edit" value="Item ' + i + '">');
+const inputs = Array.from(host.children);
+let k = 0;
+MicroBench.run({
+  run() {
+    k++;
+    for (let i = 0; i < inputs.length; i++) inputs[i].value = 'Item ' + i + ' v' + (k & 3);
+  },
+});
+</script>

@@ -1,0 +1,35 @@
+<!doctype html>
+<title>Selects</title>
+<style>
+  body { font: 15px 'Segoe UI', sans-serif; margin: 16px; }
+  .box { height: 120px; overflow: auto; border: 1px solid #aaa; padding: 8px; width: 300px; }
+  #bottom { position: fixed; bottom: 12px; left: 16px; }
+</style>
+<p>Drop-down in a small scroll container (the list must extend outside it):</p>
+<div class=box>
+  <label>Fruit <select id=fruit>
+    <option>Apple</option>
+    <option selected>Banana</option>
+    <optgroup label="Citrus">
+      <option>Lemon</option>
+      <option>Lime</option>
+      <option disabled>Orange (sold out)</option>
+    </optgroup>
+    <option>Cherry</option>
+    <option>A rather long option label that is wider than the select</option>
+  </select></label>
+  <div style="height:200px"></div>
+</div>
+<p>List box (multiple; Ctrl and Shift clicks):</p>
+<select id=many multiple size=5 style="width:160px">
+  <option>Red</option><option>Green</option><option>Blue</option><option disabled>Black</option>
+  <option>White</option><option>Yellow</option>
+</select>
+<p id=log>events:</p>
+<div id=bottom>Near the bottom: <select id=num></select></div>
+<script>
+  for (let i = 1; i <= 40; i++) document.getElementById('num').add(new Option('Number ' + i));
+  for (const s of document.querySelectorAll('select'))
+    s.addEventListener('change', () => document.getElementById('log').textContent +=
+      ' ' + s.id + '=' + [...s.options].filter(o => o.selected).map(o => o.text).join('+'));
+</script>

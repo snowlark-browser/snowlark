@@ -1,0 +1,428 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+//! Character encodings: `encoding_rs` for the Encoding Standard's encodings, plus HTML §13.2.3
+//! "determining the character encoding" (BOM, then the transport's charset, then the `<meta>` prescan of
+//! the first 1024 bytes, then the parent's encoding, then the default), and the Encoding Standard's
+//! decode helpers.
+
+use std::borrow::Cow;
+
+pub use encoding_rs::Encoding;
+use encoding_rs::{UTF_16BE, UTF_16LE, UTF_8, WINDOWS_1252, X_USER_DEFINED};
+
+use crate::headers::HeaderList;
+use crate::mime::extract_mime_type;
+
+/// HTML's confidence in an encoding.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Confidence {
+    /// From a BOM or the transport layer: a `<meta>` met later can't change it.
+    Certain,
+    /// From the prescan, the parent, or the default: the parser may still change it.
+    Tentative,
+}
+
+/// Encoding Standard "get an encoding" from a label.
+pub fn encoding_for_label(label: &str) -> Option<&'static Encoding> {
+    Encoding::for_label(label.as_bytes())
+}
+
+/// Encoding Standard "BOM sniff".
+pub fn bom_sniff(bytes: &[u8]) -> Option<&'static Encoding> {
+    Encoding::for_bom(bytes).map(|(e, _)| e)
+}
+
+/// Fetch "legacy extract an encoding": the `charset` of the response's MIME type, as an encoding.
+pub fn legacy_extract_encoding(headers: &HeaderList) -> Option<&'static Encoding> {
+    let mime = extract_mime_type(headers)?;
+    encoding_for_label(mime.parameter("charset")?)
+}
+
+/// The inputs of HTML's encoding determination.
+#[derive(Clone, Copy, Debug)]
+pub struct SniffInput<'a> {
+    /// The first bytes of the document (at least the first 1024 when available).
+    pub bytes: &'a [u8],
+    /// The `charset` parameter of the Content-Type, if any.
+    pub transport_charset: Option<&'a str>,
+    /// The encoding of a same-origin parent document (step 5), if any.
+    pub parent: Option<&'static Encoding>,
+    /// Step 7's autodetection: pick UTF-8 when the bytes are valid UTF-8 and not plain ASCII.
+    pub detect_utf8: bool,
+    /// The locale default (step 8): windows-1252 for English locales.
+    pub default: &'static Encoding,
+}
+
+impl<'a> SniffInput<'a> {
+    pub fn new(bytes: &'a [u8]) -> Self {
+        SniffInput {
+            bytes,
+            transport_charset: None,
+            parent: None,
+            detect_utf8: true,
+            default: WINDOWS_1252,
+        }
+    }
+}
+
+/// HTML §13.2.3.1 "determining the character encoding".
+pub fn sniff_html_encoding(input: &SniffInput<'_>) -> (&'static Encoding, Confidence) {
+    if let Some(e) = bom_sniff(input.bytes) {
+        return (e, Confidence::Certain);
+    }
+    if let Some(e) = input.transport_charset.and_then(encoding_for_label) {
+        return (e, Confidence::Certain);
+    }
+    let head = &input.bytes[..input.bytes.len().min(1024)];
+    if let Some(e) = prescan(head) {
+        return (e, Confidence::Tentative);
+    }
+    if let Some(parent) = input.parent {
+        if parent != UTF_16BE && parent != UTF_16LE && parent != encoding_rs::REPLACEMENT {
+            return (parent, Confidence::Tentative);
+        }
+    }
+    if input.detect_utf8 && !input.bytes.is_ascii() && std::str::from_utf8(input.bytes).is_ok() {
+        return (UTF_8, Confidence::Tentative);
+    }
+    (input.default, Confidence::Tentative)
+}
+
+fn is_space(b: u8) -> bool {
+    matches!(b, 0x09 | 0x0A | 0x0C | 0x0D | 0x20)
+}
+
+/// HTML "get an attribute" (prescan). `None` when there are no more attributes, or the input ran out.
+fn get_attribute(bytes: &[u8], pos: &mut usize) -> Option<(Vec<u8>, Vec<u8>)> {
+    while *pos < bytes.len() && (is_space(bytes[*pos]) || bytes[*pos] == b'/') {
+        *pos += 1;
+    }
+    if *pos >= bytes.len() || bytes[*pos] == b'>' {
+        return None;
+    }
+    let mut name = Vec::new();
+    let mut value = Vec::new();
+    // name
+    loop {
+        let b = *bytes.get(*pos)?;
+        if b == b'=' && !name.is_empty() {
+            *pos += 1;
+            break;
+        }
+        if is_space(b) {
+            // spaces, then maybe '='
+            while *pos < bytes.len() && is_space(bytes[*pos]) {
+                *pos += 1;
+            }
+            if bytes.get(*pos)? != &b'=' {
+                return Some((name, value));
+            }
+            *pos += 1;
+            break;
+        }
+        if b == b'/' || b == b'>' {
+            return Some((name, value));
+        }
+        name.push(b.to_ascii_lowercase());
+        *pos += 1;
+    }
+    // value
+    while *pos < bytes.len() && is_space(bytes[*pos]) {
+        *pos += 1;
+    }
+    let b = *bytes.get(*pos)?;
+    if b == b'"' || b == b'\'' {
+        let quote = b;
+        loop {
+            *pos += 1;
+            let c = *bytes.get(*pos)?;
+            if c == quote {
+                *pos += 1;
+                return Some((name, value));
+            }
+            value.push(c.to_ascii_lowercase());
+        }
+    }
+    if b == b'>' {
+        return Some((name, value));
+    }
+    loop {
+        let c = *bytes.get(*pos)?;
+        if is_space(c) || c == b'>' {
+            return Some((name, value));
+        }
+        value.push(c.to_ascii_lowercase());
+        *pos += 1;
+    }
+}
+
+/// HTML "algorithm for extracting a character encoding from a meta element" (its `content` value).
+pub fn encoding_from_meta_content(content: &[u8]) -> Option<&'static Encoding> {
+    let mut pos = 0;
+    loop {
+        let rest = &content[pos..];
+        let found = rest
+            .windows(7)
+            .position(|w| w.eq_ignore_ascii_case(b"charset"))?;
+        pos += found + 7;
+        while pos < content.len() && is_space(content[pos]) {
+            pos += 1;
+        }
+        if content.get(pos) != Some(&b'=') {
+            continue;
+        }
+        pos += 1;
+        while pos < content.len() && is_space(content[pos]) {
+            pos += 1;
+        }
+        let first = *content.get(pos)?;
+        if first == b'"' || first == b'\'' {
+            let start = pos + 1;
+            let end = content[start..].iter().position(|&b| b == first)?;
+            return Encoding::for_label(&content[start..start + end]);
+        }
+        let start = pos;
+        let end = content[start..]
+            .iter()
+            .position(|&b| is_space(b) || b == b';')
+            .map_or(content.len(), |e| start + e);
+        return Encoding::for_label(&content[start..end]);
+    }
+}
+
+/// HTML §13.2.3.2 "prescan a byte stream to determine its encoding".
+pub fn prescan(bytes: &[u8]) -> Option<&'static Encoding> {
+    let mut pos = 0;
+    while pos < bytes.len() {
+        let rest = &bytes[pos..];
+        if rest.starts_with(b"<!--") {
+            // the first '>' preceded by "--" after the '<' (the dashes may be those of "<!--")
+            let mut i = pos + 2;
+            loop {
+                i += 1;
+                if i >= bytes.len() {
+                    return None;
+                }
+                if bytes[i] == b'>' && bytes[i - 1] == b'-' && bytes[i - 2] == b'-' {
+                    break;
+                }
+            }
+            pos = i;
+        } else if rest.len() >= 6
+            && rest[..5].eq_ignore_ascii_case(b"<meta")
+            && (is_space(rest[5]) || rest[5] == b'/')
+        {
+            pos += 5;
+            let mut seen: Vec<Vec<u8>> = Vec::new();
+            let mut got_pragma = false;
+            let mut need_pragma: Option<bool> = None;
+            let mut charset: Option<&'static Encoding> = None;
+            loop {
+                let Some((name, value)) = get_attribute(bytes, &mut pos) else {
+                    if pos >= bytes.len() {
+                        return None;
+                    }
+                    break;
+                };
+                if seen.contains(&name) {
+                    continue;
+                }
+                seen.push(name.clone());
+                match name.as_slice() {
+                    b"http-equiv" => {
+                        if value == b"content-type" {
+                            got_pragma = true;
+                        }
+                    }
+                    b"content" => {
+                        if charset.is_none() {
+                            if let Some(e) = encoding_from_meta_content(&value) {
+                                charset = Some(e);
+                                need_pragma = Some(true);
+                            }
+                        }
+                    }
+                    b"charset" => {
+                        charset = Encoding::for_label(&value);
+                        need_pragma = Some(false);
+                    }
+                    _ => {}
+                }
+            }
+            let decided = match need_pragma {
+                None => None,
+                Some(true) if !got_pragma => None,
+                _ => charset,
+            };
+            if let Some(mut e) = decided {
+                if e == UTF_16BE || e == UTF_16LE {
+                    e = UTF_8;
+                }
+                if e == X_USER_DEFINED {
+                    e = WINDOWS_1252;
+                }
+                return Some(e);
+            }
+        } else if rest.len() >= 2
+            && rest[0] == b'<'
+            && (rest[1].is_ascii_alphabetic()
+                || (rest[1] == b'/' && rest.get(2).is_some_and(u8::is_ascii_alphabetic)))
+        {
+            while pos < bytes.len() && !is_space(bytes[pos]) && bytes[pos] != b'>' {
+                pos += 1;
+            }
+            while get_attribute(bytes, &mut pos).is_some() {}
+            if pos >= bytes.len() {
+                return None;
+            }
+        } else if rest.starts_with(b"<!") || rest.starts_with(b"</") || rest.starts_with(b"<?") {
+            pos += 1 + bytes[pos + 1..].iter().position(|&b| b == b'>')?;
+        }
+        pos += 1;
+    }
+    None
+}
+
+/// Encoding Standard "decode": a BOM overrides `fallback`; errors become U+FFFD.
+pub fn decode<'a>(
+    bytes: &'a [u8],
+    fallback: &'static Encoding,
+) -> (Cow<'a, str>, &'static Encoding) {
+    let (text, used, _) = fallback.decode(bytes);
+    (text, used)
+}
+
+/// Encoding Standard "UTF-8 decode": a UTF-8 BOM is stripped, errors become U+FFFD.
+pub fn utf8_decode(bytes: &[u8]) -> Cow<'_, str> {
+    UTF_8.decode_with_bom_removal(bytes).0
+}
+
+/// Encoding Standard "UTF-8 decode without BOM".
+pub fn utf8_decode_without_bom(bytes: &[u8]) -> Cow<'_, str> {
+    UTF_8.decode_without_bom_handling(bytes).0
+}
+
+/// Encoding Standard "UTF-8 decode without BOM or fail".
+pub fn utf8_decode_without_bom_or_fail(bytes: &[u8]) -> Option<&str> {
+    std::str::from_utf8(bytes).ok()
+}
+
+/// Decode a response body as text the way `Response.text()` and XHR's text do for a given type: the
+/// body's charset when it names one, UTF-8 otherwise, a BOM overriding both.
+pub fn decode_body<'a>(bytes: &'a [u8], headers: &HeaderList) -> Cow<'a, str> {
+    let fallback = legacy_extract_encoding(headers).unwrap_or(UTF_8);
+    decode(bytes, fallback).0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sniff(bytes: &[u8], charset: Option<&str>) -> (&'static str, Confidence) {
+        let mut input = SniffInput::new(bytes);
+        input.transport_charset = charset;
+        let (e, c) = sniff_html_encoding(&input);
+        (e.name(), c)
+    }
+
+    #[test]
+    fn order() {
+        use Confidence::*;
+        assert_eq!(
+            sniff(b"\xEF\xBB\xBF<meta charset=gbk>", Some("big5")),
+            ("UTF-8", Certain)
+        );
+        assert_eq!(sniff(b"\xFF\xFEa\0", None), ("UTF-16LE", Certain));
+        assert_eq!(
+            sniff(b"<meta charset=gbk>", Some("Shift_JIS")),
+            ("Shift_JIS", Certain)
+        );
+        assert_eq!(
+            sniff(b"<meta charset=gbk>", Some("bogus")),
+            ("GBK", Tentative)
+        );
+        assert_eq!(sniff(b"<p>plain ascii", None), ("windows-1252", Tentative));
+        assert_eq!(sniff("<p>caf\u{e9}".as_bytes(), None), ("UTF-8", Tentative));
+        assert_eq!(sniff(b"<p>caf\xE9", None), ("windows-1252", Tentative));
+        // latin1 is windows-1252
+        assert_eq!(sniff(b"", Some("ISO-8859-1")), ("windows-1252", Certain));
+        let mut input = SniffInput::new(b"<p>x");
+        input.parent = Some(encoding_rs::SHIFT_JIS);
+        assert_eq!(sniff_html_encoding(&input).0.name(), "Shift_JIS");
+        input.parent = Some(UTF_16LE);
+        assert_eq!(sniff_html_encoding(&input).0.name(), "windows-1252");
+    }
+
+    #[test]
+    fn prescan_cases() {
+        let p = |s: &[u8]| prescan(s).map(|e| e.name());
+        assert_eq!(p(b"<meta charset=\"koi8-r\">"), Some("KOI8-R"));
+        assert_eq!(p(b"<META CHARSET='ISO-8859-2'>"), Some("ISO-8859-2"));
+        assert_eq!(
+            p(b"<meta http-equiv=\"Content-Type\" content=\"text/html; charset=euc-kr\">"),
+            Some("EUC-KR")
+        );
+        // content without the pragma doesn't count
+        assert_eq!(p(b"<meta content=\"text/html; charset=euc-kr\">"), None);
+        // pragma after content works too
+        assert_eq!(
+            p(b"<meta content='text/html; charset=gb2312' http-equiv=content-type>"),
+            Some("GBK")
+        );
+        // comments are skipped, including "<!-->"
+        assert_eq!(
+            p(b"<!-- <meta charset=big5> --><meta charset=utf-8>"),
+            Some("UTF-8")
+        );
+        assert_eq!(p(b"<!--><meta charset=big5>"), Some("Big5"));
+        // attributes of other tags are skipped
+        assert_eq!(
+            p(b"<div title='<meta charset=big5>'><meta charset=windows-1251>"),
+            Some("windows-1251")
+        );
+        // utf-16 in a meta means utf-8; x-user-defined means windows-1252
+        assert_eq!(p(b"<meta charset=utf-16>"), Some("UTF-8"));
+        assert_eq!(p(b"<meta charset=x-user-defined>"), Some("windows-1252"));
+        // the first charset attribute wins
+        assert_eq!(p(b"<meta charset=big5 charset=gbk>"), Some("Big5"));
+        assert_eq!(p(b"<meta/charset=gbk>"), Some("GBK"));
+        assert_eq!(p(b"<metacharset=gbk>"), None);
+        assert_eq!(p(b"<meta charset=bogus><meta charset=gbk>"), Some("GBK"));
+        assert_eq!(
+            p(b"<?xml version='1.0' encoding='bogus'?><meta charset=gbk>"),
+            Some("GBK")
+        );
+        assert_eq!(p(b"<meta charset=\"unterminated"), None);
+    }
+
+    #[test]
+    fn meta_content() {
+        let e = |s: &[u8]| encoding_from_meta_content(s).map(|e| e.name());
+        assert_eq!(e(b"text/html; charset=utf-8"), Some("UTF-8"));
+        assert_eq!(e(b"text/html; CHARSET = \"shift_jis\""), Some("Shift_JIS"));
+        assert_eq!(e(b"charset='unterminated"), None);
+        assert_eq!(e(b"charsetx charset=gbk"), Some("GBK"));
+        assert_eq!(e(b"text/html"), None);
+    }
+
+    #[test]
+    fn decode_helpers() {
+        assert_eq!(utf8_decode(b"\xEF\xBB\xBFhi"), "hi");
+        assert_eq!(utf8_decode_without_bom(b"\xEF\xBB\xBFhi"), "\u{FEFF}hi");
+        assert_eq!(utf8_decode(b"a\xFFb"), "a\u{FFFD}b");
+        assert!(utf8_decode_without_bom_or_fail(b"a\xFF").is_none());
+        let (text, used) = decode(b"caf\xE9", WINDOWS_1252);
+        assert_eq!((text.as_ref(), used.name()), ("caf\u{e9}", "windows-1252"));
+        let (text, used) = decode(b"\xFE\xFF\0a", WINDOWS_1252);
+        assert_eq!((text.as_ref(), used.name()), ("a", "UTF-16BE"));
+        let mut h = HeaderList::new();
+        h.append("Content-Type", "text/plain; charset=iso-8859-1");
+        assert_eq!(decode_body(b"\xE9", &h), "\u{e9}");
+        assert_eq!(
+            decode_body("\u{e9}".as_bytes(), &HeaderList::new()),
+            "\u{e9}"
+        );
+    }
+}

@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>yt: loading</title>
+<!-- A public YouTube video embedded at 1280x720, muted and playing, for tools/scrub/youtube.py. A move
+outside the player is reported in the title ("at=x,y"), for the driver to find the page in the window. -->
+<style>
+  html, body { margin: 0; background: #222; overflow: hidden; width: 100%; height: 100%; }
+  #player { position: absolute; left: 0; top: 0; }
+</style>
+<div id="player"></div>
+<script>
+const q = new URLSearchParams(location.search);
+const id = q.get('v') || 'aqz-KE-bpKQ';
+let player = null, state = -2, t = 0, at = 'none';
+addEventListener('pointermove', (e) => { at = `${Math.round(e.clientX)},${Math.round(e.clientY)}`; });
+const tag = document.createElement('script');
+tag.src = 'https://www.youtube.com/iframe_api';
+document.head.appendChild(tag);
+function onYouTubeIframeAPIReady() {
+  player = new YT.Player('player', {
+    width: 1280, height: 720, videoId: id,
+    playerVars: { autoplay: 1, mute: 1, playsinline: 1, controls: 1, origin: location.origin },
+    events: { onReady: (e) => { e.target.mute(); if (!q.has('paused')) e.target.playVideo(); } },
+  });
+}
+setInterval(() => {
+  if (player && player.getPlayerState) { state = player.getPlayerState(); t = player.getCurrentTime(); }
+  document.title = `yt state=${state} t=${t.toFixed(1)} at=${at} dpr=${devicePixelRatio}`;
+}, 250);
+</script>

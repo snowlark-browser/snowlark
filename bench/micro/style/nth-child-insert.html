@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>style/nth-child-insert</title>
+<!-- Insert an item at the start of a 200-item list styled with :nth-child, read a computed style, remove it, read again. -->
+<style>li:nth-child(odd) { color: rgb(0, 0, 255); } li:nth-child(3n+1) { background: rgb(240, 240, 240); }</style>
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const ul = document.createElement('ul');
+ul.innerHTML = MicroBench.repeat(200, (i) => '<li>Item ' + i + '</li>');
+document.getElementById('host').appendChild(ul);
+const last = ul.lastElementChild;
+MicroBench.run({
+  run() {
+    const li = document.createElement('li');
+    li.textContent = 'new';
+    ul.insertBefore(li, ul.firstChild);
+    getComputedStyle(last).color;
+    li.remove();
+    getComputedStyle(last).color;
+  },
+});
+</script>

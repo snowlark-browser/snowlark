@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/svg-build-200</title>
+<!-- Build an SVG chart of 200 rects with createElementNS and setAttribute, insert it, remove it (the chart suites). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+const NS = 'http://www.w3.org/2000/svg';
+MicroBench.run({
+  run() {
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', '800');
+    svg.setAttribute('height', '200');
+    for (let i = 0; i < 200; i++) {
+      const r = document.createElementNS(NS, 'rect');
+      r.setAttribute('x', String(i * 4));
+      r.setAttribute('y', String(200 - (i % 50) * 4));
+      r.setAttribute('width', '3');
+      r.setAttribute('height', String((i % 50) * 4));
+      r.setAttribute('fill', i % 2 ? '#36c' : '#c63');
+      svg.appendChild(r);
+    }
+    host.appendChild(svg);
+    host.removeChild(svg);
+  },
+});
+</script>

@@ -1,0 +1,41 @@
+/*
+ * The rules the HTML Standard, section 15 "Rendering", expects "in quirks mode"
+ * (https://html.spec.whatwg.org/multipage/rendering.html, CC BY 4.0, WHATWG). Added to the user-agent
+ * origin after ua.css when the document is in quirks mode.
+ *
+ * Not here: the §15.3.9 margin collapsing quirks (they depend on "substantial" siblings, which no selector
+ * expresses; layout owns them) and the `td[nowrap][width]` hint (hints.rs).
+ */
+
+@namespace "http://www.w3.org/1999/xhtml";
+
+/* 15.3.3 Flow content */
+
+form { margin-block-end: 1em; }
+
+/* 15.3.7 Lists */
+
+li { list-style-position: inside; }
+li :is(dir, menu, ol, ul) { list-style-position: outside; }
+:is(dir, menu, ol, ul) :is(dir, menu, ol, ul, li) { list-style-position: unset; }
+
+/* 15.3.8 Tables */
+
+table {
+  font-weight: initial;
+  font-style: initial;
+  font-variant: initial;
+  font-size: initial;
+  line-height: initial;
+  white-space: initial;
+  text-align: initial;
+}
+
+/* 15.3.10 Form controls */
+
+input:not([type=image i]), textarea { box-sizing: border-box; }
+
+/* 15.4.2 Images */
+
+img[align=left i] { margin-right: 3px; }
+img[align=right i] { margin-left: 3px; }

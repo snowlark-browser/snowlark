@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>bindings/element-setters-100</title>
+<!-- Set id and title of 100 elements. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<div>x</div>');
+const els = Array.from(host.children);
+let k = 0;
+MicroBench.run({
+  run() {
+    k++;
+    for (let i = 0; i < els.length; i++) {
+      els[i].id = 'e' + i + '_' + (k & 1);
+      els[i].title = 'title ' + (k & 1);
+    }
+  },
+});
+</script>

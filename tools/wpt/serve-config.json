@@ -1,0 +1,15 @@
+{
+  "browser_host": "web-platform.test",
+  "server_host": "127.0.0.1",
+  "check_subdomains": false,
+  "ports": {
+    "http": [8000, 8001],
+    "https": [8443, 8444],
+    "http-local": ["auto"],
+    "http-public": ["auto"],
+    "https-local": ["auto"],
+    "https-public": ["auto"],
+    "ws": ["auto"],
+    "wss": ["auto"]
+  }
+}

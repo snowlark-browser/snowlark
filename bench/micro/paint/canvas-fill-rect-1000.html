@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>paint/canvas-fill-rect-1000</title>
+<!-- 1,000 fillRect calls with changing colors, then getImageData of one pixel (forces the raster). -->
+<body>
+<canvas id="c" width="512" height="512"></canvas>
+<script src="../resources/runner.js"></script>
+<script>
+const ctx = document.getElementById('c').getContext('2d');
+const colors = ['#f00', '#0f0', '#00f', '#ff0', '#0ff', '#f0f', '#888', '#123456'];
+MicroBench.run({
+  run() {
+    for (let i = 0; i < 1000; i++) {
+      ctx.fillStyle = colors[i & 7];
+      ctx.fillRect((i * 7) % 480, (i * 13) % 480, 32, 32);
+    }
+    ctx.getImageData(0, 0, 1, 1);
+  },
+});
+</script>

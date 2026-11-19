@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>selectors/get-by-class-live</title>
+<!-- A live getElementsByClassName collection read after each class change. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<div class="container"><ul class="list">' + MicroBench.repeat(100, (i) => '<li class="item' + (i % 7 ? '' : ' hidden') + '"><div class="view"><span class="label" data-k="' + (i % 3 ? 'x' : 'y') + '">Item ' + i + '</span><a class="link" href="#">go</a></div></li>') + '</ul><p class="needle">end</p></div>';
+const live = host.getElementsByClassName('item');
+const items = Array.from(live);
+let n = 0;
+MicroBench.run({
+  run() {
+    for (let i = 0; i < 10; i++) {
+      items[i * 10].classList.toggle('item');
+      n += live.length;
+      items[i * 10].classList.toggle('item');
+      n += live[50] ? 1 : 0;
+    }
+  },
+});
+</script>

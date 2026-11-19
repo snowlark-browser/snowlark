@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>layout/geometry-reads-200</title>
+<!-- getBoundingClientRect() of 200 elements, nothing changed. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(200, (i) => '<div class="t">Item ' + i + ' with a few words of text that wrap at a narrow width</div>');
+const els = Array.from(host.children);
+let y = 0;
+MicroBench.run({
+  run() { y = 0; for (const e of els) y += e.getBoundingClientRect().top; },
+});
+</script>

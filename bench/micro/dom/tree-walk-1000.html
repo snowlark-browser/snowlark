@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/tree-walk-1000</title>
+<!-- Walk a 1,000-node tree with firstChild and nextSibling, counting elements. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<div class="r"><span>a</span><span>b</span><em>c</em></div>');
+let count = 0;
+function walk(n) {
+  for (let c = n.firstChild; c; c = c.nextSibling) {
+    if (c.nodeType === 1) count++;
+    walk(c);
+  }
+}
+MicroBench.run({
+  run() { count = 0; walk(host); },
+  check() { return count === 400; },
+});
+</script>

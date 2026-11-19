@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>selectors/closest-200</title>
+<!-- Element.closest('.container') from 200 leaves (event delegation's lookup). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<div class="container"><ul class="list">' + MicroBench.repeat(100, (i) => '<li class="item' + (i % 7 ? '' : ' hidden') + '"><div class="view"><span class="label" data-k="' + (i % 3 ? 'x' : 'y') + '">Item ' + i + '</span><a class="link" href="#">go</a></div></li>') + '</ul><p class="needle">end</p></div>';
+const els = Array.from(host.querySelectorAll('span, a'));
+let n = 0;
+MicroBench.run({
+  run() { n = 0; for (const e of els) if (e.closest('.container')) n++; },
+  check() { return n === 200; },
+});
+</script>

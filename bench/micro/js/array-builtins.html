@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/array-builtins</title>
+<!-- map, filter, reduce, indexOf, slice, concat and sort on arrays of 1,000 numbers and objects (array builtins); no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+const nums = Array.from({ length: 1000 }, (_, i) => (i * 7919) % 1000);
+const items = nums.map((n, i) => ({ id: i, n, done: (n & 1) === 0 }));
+let sink = 0;
+MicroBench.run({
+  run() {
+    const doubled = nums.map((n) => n * 2);
+    const open = items.filter((t) => !t.done);
+    const total = open.reduce((a, t) => a + t.n, 0);
+    const idx = doubled.indexOf(1998) + nums.includes(500);
+    const copy = nums.slice(100, 900).concat(doubled.slice(0, 100));
+    copy.sort((a, b) => a - b);
+    const ids = items.findIndex((t) => t.id === 777) + items.some((t) => t.n === 999);
+    sink += total + idx + copy[400] + ids + open.length;
+  },
+  check() { return sink > 0; },
+});
+</script>

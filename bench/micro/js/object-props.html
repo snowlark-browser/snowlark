@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/object-props</title>
+<!-- Read and write properties of 1,000 objects of four shapes (polymorphic inline caches); no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+const objs = [];
+for (let i = 0; i < 1000; i++) {
+  switch (i % 4) {
+    case 0: objs.push({ x: i, y: 1, z: 2 }); break;
+    case 1: objs.push({ y: 1, x: i, z: 2, w: 0 }); break;
+    case 2: objs.push({ z: 2, x: i, y: 1 }); break;
+    default: objs.push({ a: 0, x: i, y: 1, z: 2 });
+  }
+}
+let sink = 0;
+MicroBench.run({
+  run() {
+    let s = 0;
+    for (let k = 0; k < 10; k++) {
+      for (let i = 0; i < objs.length; i++) {
+        const o = objs[i];
+        s += o.x + o.y * o.z;
+        o.y = (o.y + 1) & 7;
+      }
+    }
+    sink += s;
+  },
+  check() { return sink > 0; },
+});
+</script>

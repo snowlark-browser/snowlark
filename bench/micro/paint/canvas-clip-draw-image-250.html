@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>paint/canvas-clip-draw-image-250</title>
+<!-- A frame of a tiled reveal: an 1860x686 image element drawn whole, then 250 of its 45x40 cells, each inside
+     its own rectangle clip (save, beginPath, rect, clip, drawImage, restore), then getImageData of one pixel. -->
+<body>
+<canvas id="c" width="1860" height="686"></canvas>
+<script src="../resources/runner.js"></script>
+<script>
+const W = 1860, H = 686, COLS = 42, ROW = 39;
+const ctx = document.getElementById('c').getContext('2d');
+const img = new Image();
+const cells = [];
+let frame = 0;
+MicroBench.run({
+  async setup() {
+    const src = document.createElement('canvas');
+    src.width = W;
+    src.height = H;
+    const s = src.getContext('2d');
+    for (let y = 0; y < H; y += ROW) {
+      for (let x = 0; x < COLS; x++) {
+        s.fillStyle = `rgb(${(x * 6) % 256},${(y * 3) % 256},${(x * y) % 256})`;
+        s.fillRect(x * W / COLS, y, W / COLS + 1, ROW);
+      }
+    }
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = () => reject(new Error('the image did not load'));
+      img.src = src.toDataURL();
+    });
+    const step = W / COLS;
+    for (let row = 0; row * ROW < H; row++) {
+      for (let col = 0; col < COLS; col++) {
+        if ((row * COLS + col) % 3 === 0 && cells.length < 250) cells.push({ x: col * step, y: row * ROW });
+      }
+    }
+  },
+  run() {
+    const w = Math.ceil(W / COLS + 1);
+    frame++;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    ctx.drawImage(img, 0, 0);
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
+      const h = Math.min(40, H - c.y);
+      ctx.globalAlpha = 0.2 + 0.8 * (((i + frame) % 10) / 10);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(Math.floor(c.x), c.y, w + 1, h);
+      ctx.clip();
+      ctx.drawImage(img, c.x, c.y, w, h, c.x, c.y, w, h);
+      ctx.restore();
+    }
+    ctx.restore();
+    ctx.getImageData(0, 0, 1, 1);
+  },
+  check() {
+    // The cell at the origin shows the image's first tile (black) over white, not white.
+    const p = ctx.getImageData(10, 10, 1, 1).data;
+    return cells.length === 250 && p[3] === 255 && p[0] < 250;
+  },
+});
+</script>

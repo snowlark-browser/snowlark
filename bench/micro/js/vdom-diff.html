@@ -1,0 +1,41 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/vdom-diff</title>
+<!-- Build two virtual trees of 200 keyed list items and diff them into a patch list (a framework's render and reconcile, plain objects only); no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+function h(tag, props, ...children) { return { tag, props: props || {}, children, key: props && props.key }; }
+function render(items, sel) {
+  return h('ul', { className: 'list' }, ...items.map((t) =>
+    h('li', { key: t.id, className: t.id === sel ? 'item selected' : 'item' },
+      h('input', { type: 'checkbox', checked: t.done }), h('label', null, t.title), h('button', { className: 'x' }))));
+}
+function diff(a, b, patches) {
+  if (a.tag !== b.tag) { patches.push({ op: 'replace', b }); return; }
+  for (const k in b.props) if (a.props[k] !== b.props[k]) patches.push({ op: 'prop', k, v: b.props[k] });
+  for (const k in a.props) if (!(k in b.props)) patches.push({ op: 'remove-prop', k });
+  const old = new Map();
+  for (const c of a.children) if (typeof c === 'object' && c.key !== undefined) old.set(c.key, c);
+  for (let i = 0; i < b.children.length; i++) {
+    const c = b.children[i];
+    if (typeof c !== 'object') { if (a.children[i] !== c) patches.push({ op: 'text', c }); continue; }
+    const prev = c.key !== undefined ? old.get(c.key) : a.children[i];
+    if (prev) diff(prev, c, patches); else patches.push({ op: 'insert', c });
+  }
+}
+const items = Array.from({ length: 200 }, (_, i) => ({ id: i, title: 'Todo ' + i, done: i % 4 === 0 }));
+let sel = 0, sink = 0;
+MicroBench.run({
+  run() {
+    const a = render(items, sel);
+    sel = (sel + 7) % 200;
+    items[sel].done = !items[sel].done;
+    const b = render(items, sel);
+    const patches = [];
+    diff(a, b, patches);
+    sink += patches.length;
+  },
+  check() { return sink > 0; },
+});
+</script>

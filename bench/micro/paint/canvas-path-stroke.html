@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>paint/canvas-path-stroke</title>
+<!-- Stroke a 500-segment path, then getImageData of one pixel. -->
+<body>
+<canvas id="c" width="512" height="512"></canvas>
+<script src="../resources/runner.js"></script>
+<script>
+const ctx = document.getElementById('c').getContext('2d');
+MicroBench.run({
+  run() {
+    ctx.clearRect(0, 0, 512, 512);
+    ctx.beginPath();
+    ctx.moveTo(0, 256);
+    for (let i = 0; i < 500; i++) ctx.lineTo(i, 256 + Math.sin(i / 10) * 200);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#36c';
+    ctx.stroke();
+    ctx.getImageData(0, 0, 1, 1);
+  },
+});
+</script>

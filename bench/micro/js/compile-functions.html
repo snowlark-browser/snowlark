@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/compile-functions</title>
+<!-- Parse, compile and run a new 40-line function each call, source never seen before (the parser and bytecode compiler); no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+const body = [];
+for (let i = 0; i < 20; i++) {
+  body.push(`const v${i} = a.map((x) => x * ${i} + (b[${i % 5}] || 0)).filter((x) => x % 3 !== ${i % 3});`);
+  body.push(`if (v${i}.length > ${i}) { out.push({ k: 'k${i}', n: v${i}.length, s: \`\${v${i}[0]}-${i}\` }); }`);
+}
+const text = body.join('\n') + '\nreturn out.length;';
+let counter = 0;
+let sink = 0;
+const a = [1, 2, 3, 4, 5, 6, 7, 8];
+const b = [1, 2, 3, 4, 5];
+MicroBench.run({
+  run() {
+    const f = new Function('a', 'b', 'out', `// unique ${counter++}\n` + text);
+    sink += f(a, b, []);
+  },
+  check() { return sink > 0; },
+});
+</script>

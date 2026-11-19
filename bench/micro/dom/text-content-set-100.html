@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/text-content-set-100</title>
+<!-- Set textContent on 100 spans in the document. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<span>' + i + '</span> ');
+const spans = Array.from(host.querySelectorAll('span'));
+let k = 0;
+MicroBench.run({
+  run() {
+    k++;
+    for (let i = 0; i < spans.length; i++) spans[i].textContent = 'v' + k + '_' + i;
+  },
+});
+</script>

@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/append-remove-100</title>
+<!-- Build a 100-item list with createElement and appendChild, insert it into the document, remove it (TodoMVC's vanilla render). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+MicroBench.run({
+  run() {
+    const ul = document.createElement('ul');
+    for (let i = 0; i < 100; i++) {
+      const li = document.createElement('li');
+      li.className = 'item';
+      li.appendChild(document.createTextNode('Item ' + i));
+      ul.appendChild(li);
+    }
+    host.appendChild(ul);
+    host.removeChild(ul);
+  },
+});
+</script>

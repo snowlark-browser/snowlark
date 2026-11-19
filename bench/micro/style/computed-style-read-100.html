@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>style/computed-style-read-100</title>
+<!-- Read three computed properties of 100 elements, nothing changed. -->
+<style>.label { color: rgb(10, 20, 30); font-size: 14px; }</style>
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<div class="item"><span class="label">Item ' + i + '</span><span class="meta">m</span></div>');
+const items = Array.from(host.querySelectorAll('.label'));
+let n = 0;
+MicroBench.run({
+  run() {
+    for (let i = 0; i < items.length; i++) {
+      const cs = getComputedStyle(items[i]);
+      n += cs.color.length + cs.fontSize.length + cs.display.length;
+    }
+  },
+});
+</script>

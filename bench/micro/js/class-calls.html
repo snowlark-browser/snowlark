@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/class-calls</title>
+<!-- Make 300 class instances (two-level inheritance) and call methods, getters, closures, spread and destructuring on them; no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+class Shape {
+  constructor(x, y) { this.x = x; this.y = y; }
+  move(dx, dy) { return new this.constructor(this.x + dx, this.y + dy, ...this.extra()); }
+  extra() { return []; }
+  get norm() { return Math.abs(this.x) + Math.abs(this.y); }
+}
+class Box extends Shape {
+  constructor(x, y, w = 1, h = 1) { super(x, y); this.w = w; this.h = h; }
+  extra() { return [this.w, this.h]; }
+  area() { return this.w * this.h; }
+}
+class Circle extends Shape {
+  constructor(x, y, r = 1) { super(x, y); this.r = r; }
+  extra() { return [this.r]; }
+  area() { return 3 * this.r * this.r; }
+}
+const adder = (k) => (v) => v + k;
+let sink = 0;
+MicroBench.run({
+  run() {
+    let total = 0;
+    const add2 = adder(2);
+    for (let i = 0; i < 300; i++) {
+      const s = i & 1 ? new Box(i, -i, 2, 3) : new Circle(-i, i, 2);
+      const m = s.move(1, 1);
+      const { x, y, ...rest } = m;
+      total += add2(m.area()) + m.norm + x + y + Object.keys(rest).length;
+    }
+    sink += total;
+  },
+  check() { return sink > 0; },
+});
+</script>

@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>paint/canvas-fill-text-100</title>
+<!-- 100 fillText calls, then getImageData of one pixel. -->
+<body>
+<canvas id="c" width="512" height="512"></canvas>
+<script src="../resources/runner.js"></script>
+<script>
+const ctx = document.getElementById('c').getContext('2d');
+ctx.font = '14px sans-serif';
+MicroBench.run({
+  run() {
+    ctx.clearRect(0, 0, 512, 512);
+    for (let i = 0; i < 100; i++) ctx.fillText('Label ' + i, (i % 5) * 100, 14 + Math.floor(i / 5) * 24);
+    ctx.getImageData(0, 0, 1, 1);
+  },
+});
+</script>

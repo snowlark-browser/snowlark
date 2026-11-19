@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>events/delegated-click</title>
+<!-- click() on 10 items of a list whose one listener delegates through closest() (jQuery's .on()). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<ul class="list">' + MicroBench.repeat(100, (i) => '<li class="item"><div class="view"><label>Item ' + i + '</label><span class="x">x</span></div></li>') + '</ul>';
+let hits = 0;
+host.addEventListener('click', (e) => {
+  const li = e.target.closest('.item');
+  if (li && e.target.matches('.x')) hits++;
+});
+const targets = Array.from(host.querySelectorAll('.x')).filter((e, i) => i % 10 === 0);
+MicroBench.run({
+  run() { for (const t of targets) t.click(); },
+  check() { return hits > 0; },
+});
+</script>

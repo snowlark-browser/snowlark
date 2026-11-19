@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>layout/grid-relayout</title>
+<!-- Change the width of a 10-column grid of 200 cells, then read its height. -->
+<style>.grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }</style>
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<div class="grid">' + MicroBench.repeat(200, (i) => '<div>Cell ' + i + '</div>') + '</div>';
+const grid = host.firstElementChild;
+let wide = false;
+MicroBench.run({
+  run() {
+    wide = !wide;
+    grid.style.width = wide ? '1000px' : '700px';
+    MicroBench.flush(grid);
+  },
+});
+</script>

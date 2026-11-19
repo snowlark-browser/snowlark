@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>layout/flex-row-relayout</title>
+<!-- Change the width of a flex row of 100 items with text, then read its height. -->
+<style>.row { display: flex; flex-wrap: wrap; } .cell { flex: 1 0 60px; padding: 2px; }</style>
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<div class="row">' + MicroBench.repeat(100, (i) => '<div class="cell">Item ' + i + ' text</div>') + '</div>';
+const row = host.firstElementChild;
+let wide = false;
+MicroBench.run({
+  run() {
+    wide = !wide;
+    row.style.width = wide ? '1000px' : '800px';
+    MicroBench.flush(row);
+  },
+});
+</script>

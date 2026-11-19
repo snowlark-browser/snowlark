@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>bindings/node-getters-100</title>
+<!-- Read firstChild, parentNode, nextSibling, nodeType, tagName, id and className of 100 elements. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<div id="d' + i + '" class="c' + (i % 5) + '"><span>t</span></div>');
+const els = Array.from(host.children);
+let n = 0;
+MicroBench.run({
+  run() {
+    for (const e of els) {
+      n += e.firstChild.nodeType + (e.parentNode ? 1 : 0) + (e.nextSibling ? 1 : 0);
+      n += e.tagName.length + e.id.length + e.className.length;
+    }
+  },
+});
+</script>

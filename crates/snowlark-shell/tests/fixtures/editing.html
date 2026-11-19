@@ -1,0 +1,16 @@
+<!doctype html>
+<title>Editing</title>
+<style>
+  body { font: 16px 'Segoe UI', sans-serif; margin: 24px; max-width: 700px }
+  #editor { border: 1px solid #999; padding: 8px 12px; min-height: 120px; border-radius: 4px }
+  #editor:focus { outline: 2px solid #0078d4 }
+  .note::selection { background: #ffd54f; color: #000 }
+</style>
+<p>Select this paragraph with the mouse (drag, double-click a word, triple-click the paragraph); Ctrl+A selects the page and Ctrl+C copies it.</p>
+<p class=note>This paragraph has its own <b>::selection</b> colors.</p>
+<div id=editor contenteditable><p>An <b>editable</b> paragraph.</p><p>A second one: type, press Enter, Backspace, Ctrl+B.</p></div>
+<p id=log>input events:</p>
+<script>
+  const ed = document.getElementById('editor'), log = document.getElementById('log');
+  ed.addEventListener('input', e => log.textContent = 'last input: ' + e.inputType + (e.data ? ' "' + e.data + '"' : ''));
+</script>

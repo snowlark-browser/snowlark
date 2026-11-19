@@ -1,0 +1,16 @@
+[package]
+name = "snowlark-layout"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Snowlark layout: box tree, block/inline/table/positioned layout, flex and grid through taffy, fragments, painting"
+
+[dependencies]
+# UAX #9 over a formatting context's text with CSS's bidi controls (CSS Writing Modes 4 §2.4).
+unicode-bidi = "0.3"
+snowlark-dom = { path = "../snowlark-dom" }
+snowlark-paint = { path = "../snowlark-paint" }
+kurbo = "0.13"
+rustc-hash = "2"
+smallvec = { version = "1.13", features = ["union", "const_generics"] }
+taffy = { version = "0.15", default-features = false, features = ["std", "flexbox", "grid", "calc", "content_size", "detailed_layout_info"] }

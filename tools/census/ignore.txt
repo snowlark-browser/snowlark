@@ -1,0 +1,41 @@
+# Members Chrome exposes that the census does not count as missing (fnmatch patterns over the
+# census keys: "Name", "Name.static", "Name.prototype.member", "window.member", "self.member",
+# "document.member"). Applied to the Snowlark-only side too. Keep it small: everything here is a
+# judgement that Snowlark should NOT add it.
+
+# Chrome-only prefixed APIs.
+*webkit*
+*WebKit*
+*Webkit*
+window.chrome
+window.onsearch
+
+# Chrome-only, non-standard, and not in Firefox or Safari.
+Performance.prototype.memory
+MouseEvent.prototype.fromElement
+MouseEvent.prototype.toElement
+
+# The Privacy Sandbox ad APIs (Protected Audience, Shared Storage, Fenced Frames, Topics,
+# Attribution Reporting), deprecated and being removed from Chrome.
+*AdAuction*
+*InterestGroup*
+*adAuction*
+*interestGroup*
+Fence
+Fence.*
+FencedFrameConfig
+FencedFrameConfig.*
+HTMLFencedFrameElement
+HTMLFencedFrameElement.*
+SharedStorage*
+window.sharedStorage
+self.sharedStorage
+ProtectedAudience
+ProtectedAudience.*
+Navigator.prototype.protectedAudience
+WorkerNavigator.prototype.protectedAudience
+Navigator.prototype.deprecated*
+Document.prototype.browsingTopics
+*AttributionReporting*
+*attributionSrc*
+*attributionReporting*

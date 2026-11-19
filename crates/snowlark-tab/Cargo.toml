@@ -1,0 +1,24 @@
+[package]
+name = "snowlark-tab"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The renderer half of a tab: the page driver, the raster thread and the messages between a tab and the browser"
+
+[dependencies]
+snowlark-dom = { path = "../snowlark-dom" }
+snowlark-idb = { path = "../snowlark-idb" }
+snowlark-ipc = { path = "../snowlark-ipc" }
+snowlark-js = { path = "../snowlark-js" }
+snowlark-layout = { path = "../snowlark-layout" }
+snowlark-audio = { path = "../snowlark-audio" }
+snowlark-media = { path = "../snowlark-media" }
+snowlark-net = { path = "../snowlark-net" }
+snowlark-paint = { path = "../snowlark-paint" }
+snowlark-page = { path = "../snowlark-page" }
+snowlark-render = { path = "../snowlark-render" }
+snowlark-style = { path = "../snowlark-style" }
+serde = { version = "1", features = ["derive"] }
+
+[lib]
+doctest = false

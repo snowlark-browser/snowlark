@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>bindings/create-element-1000</title>
+<!-- document.createElement('div') 1,000 times (a new wrapper each), nothing inserted. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+let last;
+MicroBench.run({
+  run() { for (let i = 0; i < 1000; i++) last = document.createElement('div'); },
+});
+</script>

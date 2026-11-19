@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/string-ops</title>
+<!-- Build, split, join, search, slice and case-map strings of 200 words (string builtins); no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+const words = Array.from({ length: 200 }, (_, i) => 'Word' + i.toString(36) + (i % 3 ? 'ing' : 'ed'));
+let sink = 0;
+MicroBench.run({
+  run() {
+    let s = '';
+    for (let i = 0; i < words.length; i++) s += `${words[i]}-${i} `;
+    const parts = s.trim().split(' ');
+    const joined = parts.join(',').toLowerCase();
+    let hits = 0;
+    for (let i = 0; i < parts.length; i += 7) {
+      if (joined.indexOf(parts[i].toLowerCase()) >= 0) hits++;
+      if (parts[i].startsWith('word1')) hits++;
+    }
+    sink += hits + joined.slice(100, 200).length + joined.charCodeAt(50) + s.toUpperCase().length;
+  },
+  check() { return sink > 0; },
+});
+</script>

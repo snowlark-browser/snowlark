@@ -1,0 +1,70 @@
+[package]
+name = "snowlark-page"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autotests = false
+description = "A document's lifetime in Snowlark: the engine behind the bindings, events, the window and its realm, the event loop, loading and scripts"
+
+[dependencies]
+snowlark-dom = { path = "../snowlark-dom" }
+snowlark-bindings = { path = "../snowlark-bindings" }
+snowlark-js = { path = "../snowlark-js" }
+snowlark-net = { path = "../snowlark-net" }
+snowlark-render = { path = "../snowlark-render" }
+snowlark-style = { path = "../snowlark-style" }
+snowlark-layout = { path = "../snowlark-layout" }
+snowlark-paint = { path = "../snowlark-paint" }
+snowlark-audio = { path = "../snowlark-audio" }
+snowlark-media = { path = "../snowlark-media" }
+snowlark-idb = { path = "../snowlark-idb" }
+v8 = { workspace = true }
+url = "2.5"
+encoding_rs = "0.8"
+selectors = "0.41"
+cssparser = "0.38"
+precomputed-hash = "0.1"
+smallvec = "1.13"
+kurbo = "0.13"
+rustc-hash = "2"
+getrandom = "0.3"
+regex = "1"
+# (Compression Streams: deflate and gzip; brotli, which snowlark-net also decodes)
+flate2 = "1"
+brotli = "8"
+# (SubtleCrypto.digest: the SHA family, from the TLS stack's crypto library)
+ring = "0.17"
+# (SubtleCrypto's key operations: RustCrypto's pure-Rust primitives, for what ring lacks: AES modes
+# and key wrap, GHASH for every GCM tag length, RSA-OAEP and RSA key generation, ECDH with imported
+# keys, P-521, Ed25519 and X25519, and DER key formats)
+aes = "0.8"
+ghash = "0.5"
+hmac = "0.12"
+sha1 = { version = "0.10", features = ["oid"] }
+sha2 = { version = "0.10", features = ["oid"] }
+hkdf = "0.12"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+rsa = { version = "0.9", features = ["hazmat"] }
+p256 = { version = "0.13", features = ["ecdsa", "ecdh", "pkcs8"] }
+p384 = { version = "0.13", features = ["ecdsa", "ecdh", "pkcs8"] }
+p521 = { version = "0.13", features = ["ecdsa", "ecdh", "pkcs8"] }
+ecdsa = { version = "0.16", features = ["arithmetic", "hazmat"] }
+ed25519-dalek = "2"
+x25519-dalek = "2"
+elliptic-curve = { version = "0.13", features = ["arithmetic", "ecdh", "sec1", "pkcs8"] }
+sec1 = { version = "0.7", features = ["der"] }
+pkcs1 = "0.7"
+der = { version = "0.7", features = ["oid", "alloc"] }
+spki = { version = "0.7", features = ["alloc"] }
+pkcs8 = { version = "0.10", features = ["alloc"] }
+subtle = "2.6"
+rand_core = { version = "0.6", features = ["getrandom"] }
+base64 = "0.22"
+# (unwrapKey: parsing the unwrapped JWK's JSON outside any realm)
+snowlark-ipc = { path = "../snowlark-ipc" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[test]]
+name = "it"
+path = "tests/it.rs"

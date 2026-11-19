@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>dom/collection-index-mutate-200</title>
+<!-- Walk a 200-item list's children and getElementsByTagName('span') by index, setting an attribute on each item as it goes. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const ul = document.createElement('ul');
+ul.innerHTML = MicroBench.repeat(200, (i) => '<li><span>' + i + '</span></li>');
+document.getElementById('host').appendChild(ul);
+const items = ul.children;
+const spans = ul.getElementsByTagName('span');
+let flip = false;
+MicroBench.run({
+  run() {
+    flip = !flip;
+    const v = flip ? 'a' : 'b';
+    for (let i = 0; i < items.length; i++) items[i].setAttribute('data-state', v);
+    for (let i = 0; i < spans.length; i++) spans[i].className = v;
+  },
+  check() {
+    return items[199].getAttribute('data-state') === spans[199].className;
+  },
+});
+</script>

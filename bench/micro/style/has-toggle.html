@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>style/has-toggle</title>
+<!-- Toggle a class on one of 100 items where :has() on the list depends on it, then read a computed style. -->
+<style>.list:has(.done) { color: rgb(255, 0, 0); } .item:has(.label) { padding: 1px; }</style>
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<div class="list">' + MicroBench.repeat(100, (i) => '<div class="item"><span class="label">Item ' + i + '</span><span class="meta">m</span></div>') + '</div>';
+const list = host.firstElementChild;
+const target = list.children[50];
+MicroBench.run({
+  run() {
+    target.classList.toggle('done');
+    getComputedStyle(list).color;
+  },
+});
+</script>

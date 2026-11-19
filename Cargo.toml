@@ -1,0 +1,43 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+# vendor/ holds patched third-party crates; they are not workspace members.
+exclude = ["vendor"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+
+[workspace.dependencies]
+# Pointer compression: tagged fields of 32 bits, Smis of 31 (docs/v8-speed.md 3c). The library dev.ps1 links is
+# built with it (tools/v8-pgo/pin.txt); `snowlark-js`'s inline field and Smi code assumes it.
+v8 = { version = "158.0", features = ["v8_enable_pointer_compression"] }
+
+[profile.release]
+debug = 1
+codegen-units = 4
+lto = "thin"
+
+# For iterating: `.\dev.ps1 build --profile iter` (target\iter\snowlark.exe). Same optimisation level as
+# release, but incremental and with more codegen units, so an edit rebuilds faster; never what ships.
+[profile.iter]
+inherits = "release"
+incremental = true
+codegen-units = 16
+lto = false
+
+# html5ever 0.40.1 with the HTML parser changes html5lib-tests already expect (processing instructions,
+# <search>, forms and frameset-ok in templates, select fragments, pops reported to the sink). See
+# vendor/html5ever/SNOWLARK-PATCHES.md.
+[patch.crates-io]
+html5ever = { path = "vendor/html5ever" }
+# stylo 0.22.0 with @container enabled for the servo build. See vendor/stylo/SNOWLARK-PATCHES.md.
+stylo = { path = "vendor/stylo" }
+# taffy 0.15.1 with flex layout fixes. See vendor/taffy/SNOWLARK-PATCHES.md.
+taffy = { path = "vendor/taffy" }
+# url 2.5.8 whose parser and API setters are the URL Standard's basic URL parser as written. See
+# vendor/url/SNOWLARK-PATCHES.md.
+url = { path = "vendor/url" }
+# v8 158.0.0 (V8 15.8), the crate's own roll, not on crates.io yet. See vendor/v8/SNOWLARK-PATCHES.md.
+v8 = { path = "vendor/v8" }

@@ -1,0 +1,7 @@
+target/
+*.png
+dist/
+/speedometer-report/
+/.dev/
+/dev.env
+__pycache__/

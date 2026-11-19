@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>style/inline-style-100</title>
+<!-- Set an inline style property on 100 elements, then read a computed style. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<div class="item"><span class="label">Item ' + i + '</span><span class="meta">m</span></div>');
+const items = Array.from(host.children);
+let k = 0;
+MicroBench.run({
+  run() {
+    k++;
+    for (let i = 0; i < items.length; i++) items[i].style.color = (k + i) % 2 ? 'red' : 'blue';
+    getComputedStyle(items[items.length - 1]).color;
+  },
+});
+</script>

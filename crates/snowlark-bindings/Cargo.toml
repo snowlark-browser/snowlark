@@ -1,0 +1,28 @@
+[package]
+name = "snowlark-bindings"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autotests = false
+description = "V8 bindings for Snowlark's DOM, generated from Web IDL by snowlark-idl"
+
+[features]
+# Default bodies (that panic) for every trait method, for test mocks that implement a few interfaces.
+# Never enable it in the engine: a missing implementation must stay a compile error.
+stubs = []
+
+[dependencies]
+v8 = { workspace = true }
+snowlark-js = { path = "../snowlark-js" }
+
+[dev-dependencies]
+snowlark-bindings = { path = ".", features = ["stubs"] }
+
+
+[[bench]]
+name = "getter"
+harness = false
+
+[[test]]
+name = "it"
+path = "tests/it.rs"

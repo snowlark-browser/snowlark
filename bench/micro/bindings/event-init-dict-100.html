@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>bindings/event-init-dict-100</title>
+<!-- 100 KeyboardEvent constructions with an init dictionary (every member of KeyboardEventInit and its
+     inherited dictionaries is read): the conversion TodoMVC-WebComponents and -Lit pay per key press. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+let last = null;
+MicroBench.run({
+  run() {
+    for (let i = 0; i < 100; i++) {
+      last = new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', keyCode: 65, bubbles: true, cancelable: true });
+    }
+  },
+  check() {
+    return last.key === 'a' && last.bubbles;
+  },
+});
+</script>

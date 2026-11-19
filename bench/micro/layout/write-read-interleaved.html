@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>layout/write-read-interleaved</title>
+<!-- Set an element's height and read another's offsetTop, 20 times (forced layout between writes). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(200, (i) => '<div class="t">Item ' + i + ' with a few words of text that wrap at a narrow width</div>');
+const els = Array.from(host.children);
+let k = 0;
+MicroBench.run({
+  run() {
+    k++;
+    for (let i = 0; i < 20; i++) {
+      els[i * 10].style.height = ((k + i) % 2 ? 30 : 40) + 'px';
+      els[199 - i].offsetTop;
+    }
+  },
+});
+</script>

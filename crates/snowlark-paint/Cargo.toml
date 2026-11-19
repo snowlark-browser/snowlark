@@ -1,0 +1,74 @@
+[package]
+name = "snowlark-paint"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autotests = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+windows-core = "0.62"
+windows-numerics = "0.3"
+# `IAsyncOperation::join` for the PDF renderer's asynchronous calls (`pdf`).
+windows-future = "0.3"
+# The system font database resvg draws SVG and canvas text with (snowlark-render); here only to map
+# its files once ([`font_files::map_all`]), which takes `unsafe`.
+fontdb = "0.24"
+rustc-hash = "2"
+# CRCs of the PNG files made of APNG frames for the PNG decoder (`animation::Apng::frame_png`).
+crc32fast = "1"
+smallvec = { version = "1.13", features = ["union", "const_generics"] }
+# UAX #50 Vertical_Orientation (`text-orientation: mixed`).
+unicode-vo = "0.1"
+
+[dependencies.windows]
+version = "0.62"
+features = [
+    # The PDF viewer's rasterizer (`pdf`).
+    "Data_Pdf",
+    "Foundation",
+    "Storage_Streams",
+    "Win32_Devices_Display",
+    "Win32_Foundation",
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct2D_Common",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_DirectWrite",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Imaging",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+    "Win32_Graphics_DirectComposition",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    # Timer resolution for frame pacing (`timer_resolution`).
+    "Win32_Media",
+    "Win32_System_Console",
+    "Win32_System_DataExchange",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Ole",
+    "Win32_System_Performance",
+    "Win32_System_Power",
+    "Win32_System_Registry",
+    "Win32_System_SystemServices",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    # Local time's offset by date (`window::local_offset_ms`).
+    "Win32_System_Time",
+    "Win32_UI_Controls",
+    "Win32_UI_Controls_Dialogs",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_Ime",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+]
+
+[[test]]
+name = "it"
+path = "tests/it.rs"

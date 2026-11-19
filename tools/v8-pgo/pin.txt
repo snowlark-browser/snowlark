@@ -1,0 +1,16 @@
+# The V8 library dev.ps1 links (docs/v8-build.md): the v8 crate's own V8 (same version, same build arguments),
+# its C++ compiled with a profile of Snowlark's workload and ThinLTO, made native again by thinlto-native.py, and
+# its embedded builtins laid out from a profile of the same workload (docs/v8-speed.md). V8 15.8 from the crate's
+# roll (vendor/v8), with pointer compression (the workspace's `v8_enable_pointer_compression`), for which the
+# crate publishes no prebuilt library.
+#
+# dev.ps1 uses it only while Cargo.lock's v8 is `crate`: from SNOWLARK_V8_DIR, <SNOWLARK_DEV_DIR>\v8\<name> or
+# target\v8\<name>, a folder that holds rusty_v8.lib and src_binding.rs (a build of it with tools\v8-pgo, or the
+# two release assets below, which dev.ps1 downloads and unpacks there when they are missing). dev.ps1 checks
+# `url-sha256` (the .gz as downloaded) and the v8 crate `lib-sha256` (the .lib).
+crate=158.0.0
+name=158.0.0-ptrcomp-pgo1-lto2b-bpgo2-pub
+lib-sha256=ad1b3911a7c1efd4e72b47e611fd7a4b84a6f24d0fc04b52fcce4d86d4ce0848
+url=https://github.com/snowlark-browser/snowlark/releases/download/v8-158.0.0-pgo2/rusty_v8_ptrcomp_release_x86_64-pc-windows-msvc.lib.gz
+url-sha256=a38e95d6d482afb1cfbac42c31b2ac3abf33e8a9e4b345338ddb6b1a43fa640d
+binding-url=https://github.com/snowlark-browser/snowlark/releases/download/v8-158.0.0-pgo2/src_binding_ptrcomp_release_x86_64-pc-windows-msvc.rs

@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>parser/inner-html-read-500</title>
+<!-- Serialize a 100-row subtree (about 500 nodes) by reading innerHTML. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<div class="row"><span class="a">Item ' + i + '</span><a href="#">link</a></div>');
+let s = '';
+MicroBench.run({
+  run() { s = host.innerHTML; },
+  check() { return s.length > 5000; },
+});
+</script>

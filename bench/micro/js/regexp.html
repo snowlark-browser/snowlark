@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>js/regexp</title>
+<!-- test, exec, match and replace with regular expressions over 100 lines of text (the regexp engine); no DOM. -->
+<body>
+<script src="../resources/runner.js"></script>
+<script>
+const lines = Array.from({ length: 100 }, (_, i) =>
+  `  item-${i} <b class="x${i % 9}">value ${i * 13}</b> &amp; https://example.com/p/${i}?q=${i % 5} `);
+const reUrl = /https?:\/\/([^/\s]+)(\/[^\s?]*)?(\?\S*)?/;
+const reTag = /<(\w+)([^>]*)>/g;
+const reWs = /^\s+|\s+$/g;
+const reNum = /\d+/g;
+let sink = 0;
+MicroBench.run({
+  run() {
+    let n = 0;
+    for (const line of lines) {
+      const m = reUrl.exec(line);
+      if (m) n += m[1].length + m[2].length;
+      n += line.replace(reWs, '').length;
+      n += line.replace(reTag, '[$1]').length;
+      n += (line.match(reNum) || []).length;
+      if (/class="x[0-4]"/.test(line)) n++;
+    }
+    sink += n;
+  },
+  check() { return sink > 0; },
+});
+</script>

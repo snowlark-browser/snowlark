@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>style/decoration-toggle-100</title>
+<!-- Toggle a class that strikes through and recolours the labels of 100 list items in flex rows (a to-do list's completed items), then read a layout value (the forced update: restyle, box tree, layout). -->
+<style>
+ul { list-style: none; margin: 0; padding: 0; }
+li { display: flex; align-items: center; padding: 4px; border-bottom: 1px solid rgb(200, 200, 200); }
+li label { flex: 1; display: block; color: rgb(60, 60, 60); }
+.done li label { color: rgb(150, 150, 150); text-decoration: line-through; }
+</style>
+<body>
+<ul id="host"></ul>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<li><input type="checkbox"><label>Item <b>' + i + '</b> of the list</label><button>x</button></li>');
+const last = host.lastElementChild;
+let h = 0;
+MicroBench.run({
+  run() {
+    host.classList.toggle('done');
+    h = last.offsetTop;
+  },
+});
+</script>

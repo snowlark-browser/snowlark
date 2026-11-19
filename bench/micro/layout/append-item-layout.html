@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>layout/append-item-layout</title>
+<!-- Append an item to a 100-item list and read its height, then remove it and read again (a TodoMVC add). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const ul = document.createElement('ul');
+ul.innerHTML = MicroBench.repeat(100, (i) => '<li><span>Item ' + i + '</span></li>');
+document.getElementById('host').appendChild(ul);
+MicroBench.run({
+  run() {
+    const li = document.createElement('li');
+    li.textContent = 'new item';
+    ul.appendChild(li);
+    MicroBench.flush(ul);
+    li.remove();
+    MicroBench.flush(ul);
+  },
+});
+</script>

@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>layout/block-list-width</title>
+<!-- Change the width of a container of 200 wrapping text blocks, then read its height. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(200, (i) => '<div class="t">Item ' + i + ' with a few words of text that wrap at a narrow width</div>');
+let wide = false;
+MicroBench.run({
+  run() {
+    wide = !wide;
+    host.style.width = wide ? '600px' : '400px';
+    MicroBench.flush(host);
+  },
+});
+</script>

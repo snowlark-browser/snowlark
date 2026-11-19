@@ -1,0 +1,11 @@
+[package]
+name = "snowlark-audio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Snowlark's Web Audio rendering: the render quantum, channel up- and down-mixing, the AudioParam automation timeline, the graph of audio nodes and the offline renderer. Pure DSP: no V8, no unsafe code"
+
+[lib]
+doctest = false
+
+[dependencies]

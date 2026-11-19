@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>forms/select-options-100</title>
+<!-- Replace a select's 100 options with innerHTML, read selectedIndex and value. -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = '<select></select>';
+const select = host.firstElementChild;
+const html = MicroBench.repeat(100, (i) => '<option value="v' + i + '"' + (i === 40 ? ' selected' : '') + '>Option ' + i + '</option>');
+let v = '';
+MicroBench.run({
+  run() {
+    select.innerHTML = html;
+    v = select.selectedIndex + select.value;
+  },
+  check() { return v === '40v40'; },
+});
+</script>

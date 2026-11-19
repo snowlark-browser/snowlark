@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>forms/checkbox-click-100</title>
+<!-- click() 100 checkboxes with a change listener (TodoMVC's toggles). -->
+<body>
+<div id="host"></div>
+<script src="../resources/runner.js"></script>
+<script>
+const host = document.getElementById('host');
+host.innerHTML = MicroBench.repeat(100, (i) => '<li><input class="toggle" type="checkbox"><label>Item ' + i + '</label></li>');
+let changes = 0;
+host.addEventListener('change', () => changes++);
+const boxes = Array.from(host.querySelectorAll('input'));
+MicroBench.run({
+  run() { for (const b of boxes) b.click(); },
+  check() { return changes > 0; },
+});
+</script>

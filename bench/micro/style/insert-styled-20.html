@@ -1,0 +1,57 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>style/insert-styled-20</title>
+<!-- Insert 20 styled cards (140 new elements) under a 200-rule sheet, read layout, remove them, read again: the per-element style cost of inserted content (NewsSite, TodoMVC). -->
+<style>
+body { font: 14px/1.4 sans-serif; margin: 0; }
+.list { display: block; padding: 8px; }
+.card { display: block; margin: 0 0 8px; padding: 8px 12px; border: 1px solid rgb(220, 220, 220); border-radius: 4px; background: white; }
+.card--0 { border-color: rgb(200, 0, 0); }
+.card--1 { border-color: rgb(0, 160, 0); }
+.card--2 { border-color: rgb(0, 0, 200); }
+.card:hover { background: rgb(250, 250, 250); }
+.card > .card-title { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+.card-title .link { color: rgb(20, 60, 160); text-decoration: none; }
+.card-title .link:hover { text-decoration: underline; }
+.card-text { margin: 0 0 6px; color: rgb(60, 60, 60); }
+.muted { opacity: 0.9; }
+.tags { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.tags .tag { padding: 0 6px; font-size: 12px; background: rgb(235, 240, 250); border-radius: 8px; }
+.tag[data-kind="new"] { background: rgb(255, 240, 200); }
+.tag:first-child { margin-left: 0; }
+</style>
+<body>
+<div id="host" class="list"></div>
+<script src="../resources/runner.js"></script>
+<script>
+// About 180 rules that match nothing here, as a page's framework and utility sheets add.
+const sheet = document.createElement('style');
+sheet.textContent = MicroBench.repeat(60, (i) =>
+  '.u-m' + i + ' { margin: ' + (i % 9) + 'px; }\n' +
+  '.nav .item-' + i + ' > a { color: rgb(' + i + ', 0, 0); }\n' +
+  '[data-role="r' + i + '"] .x' + i + ' { padding: ' + (i % 7) + 'px; }\n');
+document.head.appendChild(sheet);
+const host = document.getElementById('host');
+const template = document.createElement('div');
+template.innerHTML = MicroBench.repeat(20, (i) =>
+  '<article class="card card--' + (i % 3) + '"><h3 class="card-title"><a href="#" class="link">Title ' + i +
+  '</a></h3><p class="card-text muted">Some text for card ' + i + '.</p><ul class="tags"><li class="tag"' +
+  (i % 4 === 0 ? ' data-kind="new"' : '') + '>one</li><li class="tag">two</li></ul></article>');
+MicroBench.flush(host);
+MicroBench.run({
+  run() {
+    const fragment = document.createDocumentFragment();
+    for (const card of template.children) fragment.appendChild(card.cloneNode(true));
+    host.appendChild(fragment);
+    MicroBench.flush(host);
+    host.textContent = '';
+    MicroBench.flush(host);
+  },
+  check() {
+    host.appendChild(template.firstElementChild.cloneNode(true));
+    const ok = getComputedStyle(host.querySelector('.tag')).borderTopLeftRadius === '8px' && host.offsetHeight > 0;
+    host.textContent = '';
+    return ok;
+  },
+});
+</script>

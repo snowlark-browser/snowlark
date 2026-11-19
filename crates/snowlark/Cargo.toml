@@ -1,0 +1,31 @@
+[package]
+name = "snowlark"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autotests = false
+
+[features]
+# Link against a profile-instrumented V8 and write its profile on exit (`docs/v8-speed.md`).
+pgo-train = ["snowlark-js/pgo-train"]
+
+[dependencies]
+snowlark-js = { path = "../snowlark-js" }
+snowlark-paint = { path = "../snowlark-paint" }
+snowlark-net = { path = "../snowlark-net" }
+snowlark-dom = { path = "../snowlark-dom" }
+snowlark-style = { path = "../snowlark-style" }
+snowlark-layout = { path = "../snowlark-layout" }
+snowlark-render = { path = "../snowlark-render" }
+snowlark-shell = { path = "../snowlark-shell" }
+snowlark-ipc = { path = "../snowlark-ipc" }
+snowlark-tab = { path = "../snowlark-tab" }
+snowlark-page = { path = "../snowlark-page" }
+snowlark-blocker = { path = "../snowlark-blocker" }
+snowlark-media = { path = "../snowlark-media" }
+snowlark-idb = { path = "../snowlark-idb" }
+url = "2.5"
+
+[[test]]
+name = "it"
+path = "tests/it.rs"
