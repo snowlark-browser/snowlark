@@ -425,3 +425,68 @@ fn adds_to_a_key_generator_go_without_waiting_and_read_back_with_their_keys() {
          1k1,2k2,3k3,4k4,5k5,6k6,7k7,8k8,9k9,10k10 | {\"x\":\"k7\",\"id\":7} | ab | 1,2"
     );
 }
+
+/// A `CryptoKey` is serializable (WebCrypto §14 "Structured clone"): a non-extractable key pair
+/// stored in a database reads back after a restart as keys that still work together, with their
+/// type, algorithm, usages and extractability.
+#[test]
+fn crypto_keys_are_stored_and_survive_a_restart() {
+    let dir = temp("cryptokey");
+    let secure_page = |idb: &IdbBackend| {
+        let mut page = Page::new(PageOptions {
+            idb: Some(idb.clone()),
+            ..Default::default()
+        });
+        page.load_html(
+            "<!doctype html>",
+            &url::Url::parse("https://example.test/").unwrap(),
+        );
+        page.run_until_settled(Duration::from_secs(5));
+        page
+    };
+    let open = r#"
+        const open = indexedDB.open('keys', 1);
+        open.onupgradeneeded = () => open.result.createObjectStore('k');
+        const db = await req(open);
+    "#;
+    {
+        let idb = IdbBackend::persistent(dir.clone());
+        let mut p = secure_page(&idb);
+        let r = run_async(
+            &mut p,
+            &format!(
+                r#"{HELPERS}{open}
+                const pair = await crypto.subtle.generateKey({{name: 'RSA-OAEP', modulusLength: 2048,
+                    publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-1'}}, false, ['wrapKey', 'unwrapKey']);
+                const hmac = await crypto.subtle.generateKey({{name: 'HMAC', hash: 'SHA-256'}}, false, ['sign']);
+                const t = db.transaction('k', 'readwrite');
+                t.objectStore('k').put({{pair, hmac}}, 'msl');
+                await done(t);
+                const back = await req(db.transaction('k').objectStore('k').get('msl'));
+                return back.pair.privateKey instanceof CryptoKey && back.hmac.algorithm.hash.name;
+                "#
+            ),
+        );
+        assert_eq!(r, "SHA-256");
+    }
+    let idb = IdbBackend::persistent(dir.clone());
+    let mut p = secure_page(&idb);
+    let r = run_async(
+        &mut p,
+        &format!(
+            r#"{HELPERS}{open}
+            const {{pair, hmac}} = await req(db.transaction('k').objectStore('k').get('msl'));
+            const aes = await crypto.subtle.generateKey({{name: 'AES-CBC', length: 128}}, true, ['encrypt']);
+            const wrapped = await crypto.subtle.wrapKey('jwk', aes, pair.publicKey, {{name: 'RSA-OAEP'}});
+            const un = await crypto.subtle.unwrapKey('jwk', wrapped, pair.privateKey, {{name: 'RSA-OAEP'}},
+                'AES-CBC', false, ['encrypt']);
+            const mac = await crypto.subtle.sign('HMAC', hmac, new Uint8Array(4));
+            const k = pair.privateKey;
+            return [k.type, k.extractable, k.usages.join(), k.algorithm.name, k.algorithm.hash.name,
+                    k.algorithm.modulusLength, un.algorithm.length, mac.byteLength].join(' ');
+            "#
+        ),
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(r, "private false unwrapKey RSA-OAEP SHA-1 2048 128 32");
+}

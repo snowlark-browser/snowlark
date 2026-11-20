@@ -47,6 +47,8 @@ struct Fake {
     instances: AtomicU64,
     sessions: AtomicU64,
     released: Mutex<Vec<u64>>,
+    /// The key system of each instance made.
+    systems: Mutex<Vec<String>>,
     /// What its protected players were told: "play <keys> <tracks>", "sample <track> <time>
     /// <key>", "<control>", "stop".
     player: Mutex<Vec<String>>,
@@ -61,7 +63,8 @@ impl Cdm for Fake {
         matches!(key_system, "org.test.module" | "org.test.module.3000")
             && content_type.starts_with("video/mp4")
     }
-    fn create_keys(&self, request: u64, _: &str, origin: &str, inbox: &Arc<CdmInbox>) -> u64 {
+    fn create_keys(&self, request: u64, system: &str, origin: &str, inbox: &Arc<CdmInbox>) -> u64 {
+        self.systems.lock().unwrap().push(system.to_owned());
         *self.inbox.lock().unwrap() = Some(inbox.clone());
         *self.origin.lock().unwrap() = origin.to_owned();
         self.send(CdmEvent::Done {
@@ -322,10 +325,13 @@ fn a_key_system_of_the_embedders_module() {
     assert_eq!(*fake.origin.lock().unwrap(), "https://example.test");
 }
 
-/// A key system whose name ends in its security level (PlayReady's `.3000`) takes a robustness
-/// that repeats that level, and no other; one with no level in its name takes none.
+/// A module's key systems are named by their security level (PlayReady's `.3000`), and a
+/// capability's robustness is that level: a name that ends in the level may repeat it, and the
+/// name without the level takes the level as robustness and is played by the level's key system
+/// (PlayReady's `com.microsoft.playready.recommendation` with `"3000"`). A level the module does
+/// not have is not supported.
 #[test]
-fn a_robustness_that_repeats_the_key_systems_level() {
+fn a_robustness_names_the_modules_security_level() {
     let fake = Arc::new(Fake::default());
     let mut p = page_with(&fake);
     let r = run_async(
@@ -335,17 +341,76 @@ fn a_robustness_that_repeats_the_key_systems_level() {
         for (const [ks, robustness] of [['org.test.module.3000', '3000'],
                                          ['org.test.module.3000', '2000'],
                                          ['org.test.module', '3000'],
-                                         ['org.test.module.3000', '']]) {
+                                         ['org.test.module', '2000'],
+                                         ['org.test.module.3000', ''],
+                                         ['org.test.module', '']]) {
             const c = {videoCapabilities: [{contentType: 'video/mp4; codecs="avc1.64001f"', robustness}]};
             try {
                 const a = await navigator.requestMediaKeySystemAccess(ks, [c]);
-                out.push(a.getConfiguration().videoCapabilities[0].robustness || 'empty');
+                const r = a.getConfiguration().videoCapabilities[0].robustness || 'empty';
+                out.push(a.keySystem.slice(9) + ':' + r);
+                await a.createMediaKeys();
             } catch (e) { out.push(e.name); }
         }
         return out.join(' ');
     "#,
     );
-    assert_eq!(r, "3000 NotSupportedError NotSupportedError empty");
+    assert_eq!(
+        r,
+        "module.3000:3000 NotSupportedError module:3000 NotSupportedError module.3000:empty \
+         module:empty"
+    );
+    assert_eq!(
+        *fake.systems.lock().unwrap(),
+        [
+            "org.test.module.3000",
+            "org.test.module.3000",
+            "org.test.module.3000",
+            "org.test.module"
+        ]
+    );
+}
+
+/// Media Capabilities "Check Encrypted Decoding Support": `decodingInfo()` with a
+/// `keySystemConfiguration` asks the key system for one capability per track (with the track's
+/// robustness and encryption scheme), is supported exactly when that gives a configuration, and
+/// answers with a `MediaKeySystemAccess` for it whose keys are made as `requestMediaKeySystemAccess`'s.
+#[test]
+fn decoding_info_asks_the_key_system() {
+    let fake = Arc::new(Fake::default());
+    let mut p = page_with(&fake);
+    let r = run_async(
+        &mut p,
+        r#"
+        const video = {contentType: 'video/mp4; codecs="avc1.64001f"', width: 1920, height: 1080,
+                       bitrate: 5000000, framerate: 24};
+        const ask = keySystemConfiguration =>
+            navigator.mediaCapabilities.decodingInfo({type: 'media-source', video, keySystemConfiguration});
+        const out = [];
+        let info = await ask({keySystem: 'org.test.module', initDataType: 'cenc',
+                              video: {robustness: '3000', encryptionScheme: 'cbcs'}});
+        const c = info.keySystemAccess.getConfiguration();
+        out.push(info.supported, info.keySystemAccess.keySystem, c.initDataTypes.join(),
+                 c.videoCapabilities[0].robustness, c.videoCapabilities[0].encryptionScheme,
+                 c.audioCapabilities.length);
+        await info.keySystemAccess.createMediaKeys();
+        info = await ask({keySystem: 'org.test.module', video: {robustness: '2000'}});
+        out.push(info.supported, info.smooth, info.powerEfficient, info.keySystemAccess);
+        info = await ask({keySystem: 'bogus'});
+        out.push(info.supported, info.keySystemAccess);
+        info = await ask({keySystem: 'org.w3.clearkey', initDataType: 'keyids'});
+        out.push(info.supported, info.keySystemAccess.keySystem);
+        info = await ask({keySystem: 'org.w3.clearkey', initDataType: 'fps'});
+        out.push(info.supported, info.keySystemAccess);
+        return out.map(String).join(' ');
+    "#,
+    );
+    assert_eq!(
+        r,
+        "true org.test.module cenc 3000 cbcs 0 false false false null false null \
+         true org.w3.clearkey false null"
+    );
+    assert_eq!(*fake.systems.lock().unwrap(), ["org.test.module.3000"]);
 }
 
 /// A module instance is released when the document that made it unloads (a removed frame, a

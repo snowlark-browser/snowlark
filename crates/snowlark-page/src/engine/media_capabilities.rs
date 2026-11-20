@@ -6,13 +6,15 @@
 //!
 //! Decoding is answered from what the media stack plays (the answers `canPlayType()` and
 //! `MediaSource.isTypeSupported()` give), with "power efficient" when the GPU decodes the video
-//! codec. There is no WebRTC, no MediaRecorder and no key system, so a `webrtc` or `record`
-//! configuration, or one with a `keySystemConfiguration`, is not supported.
+//! codec. There is no WebRTC and no MediaRecorder, so a `webrtc` or `record` configuration is not
+//! supported. A configuration with a `keySystemConfiguration` is asked of the key system as EME's
+//! `requestMediaKeySystemAccess` asks it, and answers with the `MediaKeySystemAccess`.
 
 use snowlark_bindings::generated::{
-    AudioConfiguration, MediaCapabilitiesDecodingInfo, MediaCapabilitiesEncodingInfo,
-    MediaCapabilitiesImpl, MediaDecodingConfiguration, MediaDecodingType,
-    MediaEncodingConfiguration, MediaEncodingType, VideoConfiguration,
+    AudioConfiguration, KeySystemTrackConfiguration, MediaCapabilitiesDecodingInfo,
+    MediaCapabilitiesEncodingInfo, MediaCapabilitiesImpl, MediaCapabilitiesKeySystemConfiguration,
+    MediaDecodingConfiguration, MediaDecodingType, MediaEncodingConfiguration, MediaEncodingType,
+    MediaKeySystemConfiguration, MediaKeySystemMediaCapability, VideoConfiguration,
     WindowOrWorkerGlobalScopeImpl,
 };
 use snowlark_bindings::rt::{self, Cx, ExceptionName, Handle, JsPromise};
@@ -97,6 +99,43 @@ fn encoding_valid(c: &MediaEncodingConfiguration) -> Result<(), &'static str> {
     Ok(())
 }
 
+/// "Check Encrypted Decoding Support", 5: the EME configuration a decoding configuration with a
+/// `keySystemConfiguration` asks for (one capability per track, with that track's robustness and
+/// encryption scheme).
+fn encrypted_decoding_configuration(
+    c: &MediaDecodingConfiguration,
+    k: &MediaCapabilitiesKeySystemConfiguration,
+) -> MediaKeySystemConfiguration {
+    let capability = |content_type: &str, track: Option<&KeySystemTrackConfiguration>| {
+        vec![MediaKeySystemMediaCapability {
+            content_type: content_type.to_string(),
+            robustness: track.map(|t| t.robustness.clone()).unwrap_or_default(),
+            encryption_scheme: track.and_then(|t| t.encryption_scheme.clone()),
+        }]
+    };
+    MediaKeySystemConfiguration {
+        init_data_types: if k.init_data_type.is_empty() {
+            Vec::new()
+        } else {
+            vec![k.init_data_type.clone()]
+        },
+        distinctive_identifier: k.distinctive_identifier,
+        persistent_state: k.persistent_state,
+        session_types: k.session_types.clone(),
+        audio_capabilities: c
+            .audio
+            .as_ref()
+            .map(|a| capability(&a.content_type, k.audio.as_ref()))
+            .unwrap_or_default(),
+        video_capabilities: c
+            .video
+            .as_ref()
+            .map(|v| capability(&v.content_type, k.video.as_ref()))
+            .unwrap_or_default(),
+        ..Default::default()
+    }
+}
+
 /// Whether a valid content type's codec is of the configuration's kind (an audio codec in a
 /// video configuration, or the reverse, does not decode as that configuration).
 fn codec_kind_matches(content_type: &str, video: bool) -> bool {
@@ -127,9 +166,18 @@ impl Engine {
         })
     }
 
-    /// "Create a MediaCapabilitiesDecodingInfo": supported, smooth and power efficient.
+    /// Whether the GPU decodes the configuration's video (or there is none).
+    fn decodes_efficiently(&self, c: &MediaDecodingConfiguration) -> bool {
+        let support = snowlark_media::support();
+        c.video
+            .as_ref()
+            .is_none_or(|v| support.decodes_in_hardware(&v.content_type))
+    }
+
+    /// "Create a MediaCapabilitiesDecodingInfo" without a key system: supported, smooth and power
+    /// efficient.
     fn decoding_answer(&self, c: &MediaDecodingConfiguration) -> (bool, bool) {
-        if c.type_ == MediaDecodingType::Webrtc || c.key_system_configuration.is_some() {
+        if c.type_ == MediaDecodingType::Webrtc {
             return (false, false);
         }
         let mse = c.type_ == MediaDecodingType::MediaSource;
@@ -149,11 +197,7 @@ impl Engine {
             && c.video
                 .as_ref()
                 .is_none_or(|v| decodes(&v.content_type, true));
-        let efficient = supported
-            && c.video
-                .as_ref()
-                .is_none_or(|v| support.decodes_in_hardware(&v.content_type));
-        (supported, efficient)
+        (supported, supported && self.decodes_efficiently(c))
     }
 }
 
@@ -192,9 +236,34 @@ impl MediaCapabilitiesImpl for Engine {
         }
         // 3-5.
         let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
-        let (supported, efficient) = self.decoding_answer(&configuration);
+        // "Create a MediaCapabilitiesDecodingInfo", 2: with a key system, supported is whether
+        // "Check Encrypted Decoding Support" gives an access.
+        let access = configuration.key_system_configuration.as_ref().map(|k| {
+            let document = self.associated_document(self.media_capabilities_global(this));
+            let config = self.eme_supported_configuration(
+                &k.key_system,
+                &encrypted_decoding_configuration(&configuration, k),
+            );
+            (k.key_system.clone(), config, document)
+        });
+        let (supported, efficient) = match &access {
+            Some((_, config, _)) => {
+                let supported = config.is_some();
+                (
+                    supported,
+                    supported && self.decodes_efficiently(&configuration),
+                )
+            }
+            None => self.decoding_answer(&configuration),
+        };
         let resolve = p.clone();
-        self.queue_task(TaskSource::DomManipulation, move |_, cx| {
+        self.queue_task(TaskSource::DomManipulation, move |e, cx| {
+            let key_system_access = match access {
+                Some((key_system, Some(config), document)) => {
+                    Some(e.eme_access(key_system, config, document))
+                }
+                _ => None,
+            };
             resolve.resolve(
                 cx,
                 MediaCapabilitiesDecodingInfo {
@@ -202,7 +271,7 @@ impl MediaCapabilitiesImpl for Engine {
                     smooth: supported,
                     power_efficient: efficient,
                     configuration,
-                    key_system_access: None,
+                    key_system_access,
                 },
             );
         });

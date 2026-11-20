@@ -104,6 +104,36 @@ fn cdm_error(e: CdmError) -> rt::Error {
     }
 }
 
+/// The module key system that a key system with a robustness string names. A module's key systems
+/// are named by their security level (PlayReady's `com.microsoft.playready.recommendation.3000` is
+/// its hardware level), and the robustness string of a capability is that level: the level asked
+/// with the name without it (`com.microsoft.playready.recommendation` and robustness `"3000"`) is
+/// the named level's system, and a name that already ends in it may repeat it.
+fn module_key_system(key_system: &str, robustness: &str) -> String {
+    if robustness.is_empty()
+        || key_system
+            .strip_suffix(robustness)
+            .is_some_and(|k| k.ends_with('.'))
+    {
+        key_system.to_string()
+    } else {
+        format!("{key_system}.{robustness}")
+    }
+}
+
+/// The module key system a supported configuration of `key_system` is played by: the one its
+/// capabilities' robustness names (they were all supported by it).
+fn configuration_key_system(key_system: &str, config: &MediaKeySystemConfiguration) -> String {
+    let robustness = config
+        .video_capabilities
+        .iter()
+        .chain(&config.audio_capabilities)
+        .map(|c| c.robustness.as_str())
+        .find(|r| !r.is_empty())
+        .unwrap_or("");
+    module_key_system(key_system, robustness)
+}
+
 /// EME Ã‚Â§3.1.1.1 "Get Supported Configuration" for a key system of the embedder's module: `cenc`
 /// initialization data, temporary sessions, and the distinctive identifier and persistent state
 /// the system's module needs both of; each capability asked of the module.
@@ -142,22 +172,16 @@ fn cdm_configuration(
         return None;
     }
     // 14-15.
-    // (the key system's name says its robustness: a PlayReady name ends in its security level,
-    // which a robustness string may repeat)
-    let level = key_system
-        .rsplit_once('.')
-        .map(|(_, l)| l)
-        .filter(|l| !l.is_empty() && l.bytes().all(|b| b.is_ascii_digit()));
+    // (the robustness is asked of the module's key system it names: see `module_key_system`)
     let capabilities = |requested: &[MediaKeySystemMediaCapability]| {
         let mut out: Vec<MediaKeySystemMediaCapability> = Vec::new();
         for c in requested {
             if c.content_type.is_empty() {
                 return None;
             }
-            if !(c.robustness.is_empty() || Some(c.robustness.as_str()) == level)
-                || c.encryption_scheme
-                    .as_deref()
-                    .is_some_and(|s| !matches!(s, "cenc" | "cbcs" | "cbcs-1-9"))
+            if c.encryption_scheme
+                .as_deref()
+                .is_some_and(|s| !matches!(s, "cenc" | "cbcs" | "cbcs-1-9"))
             {
                 continue;
             }
@@ -166,7 +190,8 @@ fn cdm_configuration(
                     && o.robustness == c.robustness
                     && o.encryption_scheme == c.encryption_scheme
             });
-            if !seen && cdm.supports(key_system, &c.content_type) {
+            let system = module_key_system(key_system, &c.robustness);
+            if !seen && cdm.supports(&system, &c.content_type) {
                 out.push(c.clone());
             }
         }
@@ -426,6 +451,36 @@ impl Engine {
         Ok(p)
     }
 
+    /// EME §3.1.1.1 "Get Supported Configuration" of `candidate` for `key_system`: the
+    /// configuration it supports, or `None` (also when the key system is not one of ours).
+    pub(crate) fn eme_supported_configuration(
+        &self,
+        key_system: &str,
+        candidate: &MediaKeySystemConfiguration,
+    ) -> Option<MediaKeySystemConfiguration> {
+        if key_system == CLEAR_KEY {
+            supported_configuration(self, candidate)
+        } else {
+            let cdm = self.cdm()?;
+            cdm_configuration(&*cdm, key_system, candidate)
+        }
+    }
+
+    /// A new `MediaKeySystemAccess` for a supported configuration; its `MediaKeys` are made for
+    /// `document` (the document that asked).
+    pub(crate) fn eme_access(
+        &self,
+        key_system: String,
+        config: MediaKeySystemConfiguration,
+        document: Option<NodeId>,
+    ) -> Handle {
+        self.alloc(Object::Media(Box::new(MediaObject::KeySystemAccess {
+            key_system,
+            config: Box::new(config),
+            document,
+        })))
+    }
+
     /// `navigator.requestMediaKeySystemAccess` (EME Ã‚Â§3.1).
     pub(crate) fn request_media_key_system_access(
         &self,
@@ -446,26 +501,14 @@ impl Engine {
         }
         // 6. (in parallel; answered in a task)
         let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
-        let answer = if key_system == CLEAR_KEY {
-            configurations
-                .iter()
-                .find_map(|c| supported_configuration(self, c))
-        } else if let Some(cdm) = self.cdm() {
-            configurations
-                .iter()
-                .find_map(|c| cdm_configuration(&*cdm, key_system, c))
-        } else {
-            None
-        };
+        let answer = configurations
+            .iter()
+            .find_map(|c| self.eme_supported_configuration(key_system, c));
         let key_system = key_system.to_string();
         let resolve = p.clone();
         self.queue_task(TaskSource::DomManipulation, move |e, cx| match answer {
             Some(config) => {
-                let access = e.alloc(Object::Media(Box::new(MediaObject::KeySystemAccess {
-                    key_system,
-                    config: Box::new(config),
-                    document,
-                })));
+                let access = e.eme_access(key_system, config, document);
                 resolve.resolve(cx, access);
             }
             None => resolve.reject(
@@ -794,11 +837,15 @@ impl MediaKeySystemAccessImpl for Engine {
         }
         let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
         let key_system = self.mo(this, |o| match o {
+            MediaObject::KeySystemAccess {
+                key_system, config, ..
+            } if key_system != CLEAR_KEY => configuration_key_system(key_system, config),
             MediaObject::KeySystemAccess { key_system, .. } => key_system.clone(),
             _ => String::new(),
         });
         if key_system != CLEAR_KEY {
-            // The embedder's module: an instance for the document's origin, made in parallel.
+            // The embedder's module: an instance of the key system the configuration's
+            // robustness names, for the document's origin, made in parallel.
             let Some(cdm) = self.cdm() else {
                 p.reject(cx, not_supported("The key system is not available"));
                 return Ok(p);

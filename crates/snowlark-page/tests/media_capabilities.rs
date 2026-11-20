@@ -98,18 +98,27 @@ fn decoding_is_answered_from_what_plays() {
 }
 
 #[test]
-fn a_key_system_configuration_is_not_supported() {
-    // No key system: not supported, and no MediaKeySystemAccess.
+fn a_key_system_configuration_is_asked_of_the_key_system() {
+    // "Check Encrypted Decoding Support": Clear Key decrypts MP4, so it is supported with a
+    // MediaKeySystemAccess; an unknown key system is not, and has none.
     let mut p = page();
     let r = run_async(
         &mut p,
         &format!(
             r#"
-        const i = await navigator.mediaCapabilities.decodingInfo({{type: 'file', video: {VIDEO},
+        const mc = navigator.mediaCapabilities;
+        const i = await mc.decodingInfo({{type: 'file', video: {VIDEO},
             keySystemConfiguration: {{keySystem: 'org.w3.clearkey'}}}});
-        return [i.supported, i.keySystemAccess === null].join();
+        const n = await mc.decodingInfo({{type: 'file', video: {VIDEO},
+            keySystemConfiguration: {{keySystem: 'org.example.none'}}}});
+        return [i.supported, i.smooth, i.keySystemAccess.keySystem,
+                i.keySystemAccess.getConfiguration().videoCapabilities[0].contentType,
+                n.supported, n.keySystemAccess === null].join();
         "#
         ),
     );
-    assert_eq!(r, "false,true");
+    assert_eq!(
+        r,
+        "true,true,org.w3.clearkey,video/mp4; codecs=\"avc1.42E01E\",false,true"
+    );
 }
