@@ -380,6 +380,14 @@ the source; `git log -p vendor/stylo` shows the diff.
    at its depth. The embedder says when an element's block is its alone; neither lookup is made for it
    (it is still inserted, for an element given its block later). No style changes: a lookup that
    cannot hit is skipped.
+69. **No cascade for a `::before` or `::after` its rules cannot generate** (`style_resolver.rs`
+   `before_or_after_may_be_generated`, `resolve_pseudo_style`, `cascade_styles_with_default_parents`):
+   a rule such as `*, ::before, ::after { box-sizing: border-box }` matches both pseudo-elements of
+   every element, and each was cascaded only to be dropped (`content` computes to `normal`). Unless
+   the styles are forced, an eager `::before` or `::after` is cascaded only when a rule matched for
+   it (normal or visited) declares `content` (`all` included), or declares `display` with
+   something other than a plain value (`inherit`, `var()`: such styles are kept whatever their
+   `content`). No style changes: only styles that were dropped are not computed.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

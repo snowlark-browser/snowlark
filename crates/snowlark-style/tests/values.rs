@@ -498,6 +498,50 @@ fn style_element_changes() {
 }
 
 #[test]
+fn before_and_after_exist_only_when_their_rules_can_give_them_content() {
+    // A `::before` none of whose rules declares `content` computes `content: normal` and is not
+    // generated; one that inherits `display` or takes it from a variable keeps its style.
+    let p = Page::new(
+        "<!DOCTYPE html><style>
+           *, ::before, ::after { box-sizing: border-box; }
+           #a::before { content: 'a'; }
+           #b { content: 'b'; }
+           #b::before { all: inherit; }
+           #c::before { content: var(--c); --c: 'c'; }
+           #d::before { display: block; }
+           #e::before { display: var(--d); --d: block; }
+           #f::before { display: inherit; }
+           #g::after { content: 'g' !important; }
+           #h::after { content: none; }
+         </style><p id=a></p><p id=b></p><p id=c></p><p id=d></p><p id=e></p><p id=f></p>
+         <p id=g></p><p id=h></p><p id=i></p>",
+    );
+    let style = |sel: &str, pseudo: PseudoElement| {
+        let el = p.q(sel);
+        p.engine.pseudo_style(&p.dom, &p.data, el, &pseudo)
+    };
+    let before = style("#a", PseudoElement::Before).unwrap();
+    assert_eq!(
+        computed::computed_property_by_name(&before, "box-sizing").unwrap(),
+        "border-box"
+    );
+    assert!(style("#a", PseudoElement::After).is_none());
+    let b = style("#b", PseudoElement::Before).unwrap();
+    assert_eq!(
+        computed::computed_property_by_name(&b, "content").unwrap(),
+        "\"b\""
+    );
+    assert!(style("#c", PseudoElement::Before).is_some());
+    assert!(style("#d", PseudoElement::Before).is_none());
+    // (kept with the element, as a `display` that depends on it, but never generated)
+    assert!(style("#e", PseudoElement::Before).is_none());
+    assert!(style("#f", PseudoElement::Before).is_none());
+    assert!(style("#g", PseudoElement::After).is_some());
+    assert!(style("#h", PseudoElement::After).is_none());
+    assert!(style("#i", PseudoElement::Before).is_none());
+}
+
+#[test]
 fn pseudo_element_styles() {
     let p = Page::new(
         "<!DOCTYPE html><style>
