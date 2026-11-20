@@ -67,10 +67,12 @@ Measured on one desktop machine, both browsers on the same machine, release buil
 
 | What | When | Snowlark | Chrome | Method |
 |---|---|---|---|---|
-| Speedometer 3.1, headless | 2026-11-18 | 32.4, 32.5, 33.4 | 39.6, 40.0, 39.4 (Chrome 157) | three runs each, mean of iterations 2 to 10, idle machine |
-| Speedometer 3.1, in the window | 2026-11-15 | 19.0 | 35.4 ± 2.2 (stable, 2026-10-31, browserbench.org) | 10 iterations, first included; an older build than the row above |
+| Speedometer 3.1, headless | 2026-11-20 | 36.1, 36.1, 35.8, 35.9 | 40.7, 40.0, 39.8, 39.9 (Chrome 158) | warm runs, mean of iterations 2 to 10, idle machine; the first run of each browser is slower (ours 33.2, Chrome 34.1) |
+| Speedometer 3.1, in the window | 2026-11-20 | 31.6 | 35.4 ± 2.2 (stable, 2026-10-31, browserbench.org) | one default run |
+| Web Platform Tests, testharness | 2026-11-20 | 495,007 of 541,034 subtests (91.5%) in 15,274 files; 10,566 files pass in full | | full run of the areas we run, reftests not counted |
 | Micro benchmarks, 52 pages | 2026-11-13 | geometric mean of the ratios to Chrome: 1.65 | 1 (Chrome 157) | headless, two runs |
 
-In the headless comparison of 2026-11-18 the ratio of the suites' geometric means was 1.25.
+In the headless comparison of 2026-11-20 the ratio of the suites' geometric means was 1.10 (1.25 on 2026-11-18,
+against Chrome 157).
 [v8-speed.md](v8-speed.md) has the measurements of the V8 library work, and
 [process-isolation.md](process-isolation.md) what running tabs in their own processes costs.
