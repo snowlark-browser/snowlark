@@ -52,6 +52,55 @@ impl NodeId {
     }
 }
 
+/// A set of nodes kept as one bit per arena slot: inserting and testing cost an index, where a hash
+/// set of tens of thousands of ids costs a hash and a probe each, and its growth rehashes them.
+/// Membership is by slot: an id of a slot's earlier node (a stale id) is in the set when the slot's
+/// current node is. Meant for live nodes about to be freed together, whose slots no other live
+/// node has.
+#[derive(Clone, Default, Debug)]
+pub struct NodeSet {
+    bits: Vec<u64>,
+    len: usize,
+}
+
+impl NodeSet {
+    /// Adds `id`'s slot; false when it was in the set.
+    #[inline]
+    pub fn insert(&mut self, id: NodeId) -> bool {
+        let (w, bit) = (id.index as usize / 64, id.index % 64);
+        if w >= self.bits.len() {
+            self.bits.resize(w + 1, 0);
+        }
+        let new = self.bits[w] & (1 << bit) == 0;
+        self.bits[w] |= 1 << bit;
+        self.len += usize::from(new);
+        new
+    }
+
+    #[inline]
+    pub fn contains(&self, id: &NodeId) -> bool {
+        self.bits
+            .get(id.index as usize / 64)
+            .is_some_and(|w| w & (1 << (id.index % 64)) != 0)
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+
+impl Extend<NodeId> for NodeSet {
+    fn extend<I: IntoIterator<Item = NodeId>>(&mut self, iter: I) {
+        for id in iter {
+            self.insert(id);
+        }
+    }
+}
+
 /// `Node.nodeType` values (DOM §4.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u16)]

@@ -196,6 +196,73 @@ fn a_document_is_owned_within_its_tree_only_without_outside_nodes() {
 }
 
 #[test]
+fn an_owned_walk_stops_at_the_first_node_asked_to_stop() {
+    let (mut dom, doc) = html_doc();
+    let root = el(&mut dom, doc, "div");
+    let host = el(&mut dom, doc, "section");
+    dom.append_child(root, host).unwrap();
+    let sr = dom
+        .attach_shadow(host, ShadowRootInit::new(ShadowRootMode::Open))
+        .unwrap();
+    let inner = el(&mut dom, doc, "span");
+    dom.append_child(sr, inner).unwrap();
+    let after = el(&mut dom, doc, "p");
+    dom.append_child(root, after).unwrap();
+    let all = dom.owned_nodes(root);
+    let mut out = Vec::new();
+    assert!(dom.owned_nodes_until(root, &mut out, |_| false));
+    assert_eq!(out, all);
+    // Stopped at a node: the nodes before it, in the same order, and false.
+    let at = all.iter().position(|&n| n == inner).unwrap();
+    let mut out = vec![doc];
+    assert!(!dom.owned_nodes_until(root, &mut out, |n| n == inner));
+    assert_eq!(out[1..], all[..at]);
+}
+
+#[test]
+fn a_node_set_holds_slots() {
+    let (mut dom, doc) = html_doc();
+    let a = el(&mut dom, doc, "a");
+    let b = el(&mut dom, doc, "b");
+    let mut set = crate::NodeSet::default();
+    assert!(set.is_empty());
+    assert!(set.insert(b));
+    assert!(!set.insert(b), "once");
+    assert!(set.contains(&b) && !set.contains(&a));
+    set.extend([a, b]);
+    assert_eq!(set.len(), 2);
+}
+
+#[test]
+fn freeing_a_subtree_takes_its_nodes_off_their_documents_counts() {
+    let (mut dom, doc) = html_doc();
+    let root = el(&mut dom, doc, "div");
+    let span = el(&mut dom, doc, "span");
+    dom.append_child(root, span).unwrap();
+    // (template contents are of another document: the subtree's nodes are of two)
+    let t = el(&mut dom, doc, "template");
+    dom.append_child(root, t).unwrap();
+    let contents = dom.template_contents(t).unwrap();
+    let inert = dom.node_document(contents);
+    assert_ne!(inert, doc);
+    for _ in 0..2 {
+        let i = dom.create_element(inert, "i", None).unwrap();
+        dom.append_child(contents, i).unwrap();
+    }
+    let count = |dom: &Dom, d| {
+        dom.documents_with_node_counts()
+            .iter()
+            .find(|e| e.0 == d)
+            .map_or(0, |e| e.1)
+    };
+    let (doc_before, inert_before) = (count(&dom, doc), count(&dom, inert));
+    let owned = dom.owned_nodes(root);
+    dom.free_owned(root, &owned);
+    assert_eq!(doc_before - count(&dom, doc), 3);
+    assert_eq!(inert_before - count(&dom, inert), 3);
+}
+
+#[test]
 fn the_store_knows_whether_it_ever_held_a_shadow_root() {
     let (mut dom, doc) = html_doc();
     let host = el(&mut dom, doc, "div");

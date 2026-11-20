@@ -304,7 +304,7 @@ impl Engine {
     }
 
     /// Freed nodes leave the observers' observation lists.
-    pub(crate) fn resize_nodes_freed(&self, freed: &rustc_hash::FxHashSet<NodeId>) {
+    pub(crate) fn resize_nodes_freed(&self, freed: &snowlark_dom::NodeSet) {
         let observers = self.intersection.borrow().resize_observers.clone();
         let mut objects = self.objects.borrow_mut();
         for h in observers {

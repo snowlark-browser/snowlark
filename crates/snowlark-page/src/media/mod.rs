@@ -2027,7 +2027,7 @@ impl Engine {
     }
 
     /// Freed nodes: their players go.
-    pub(crate) fn media_nodes_freed(&self, freed: &rustc_hash::FxHashSet<NodeId>) {
+    pub(crate) fn media_nodes_freed(&self, freed: &snowlark_dom::NodeSet) {
         let mut m = self.media.borrow_mut();
         let gone: Vec<NodeId> = m
             .elements

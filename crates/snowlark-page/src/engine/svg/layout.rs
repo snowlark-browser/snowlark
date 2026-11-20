@@ -48,7 +48,7 @@ pub(crate) struct SvgState {
 
 impl SvgState {
     /// Freed nodes leave the side tables.
-    pub(crate) fn nodes_freed(&mut self, freed: &rustc_hash::FxHashSet<NodeId>) {
+    pub(crate) fn nodes_freed(&mut self, freed: &snowlark_dom::NodeSet) {
         self.current.retain(|n, _| !freed.contains(n));
         self.image_fetches.retain(|n, _| !freed.contains(n));
         self.smil.nodes_freed(freed);

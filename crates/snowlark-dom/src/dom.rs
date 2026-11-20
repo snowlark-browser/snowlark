@@ -203,21 +203,30 @@ impl Dom {
     /// Releases one slot. The generation is bumped so outstanding ids become stale; a slot whose
     /// generation would pass [`NodeId::MAX_GENERATION`] is retired instead of reused.
     fn release(&mut self, id: NodeId) {
+        if let Some(d) = self.release_uncounted(id) {
+            self.uncount(d, 1);
+        }
+    }
+
+    /// Takes `n` nodes off document `d`'s count.
+    fn uncount(&mut self, d: NodeId, n: u32) {
+        if let std::collections::hash_map::Entry::Occupied(mut e) = self.doc_nodes.entry(d) {
+            *e.get_mut() -= n;
+            if *e.get() == 0 {
+                e.remove();
+            }
+        }
+    }
+
+    /// [`Dom::release`], leaving the node's document's count to the caller: returns the document.
+    fn release_uncounted(&mut self, id: NodeId) -> Option<NodeId> {
         let slot = &mut self.nodes[id.index as usize];
         debug_assert_eq!(slot.generation, id.generation);
         if slot.flags & (flags::OBSERVED | flags::TRANSIENT_OBSERVED) != 0 {
             self.observed -= 1;
         }
         self.live -= 1;
-        if let Some(d) = slot.document.take() {
-            if let std::collections::hash_map::Entry::Occupied(mut e) = self.doc_nodes.entry(d) {
-                *e.get_mut() -= 1;
-                if *e.get() == 0 {
-                    e.remove();
-                }
-            }
-        }
-        let slot = &mut self.nodes[id.index as usize];
+        let document = slot.document.take();
         match slot
             .generation
             .checked_add(1)
@@ -242,6 +251,7 @@ impl Dom {
                 slot.flags = 0;
             }
         }
+        document
     }
 
     /// Frees `root` and everything it owns: its descendants, template contents, shadow roots, and
@@ -265,8 +275,23 @@ impl Dom {
             "free_owned on a node with a parent"
         );
         debug_assert_eq!(owned, &self.owned_nodes(root)[..]);
+        // (the nodes of a subtree mostly share a document: its count is taken down once per run)
+        let mut run: Option<(NodeId, u32)> = None;
         for &id in owned {
-            self.release(id);
+            let Some(d) = self.release_uncounted(id) else {
+                continue;
+            };
+            match &mut run {
+                Some((doc, n)) if *doc == d => *n += 1,
+                _ => {
+                    if let Some((doc, n)) = run.replace((d, 1)) {
+                        self.uncount(doc, n);
+                    }
+                }
+            }
+        }
+        if let Some((doc, n)) = run {
+            self.uncount(doc, n);
         }
     }
 
@@ -275,6 +300,18 @@ impl Dom {
     /// owner document).
     pub fn owned_nodes(&self, root: NodeId) -> Vec<NodeId> {
         let mut out = Vec::new();
+        self.owned_nodes_until(root, &mut out, |_| false);
+        out
+    }
+
+    /// [`Dom::owned_nodes`] appended to `out`, in the same order, unless `stop` is true for one of
+    /// them: then the walk ends there (`out` has the nodes before it) and this returns false.
+    pub fn owned_nodes_until(
+        &self,
+        root: NodeId,
+        out: &mut Vec<NodeId>,
+        mut stop: impl FnMut(NodeId) -> bool,
+    ) -> bool {
         // Each tree (the root's, and the shadow trees, template contents, Attr nodes and template
         // contents owner documents it owns) is walked in tree order; the owned trees wait on a
         // stack, which most subtrees never use.
@@ -294,11 +331,14 @@ impl Dom {
                     NodeData::Document(d) => trees.extend(d.template_contents_owner),
                     _ => {}
                 }
+                if stop(id) {
+                    return false;
+                }
                 out.push(id);
                 cur = self.next_in_tree_order(id, Some(tree));
             }
         }
-        out
+        true
     }
 
     /// The opaque root of a node (what keeps its wrapper reachable, ARCHITECTURE.md "Wrappers and

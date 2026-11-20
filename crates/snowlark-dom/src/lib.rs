@@ -46,8 +46,8 @@ pub use error::{DomError, DomResult};
 pub use mutation::NodeOrString;
 pub use node::{
     element_flags, qualified_name, Attr, AttrList, CustomElementState, DocumentData, DocumentKind,
-    ElementData, Node, NodeData, NodeId, NodeType, QuirksMode, ShadowRootData, ShadowRootMode,
-    SlotAssignmentMode, INLINE_ATTRS,
+    ElementData, Node, NodeData, NodeId, NodeSet, NodeType, QuirksMode, ShadowRootData,
+    ShadowRootMode, SlotAssignmentMode, INLINE_ATTRS,
 };
 pub use parser::{AdjacentPosition, DomSink, HtmlParser, ParseOptions, ParseStep};
 pub use records::{subtree, MutationKind, MutationRecord, Reaction, ReactionFilter};

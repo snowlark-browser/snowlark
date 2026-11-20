@@ -26,7 +26,9 @@
 //!
 //! `--cycles` also counts the CPU cycles charged to this (the page's) thread and to the whole process
 //! in each event loop turn, by the suite and iteration the runner was in at the turn's end, and writes
-//! them to `cycles.json` and the report. The checks between turns are not charged; they make the
+//! them to `cycles.json` and the report, with the engine's collection time ([`gc_counters`]) by suite
+//! and by step: each turn is charged to the step part the runner's `performance.mark` calls put it
+//! in ([`step_bucket`]). The checks between turns are not charged; they make the
 //! run's wall times a little longer. `--pin-pcores` first restricts the process to the performance
 //! cores of a hybrid processor; `--cpu N` runs the page's thread on logical processor N alone, at a
 //! raised priority, and the process's other threads off N's core (`tools/speedometer/quick_ab.py`
@@ -50,19 +52,73 @@ const WHERE_JS: &str = "(() => { const c = globalThis.benchmarkClient; if (!c) r
      const l = document.getElementById('info-label'); \
      return ((c._measuredValuesList && c._measuredValuesList.length) || 0) + '|' + (l ? l.textContent : ''); })()";
 
+/// The engine's collection counters a turn is charged with ([`gc_counters`]).
+const GC_COLUMNS: usize = 7;
+
+/// The engine's collection totals: collections after tasks and in idle time (ns), V8's interrupts
+/// inside script (ns), the passes they ran, the wrappers pending at those passes, and the passes'
+/// snapshots and the snapshots' walk of every object's references (ns).
+fn gc_counters(page: &Page) -> [u64; GC_COLUMNS] {
+    let s = page.engine().gc_stats();
+    [
+        s.after_task_ns,
+        s.idle_ns,
+        s.interrupt_ns,
+        s.interrupt_passes,
+        s.interrupt_wrappers,
+        s.interrupt_snapshot_ns,
+        s.interrupt_refs_ns,
+    ]
+}
+
+/// One step bucket's totals over the iterations ([`step_bucket`]).
+#[derive(Clone, Copy, Default)]
+struct StepCharge {
+    turns: u64,
+    thread: u64,
+    gc: [u64; GC_COLUMNS],
+}
+
 /// The cycles of each event loop turn, by the iteration and suite the runner was in at its end.
 #[derive(Default)]
 struct SuiteCycles {
     /// (iteration, suite, cycles), in the order first seen.
     entries: Vec<(u32, String, Cycles)>,
+    /// (suite, the engine's collection counters), summed over the iterations, in the order first seen.
+    collections: Vec<(String, [u64; GC_COLUMNS])>,
+    /// (step bucket, its totals), summed over the iterations, in the order first seen.
+    steps: Vec<(String, StepCharge)>,
     /// When the last turn charged ended (the cycles from there on are the next turn's).
     mark: Cycles,
+    /// The engine's collection counters then.
+    gc_mark: [u64; GC_COLUMNS],
+    /// The last `performance.mark` made before the turn.
+    last_mark: String,
 }
 
 impl SuiteCycles {
+    fn new(page: &Page) -> Self {
+        page.engine().watch_marks();
+        SuiteCycles {
+            mark: Cycles::now(),
+            gc_mark: gc_counters(page),
+            ..Default::default()
+        }
+    }
+
     /// Charges the cycles since the mark, the turn just run, to where the runner is now.
     fn charge(&mut self, page: &mut Page) {
         let turn = Cycles::now().since(self.mark);
+        let gc_now = gc_counters(page);
+        let mut gc = [0; GC_COLUMNS];
+        for (k, v) in gc.iter_mut().enumerate() {
+            *v = gc_now[k] - self.gc_mark[k];
+        }
+        let marks = page.engine().take_watched_marks().unwrap_or_default();
+        let bucket = step_bucket(&marks, &self.last_mark);
+        if let Some(last) = marks.last() {
+            self.last_mark.clone_from(last);
+        }
         if let Some((iteration, suite)) = page
             .eval(WHERE_JS, "<speedometer-harness>")
             .ok()
@@ -70,13 +126,78 @@ impl SuiteCycles {
             .and_then(parse_where)
         {
             self.add(iteration, suite, turn);
+            let at = match self.collections.iter().position(|(s, _)| s == suite) {
+                Some(at) => at,
+                None => {
+                    self.collections.push((suite.to_owned(), [0; GC_COLUMNS]));
+                    self.collections.len() - 1
+                }
+            };
+            for (k, v) in gc.iter().enumerate() {
+                self.collections[at].1[k] += v;
+            }
+            let at = match self.steps.iter().position(|(s, _)| *s == bucket) {
+                Some(at) => at,
+                None => {
+                    self.steps.push((bucket, StepCharge::default()));
+                    self.steps.len() - 1
+                }
+            };
+            let c = &mut self.steps[at].1;
+            c.turns += 1;
+            c.thread += turn.thread;
+            for (k, v) in gc.iter().enumerate() {
+                c.gc[k] += v;
+            }
         }
         self.mark = Cycles::now();
+        self.gc_mark = gc_now;
     }
 
     /// Leaves the cycles since the mark uncharged (the harness's own work).
-    fn skip(&mut self) {
+    fn skip(&mut self, page: &Page) {
         self.mark = Cycles::now();
+        self.gc_mark = gc_counters(page);
+    }
+
+    /// The report's collection tables: by suite, then by step bucket ([`step_bucket`]), each summed
+    /// over the iterations.
+    fn collections_table(&self) -> String {
+        let mut out = String::from(
+            "engine collections, all iterations: after tasks, idle, V8's interrupt (ms); the \
+             interrupts' passes, wrappers pending at them; their snapshots, the snapshots' \
+             references walk (ms)\n",
+        );
+        let row = |out: &mut String, name: &str, gc: &[u64; GC_COLUMNS]| {
+            let _ = write!(out, "{name:<45}");
+            write_gc(out, gc);
+        };
+        let mut total = [0; GC_COLUMNS];
+        for (suite, gc) in &self.collections {
+            for (k, v) in gc.iter().enumerate() {
+                total[k] += v;
+            }
+            row(&mut out, suite, gc);
+        }
+        row(&mut out, "total", &total);
+        let _ = writeln!(
+            out,
+            "\nby step (sync, between its sync end and async start, async, after it until the next \
+             step: by the runner's marks), all iterations: turns, page thread cycles (G), then as \
+             above"
+        );
+        for (step, c) in &self.steps {
+            let _ = write!(
+                out,
+                "{:<60}{:7}{:8.3}",
+                step,
+                c.turns,
+                c.thread as f64 / 1e9
+            );
+            write_gc(&mut out, &c.gc);
+        }
+        out.push('\n');
+        out
     }
 
     fn add(&mut self, iteration: u32, suite: &str, cycles: Cycles) {
@@ -111,7 +232,9 @@ impl SuiteCycles {
             .map_or(Cycles::default(), |e| e.2)
     }
 
-    /// `{"pinned": mask or null, "iterations": [{suite: {"thread": n, "process": n}}]}`.
+    /// `{"pinned": mask or null, "iterations": [{suite: {"thread": n, "process": n}}],
+    /// "collections": {suite: [counters]}, "steps": {bucket: {"turns": n, "thread": n, "gc":
+    /// [counters]}}}`, the counters as [`gc_counters`] orders them.
     fn json(&self, pinned: Option<u64>) -> String {
         let mut out = String::new();
         let _ = write!(
@@ -135,7 +258,25 @@ impl SuiteCycles {
             }
             out.push('}');
         }
-        out.push_str("]}\n");
+        // (the collection counters as `gc_counters` orders them)
+        out.push_str("],\"collections\":{");
+        for (k, (s, gc)) in self.collections.iter().enumerate() {
+            let sep = if k == 0 { "" } else { "," };
+            let _ = write!(out, "{sep}\"{}\":{gc:?}", json_escape(s));
+        }
+        out.push_str("},\"steps\":{");
+        for (k, (s, c)) in self.steps.iter().enumerate() {
+            let sep = if k == 0 { "" } else { "," };
+            let _ = write!(
+                out,
+                "{sep}\"{}\":{{\"turns\":{},\"thread\":{},\"gc\":{:?}}}",
+                json_escape(s),
+                c.turns,
+                c.thread,
+                c.gc
+            );
+        }
+        out.push_str("}}\n");
         out
     }
 
@@ -188,6 +329,76 @@ impl MarkLog {
         let (count, names) = text.split_once(' ').unwrap_or((&text, ""));
         self.seen = count.parse().unwrap_or(self.seen);
         eprintln!("[turn] {names}");
+    }
+}
+
+/// A row's collection counters ([`gc_counters`]): times in ms, counts as they are.
+fn write_gc(out: &mut String, gc: &[u64; GC_COLUMNS]) {
+    for (k, &v) in gc.iter().enumerate() {
+        if k == 3 || k == 4 {
+            let _ = write!(out, "{v:9}");
+        } else {
+            let _ = write!(out, "{:9.1}", v as f64 / 1e6);
+        }
+    }
+    out.push('\n');
+}
+
+/// Where a step's `performance.mark` stands in it.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum StepMark {
+    Start,
+    SyncEnd,
+    AsyncStart,
+    AsyncEnd,
+}
+
+/// A step's mark (`<suite>.<step>-start`, `-sync-end`, `-async-start`, `-async-end`) as the step
+/// and where it stands; `None` for the runner's own marks.
+fn step_mark(name: &str) -> Option<(&str, StepMark)> {
+    if ["suite-", "runner-", "iteration-", "warmup-"]
+        .iter()
+        .any(|p| name.starts_with(p))
+    {
+        return None;
+    }
+    [
+        ("-sync-end", StepMark::SyncEnd),
+        ("-async-start", StepMark::AsyncStart),
+        ("-async-end", StepMark::AsyncEnd),
+        ("-start", StepMark::Start),
+    ]
+    .into_iter()
+    .find_map(|(suffix, m)| Some((name.strip_suffix(suffix)?, m)))
+}
+
+/// The part of the runner's work a turn belongs to, from the `performance.mark` calls it made
+/// (`marks`) and the last one made before it (`before`): `<suite>.<step> sync` for a turn that
+/// started or ended a step's sync part, `between` for the turns from its sync end to its async
+/// start, `async` for a turn that marked its async start or end and those in between, `after` for
+/// the turns from there to the next step, and `(outside steps)` for the rest (preparing a suite,
+/// the runner's own marks).
+fn step_bucket(marks: &[String], before: &str) -> String {
+    let label = |step: &str, m: StepMark| {
+        let part = match m {
+            StepMark::Start => "sync",
+            StepMark::SyncEnd => "between",
+            StepMark::AsyncStart => "async",
+            StepMark::AsyncEnd => "after",
+        };
+        format!("{step} {part}")
+    };
+    // (a turn that marked a step is charged to its earliest part)
+    if let Some((step, m)) = marks.iter().filter_map(|n| step_mark(n)).min_by_key(|e| e.1) {
+        let m = match m {
+            StepMark::Start | StepMark::SyncEnd => StepMark::Start,
+            _ => StepMark::AsyncStart,
+        };
+        return label(step, m);
+    }
+    match step_mark(before) {
+        Some((step, m)) => label(step, m),
+        None => "(outside steps)".to_owned(),
     }
 }
 
@@ -457,10 +668,7 @@ pub fn run(args: &[String]) -> i32 {
     let mut started = false;
     // (when the last step finished or the runner moved to another suite)
     let mut moved = Instant::now();
-    let mut cycles = count_cycles.then(|| SuiteCycles {
-        mark: Cycles::now(),
-        ..Default::default()
-    });
+    let mut cycles = count_cycles.then(|| SuiteCycles::new(&page));
     let mut marks =
         std::env::var_os("SNOWLARK_SPEEDOMETER_MARKS").map(|_| MarkLog { seen: 0 });
     while start.elapsed() < timeout {
@@ -493,7 +701,7 @@ pub fn run(args: &[String]) -> i32 {
         let polled = progress(&mut page);
         let Some(p) = polled else {
             if let Some(c) = cycles.as_mut() {
-                c.skip();
+                c.skip(&page);
             }
             continue;
         };
@@ -518,7 +726,7 @@ pub fn run(args: &[String]) -> i32 {
         finished = p.finished;
         started |= p.finished > 0 || !p.label.is_empty();
         if let Some(c) = cycles.as_mut() {
-            c.skip();
+            c.skip(&page);
         }
         if p.done {
             completed = true;
@@ -591,6 +799,7 @@ pub fn run(args: &[String]) -> i32 {
     }
     if let Some(c) = &cycles {
         report.push_str(&c.table());
+        report.push_str(&c.collections_table());
         let path = out_dir.join("cycles.json");
         if let Err(e) = std::fs::write(&path, c.json(pinned)) {
             eprintln!("cannot write {}: {e}", path.display());

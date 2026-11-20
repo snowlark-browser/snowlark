@@ -302,6 +302,17 @@ pub fn any_wrapped(
         .any(|h| st.gc.maybe_wrapped(h.get()) && map.get(&h.get()).is_some_and(|w| !w.is_dead()))
 }
 
+/// Calls `f` with the test [`any_wrapped`] makes of one handle, the state taken once for all its
+/// calls (a walk that stops at the first node with a wrapper).
+pub fn with_wrapped<R>(
+    scope: &v8::PinScope<'_, '_>,
+    f: impl FnOnce(&dyn Fn(Handle) -> bool) -> R,
+) -> R {
+    let st = state(scope);
+    let map = st.wrappers.borrow();
+    f(&|h| st.gc.maybe_wrapped(h.get()) && map.get(&h.get()).is_some_and(|w| !w.is_dead()))
+}
+
 /// The state of `handle`'s wrapper.
 pub fn wrapper_state(scope: &v8::PinScope<'_, '_>, handle: Handle) -> WrapperState {
     let st = state(scope);
@@ -323,6 +334,11 @@ pub fn has_pending(scope: &v8::PinScope<'_, '_>) -> (bool, bool) {
     let pending = !st.gc.pending.borrow().is_empty();
     let dead = !st.gc.dead.borrow().is_empty();
     (pending, dead)
+}
+
+/// How many wrappers wait for a pass (duplicates counted).
+pub fn pending_len(scope: &v8::PinScope<'_, '_>) -> usize {
+    state(scope).gc.pending.borrow().len()
 }
 
 /// Whether a pass was asked for, or enough wrappers are pending: the pass threshold when the event

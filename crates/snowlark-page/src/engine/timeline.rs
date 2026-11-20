@@ -257,6 +257,21 @@ impl PerformanceData {
     }
 }
 
+impl Engine {
+    /// From now on, keeps the names of the `performance.mark` calls of every realm until
+    /// [`Engine::take_watched_marks`], for a harness that splits a benchmark's run by its marks.
+    /// Nothing a page observes changes.
+    pub fn watch_marks(&self) {
+        self.watched_marks.borrow_mut().get_or_insert_with(Vec::new);
+    }
+
+    /// The names of the `performance.mark` calls since the last call (or since
+    /// [`Engine::watch_marks`]), in order; `None` when no harness watches them.
+    pub fn take_watched_marks(&self) -> Option<Vec<String>> {
+        self.watched_marks.borrow_mut().as_mut().map(std::mem::take)
+    }
+}
+
 /// The observer type of a `PerformanceObserver`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ObserverType {
@@ -763,6 +778,9 @@ impl PerformanceImpl for Engine {
         self.queue_performance_entry(entry);
         if let Some(m) = &self.sample_marks {
             m.mark(mark_name);
+        }
+        if let Some(names) = self.watched_marks.borrow_mut().as_mut() {
+            names.push(mark_name.to_owned());
         }
         Ok(entry)
     }

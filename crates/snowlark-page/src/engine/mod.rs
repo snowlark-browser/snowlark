@@ -531,6 +531,8 @@ pub struct Engine {
     pub(crate) canvas_frames_pending: RefCell<Vec<(NodeId, snowlark_render::canvas::FrameRequest)>>,
     /// [`Engine::set_canvas_frames_async`].
     pub(crate) canvas_frames_async: Cell<bool>,
+    /// [`Engine::watch_marks`]: the names of the `performance.mark` calls not taken yet.
+    pub(crate) watched_marks: RefCell<Option<Vec<String>>>,
     /// Navigations to open in new tabs (URL, in the background), for the embedder.
     pub(crate) open_requests: RefCell<Vec<(::url::Url, bool)>>,
     /// A hosted top-level traversable's document whose rendering state is in `render` for now,
@@ -714,6 +716,7 @@ impl Engine {
             canvas_dirty: RefCell::new(Vec::new()),
             canvas_frames_pending: RefCell::new(Vec::new()),
             canvas_frames_async: Cell::new(false),
+            watched_marks: RefCell::new(None),
             open_requests: RefCell::new(Vec::new()),
             view: Cell::new(None),
             pointer: RefCell::new(crate::input::PointerState::default()),

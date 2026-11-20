@@ -5439,7 +5439,7 @@ impl Renderer {
     }
 
     /// Detached nodes the page is about to free: what this renderer keeps for them goes.
-    pub fn nodes_freed(&mut self, freed: &rustc_hash::FxHashSet<NodeId>) {
+    pub fn nodes_freed(&mut self, freed: &snowlark_dom::NodeSet) {
         let Some(doc) = self.doc.as_deref_mut() else {
             return;
         };

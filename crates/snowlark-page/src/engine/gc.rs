@@ -336,6 +336,16 @@ pub(crate) struct Snapshot {
     explain: Vec<String>,
     /// How many objects and references it went through: what it cost.
     walked: usize,
+    /// The time its walk of every object's references took (ns).
+    refs_ns: u64,
+}
+
+/// Where the time of one pass went ([`Engine::gc_interrupt_pass`]), ns.
+#[derive(Default)]
+struct PassTime {
+    snapshot: u64,
+    /// The snapshot's walk of every object's references.
+    refs: u64,
 }
 
 /// New wrappers per item a snapshot walks before the next pass is asked for: a page's passes then
@@ -666,6 +676,19 @@ pub struct GcStats {
     pub objects_freed: u64,
     /// Turns after which a due collection waited because a task was ready.
     pub deferred: u64,
+    /// Time spent in collections the event loop ran after a task, and in its idle time (ns).
+    pub after_task_ns: u64,
+    pub idle_ns: u64,
+    /// V8's interrupts that asked for a pass inside script, and their time (ns).
+    pub interrupts: u64,
+    pub interrupt_ns: u64,
+    /// The passes those interrupts ran (wrappers were pending and no state was borrowed), the
+    /// wrappers pending when each began, and the time of their snapshots and of the snapshots' walk
+    /// of every object's references (ns).
+    pub interrupt_passes: u64,
+    pub interrupt_wrappers: u64,
+    pub interrupt_snapshot_ns: u64,
+    pub interrupt_refs_ns: u64,
 }
 
 impl Engine {
@@ -931,6 +954,7 @@ impl Engine {
                 h.get()
             )
         };
+        let refs_start = std::time::Instant::now();
         {
             let objects = self.objects.try_borrow().ok()?;
             if discarded.owned.is_empty() && t.is_none() {
@@ -968,6 +992,7 @@ impl Engine {
                 }
             }
         }
+        let refs_ns = refs_start.elapsed().as_nanos() as u64;
         {
             let from = at(&r);
             let l = self.loader.try_borrow().ok()?;
@@ -1260,6 +1285,7 @@ impl Engine {
             discarded,
             explain,
             walked,
+            refs_ns,
         })
     }
 
@@ -1316,13 +1342,25 @@ impl Engine {
     /// after the pass, which runs no script and only changes how wrappers and their values are held.
     /// `None` when some state was borrowed.
     fn gc_pass_snapshot(&self, scope: &mut v8::PinScope<'_, '_>) -> Option<Option<Snapshot>> {
+        self.gc_pass_measured(scope, &mut PassTime::default())
+    }
+
+    /// [`Engine::gc_pass_snapshot`], keeping in `time` where the pass's time went.
+    fn gc_pass_measured(
+        &self,
+        scope: &mut v8::PinScope<'_, '_>,
+        time: &mut PassTime,
+    ) -> Option<Option<Snapshot>> {
         if !rt::has_pending(scope).0 {
             return Some(None);
         }
+        let start = std::time::Instant::now();
         let Some(snap) = self.snapshot() else {
             rt::defer_pass(scope);
             return None;
         };
+        time.snapshot = start.elapsed().as_nanos() as u64;
+        time.refs = snap.refs_ns;
         rt::pace_passes(scope, snap.walked / WALKED_PER_WRAPPER);
         self.gc.borrow_mut().stats.passes += 1;
         let weakened = rt::pass(scope, &mut |h| self.keep(&snap, h));
@@ -1331,6 +1369,26 @@ impl Engine {
             self.gc_trace_event_values(scope, h);
         }
         Some(Some(snap))
+    }
+
+    /// The pass V8's interrupt asks for inside script, its time added to the totals ([`GcStats`]).
+    fn gc_interrupt_pass(&self, scope: &mut v8::PinScope<'_, '_>) {
+        let pending = rt::pending_len(scope) as u64;
+        let start = std::time::Instant::now();
+        let mut time = PassTime::default();
+        let ran = matches!(self.gc_pass_measured(scope, &mut time), Some(Some(_)));
+        let spent = start.elapsed().as_nanos() as u64;
+        if let Ok(mut gc) = self.gc.try_borrow_mut() {
+            let s = &mut gc.stats;
+            s.interrupts += 1;
+            s.interrupt_ns += spent;
+            if ran {
+                s.interrupt_passes += 1;
+                s.interrupt_wrappers += pending;
+                s.interrupt_snapshot_ns += time.snapshot;
+                s.interrupt_refs_ns += time.refs;
+            }
+        }
     }
 
     /// `SNOWLARK_GC_STATS=1`: after a V8 collection (at most every two seconds), a report on stderr
@@ -2148,7 +2206,7 @@ impl Engine {
     }
 
     /// Drops the side-table entries of nodes about to be freed.
-    fn purge_nodes(&self, freed: &rustc_hash::FxHashSet<NodeId>) {
+    fn purge_nodes(&self, freed: &snowlark_dom::NodeSet) {
         let is_freed = |h: &Handle| handle_node(*h).is_some_and(|n| freed.contains(&n));
         self.listeners.borrow_mut().retain(|h, _| !is_freed(h));
         self.handlers.borrow_mut().retain(|(h, _), _| !is_freed(h));
@@ -2423,26 +2481,33 @@ impl Engine {
         // Detached subtrees with no live wrapper and nothing outside JS referring to them; and
         // documents that are no browsing context's (any more, or ever: one `createHTMLDocument` or
         // `DOMParser` made), which go with their trees once nothing reaches them.
-        let roots: rustc_hash::FxHashSet<NodeId> = {
+        // (the candidates' opaque roots, each once: a removed subtree's nodes whose wrappers died
+        // are candidates by the hundred; sets by slot, as these are live nodes)
+        let mut asked = snowlark_dom::NodeSet::default();
+        let mut roots: Vec<NodeId> = Vec::new();
+        {
             let dom = self.dom();
             let html = self.html.borrow();
             let never_active =
                 |d: &NodeId| !html.docs.get(d).is_some_and(|s| s.has_browsing_context);
-            candidates
-                .into_iter()
-                .filter(|&n| dom.is_alive(n))
-                .map(|n| dom.opaque_root(n))
-                .filter(|&r| {
-                    (!dom.is_document(r) || snap.discarded.inactive(&r) || never_active(&r))
-                        && !snap.pinned_roots.contains(&r.to_bits())
-                })
-                .collect()
-        };
-        let mut freed = rustc_hash::FxHashSet::default();
+            for n in candidates {
+                if !dom.is_alive(n) {
+                    continue;
+                }
+                let r = dom.opaque_root(n);
+                if asked.insert(r)
+                    && (!dom.is_document(r) || snap.discarded.inactive(&r) || never_active(&r))
+                    && !snap.pinned_roots.contains(&r.to_bits())
+                {
+                    roots.push(r);
+                }
+            }
+        }
+        let mut freed = snowlark_dom::NodeSet::default();
         let mut free_roots = Vec::new();
         let mut free_realms = Vec::new();
-        let mut asked = roots.clone();
-        let mut roots: Vec<NodeId> = roots.into_iter().collect();
+        // (a subtree that keeps a wrapper is walked only up to its first wrapped node)
+        let mut nodes = Vec::new();
         while let Some(root) = roots.pop() {
             // A discarded browsing context's document goes with its Window's group, once nothing
             // of it has a wrapper or a pin and no node of the document is outside its tree.
@@ -2458,10 +2523,15 @@ impl Engine {
                 }
                 None => None,
             };
-            let nodes = self.dom().owned_nodes(root);
-            if rt::any_wrapped(cx.scope(), nodes.iter().map(|&n| node_handle(n))) {
+            nodes.clear();
+            let unwrapped = rt::with_wrapped(cx.scope(), |wrapped| {
+                self.dom()
+                    .owned_nodes_until(root, &mut nodes, |n| wrapped(node_handle(n)))
+            });
+            if !unwrapped {
                 continue;
             }
+            let nodes = std::mem::take(&mut nodes);
             if self.dom().is_document(root) && !self.dom().documents_owned_within(&nodes) {
                 // An inactive document waits on its nodes outside its tree (subtrees its script
                 // removed): they are asked now too, rather than only when a wrapper of theirs dies,
@@ -2791,7 +2861,7 @@ impl Engine {
             }
         }
         self.gc.borrow_mut().due_since = None;
-        self.collect_garbage_timed(cx)
+        self.collect_garbage_timed(cx, false)
     }
 
     /// The collection the event loop runs when it is about to wait with nothing to do and `free`
@@ -2811,7 +2881,7 @@ impl Engine {
         if !self.collection_due(cx, true) {
             return false;
         }
-        self.collect_garbage_timed(cx)
+        self.collect_garbage_timed(cx, true)
     }
 
     /// Whether a due collection waits for the ready tasks ([`Engine::collect_garbage_after_task`]).
@@ -2848,11 +2918,20 @@ impl Engine {
             || !gc.unloaded_pending.is_empty()
     }
 
-    /// [`Engine::collect_garbage`], keeping how long it took for the idle time the next one needs.
-    fn collect_garbage_timed(&self, cx: &mut Cx) -> bool {
+    /// [`Engine::collect_garbage`], keeping how long it took for the idle time the next one needs,
+    /// and adding it to the totals ([`GcStats`]) of the loop's busy or `idle` collections.
+    fn collect_garbage_timed(&self, cx: &mut Cx, idle: bool) -> bool {
         let start = std::time::Instant::now();
         let collected = self.collect_garbage(cx);
-        self.gc.borrow_mut().last_cost = start.elapsed();
+        let cost = start.elapsed();
+        let mut gc = self.gc.borrow_mut();
+        gc.last_cost = cost;
+        let ns = cost.as_nanos() as u64;
+        if idle {
+            gc.stats.idle_ns += ns;
+        } else {
+            gc.stats.after_task_ns += ns;
+        }
         collected
     }
 
@@ -2956,7 +3035,7 @@ fn interrupt_pass(scope: &mut v8::PinScope<'_, '_, ()>) {
     };
     let context = v8::Local::new(scope, &realm);
     let scope = &mut v8::ContextScope::new(scope, context);
-    engine.gc_pass(scope);
+    engine.gc_interrupt_pass(scope);
 }
 
 /// Installs the wrapper lifetime hooks in an isolate whose bindings are installed.

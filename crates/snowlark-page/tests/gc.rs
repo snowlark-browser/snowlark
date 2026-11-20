@@ -706,6 +706,62 @@ fn a_pass_waits_for_the_loop_to_be_idle() {
     assert!(in_turn > 0, "20,000 get one in the task");
 }
 
+/// The time of V8's interrupt passes inside script, of their snapshots and the snapshots' walk of
+/// every object's references, and of the collections after a task and in idle time, are kept.
+#[test]
+fn passes_and_collections_are_timed() {
+    let mut page = page();
+    let before = page.engine().gc_stats();
+    let (in_turn, _) = passes_in_the_turn_and_idle(&mut page, 20_000);
+    assert!(in_turn > 0, "20,000 new wrappers get a pass in the task");
+    let s = page.engine().gc_stats();
+    let passes = s.interrupt_passes - before.interrupt_passes;
+    assert!(passes > 0 && s.interrupts - before.interrupts >= passes);
+    assert!(
+        s.interrupt_wrappers - before.interrupt_wrappers >= 16_384,
+        "a pass begins at four times the threshold"
+    );
+    let ns = s.interrupt_ns - before.interrupt_ns;
+    let snapshot = s.interrupt_snapshot_ns - before.interrupt_snapshot_ns;
+    let refs = s.interrupt_refs_ns - before.interrupt_refs_ns;
+    assert!(
+        ns >= snapshot && snapshot >= refs && refs > 0,
+        "{ns} {snapshot} {refs}"
+    );
+
+    let before = page.engine().gc_stats();
+    let (_, next, _) = collections_in_the_turn_the_next_and_idle(&mut page, 5_000);
+    assert!(next > 0);
+    assert!(page.engine().gc_stats().after_task_ns > before.after_task_ns);
+    let before = page.engine().gc_stats();
+    let (in_turn, idle) = collections_in_the_turn_and_idle(&mut page, 2_000);
+    assert!(in_turn == 0 && idle > 0);
+    let s = page.engine().gc_stats();
+    assert!(s.idle_ns > before.idle_ns);
+}
+
+/// A harness that watches the `performance.mark` calls gets the names of those made since it last
+/// asked; the page sees no change.
+#[test]
+fn a_harness_sees_the_performance_marks_made() {
+    let mut page = page();
+    eval(&mut page, "performance.mark('before')");
+    assert_eq!(page.engine().take_watched_marks(), None);
+    page.engine().watch_marks();
+    assert_eq!(page.engine().take_watched_marks(), Some(vec![]));
+    let entries = eval(
+        &mut page,
+        "performance.mark('a'); performance.mark('b.c-sync-end'); \
+         performance.getEntriesByType('mark').map(m => m.name).join()",
+    );
+    assert_eq!(entries, "before,a,b.c-sync-end");
+    assert_eq!(
+        page.engine().take_watched_marks(),
+        Some(vec!["a".to_owned(), "b.c-sync-end".to_owned()])
+    );
+    assert_eq!(page.engine().take_watched_marks(), Some(vec![]));
+}
+
 /// A busy loop leaves to its idle time a collection that only a backlog of removed subtrees asks
 /// for, as Chromium's collectors work in idle tasks between frames, and collects without waiting
 /// for idle time only when four times that waits, after the first task that leaves none ready.

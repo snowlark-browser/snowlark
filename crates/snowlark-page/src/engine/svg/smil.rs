@@ -118,7 +118,7 @@ pub(crate) struct Smil {
 
 impl Smil {
     /// Forgets freed nodes.
-    pub(crate) fn nodes_freed(&mut self, freed: &FxHashSet<NodeId>) {
+    pub(crate) fn nodes_freed(&mut self, freed: &snowlark_dom::NodeSet) {
         self.loaded.retain(|n| !freed.contains(n));
         if self.elements.is_empty() && self.containers.is_empty() {
             return;
