@@ -253,6 +253,69 @@ fn a_change_in_one_row_of_a_column_runs_no_other_row_again() {
     assert_same_as_a_full_build(&mut t, &f);
 }
 
+/// A row of a nested row container (holding `item`) and a 73px block, in a column: the nested
+/// row is measured for its flex base size with no height available, then again within the
+/// row's height once that is known.
+fn nested_rows(
+    item: impl FnOnce(&mut crate::testing::TestStyle),
+) -> (T, [snowlark_dom::NodeId; 3]) {
+    let mut t = T::new();
+    let root = t.root();
+    let column = t.doc.block(root, |s| {
+        s.display = Display::FLEX;
+        s.flex_direction = FlexDirection::Column;
+    });
+    let row = t.doc.block(column, |s| {
+        s.display = Display::FLEX;
+        s.align_items = Align::Center;
+    });
+    let nested = t.doc.block(row, |s| s.display = Display::FLEX);
+    let a = t.doc.block(nested, item);
+    t.doc.text(a, "ab cd");
+    let b = t.doc.block(nested, |_| {});
+    t.doc.text(b, "efg");
+    t.doc.block(row, |s| {
+        s.width = SizeValue::px(30.0);
+        s.height = SizeValue::px(73.0);
+    });
+    (t, [nested, a, b])
+}
+
+#[test]
+fn a_flex_container_is_measured_once_whatever_height_is_available() {
+    // Its items turn no height into a width, so the nested row's measurements do not change with
+    // the height available to it (css-flexbox-1 §9.2 step 3, §9.4): each is a cache hit the
+    // second time.
+    let (mut t, [nested, a, b]) = nested_rows(|_| {});
+    let f = t.run(400.0, 400.0);
+    let s = t.layout.stats();
+    assert_eq!(rect(&f, nested), r(0.0, 31.5, 80.0, 10.0));
+    assert_eq!(rect(&f, a), r(0.0, 31.5, 50.0, 10.0));
+    assert_eq!(rect(&f, b), r(50.0, 31.5, 30.0, 10.0));
+    // (the column, the row and the nested row each measured and laid out; without the fold the
+    // nested row runs three more times, for the row's height)
+    assert_eq!(s.algorithm_runs, 7, "{s:?}");
+    assert_same_as_a_full_build(&mut t, &f);
+}
+
+#[test]
+fn a_flex_container_whose_item_has_a_ratio_is_measured_in_the_height_available() {
+    // An item with `aspect-ratio` takes its width from the height it is stretched to (css-sizing-4
+    // §5): the nested row's measurements depend on the height available to it.
+    let (mut t, [nested, a, _]) = nested_rows(|s| {
+        s.aspect_ratio = AspectRatio {
+            auto: false,
+            ratio: Some(1.0),
+        };
+    });
+    let f = t.run(400.0, 400.0);
+    assert_eq!(rect(&f, nested), r(0.0, 11.5, 80.0, 50.0));
+    assert_eq!(rect(&f, a), r(0.0, 11.5, 50.0, 50.0));
+    let s = t.layout.stats();
+    assert_eq!(s.algorithm_runs, 10, "{s:?}");
+    assert_same_as_a_full_build(&mut t, &f);
+}
+
 #[test]
 fn a_nested_container_laid_out_again_builds_its_fragment_again() {
     // A change inside a card marks it dirty: taffy runs it again and its fragment is built again.

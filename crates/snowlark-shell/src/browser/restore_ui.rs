@@ -33,7 +33,8 @@ impl Browser {
     /// Keeps the window's placement in the profile: when it changed (checked once a second, the
     /// write on a thread of its own), and for the last time as the window closes.
     pub(super) fn save_window(&mut self, window: &snowlark_paint::window::Window, last: bool) {
-        let Some(p) = window.placement() else {
+        // (an Incognito window's placement is not kept)
+        let Some(p) = window.placement().filter(|_| !self.off_the_record()) else {
             return;
         };
         if self.placed == Some(p) {

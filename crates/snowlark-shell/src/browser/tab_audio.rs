@@ -81,7 +81,7 @@ impl Browser {
     /// "Mute site" / "Unmute site": the setting is saved and the site's tabs follow.
     fn set_site_mute(&mut self, site: &str, muted: bool) {
         if self.settings.set_site_muted(site, muted) {
-            let _ = self.settings.save(&self.profile.settings_file());
+            self.save_settings();
         }
         for i in 0..self.tabs.len() {
             let on_site = self

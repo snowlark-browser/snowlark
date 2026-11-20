@@ -141,7 +141,7 @@ impl Browser {
     /// The collapse button: favicons only, or titles again.
     pub(super) fn toggle_side_collapsed(&mut self) {
         self.settings.vertical_tabs_collapsed = !self.settings.vertical_tabs_collapsed;
-        let _ = self.settings.save(&self.profile.settings_file());
+        self.save_settings();
         self.side_width_changed();
     }
 
@@ -182,7 +182,7 @@ impl Browser {
             }
         }
         self.pressed = Hit::None;
-        let _ = self.settings.save(&self.profile.settings_file());
+        self.save_settings();
         self.hover = if self.in_chrome(dip) {
             self.layout().hit(dip)
         } else {
@@ -246,7 +246,7 @@ impl Browser {
     /// choice.
     pub(super) fn toggle_vertical_tabs(&mut self) {
         self.settings.vertical_tabs = !self.settings.vertical_tabs;
-        let _ = self.settings.save(&self.profile.settings_file());
+        self.save_settings();
         self.side_layout_changed();
         self.refresh_settings_pages();
     }

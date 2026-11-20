@@ -109,6 +109,13 @@ impl Backend {
         Backend(Arc::new(LocalIdb::in_memory()))
     }
 
+    /// [`Backend::in_memory`], reporting `quota` from `estimate()` ([`LocalIdb::set_quota`]).
+    pub fn in_memory_with_quota(quota: u64) -> Backend {
+        let idb = LocalIdb::in_memory();
+        idb.set_quota(quota);
+        Backend(Arc::new(idb))
+    }
+
     /// A backend in this process that keeps its databases in `dir`.
     pub fn persistent(dir: PathBuf) -> Backend {
         Backend(Arc::new(LocalIdb::persistent(dir)))

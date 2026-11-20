@@ -27,6 +27,8 @@ pub struct InternalState {
     pub bookmarks: crate::bookmarks::Bookmarks,
     /// The bookmark manager's delete notice and when it goes (milliseconds since the epoch).
     pub bookmark_toast: Option<(String, i64)>,
+    /// The profile's downloads, for the downloads page (the same store the window records in).
+    pub downloads: Arc<Mutex<crate::downloads::DownloadHistory>>,
 }
 
 /// The browser's own pages, made from `state` (and the cookie store for the sites with data, and
@@ -64,6 +66,8 @@ impl BrowserPages {
             InternalKind::History
         } else if crate::bookmarks_page::is_bookmarks_url(url) {
             InternalKind::Bookmarks
+        } else if crate::downloads_page::is_downloads_url(url) {
+            InternalKind::Downloads
         } else {
             InternalKind::Other
         }
@@ -79,6 +83,7 @@ impl BrowserPages {
             InternalKind::Settings | InternalKind::About => crate::settings::shown_url(url),
             InternalKind::History => crate::history_page::shown_url(url),
             InternalKind::Bookmarks => crate::bookmarks_page::shown_url(url),
+            InternalKind::Downloads => crate::downloads_page::shown_url(url),
             InternalKind::Other => url.clone(),
         };
         let html = match Self::kind_of(&shown) {
@@ -109,6 +114,21 @@ impl BrowserPages {
                     dark,
                     now_ms(),
                     &window::local_offset_ms,
+                ))
+            }
+            InternalKind::Downloads => {
+                let (dark, downloads) = {
+                    let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+                    (st.dark, st.downloads.clone())
+                };
+                let downloads = downloads.lock().unwrap_or_else(|e| e.into_inner());
+                Some(crate::downloads_page::downloads_html(
+                    &downloads,
+                    &crate::downloads_page::query_of(&shown),
+                    dark,
+                    now_ms(),
+                    &window::local_offset_ms,
+                    &|p| p.is_file(),
                 ))
             }
             InternalKind::Settings | InternalKind::About => {
@@ -205,6 +225,7 @@ impl Browser {
                 || e.tab.state.url.starts_with("snowlark://credits")
                 || e.tab.state.url.starts_with("snowlark://history")
                 || e.tab.state.url.starts_with("snowlark://bookmarks")
+                || e.tab.state.url.starts_with("snowlark://downloads")
             {
                 e.tab.reload();
             }
@@ -235,7 +256,7 @@ impl Browser {
         if !self.settings.apply_query(query) {
             return;
         }
-        let _ = self.settings.save(&self.profile.settings_file());
+        self.save_settings();
         self.settings_notice = None;
         self.apply_user_agent();
         if before.bookmarks_bar != self.settings.bookmarks_bar {
@@ -263,9 +284,9 @@ impl Browser {
             return;
         }
         self.dark = dark;
-        window.set_dark_frame(dark);
+        window.set_dark_frame(self.chrome_dark());
         self.devtools_window_theme();
-        self.comp.send(CompMsg::Dark(dark));
+        self.comp.send(CompMsg::Dark(self.chrome_dark()));
         for e in self.tabs.iter().filter(|e| e.crashed.is_none()) {
             e.tab.send(TabCommand::ColorScheme(dark));
         }
@@ -368,6 +389,10 @@ mod tests {
         let (shown, html) = page("snowlark://history/apply?q=a&r=1-2+x");
         assert_eq!(shown, "snowlark://history/?q=a");
         assert!(html.is_some_and(|h| h.contains("<title>History</title>")));
+        assert_eq!(kind("snowlark://downloads/?q=a"), InternalKind::Downloads);
+        let (shown, html) = page("snowlark://downloads/apply?op=clear&q=a");
+        assert_eq!(shown, "snowlark://downloads/?q=a");
+        assert!(html.is_some_and(|h| h.contains("<title>Downloads</title>")));
         assert_eq!(kind("https://a.example/"), InternalKind::Other);
     }
 
@@ -552,6 +577,113 @@ mod tests {
         );
         assert_eq!(eval(&mut d, shown_pages), "appearance");
         assert_eq!(eval(&mut d, hits), "several tabs");
+    }
+
+    /// The downloads page in the engine: its entries newest first, the search as you type, and
+    /// what its buttons ask the browser for.
+    #[test]
+    fn the_downloads_page_searches_as_you_type_and_asks_for_its_actions() {
+        use crate::downloads::{DownloadHistory, Start, State};
+        let net = NetThread::start(NetConfig::default()).unwrap();
+        let downloads = Arc::new(Mutex::new(DownloadHistory::in_memory()));
+        let (a, b) = {
+            let mut h = downloads.lock().unwrap();
+            let now = now_ms();
+            let mut add = |name: &str, ago: i64| {
+                let id = h.start(Start {
+                    target_path: std::env::temp_dir().join(name),
+                    url_chain: vec![format!("https://files.example/{name}")],
+                    start_time: now - ago,
+                    ..Default::default()
+                });
+                h.finish(id, State::Cancelled, None, now);
+                id
+            };
+            (add("report.pdf", 2000), add("photo.jpg", 1000))
+        };
+        let state = Arc::new(Mutex::new(InternalState {
+            downloads: downloads.clone(),
+            ..Default::default()
+        }));
+        let pages = internal_pages(
+            state,
+            Arc::new(Mutex::new(History::in_memory())),
+            net.client(),
+            None,
+        );
+        let mut d = driver_with(&net, pages);
+        let eval =
+            |d: &mut crate::page_driver::PageDriver, js: &str| d.page().eval(js, "t").unwrap();
+        d.navigate(Url::parse("snowlark://downloads/").unwrap());
+        settle(&mut d, |d| {
+            !d.info().loading && d.info().title == "Downloads"
+        });
+        let shown = "[...document.querySelectorAll('.item')].filter(i => getComputedStyle(i).display != 'none').map(i => i.querySelector('.name').textContent).join()";
+        assert_eq!(eval(&mut d, shown), "photo.jpg,report.pdf");
+        assert_eq!(
+            eval(&mut d, "document.querySelector('.day h2').textContent"),
+            "Today"
+        );
+        // Each keystroke filters the list; nothing found says so.
+        eval(
+            &mut d,
+            "const s = document.getElementById('search'); s.value = 'REPORT'; s.dispatchEvent(new Event('input'))",
+        );
+        assert_eq!(eval(&mut d, shown), "report.pdf");
+        eval(
+            &mut d,
+            "s.value = 'zebra'; s.dispatchEvent(new Event('input'))",
+        );
+        assert_eq!(eval(&mut d, shown), "");
+        assert_eq!(
+            eval(&mut d, "document.getElementById('empty').hidden + document.getElementById('empty').textContent"),
+            "falseNo search results found"
+        );
+        eval(&mut d, "s.value = ''; s.dispatchEvent(new Event('input'))");
+        assert_eq!(eval(&mut d, shown), "photo.jpg,report.pdf");
+        // The buttons ask the browser.
+        let request = |d: &mut crate::page_driver::PageDriver| {
+            let start = Instant::now();
+            let mut r = Vec::new();
+            while r.is_empty() && start.elapsed() < Duration::from_secs(10) {
+                d.update();
+                r = d.take_internal_requests();
+            }
+            match &r[..] {
+                [crate::driver::InternalRequest::Downloads(q)] => q.clone(),
+                _ => panic!("{r:?}"),
+            }
+        };
+        for (js, want) in [
+            (
+                format!("document.querySelector('#d{a} [data-op=remove]').click()"),
+                format!("op=remove&id={a}"),
+            ),
+            (
+                format!("document.querySelector('#d{b} [data-op=copy]').click()"),
+                format!("op=copy&id={b}"),
+            ),
+            (
+                format!("document.querySelector('#d{b} [data-op=retry]').click()"),
+                format!("op=retry&id={b}"),
+            ),
+            (
+                "document.getElementById('clear-all').click()".into(),
+                "op=clear".into(),
+            ),
+            (
+                "document.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true}))"
+                    .into(),
+                "op=undo".into(),
+            ),
+        ] {
+            eval(&mut d, &js);
+            assert_eq!(request(&mut d), want);
+        }
+        assert_eq!(
+            eval(&mut d, "document.getElementById('toast').textContent"),
+            "Copied download link"
+        );
     }
 
     /// The history page: its rows, a row's menu removing one row, the selection removing

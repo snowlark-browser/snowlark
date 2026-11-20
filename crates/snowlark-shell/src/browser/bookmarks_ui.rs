@@ -97,7 +97,7 @@ impl Browser {
 
     pub(super) fn toggle_bookmarks_bar(&mut self) {
         self.settings.bookmarks_bar = !self.settings.bookmarks_bar;
-        let _ = self.settings.save(&self.profile.settings_file());
+        self.save_settings();
         self.close_popup();
         // (the page area changes: a resize of the content)
         self.resized();

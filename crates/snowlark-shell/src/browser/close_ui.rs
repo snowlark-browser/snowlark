@@ -59,7 +59,7 @@ impl Browser {
         self.overlay_dirty = true;
         if d.checked(0) && self.settings.warn_on_close {
             self.settings.warn_on_close = false;
-            let _ = self.settings.save(&self.profile.settings_file());
+            self.save_settings();
             self.refresh_settings_pages();
         }
         window.close();

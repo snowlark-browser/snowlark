@@ -153,6 +153,11 @@ impl Profile {
         self.dir.join("settings.json")
     }
 
+    /// The download history ([`crate::downloads`]).
+    pub fn downloads_file(&self) -> PathBuf {
+        self.dir.join("downloads.json")
+    }
+
     /// Where the minidumps of crashed renderer processes go (`snowlark_ipc::Launch::crash_dumps`); Chrome
     /// keeps its crash reports in the profile's `Crashpad/reports` folder.
     pub fn crash_dumps_dir(&self) -> PathBuf {
@@ -209,6 +214,7 @@ mod tests {
         );
         assert_eq!(p.history_file(), dir.join("history.json"));
         assert_eq!(p.bookmarks_file(), dir.join("bookmarks.json"));
+        assert_eq!(p.downloads_file(), dir.join("downloads.json"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

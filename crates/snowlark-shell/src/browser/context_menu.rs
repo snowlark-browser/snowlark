@@ -25,6 +25,7 @@ pub fn context_entries(
     can_forward: bool,
     engine: &str,
     inspect: Point,
+    incognito: bool,
 ) -> Vec<Entry<Command>> {
     let t = &info.target;
     let mut out = Vec::new();
@@ -33,6 +34,13 @@ pub fn context_entries(
             "Open link in new tab",
             Command::OpenInNewTab(link.clone()),
         ));
+        // (from a regular window; an Incognito window's new tab is already Incognito)
+        if !incognito {
+            out.push(Entry::item(
+                "Open link in Incognito window",
+                Command::OpenInIncognito(link.clone()),
+            ));
+        }
         out.push(
             Entry::item("Copy link address", Command::CopyText(link.to_string()))
                 .icon(MenuIcon::Glyph(glyph::COPY)),
@@ -185,6 +193,7 @@ impl Browser {
             can_forward,
             self.settings.engine().name,
             at,
+            self.off_the_record(),
         );
         self.open_menu(entries, at, Hit::None, info.keyboard);
     }
@@ -292,52 +301,6 @@ impl Browser {
                     }
                     Ok(r) => eprintln!("[save] {url}: status {}", r.head.status),
                     Err(e) => eprintln!("[save] {url}: {}", e.message),
-                }
-            });
-    }
-}
-
-impl Browser {
-    /// M5: a navigation whose response is a download (`tab_host::is_download`): saved where the
-    /// user says, as an image is (the Save As dialog and the body run on a thread of their own).
-    /// Chromium hands such a response to its download manager
-    /// (`NavigationRequest::OnResponseStarted`, `is_download`); this is Snowlark's.
-    pub(super) fn save_download(&mut self, window: &Window, download: crate::tab_host::Download) {
-        let owner = window.handle();
-        let crate::tab_host::Download {
-            url,
-            head,
-            mut stream,
-        } = download;
-        let name = download_file_name(&url, &head);
-        let _ = std::thread::Builder::new()
-            .name("snowlark download".into())
-            .spawn(move || {
-                let ext = name
-                    .rsplit_once('.')
-                    .map(|(_, e)| e.to_ascii_lowercase())
-                    .filter(|e| e.len() <= 5 && !e.is_empty());
-                let filter = ext.map(|e| (format!("{} file", e.to_uppercase()), format!("*.{e}")));
-                let filters: Vec<(&str, &str)> = filter
-                    .iter()
-                    .map(|(d, p)| (d.as_str(), p.as_str()))
-                    .collect();
-                let Some(path) = window::save_file_dialog(owner, &name, &filters) else {
-                    return;
-                };
-                let mut body = Vec::new();
-                while let Some(e) = stream.next_blocking() {
-                    match e {
-                        snowlark_net::FetchEvent::Body(b) => body.extend_from_slice(&b),
-                        snowlark_net::FetchEvent::Error(e) => {
-                            eprintln!("[download] {url}: {}", e.message);
-                            return;
-                        }
-                        _ => {}
-                    }
-                }
-                if let Err(e) = std::fs::write(&path, body) {
-                    eprintln!("[download] {}: {e}", path.display());
                 }
             });
     }
@@ -462,6 +425,7 @@ mod tests {
             true,
             "Bing",
             Point::ZERO,
+            false,
         );
         assert_eq!(
             labels(&page),
@@ -488,11 +452,13 @@ mod tests {
             true,
             "Bing",
             Point::ZERO,
+            false,
         );
         assert_eq!(
             labels(&both),
             [
                 "Open link in new tab",
+                "Open link in Incognito window",
                 "Copy link address",
                 "-",
                 "Open image in new tab",
@@ -508,6 +474,25 @@ mod tests {
         assert!(both
             .iter()
             .any(|e| matches!(e, Entry::Item { action: Command::SaveImage(u), .. } if *u == img)));
+        assert!(both.iter().any(
+            |e| matches!(e, Entry::Item { action: Command::OpenInIncognito(u), .. } if *u == link)
+        ));
+        // An Incognito window's link menu has no row for another Incognito window.
+        let in_incognito = context_entries(
+            &info(ContextTarget {
+                link: Some(link.clone()),
+                ..Default::default()
+            }),
+            false,
+            false,
+            "Bing",
+            Point::ZERO,
+            true,
+        );
+        let rows = labels(&in_incognito);
+        let has = |label: &str| rows.iter().any(|r| r == label);
+        assert!(has("Open link in new tab") && has("Copy link address"));
+        assert!(!has("Open link in Incognito window"));
         assert_eq!(file_name_for(&img, "image"), "pic one.png");
         assert_eq!(
             file_name_for(&Url::parse("https://a.example/").unwrap(), "image"),

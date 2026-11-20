@@ -38,6 +38,8 @@ pub mod crash;
 pub mod credits;
 pub mod devtools;
 pub mod dialog;
+pub mod downloads;
+pub mod downloads_page;
 pub mod find_bar;
 mod gpu_compositor;
 pub mod gpu_process;
@@ -45,6 +47,7 @@ pub mod history;
 pub mod history_page;
 pub mod local_storage;
 pub mod menu;
+pub mod partition;
 pub mod popup;
 pub mod profile;
 #[cfg(test)]
@@ -103,9 +106,15 @@ pub fn run(start: Option<&str>, model: ProcessModel, gpu_process: bool) -> i32 {
         gpu_process::GpuHost::start(move || gpu_process::gpu_launch(&dumps))
     });
     let spares = tab_host::spare_pool(model, move || tab_host::renderer_launch(None, &dumps));
+    // (what every window shares: the regular partition, the content blocker, the GPU process)
+    let app = browser::incognito::App::new(profile, model, gpu);
+    let first = app.clone();
     let result = window::run(options, move |w| {
-        browser::Route::main(browser::Browser::new(w, &profile, url, model, spares, gpu))
+        let partition = first.regular.clone();
+        browser::Route::main(browser::Browser::new(w, first, partition, url, spares))
     });
+    // (the regular partition's last writes reach the profile)
+    drop(app);
     match result {
         Ok(()) => 0,
         Err(e) => {

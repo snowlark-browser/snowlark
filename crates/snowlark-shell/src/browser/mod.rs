@@ -19,11 +19,13 @@ mod context_menu;
 mod devtools_menus;
 mod devtools_ui;
 mod devtools_window;
+mod downloads_ui;
 mod drop_files;
 mod find;
 mod fullscreen;
 mod hang_ui;
 mod history_ui;
+pub mod incognito;
 pub(crate) mod node_menu;
 mod popup_window;
 mod restore_ui;
@@ -40,7 +42,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 
 use snowlark_media::TabMuteControl;
-use snowlark_net::{NetClient, NetConfig, NetThread, Url};
+use snowlark_net::{NetClient, Url};
 use snowlark_paint::window::{
     self, keys, CaptionAction, CaptionButton, Cursor, Event, HitArea, Modifiers, MouseButton,
     Window, WindowHandler,
@@ -218,7 +220,11 @@ enum Focus {
 }
 
 pub struct Browser {
-    _net_thread: NetThread,
+    /// What the browser's windows share ([`incognito`]).
+    app: std::rc::Rc<incognito::App>,
+    /// The profile's storage: its network, storage, databases and history (an Incognito
+    /// window's is shared with the other Incognito windows).
+    partition: std::rc::Rc<crate::partition::Partition>,
     /// Content blocking (`None` with `SNOWLARK_BLOCK=0`).
     blocker: Option<Arc<snowlark_blocker::ContentBlocker>>,
     comp: CompositorThread,
@@ -235,13 +241,13 @@ pub struct Browser {
     /// The spare renderer new tabs take (with `--process-model=tab`).
     spares: Option<snowlark_tab::spare::SparePool>,
     /// The GPU process (`--gpu-process`, M7).
-    gpu_process: Option<crate::gpu_process::GpuHost>,
-    /// `localStorage`, kept in the profile.
-    local_storage: crate::local_storage::LocalStorage,
+    gpu_process: Option<std::rc::Rc<crate::gpu_process::GpuHost>>,
     tabs: TabList<TabEntry>,
     next_id: TabId,
     /// The pages visited, shared with the history page.
     history: Arc<std::sync::Mutex<History>>,
+    /// The profile's downloads, shared with the downloads page and the download threads.
+    downloads: Arc<std::sync::Mutex<crate::downloads::DownloadHistory>>,
     profile: Profile,
     settings: Settings,
     bookmarks: Bookmarks,
@@ -381,33 +387,21 @@ pub struct Browser {
 impl Browser {
     pub fn new(
         window: &Window,
-        profile: &Profile,
+        app: std::rc::Rc<incognito::App>,
+        partition: std::rc::Rc<crate::partition::Partition>,
         start: Option<Url>,
-        process_model: ProcessModel,
         spares: Option<snowlark_tab::spare::SparePool>,
-        gpu_process: Option<crate::gpu_process::GpuHost>,
     ) -> Browser {
-        let mut config = NetConfig::from_env();
-        profile.ensure();
-        config.profile_dir = Some(profile.dir.clone());
-        let net_thread = snowlark_tab::script_check::start_net(config.clone())
-            .or_else(|_| {
-                config.profile_dir = None;
-                snowlark_tab::script_check::start_net(config)
-            })
-            .expect("network thread");
-        let net: NetClient = net_thread.client();
-        // (the folder a page in this process opens, snowlark-page's loader)
-        let code_cache = (process_model == ProcessModel::Tab).then(|| {
-            let enabled = std::env::var("SNOWLARK_CODE_CACHE").map_or(true, |v| v != "0");
-            match net.profile_dir().filter(|_| enabled) {
-                Some(dir) => snowlark_js::code_cache::CodeCache::open(
-                    dir.join("code-cache"),
-                    snowlark_js::code_cache::DEFAULT_BUDGET,
-                ) as Arc<dyn snowlark_js::code_cache::CodeCacheStore>,
-                None => Arc::new(crate::tab_host::NoCodeCache),
-            }
-        });
+        let profile = &app.profile.clone();
+        let process_model = app.model;
+        let gpu_process = app.gpu_process.clone();
+        let off_the_record = partition.is_off_the_record();
+        if !off_the_record {
+            profile.ensure();
+        }
+        let net: NetClient = partition.net.clone();
+        // (with `single`, a page in this process opens the folder itself: snowlark-page's loader)
+        let code_cache = (process_model == ProcessModel::Tab).then(|| partition.code_cache());
         let gpu = Gpu::new().expect("a Direct3D 11 device");
         let text = Arc::new(TextEngine::new().expect("DirectWrite"));
         let images = Arc::new(ImageStore::new());
@@ -439,26 +433,22 @@ impl Browser {
             notice: None,
             bookmarks: Default::default(),
             bookmark_toast: None,
+            // (an Incognito window's files are kept, its list of them only while it is open)
+            downloads: Arc::new(std::sync::Mutex::new(if off_the_record {
+                crate::downloads::DownloadHistory::in_memory()
+            } else {
+                crate::downloads::DownloadHistory::load(&profile.downloads_file())
+            })),
         }));
-        // Content blocking: on unless SNOWLARK_BLOCK=0.
-        let blocker = snowlark_blocker::policy::enabled_by_env(true).then(|| {
-            snowlark_blocker::ContentBlocker::open(&snowlark_blocker::data_dir(&profile.dir))
-        });
-        if let Some(b) = &blocker {
-            // The lists are fetched through the browser's own client (not filtered).
-            b.start_updater(net.clone());
-        }
-        let history = Arc::new(std::sync::Mutex::new(History::load(
-            &profile.history_file(),
-            profile.legacy_history().as_deref(),
-        )));
+        // (content blocking: the windows' one, `App::new`)
+        let blocker = app.blocker.clone();
+        let history = partition.history.clone();
         let pages = settings_ui::internal_pages(
             internal.clone(),
             history.clone(),
             net.clone(),
             blocker.clone(),
         );
-        let local_storage = crate::local_storage::LocalStorage::open(profile.local_storage_dir());
         let tab_ctx = TabContext {
             gpu,
             videos: Some(videos),
@@ -476,25 +466,30 @@ impl Browser {
             audio: None,
             // (AudioContexts play on the default output device, from any process model)
             audio_out: snowlark_media::audio_outputs(),
-            broadcast: snowlark_page::BroadcastHub::default(),
-            web_storage: local_storage.host(),
-            // (IndexedDB's databases live in the profile, a folder per origin; each origin's
-            // quota is a share of the profile's volume)
-            idb: snowlark_page::IdbBackend::persistent_with_quota(
-                profile.dir.join("IndexedDB"),
-                snowlark_ipc::win::volume_size(&profile.dir)
-                    .map_or(snowlark_idb::QUOTA, snowlark_idb::quota_for_volume),
-            ),
+            // (the partition's: its tabs' channels, storage and databases)
+            broadcast: partition.broadcast.clone(),
+            web_storage: partition.local_storage.host(),
+            idb: partition.idb.clone(),
         };
-        let bookmarks = Bookmarks::load(
+        let mut bookmarks = Bookmarks::load(
             &profile.bookmarks_file(),
             profile.legacy_bookmarks().as_deref(),
         );
-        internal.lock().unwrap_or_else(|e| e.into_inner()).bookmarks = bookmarks.snapshot();
-        window.set_dark_frame(dark);
+        if off_the_record {
+            // (the regular window owns the file: an Incognito window shows the bookmarks as they
+            // were when it opened, and keeps its own changes in memory)
+            bookmarks = bookmarks.snapshot();
+        }
+        let downloads = {
+            let mut st = internal.lock().unwrap_or_else(|e| e.into_inner());
+            st.bookmarks = bookmarks.snapshot();
+            st.downloads.clone()
+        };
+        window.set_dark_frame(dark || off_the_record);
         let dock = Dock::from_name(&settings.devtools_dock);
         let mut b = Browser {
-            _net_thread: net_thread,
+            app,
+            partition,
             blocker,
             comp,
             windows,
@@ -506,10 +501,10 @@ impl Browser {
             code_cache,
             spares,
             gpu_process,
-            local_storage,
             tabs: TabList::default(),
             next_id: 1,
             history,
+            downloads,
             profile: profile.clone(),
             settings,
             bookmarks,
@@ -591,9 +586,11 @@ impl Browser {
             next_popup: 1,
             main_opens: Vec::new(),
         };
-        b.comp.send(CompMsg::Dark(dark));
+        b.comp.send(CompMsg::Dark(b.chrome_dark()));
         b.apply_user_agent();
-        b.start_session();
+        if !off_the_record {
+            b.start_session();
+        }
         let url = start.unwrap_or_else(|| b.startup_url());
         b.open_tab(url, Placement::End);
         if b.active_url() == START_PAGE {
@@ -1316,7 +1313,9 @@ impl Browser {
                             e.icon_bytes = None;
                         }
                     }
-                    if !s.loading && (url_changed || e.tab.state.loading) {
+                    if self.partition.is_off_the_record() {
+                        // (an Incognito window records no history)
+                    } else if !s.loading && (url_changed || e.tab.state.loading) {
                         self.history
                             .lock()
                             .unwrap_or_else(|e| e.into_inner())
@@ -1359,7 +1358,8 @@ impl Browser {
                     let tab = &mut self.tabs.get_mut(i).unwrap().tab;
                     tab.navigation_ready(number);
                     if let Some(download) = tab.take_download() {
-                        self.save_download(window, download);
+                        let tab_url = tab.state.url.clone();
+                        self.save_download(window, download, tab_url);
                     } else if tab.needs_swap() {
                         self.swap_tab(i);
                     }
@@ -1509,6 +1509,9 @@ impl Browser {
                 TabEvent::Internal(crate::driver::InternalRequest::Bookmarks(q)) => {
                     self.apply_bookmarks(&q)
                 }
+                TabEvent::Internal(crate::driver::InternalRequest::Downloads(q)) => {
+                    self.apply_downloads(window, &q)
+                }
                 TabEvent::Crashed(message) => {
                     if self.autoscroll.is_some_and(|s| s.tab == id) {
                         self.end_autoscroll();
@@ -1587,9 +1590,14 @@ impl Browser {
             .active()
             .map(|e| e.tab.state.title.clone())
             .filter(|t| !t.is_empty());
+        let app = if self.off_the_record() {
+            "Snowlark (Incognito)"
+        } else {
+            "Snowlark"
+        };
         window.set_title(&match title {
-            Some(t) => format!("{t} - Snowlark"),
-            None => "Snowlark".into(),
+            Some(t) => format!("{t} - {app}"),
+            None => app.into(),
         });
     }
 
@@ -1671,7 +1679,7 @@ impl Browser {
                 zoom,
             },
             spinner: self.spinner,
-            theme: chrome::theme(self.dark),
+            theme: chrome::theme(self.chrome_dark()),
             bar: if self.settings.bookmarks_bar {
                 self.bar_views()
             } else {
@@ -1716,7 +1724,7 @@ impl Browser {
             menu: self.menu.as_ref(),
             tooltip: self.tooltip.as_ref(),
         };
-        let theme = chrome::theme(self.dark);
+        let theme = chrome::theme(self.chrome_dark());
         let area = self.page_dips();
         let overlay = chrome::build_overlay(&view, &layout, self.page_rect(), &self.fonts, &theme);
         let mut b = snowlark_paint::DisplayListBuilder::new();
@@ -2473,6 +2481,7 @@ impl Browser {
             k if ctrl && k == b'B' as u16 && mods.shift => self.toggle_bookmarks_bar(),
             k if ctrl && k == b'D' as u16 && !mods.shift => self.bookmark_page(),
             k if ctrl && !mods.shift && k == b'H' as u16 => self.open_history(),
+            k if ctrl && !mods.shift && k == b'J' as u16 => self.open_downloads(),
             k if ctrl && mods.shift && k == b'O' as u16 => self.open_bookmark_manager(),
             keys::DELETE if ctrl && mods.shift => self.open_clear_browsing_data(),
             k if ctrl && k == b'T' as u16 && mods.shift => {
@@ -2482,6 +2491,7 @@ impl Browser {
             }
             // (Ctrl+N too: the browser has one window, so a new one is a new tab)
             k if ctrl && (k == b'T' as u16 || (k == b'N' as u16 && !mods.shift)) => self.new_tab(),
+            k if ctrl && mods.shift && k == b'N' as u16 => self.new_incognito_window(),
             k if ctrl && (k == b'W' as u16 || k == keys::F4) => {
                 let i = self.tabs.active_index();
                 self.close_tab(i, window);
@@ -2913,6 +2923,7 @@ impl WindowHandler for Browser {
             Event::Timer(TIMER_HANG) => self.hang_timer(window),
             Event::Timer(TIMER_TASKS) => self.refresh_task_manager(window),
             Event::Timer(TIMER_FOLDER_DROP) => self.bookmark_drag_timer(window),
+            Event::Timer(downloads_ui::TIMER_DOWNLOADS) => self.downloads_tick(window),
             Event::Timer(_) => {}
             Event::Wake => {
                 self.drain_tab_events(window);

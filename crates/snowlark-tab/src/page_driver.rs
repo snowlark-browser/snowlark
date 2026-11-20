@@ -479,6 +479,14 @@ impl PageDriver {
                 ));
                 continue;
             }
+            // (and the downloads page's, to act on a download or the list)
+            let downloads = |u: &Url| self.ctx.internal.kind(u) == InternalKind::Downloads;
+            if from.as_ref().is_some_and(downloads) && downloads(&url) && url.path() == "/apply" {
+                self.internal_requests.push(InternalRequest::Downloads(
+                    url.query().unwrap_or("").to_owned(),
+                ));
+                continue;
+            }
             // A link between the browser's pages: a navigation of the tab's own, which the
             // browser begins (it holds the session history).
             self.begun.push(snowlark_page::embedder::BeginNavigation {
@@ -1638,6 +1646,9 @@ mod tests {
                 Ok(u) if u.scheme() == "snowlark" && u.host_str() == Some("bookmarks") => {
                     InternalKind::Bookmarks
                 }
+                Ok(u) if u.scheme() == "snowlark" && u.host_str() == Some("downloads") => {
+                    InternalKind::Downloads
+                }
                 Ok(u) if u.scheme() == "snowlark" && u.host_str() == Some("settings") => {
                     if u.path().trim_end_matches('/') == "/help" {
                         InternalKind::About
@@ -1658,6 +1669,7 @@ mod tests {
                         InternalKind::Credits => Some("<title>Credits</title>"),
                         InternalKind::History => Some("<title>History</title>"),
                         InternalKind::Bookmarks => Some("<title>Bookmarks</title>"),
+                        InternalKind::Downloads => Some("<title>Downloads</title>"),
                         InternalKind::Other => None,
                     };
                     InternalAnswer::Page {
@@ -2124,6 +2136,25 @@ mod tests {
         assert_eq!(
             d.take_internal_requests(),
             [InternalRequest::Bookmarks("op=undo".into())]
+        );
+        // The downloads page's actions come only from the downloads page.
+        d.page()
+            .eval("location = 'snowlark://downloads/apply?op=show&id=1'", "t")
+            .unwrap();
+        for _ in 0..20 {
+            d.update();
+        }
+        assert!(d.take_internal_requests().is_empty());
+        assert_eq!(d.take_begun_navigations().len(), 1);
+        d.navigate(Url::parse("snowlark://downloads/").unwrap());
+        settle(&mut d, |d| d.info().title == "Downloads");
+        d.page()
+            .eval("location = 'snowlark://downloads/apply?op=show&id=1'", "t")
+            .unwrap();
+        settle(&mut d, |d| !d.internal_requests.is_empty());
+        assert_eq!(
+            d.take_internal_requests(),
+            [InternalRequest::Downloads("op=show&id=1".into())]
         );
         // The About page is a page of its own, not the settings page.
         d.navigate(Url::parse("snowlark://settings/help").unwrap());

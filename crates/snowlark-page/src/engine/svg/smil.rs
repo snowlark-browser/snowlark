@@ -379,8 +379,13 @@ impl Engine {
 
     /// An element was inserted (`connected`: into a document) or removed.
     pub(crate) fn smil_tree_changed(&self, node: NodeId, connected: bool) {
-        let dom = self.dom();
-        let animation = dom.element(node).is_some_and(is_animation_element);
+        let animation = self.dom().element(node).is_some_and(is_animation_element);
+        self.smil_tree_changed_as(node, connected, animation);
+    }
+
+    /// [`Engine::smil_tree_changed`] for a node whose caller knows whether it is an animation
+    /// element.
+    pub(crate) fn smil_tree_changed_as(&self, node: NodeId, connected: bool, animation: bool) {
         let mut st = self.svg.borrow_mut();
         if animation {
             if connected {

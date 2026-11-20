@@ -313,7 +313,7 @@ impl Browser {
             &self.windows,
             self.gpu_process.as_ref().map(|h| h.link()),
         );
-        comp.send(CompMsg::Dark(self.dark));
+        comp.send(CompMsg::Dark(self.chrome_dark()));
         if let Some(v) = &self.tab_ctx.videos {
             comp.send(CompInput::videos(v.clone()));
         }

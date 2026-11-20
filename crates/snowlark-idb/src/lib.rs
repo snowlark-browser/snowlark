@@ -27,8 +27,8 @@ pub mod service;
 pub mod wire;
 
 pub use backend::{
-    lock, quota_for_volume, DbRef, Durability, Failure, Inbox, LocalIdb, LoopId, Mode, Msg,
-    Refused, WriteError, QUOTA,
+    lock, quota_for_volume, quota_in_memory, DbRef, Durability, Failure, Inbox, LocalIdb, LoopId,
+    Mode, Msg, Refused, WriteError, QUOTA,
 };
 pub use db::{Change, Database, Direction, Found, Index, Record, Seek, Source, Store, Undo, Value};
 pub use key::{compare, Key, KeyPath, KeyRange};

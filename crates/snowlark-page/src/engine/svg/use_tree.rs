@@ -190,7 +190,14 @@ impl Engine {
 
     /// An element was inserted (`connected`: into a document).
     pub(crate) fn use_inserted(&self, node: NodeId, connected: bool) {
-        if connected && is_svg(&self.dom(), node, "use") {
+        let is_use = connected && is_svg(&self.dom(), node, "use");
+        self.use_inserted_as(node, is_use);
+    }
+
+    /// [`Engine::use_inserted`] for a node whose caller knows whether it is a `use` element
+    /// inserted into a document.
+    pub(crate) fn use_inserted_as(&self, node: NodeId, connected_use: bool) {
+        if connected_use {
             let mut st = self.svg.borrow_mut();
             st.uses.elements.insert(node);
             st.uses.dirty.insert(node);

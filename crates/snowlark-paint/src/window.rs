@@ -1004,7 +1004,8 @@ pub(crate) struct State {
     queue: RefCell<VecDeque<Event>>,
     /// The frame is drawn by the handler (the caption is client area); else Windows' own.
     custom_frame: bool,
-    /// The window [`run`] made: its destruction ends the message loop.
+    /// A browser window ([`run`]'s, or [`open_browser_window`]'s): the destruction of the last
+    /// of them ends the message loop.
     main: bool,
 }
 
@@ -1865,7 +1866,9 @@ unsafe fn handle_message(
             }
             WM_DESTROY => {
                 state.dispatch(Event::Destroyed);
-                if state.main {
+                // (the loop ends with the last browser window)
+                if state.main && BROWSER_WINDOWS.with(|n| n.replace(n.get().saturating_sub(1))) <= 1
+                {
                     PostQuitMessage(0);
                 }
                 LRESULT(0)
@@ -1989,6 +1992,22 @@ pub fn open(
     unsafe { create(&options, false, false, true, make) }
 }
 
+/// Makes another browser window on the calling thread, which must be the one running [`run`]'s
+/// loop: like [`run`]'s, with the frame its handler draws. The loop ends when the last browser
+/// window is destroyed, whichever was first.
+pub fn open_browser_window(
+    options: WindowOptions,
+    make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
+) -> windows::core::Result<WindowHandle> {
+    // SAFETY: as for `run`: made on this thread, whose loop (`run`'s) delivers its messages.
+    unsafe { create(&options, true, true, true, make) }
+}
+
+thread_local! {
+    /// The browser windows of this thread that are not destroyed yet.
+    static BROWSER_WINDOWS: Cell<usize> = const { Cell::new(0) };
+}
+
 /// Registers the class (once), makes the window, calls `make` for its handler and, when `show`,
 /// shows it where `options` say.
 ///
@@ -2086,6 +2105,9 @@ unsafe fn create(
             }
         };
         let state = &*raw;
+        if main {
+            BROWSER_WINDOWS.with(|n| n.set(n.get() + 1));
+        }
         crate::drop_target::register(hwnd);
         if custom_frame {
             // A 1 px DWM frame keeps the shadow and the rounded corners without a caption.
@@ -2621,6 +2643,91 @@ mod tests {
         assert!(caption.get(), "the second window has a caption of its own");
         assert_eq!(destroyed.get(), 1);
         assert_eq!(ticks_after.get(), 1);
+    }
+
+    /// A second browser window (an Incognito one) keeps the loop running after the first is
+    /// destroyed; the loop ends with it.
+    #[test]
+    fn the_loop_ends_with_the_last_browser_window() {
+        struct Second {
+            first_gone: Rc<Cell<bool>>,
+            ticks_after: Rc<Cell<u32>>,
+            armed: bool,
+        }
+        impl WindowHandler for Second {
+            fn event(&mut self, window: &Window, event: Event) -> bool {
+                match event {
+                    Event::Resized { .. } if !self.armed => {
+                        self.armed = true;
+                        window.set_timer(7, 20);
+                    }
+                    Event::Timer(7) if self.first_gone.get() => {
+                        self.ticks_after.set(self.ticks_after.get() + 1);
+                        window.kill_timer(7);
+                        window.close();
+                    }
+                    _ => {}
+                }
+                true
+            }
+            fn hit_test(&mut self, _: &Window, _: i32, _: i32) -> HitArea {
+                HitArea::Client
+            }
+        }
+        struct First {
+            first_gone: Rc<Cell<bool>>,
+            ticks_after: Rc<Cell<u32>>,
+            opened: bool,
+        }
+        impl WindowHandler for First {
+            fn event(&mut self, window: &Window, event: Event) -> bool {
+                match event {
+                    Event::Resized { .. } if !self.opened => {
+                        self.opened = true;
+                        let second = Second {
+                            first_gone: self.first_gone.clone(),
+                            ticks_after: self.ticks_after.clone(),
+                            armed: false,
+                        };
+                        let options = WindowOptions {
+                            title: "snowlark-paint test (second browser window)".into(),
+                            width: 200,
+                            height: 150,
+                            maximized: false,
+                            placement: None,
+                            at: None,
+                        };
+                        open_browser_window(options, move |_| Box::new(second)).unwrap();
+                        window.close();
+                    }
+                    Event::Destroyed => self.first_gone.set(true),
+                    _ => {}
+                }
+                true
+            }
+            fn hit_test(&mut self, _: &Window, _: i32, _: i32) -> HitArea {
+                HitArea::Client
+            }
+        }
+        let first_gone = Rc::new(Cell::new(false));
+        let ticks_after = Rc::new(Cell::new(0));
+        let first = First {
+            first_gone: first_gone.clone(),
+            ticks_after: ticks_after.clone(),
+            opened: false,
+        };
+        let options = WindowOptions {
+            title: "snowlark-paint test".into(),
+            width: 120,
+            height: 80,
+            maximized: false,
+            placement: None,
+            at: None,
+        };
+        run(options, move |_| Box::new(first)).unwrap();
+        assert!(first_gone.get());
+        assert_eq!(ticks_after.get(), 1, "the loop ended with the first window");
+        assert_eq!(BROWSER_WINDOWS.with(Cell::get), 0);
     }
 
     /// While a button pressed in the window is held, leaving the window is not reported (the drag

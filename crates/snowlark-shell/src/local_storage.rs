@@ -5,6 +5,7 @@
 //! The browser's `localStorage`: [`WebStorageHost`] with its areas kept in the profile, a file per
 //! origin. Areas load when first opened. Changes reach the disk from a thread of their own, at most a
 //! second late, and all of them when the browser closes; a crash loses that second.
+//! An Incognito window's ([`LocalStorage::in_memory`]) keeps its areas in memory only.
 
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
@@ -62,7 +63,10 @@ fn save(dir: &Path, origin: String, items: Items) {
     }
 }
 
-fn flush(host: &WebStorageHost, dir: &Path) {
+fn flush(host: &WebStorageHost, dir: Option<&Path>) {
+    let Some(dir) = dir else {
+        return;
+    };
     for (origin, items) in host.take_dirty() {
         save(dir, origin, items);
     }
@@ -71,7 +75,8 @@ fn flush(host: &WebStorageHost, dir: &Path) {
 /// See the module documentation. Dropping it writes what is left.
 pub struct LocalStorage {
     host: Arc<WebStorageHost>,
-    dir: PathBuf,
+    /// The profile's folder of areas (`None`: in memory only).
+    dir: Option<PathBuf>,
     stop: Option<Sender<()>>,
     thread: Option<JoinHandle<()>>,
 }
@@ -86,16 +91,26 @@ impl LocalStorage {
             .name("snowlark local storage".into())
             .spawn(move || loop {
                 match stopped.recv_timeout(FLUSH_EVERY) {
-                    Err(RecvTimeoutError::Timeout) => flush(&flushing, &flush_dir),
+                    Err(RecvTimeoutError::Timeout) => flush(&flushing, Some(&flush_dir)),
                     _ => return,
                 }
             })
             .ok();
         LocalStorage {
             host,
-            dir,
+            dir: Some(dir),
             stop: Some(stop),
             thread,
+        }
+    }
+
+    /// Areas that live in memory only and are gone when this is dropped: an Incognito window's.
+    pub fn in_memory() -> LocalStorage {
+        LocalStorage {
+            host: WebStorageHost::new(),
+            dir: None,
+            stop: None,
+            thread: None,
         }
     }
 
@@ -106,7 +121,7 @@ impl LocalStorage {
     /// The origins with an area, in memory or on disk.
     fn origins(&self) -> Vec<String> {
         let mut origins = self.host.origins();
-        if let Ok(entries) = std::fs::read_dir(&self.dir) {
+        if let Some(Ok(entries)) = self.dir.as_ref().map(std::fs::read_dir) {
             origins.extend(
                 entries
                     .flatten()
@@ -124,7 +139,9 @@ impl LocalStorage {
         let on_site = snowlark_page::web_storage::site_matcher(site);
         for origin in self.origins().into_iter().filter(|o| on_site(o)) {
             self.host.wipe(&origin);
-            let _ = std::fs::remove_file(self.dir.join(file_name(&origin)));
+            if let Some(dir) = &self.dir {
+                let _ = std::fs::remove_file(dir.join(file_name(&origin)));
+            }
         }
     }
 }
@@ -134,8 +151,16 @@ impl LocalStorage {
     /// data of a time range. What is waiting to be written goes to disk first, so an area's file
     /// time is when it last changed.
     pub fn clear_modified_between(&self, begin: SystemTime, end: SystemTime) {
-        flush(&self.host, &self.dir);
-        let Ok(entries) = std::fs::read_dir(&self.dir) else {
+        let Some(dir) = &self.dir else {
+            // (in memory: every area changed while the window was open, so within any range
+            // that reaches now; ranges are always "from then until now")
+            for origin in self.host.origins() {
+                self.host.wipe(&origin);
+            }
+            return;
+        };
+        flush(&self.host, Some(dir));
+        let Ok(entries) = std::fs::read_dir(dir) else {
             return;
         };
         for e in entries.flatten() {
@@ -157,7 +182,7 @@ impl Drop for LocalStorage {
         if let Some(t) = self.thread.take() {
             let _ = t.join();
         }
-        flush(&self.host, &self.dir);
+        flush(&self.host, self.dir.as_deref());
     }
 }
 
@@ -256,7 +281,7 @@ mod tests {
         let s = LocalStorage::open(d.clone());
         set(&s, "https://old.example", "k", "v");
         set(&s, "https://new.example", "k", "v");
-        flush(&s.host, &s.dir);
+        flush(&s.host, s.dir.as_deref());
         let hour = Duration::from_secs(3600);
         let now = SystemTime::now();
         std::fs::File::options()
@@ -274,6 +299,21 @@ mod tests {
         assert!(get(&s, "https://new.example").is_empty());
         drop(s);
         let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn areas_in_memory_are_shared_by_its_clients_and_gone_with_it() {
+        let s = LocalStorage::in_memory();
+        set(&s, A, "k", "v");
+        assert_eq!(get(&s, A), [("k".to_owned(), "v".to_owned())]);
+        s.clear_site(Some("a.example"));
+        assert!(get(&s, A).is_empty());
+        set(&s, A, "k", "v");
+        let now = SystemTime::now();
+        s.clear_modified_between(now - Duration::from_secs(60), now);
+        assert!(get(&s, A).is_empty());
+        drop(s);
+        assert!(get(&LocalStorage::in_memory(), A).is_empty());
     }
 
     #[test]

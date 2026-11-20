@@ -51,8 +51,26 @@ pub fn volume_size(path: &std::path::Path) -> Option<u64> {
     Some(total)
 }
 
+/// The machine's physical memory in bytes.
+pub fn physical_memory() -> Option<u64> {
+    use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+    let mut status = MEMORYSTATUSEX {
+        dwLength: std::mem::size_of::<MEMORYSTATUSEX>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: `status` is a valid MEMORYSTATUSEX with its length set, which the call fills.
+    unsafe { GlobalMemoryStatusEx(&mut status) }.ok()?;
+    Some(status.ullTotalPhys)
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_machine_has_physical_memory() {
+        let bytes = super::physical_memory().unwrap();
+        assert!(bytes > 1 << 30, "{bytes}");
+    }
+
     #[test]
     fn the_volume_of_a_folder_has_a_size() {
         let size = super::volume_size(&std::env::temp_dir()).unwrap();

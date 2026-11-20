@@ -226,6 +226,7 @@ every_variant!(internal_request: InternalRequest, [
     InternalRequest::Settings(_) => InternalRequest::Settings("theme=dark".into()),
     InternalRequest::History(_) => InternalRequest::History("r=1-2+https%3A%2F%2Fa.example%2F".into()),
     InternalRequest::Bookmarks(_) => InternalRequest::Bookmarks("op=delete&id=3".into()),
+    InternalRequest::Downloads(_) => InternalRequest::Downloads("op=remove&id=3".into()),
 ]);
 
 every_variant!(cursor: Cursor, [

@@ -16,6 +16,10 @@ use crate::tab::*;
 use crate::tab_host::{Renderer, TabHost};
 use std::sync::mpsc::channel;
 
+/// Incognito's partition, with this file's tabs and servers.
+#[path = "incognito_tests.rs"]
+mod incognito;
+
 /// A tab whose compositor does not exist: its viewport is at the top.
 fn spawn(id: TabId, ctx: TabContext, device: Device, url: Url, factory: DriverFactory) -> TabHost {
     TabHost::spawn(id, ctx, Default::default(), device, url, factory)

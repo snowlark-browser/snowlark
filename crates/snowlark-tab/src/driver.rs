@@ -88,6 +88,8 @@ pub enum InternalKind {
     History,
     /// The bookmark manager.
     Bookmarks,
+    /// The downloads page.
+    Downloads,
     /// Not one of those (an address the browser has no page at, or another scheme).
     Other,
 }
@@ -187,6 +189,9 @@ pub enum InternalRequest {
     History(String),
     /// A change the bookmark manager asks for (its query).
     Bookmarks(String),
+    /// What the downloads page asks for (its query): open a file, show it in its folder, copy its
+    /// link, remove it from the list, cancel or retry it, clear the list, undo a removal.
+    Downloads(String),
 }
 
 /// What a driver gets when its tab starts.

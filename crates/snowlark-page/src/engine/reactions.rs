@@ -92,6 +92,84 @@ fn wants_new_attribute_reaction(e: &ElementData, a: &Attr) -> bool {
             && &**a.local_name() == "open")
 }
 
+/// What a node is to [`Engine::react`], read once per reaction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    /// Not an element.
+    Other,
+    /// An HTML element with steps of its own, or one that is (or may become) a custom element:
+    /// every step applies.
+    Element,
+    /// An HTML element with no steps of its own: only the steps every element has (event handler
+    /// content attributes, `slot`/`name`, `nonce`, `popover`, `autofocus`, slot assignment,
+    /// focus fixup, SVG `use` and animation bookkeeping) apply to it. It stays one: its name and
+    /// `is` value never change, and an uncustomized element without either is never upgraded.
+    PlainHtml,
+    /// An uncustomized element not in the HTML namespace (SVG, MathML): none of the steps of
+    /// particular HTML elements apply to it, nor custom element callbacks.
+    Foreign,
+}
+
+fn kind(dom: &Dom, node: NodeId) -> Kind {
+    let Some(e) = dom.element(node) else {
+        return Kind::Other;
+    };
+    let name = e.name();
+    if e.custom_state() != CustomElementState::Uncustomized
+        || dom.element_flags(node) & snowlark_dom::element_flags::FORM_ASSOCIATED_CUSTOM != 0
+    {
+        return Kind::Element;
+    }
+    if name.ns != ns!(html) {
+        return Kind::Foreign;
+    }
+    // (an uncustomized element with no `is` value and no hyphen in its name matches no custom
+    // element definition, so it is never upgraded nor form-associated)
+    if dom.is_value(node).is_none()
+        && !has_steps_of_its_own(&name.local)
+        && !name.local.contains('-')
+    {
+        Kind::PlainHtml
+    } else {
+        Kind::Element
+    }
+}
+
+/// The HTML elements that `react`'s steps single out by name: insertion, removing, attribute
+/// change, children changed and adopting steps of their own, form states (listed elements,
+/// options, forms, datalists), controls, media and images.
+fn has_steps_of_its_own(local: &snowlark_dom::LocalName) -> bool {
+    matches!(
+        *local,
+        local_name!("script")
+            | local_name!("iframe")
+            | local_name!("frame")
+            | local_name!("object")
+            | local_name!("embed")
+            | local_name!("link")
+            | local_name!("meta")
+            | local_name!("base")
+            | local_name!("img")
+            | local_name!("source")
+            | local_name!("track")
+            | local_name!("video")
+            | local_name!("audio")
+            | local_name!("canvas")
+            | local_name!("details")
+            | local_name!("dialog")
+            | local_name!("form")
+            | local_name!("button")
+            | local_name!("fieldset")
+            | local_name!("input")
+            | local_name!("output")
+            | local_name!("select")
+            | local_name!("textarea")
+            | local_name!("option")
+            | local_name!("optgroup")
+            | local_name!("datalist")
+    )
+}
+
 impl Engine {
     /// Queues one of the engine's microtasks.
     pub(crate) fn queue_internal_microtask(&self, cx: &mut Cx, task: Microtask) {
@@ -252,13 +330,27 @@ impl Engine {
                         self.live_ranges_inserted(node, 1);
                     }
                 }
-                if !self.dom().is_element(node) {
+                let kind = kind(&self.dom(), node);
+                if kind == Kind::Other {
                     return;
                 }
-                self.form_state_inserted(node, root);
-                self.smil_tree_changed(node, connected);
-                self.use_inserted(node, connected);
-                if connected {
+                // (the steps of particular HTML elements and of custom elements apply only to
+                // an `Element`; the others skip them)
+                let particular = kind == Kind::Element;
+                let plain = kind == Kind::PlainHtml;
+                // (a subtree's form-state elements; the node's own, which only those have)
+                if root || particular {
+                    self.form_state_inserted(node, root);
+                }
+                if plain {
+                    // (an HTML element is no animation element nor `use`)
+                    self.smil_tree_changed_as(node, connected, false);
+                    self.use_inserted_as(node, false);
+                } else {
+                    self.smil_tree_changed(node, connected);
+                    self.use_inserted(node, connected);
+                }
+                if connected && !plain {
                     if self.dom().custom_element_state(node)
                         == snowlark_dom::CustomElementState::Custom
                     {
@@ -267,30 +359,34 @@ impl Engine {
                         self.try_upgrade(cx, node);
                     }
                 }
-                if connected && super::svg::is_svg(&self.dom(), node, "script") {
+                if connected && !plain && super::svg::is_svg(&self.dom(), node, "script") {
                     post_connection.push(node);
                 }
                 // (an instance's image loads with its original's: no events of its own)
                 if connected
+                    && !plain
                     && super::svg::is_svg(&self.dom(), node, "image")
                     && !super::svg::use_tree::in_use_tree(&self.dom(), node)
                 {
                     self.svg_image_update(node);
                 }
                 if connected
+                    && particular
                     && self
                         .dom()
                         .is_html_element_named(node, &snowlark_dom::local_name!("dialog"))
                 {
                     self.dialog_inserted(node);
                 }
-                self.html_insertion_steps(cx, node, connected, post_connection);
-                if let Some(p) = self.dom().parent(node) {
-                    self.option_tree_changed(node, p);
+                self.html_insertion_steps(cx, node, connected, plain, post_connection);
+                if particular {
+                    if let Some(p) = self.dom().parent(node) {
+                        self.option_tree_changed(node, p);
+                    }
+                    self.img_inserted(cx, node, root);
+                    // HTML §4.8.11: media elements and their `<source>` and `<track>` children.
+                    self.media_inserted(cx, node);
                 }
-                self.img_inserted(cx, node, root);
-                // HTML §4.8.11: media elements and their `<source>` and `<track>` children.
-                self.media_inserted(cx, node);
             }
             Reaction::Removed {
                 node,
@@ -303,6 +399,7 @@ impl Engine {
                 if !self.dom().is_alive(node) {
                     return;
                 }
+                let kind = kind(&self.dom(), node);
                 if old_parent.is_some() {
                     // The removed node, its descendants' wrappers (descendants may have no
                     // reactions of their own; the removal collected them), and the focused
@@ -312,10 +409,12 @@ impl Engine {
                     self.unfocus_if_removed(node);
                 }
                 if let Some(p) = old_parent.filter(|&p| self.dom().is_alive(p)) {
-                    if self.dom().is_element(node) {
+                    if kind != Kind::Other {
                         self.form_state_removed(node, p, &removed[start as usize..end as usize]);
                     }
-                    self.option_tree_changed(node, p);
+                    if kind == Kind::Element {
+                        self.option_tree_changed(node, p);
+                    }
                     self.live_ranges_removed(node, p, old_previous);
                     self.node_iterators_removed(node, p, old_previous, old_next);
                     if was_connected {
@@ -338,18 +437,27 @@ impl Engine {
                     // (the dialog removing steps, for top layer elements in the removed subtree)
                     self.top_layer_prune();
                 }
-                if self.dom().is_element(node) {
-                    self.smil_tree_changed(node, false);
+                if kind != Kind::Other {
+                    // (as for insertion: only an `Element` has steps of its own)
+                    let particular = kind == Kind::Element;
+                    if kind == Kind::PlainHtml {
+                        self.smil_tree_changed_as(node, false, false);
+                    } else {
+                        self.smil_tree_changed(node, false);
+                    }
                     self.use_removed(node, old_parent);
-                    if was_connected
+                    if particular
+                        && was_connected
                         && self.dom().custom_element_state(node)
                             == snowlark_dom::CustomElementState::Custom
                     {
                         self.enqueue_callback(cx, node, "disconnectedCallback", Vec::new());
                     }
-                    self.html_removing_steps(node, old_parent);
-                    self.media_removed(node, old_parent);
-                    self.img_removed(cx, node, old_parent, old_next);
+                    self.html_removing_steps(node, old_parent, particular);
+                    if particular {
+                        self.media_removed(node, old_parent);
+                        self.img_removed(cx, node, old_parent, old_next);
+                    }
                 }
             }
             Reaction::AttributeChanged {
@@ -362,8 +470,13 @@ impl Engine {
                 if !self.dom().is_alive(element) {
                     return;
                 }
-                if self.dom().custom_element_state(element)
-                    == snowlark_dom::CustomElementState::Custom
+                // (as for insertion: only an `Element` has steps of its own)
+                let kind = kind(&self.dom(), element);
+                let particular = kind == Kind::Element;
+                let plain = kind == Kind::PlainHtml;
+                if particular
+                    && self.dom().custom_element_state(element)
+                        == snowlark_dom::CustomElementState::Custom
                 {
                     self.enqueue_callback(
                         cx,
@@ -379,17 +492,22 @@ impl Engine {
                 }
                 self.smil_attribute_changed(element, &local_name);
                 self.use_attribute_changed(element, &local_name);
-                if &*local_name == "href" && super::svg::is_svg(&self.dom(), element, "image") {
+                if &*local_name == "href"
+                    && !plain
+                    && super::svg::is_svg(&self.dom(), element, "image")
+                {
                     self.svg_image_update(element);
                 }
                 // (HTML §4.12.1: a script without a source that gets one is prepared)
                 if &*local_name == "href"
+                    && !plain
                     && old_value.is_none()
                     && super::svg::is_svg(&self.dom(), element, "script")
                 {
                     self.script_post_connection(cx, element);
                 }
-                if &*local_name == "src"
+                if particular
+                    && &*local_name == "src"
                     && namespace.is_none()
                     && old_value.is_none()
                     && new_value.is_some()
@@ -400,7 +518,8 @@ impl Engine {
                     self.script_post_connection(cx, element);
                 }
                 // (HTML §4.12.1: a script that gets an async attribute is no longer forced async)
-                if namespace.is_none()
+                if particular
+                    && namespace.is_none()
                     && &*local_name == "async"
                     && old_value.is_none()
                     && new_value.is_some()
@@ -412,7 +531,8 @@ impl Engine {
                 }
                 if namespace.is_none() {
                     // (the dialog attribute change steps: `open` added or removed)
-                    if new_value.is_some() != old_value.is_some()
+                    if particular
+                        && new_value.is_some() != old_value.is_some()
                         && &*local_name == "open"
                         && self
                             .dom()
@@ -432,9 +552,13 @@ impl Engine {
                         cx,
                         element,
                         &local_name,
+                        particular,
                         old_value.as_deref(),
                         new_value.as_deref(),
                     );
+                    if !particular {
+                        return;
+                    }
                     self.form_state_attribute_changed(element);
                     self.control_attribute_changed(element);
                     self.details_attribute_changed(
@@ -481,8 +605,15 @@ impl Engine {
                     return;
                 }
                 self.use_children_changed(parent);
-                self.form_state_children_changed(parent);
-                if self.dom().is_script_element(parent) && self.dom().is_connected(parent) {
+                // (a textarea's, a select's or an option's; a script's, HTML or SVG)
+                let kind = kind(&self.dom(), parent);
+                if kind == Kind::Element {
+                    self.form_state_children_changed(parent);
+                }
+                if matches!(kind, Kind::Element | Kind::Foreign)
+                    && self.dom().is_script_element(parent)
+                    && self.dom().is_connected(parent)
+                {
                     // DOM §4.2.3 "insert" runs the children changed steps (step 9) before the
                     // post-connection steps of the nodes it inserted (step 11): the script's
                     // steps go before those of its new descendants.
@@ -558,12 +689,14 @@ impl Engine {
         }
     }
 
-    /// HTML's insertion steps for an element.
+    /// HTML's insertion steps for an element (`plain`: one of [`Kind::PlainHtml`], which has none
+    /// of its own).
     fn html_insertion_steps(
         &self,
         cx: &mut Cx,
         el: NodeId,
         connected: bool,
+        plain: bool,
         post_connection: &mut Vec<NodeId>,
     ) {
         let dom = self.dom();
@@ -586,6 +719,10 @@ impl Engine {
             self.autofocus_inserted(el);
         } else {
             drop(dom);
+        }
+        if plain {
+            self.slot_insertion_steps(el);
+            return;
         }
         let dom = self.dom();
         if dom.namespace(el) != &ns!(html) {
@@ -642,8 +779,9 @@ impl Engine {
         }
     }
 
-    /// HTML's removing steps for an element.
-    fn html_removing_steps(&self, el: NodeId, old_parent: Option<NodeId>) {
+    /// HTML's removing steps for an element (`particular`: a [`Kind::Element`], which may have
+    /// steps of its own).
+    fn html_removing_steps(&self, el: NodeId, old_parent: Option<NodeId>, particular: bool) {
         // Focus fixup (HTML §6.6.4): a removed focused element leaves its document without focus.
         // Every shadow-including descendant of a removed node gets a reaction of its own, so the
         // focused element is met as `el` itself when it goes with an ancestor.
@@ -653,18 +791,21 @@ impl Engine {
                 s.focused = None;
             }
         });
-        if self.is_frame_container(el) {
+        if particular && self.is_frame_container(el) {
             self.frame_removed(el);
         }
         self.slot_removing_steps(el, old_parent);
     }
 
-    /// Attribute change steps of HTML elements: event handler content attributes, slots.
+    /// Attribute change steps of HTML elements: event handler content attributes, slots, and
+    /// those of particular elements (`particular`: a [`Kind::Element`]; the others have only the
+    /// steps every element has).
     fn html_attribute_changed(
         &self,
         cx: &mut Cx,
         el: NodeId,
         local: &snowlark_dom::LocalName,
+        particular: bool,
         old_value: Option<&str>,
         value: Option<&str>,
     ) {
@@ -707,7 +848,8 @@ impl Engine {
                 }
             }
         }
-        if matches!(&**local, "name" | "content")
+        if particular
+            && matches!(&**local, "name" | "content")
             && self.dom().is_html_element_named(el, &local_name!("meta"))
         {
             self.meta_referrer(el);
@@ -723,6 +865,8 @@ impl Engine {
                     }
                 }
             }
+            // (the steps below are of particular elements)
+            _ if !particular => {}
             "loading" if self.dom().is_html_element_named(el, &local_name!("img")) => {
                 self.img_loading_changed(el);
             }
@@ -775,6 +919,68 @@ impl Engine {
                 self.link_element_changed(el)
             }
             _ => {}
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snowlark_dom::ParseOptions;
+
+    /// The first element of `doc` with `id`.
+    fn by_id(dom: &Dom, doc: NodeId, id: &str) -> NodeId {
+        dom.inclusive_descendants(doc)
+            .find(|&n| dom.is_element(n) && dom.attr(n, &ns!(), &"id".into()) == Some(id))
+            .unwrap()
+    }
+
+    #[test]
+    fn only_html_elements_without_steps_of_their_own_are_plain() {
+        let mut dom = Dom::new();
+        let doc = dom.parse_html_str(
+            "<div id=div></div><p id=p>text</p><span id=is is=x-span></span><x-a id=custom></x-a>\
+             <svg><g id=g /></svg>",
+            ParseOptions::default(),
+        );
+        assert_eq!(kind(&dom, by_id(&dom, doc, "div")), Kind::PlainHtml);
+        assert_eq!(kind(&dom, by_id(&dom, doc, "p")), Kind::PlainHtml);
+        let text = dom.first_child(by_id(&dom, doc, "p")).unwrap();
+        assert_eq!(kind(&dom, text), Kind::Other);
+        assert_eq!(kind(&dom, doc), Kind::Other);
+        // (an `is` value or a valid custom element name: it may be upgraded)
+        assert_eq!(kind(&dom, by_id(&dom, doc, "is")), Kind::Element);
+        assert_eq!(kind(&dom, by_id(&dom, doc, "custom")), Kind::Element);
+        // (not HTML: its own steps are SVG's, which `react` tests for it)
+        assert_eq!(kind(&dom, by_id(&dom, doc, "g")), Kind::Foreign);
+        // (a form-associated custom element)
+        let div = by_id(&dom, doc, "div");
+        dom.set_form_associated_custom(div, true);
+        assert_eq!(kind(&dom, div), Kind::Element);
+    }
+
+    /// Every element `react`'s handlers single out by name, and every one whose descendants the
+    /// reaction filter asks for, has steps of its own.
+    #[test]
+    fn elements_with_steps_of_their_own_are_not_plain() {
+        let names = [
+            "script", "iframe", "frame", "object", "embed", "link", "meta", "base", "img",
+            "source", "track", "video", "audio", "canvas", "details", "dialog", "form", "button",
+            "fieldset", "input", "output", "select", "textarea", "option", "optgroup", "datalist",
+        ];
+        let mut dom = Dom::new();
+        let doc = dom.parse_html_str("", ParseOptions::default());
+        for name in names {
+            let el = dom.create_element(doc, name, None).unwrap();
+            assert_eq!(kind(&dom, el), Kind::Element, "{name}");
+        }
+        for name in [
+            "div", "span", "li", "ul", "a", "section", "label", "slot", "template",
+        ] {
+            let el = dom.create_element(doc, name, None).unwrap();
+            assert_eq!(kind(&dom, el), Kind::PlainHtml, "{name}");
+            let data = dom.element(el).unwrap();
+            assert!(!wants_descendant_reaction(data), "{name}");
         }
     }
 }

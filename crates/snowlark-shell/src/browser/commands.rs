@@ -19,6 +19,10 @@ use crate::tabs::Placement;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     NewTab,
+    /// A new Incognito window.
+    NewIncognitoWindow,
+    /// A link, in a new Incognito window.
+    OpenInIncognito(Url),
     ReopenClosedTab,
     CloseTab,
     ZoomIn,
@@ -36,6 +40,8 @@ pub enum Command {
     About,
     /// The history page, in a new tab (or the one showing it).
     History,
+    /// The downloads page, in a new tab (or the one showing it).
+    Downloads,
     BookmarkManager,
     Back,
     Forward,
@@ -138,6 +144,8 @@ impl Browser {
         let zoom = self.tabs.active().map_or(1.0, |e| e.zoom);
         vec![
             Entry::item("New tab", Command::NewTab).shortcut("Ctrl+T"),
+            Entry::item("New Incognito window", Command::NewIncognitoWindow)
+                .shortcut("Ctrl+Shift+N"),
             Entry::item("Reopen closed tab", Command::ReopenClosedTab)
                 .shortcut("Ctrl+Shift+T")
                 .enabled(!self.closed.is_empty()),
@@ -150,6 +158,7 @@ impl Browser {
                 .checked(self.settings.bookmarks_bar),
             Entry::item("Bookmark manager", Command::BookmarkManager).shortcut("Ctrl+Shift+O"),
             Entry::item("History", Command::History).shortcut("Ctrl+H"),
+            Entry::item("Downloads", Command::Downloads).shortcut("Ctrl+J"),
             Entry::Separator,
             Entry::item("Zoom in", Command::ZoomIn).shortcut("Ctrl++"),
             Entry::item("Zoom out", Command::ZoomOut).shortcut("Ctrl+-"),
@@ -255,6 +264,8 @@ impl Browser {
     pub(super) fn run(&mut self, window: &Window, cmd: Command) {
         match cmd {
             Command::NewTab => self.new_tab(),
+            Command::NewIncognitoWindow => self.new_incognito_window(),
+            Command::OpenInIncognito(u) => self.open_in_incognito(u),
             Command::ReopenClosedTab => {
                 if let Some(url) = self.closed.pop().and_then(|u| Url::parse(&u).ok()) {
                     self.open_tab(url, Placement::End);
@@ -277,6 +288,7 @@ impl Browser {
             Command::Find => self.open_find(),
             Command::Settings => self.open_settings(),
             Command::History => self.open_history(),
+            Command::Downloads => self.open_downloads(),
             Command::BookmarkManager => self.open_bookmark_manager(),
             Command::About => self.open_about(),
             Command::Back => self.go_active(-1),

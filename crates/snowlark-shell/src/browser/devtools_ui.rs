@@ -109,7 +109,7 @@ impl Browser {
         }
         self.dock = side;
         self.settings.devtools_dock = side.name().to_owned();
-        let _ = self.settings.save(&self.profile.settings_file());
+        self.save_settings();
         self.relayout_page();
         self.sync_devtools_window();
     }

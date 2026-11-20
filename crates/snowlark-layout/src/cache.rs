@@ -33,6 +33,11 @@ pub(crate) struct BoxCache<S: Style> {
     /// style handles before the next layout.
     pub inline_restyled: bool,
     pub taffy: Option<Box<TaffyNode<S>>>,
+    /// Whether a block size given to this flex container that is not definite (its available
+    /// height, which it passes to its stretched items as their height) can change its inline
+    /// size or its content height: `crate::flex_grid::given_height_reaches_width`. It depends
+    /// on its descendants' styles, so it goes with them on the dirty path.
+    pub height_reaches_width: Option<bool>,
 }
 
 impl<S: Style> Default for BoxCache<S> {
@@ -45,6 +50,7 @@ impl<S: Style> Default for BoxCache<S> {
             inline_stale: true,
             inline_restyled: false,
             taffy: None,
+            height_reaches_width: None,
         }
     }
 }
@@ -56,6 +62,7 @@ impl<S: Style> BoxCache<S> {
         self.layout = None;
         self.intrinsic = None;
         self.intrinsic_across = None;
+        self.height_reaches_width = None;
         if let Some(t) = &mut self.taffy {
             t.cache.clear();
             t.built = None;

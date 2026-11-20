@@ -138,6 +138,10 @@ impl Route {
     pub(crate) fn main(browser: Browser) -> Box<dyn WindowHandler> {
         let rc = Rc::new(RefCell::new(browser));
         rc.borrow_mut().me = Rc::downgrade(&rc);
+        if rc.borrow().partition.is_off_the_record() {
+            let app = rc.borrow().app.clone();
+            app.add_incognito(Rc::downgrade(&rc));
+        }
         Box::new(Route {
             browser: Rc::downgrade(&rc),
             _owner: Some(rc),

@@ -919,11 +919,27 @@ impl<S: Style> Tree<'_, '_, S> {
     ///   whatever its containing block's height, so that height is left out (`parent_size`). Taffy
     ///   keys an item's final layout on it, and a column container passes its own height, which any
     ///   item growing changes: every other item missed the cache and ran its algorithm again.
-    fn unread_height_folded(&self, id: BoxId, mut inputs: LayoutInput) -> LayoutInput {
+    ///
+    /// - A flex container measured without a known height reads its available height only to pass it
+    ///   on: to its stretched items as their (not definite) height while their flex base sizes are
+    ///   found, and to its items as their available height. When no item can turn a height it is
+    ///   given into a width or a content height ([`given_height_reaches_width`]), the container's
+    ///   measurements are the same for every available height. A row container laid out with a known
+    ///   height measures its items again with that height available, after measuring them with none.
+    fn unread_height_folded(&mut self, id: BoxId, mut inputs: LayoutInput) -> LayoutInput {
         let b = self.cx.tree.b(id);
         if b.style.view() != self.cx.frame {
             return inputs;
         }
+        if b.kind == BoxKind::Flex
+            && inputs.run_mode == RunMode::ComputeSize
+            && inputs.known_dimensions.height.is_none()
+            && matches!(inputs.available_space.height, AvailableSpace::Definite(_))
+            && !given_height_reaches_width(self.cx.tree, id)
+        {
+            inputs.available_space.height = AvailableSpace::MaxContent;
+        }
+        let b = self.cx.tree.b(id);
         if inputs.parent_size.height.is_some()
             && b.parent
                 .is_some_and(|p| self.cx.tree.b(p).kind == BoxKind::Flex)
@@ -1177,6 +1193,48 @@ impl<S: Style> Tree<'_, '_, S> {
         self.node_mut(tid(id)).leaf = Some(r);
         out
     }
+}
+
+/// Whether flex container `id`'s measurements can change with a block size it is given that is not
+/// definite: its available height, which it passes to its items as their available height, and to
+/// its stretched items as their height while their flex base sizes are found (css-flexbox-1 §9.2,
+/// §9.4). That is so when the container wraps its column into lines by that height, or an item can
+/// turn a height into a width: a replaced box or one with an `aspect-ratio` (through its ratio,
+/// css-sizing-4 §5), a box in another writing mode (whose inline size it is, CSS Writing Modes 4
+/// §7.3), grid, table and multi-column layout (which size their tracks, rows and columns in it), and
+/// a nested flex container with such an item. A block container's width does not depend on its
+/// height (CSS 2 §10.3); a height that is not definite does not reach its children's percentages
+/// (CSS 2 §10.5). Kept on the box until its subtree or styles change (the dirty path clears it).
+fn given_height_reaches_width<S: Style>(tree: &mut BoxTree<S>, id: BoxId) -> bool {
+    if let Some(v) = tree.b(id).cache.height_reaches_width {
+        return v;
+    }
+    let b = tree.b(id);
+    let s = &b.style;
+    let mut reaches = style_ratio(s).is_some()
+        || matches!(
+            s.flex_direction(),
+            FlexDirection::Column | FlexDirection::ColumnReverse
+        ) && s.flex_wrap() != FlexWrap::Nowrap;
+    let view = s.view();
+    let mut i = 0;
+    while !reaches && i < tree.b(id).children.len() {
+        let c = tree.b(id).children[i];
+        i += 1;
+        let cb = tree.b(c);
+        if cb.is_out_of_flow() || matches!(cb.kind, BoxKind::Text | BoxKind::LineBreak) {
+            continue;
+        }
+        let cs = &cb.style;
+        reaches = match cb.kind {
+            _ if cs.view() != view || style_ratio(cs).is_some() || cs.is_multicol() => true,
+            BoxKind::Replaced | BoxKind::Grid | BoxKind::TableWrapper | BoxKind::Table => true,
+            BoxKind::Flex => given_height_reaches_width(tree, c),
+            _ => false,
+        };
+    }
+    tree.b_mut(id).cache.height_reaches_width = Some(reaches);
+    reaches
 }
 
 /// Whether a replaced box with a percentage height is a child of `id` (or of its anonymous blocks):

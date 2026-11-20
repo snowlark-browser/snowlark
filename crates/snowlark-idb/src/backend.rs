@@ -71,6 +71,18 @@ pub fn quota_for_volume(volume_size: u64) -> u64 {
     (pool as f64 * 0.75) as u64
 }
 
+/// The quota of each storage key on a profile kept in memory (an Incognito window's), on a machine
+/// with `physical_memory` bytes: a pool of 15-20% of the memory, the share drawn from `unit` (a
+/// random number in [0, 1), drawn once per profile, so the quota does not name the machine's memory
+/// exactly), and a third of the pool for any one site (the policy the engine family follows).
+pub fn quota_in_memory(physical_memory: u64, unit: f64) -> u64 {
+    const LOWER: f64 = 0.15;
+    const UPPER: f64 = 0.2;
+    let ratio = LOWER + unit.clamp(0.0, 1.0) * (UPPER - LOWER);
+    let pool = (physical_memory as f64 * ratio) as u64;
+    pool / 3
+}
+
 /// What the backend tells an event loop.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Msg {
@@ -1268,6 +1280,19 @@ mod tests {
     fn a_sites_quota_is_three_fifths_of_the_volume() {
         assert_eq!(quota_for_volume(1_000_000_000_000), 600_000_000_000);
         assert_eq!(quota_for_volume(0), 0);
+        // In memory: a third of 15% to 20% of the machine's memory.
+        let gib = 1u64 << 30;
+        let near = |a: u64, b: u64| a.abs_diff(b) <= 1;
+        assert!(near(
+            quota_in_memory(30 * gib, 0.0),
+            30 * gib * 15 / 100 / 3
+        ));
+        assert!(near(
+            quota_in_memory(30 * gib, 1.0),
+            30 * gib * 20 / 100 / 3
+        ));
+        let mid = quota_in_memory(30 * gib, 0.5);
+        assert!(mid > quota_in_memory(30 * gib, 0.0) && mid < quota_in_memory(30 * gib, 1.0));
     }
 
     fn inbox() -> Arc<Inbox> {

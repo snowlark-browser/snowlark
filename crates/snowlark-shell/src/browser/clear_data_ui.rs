@@ -34,7 +34,7 @@ impl Browser {
     /// The dialog's "Delete data": deletes what `choice` names, keeps the choice for next time.
     pub(super) fn clear_browsing_data(&mut self, choice: Choice) {
         choice.keep(&mut self.settings);
-        let _ = self.settings.save(&self.profile.settings_file());
+        self.save_settings();
         if choice.any() {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -43,7 +43,7 @@ impl Browser {
                 &Stores {
                     history: &self.history,
                     net: &self.tab_ctx.net,
-                    local_storage: &self.local_storage,
+                    local_storage: &self.partition.local_storage,
                     code_cache: self.code_cache.as_deref(),
                 },
                 choice,
