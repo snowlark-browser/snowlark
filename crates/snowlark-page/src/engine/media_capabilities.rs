@@ -256,6 +256,38 @@ impl MediaCapabilitiesImpl for Engine {
             }
             None => self.decoding_answer(&configuration),
         };
+        if crate::media::trace_on() {
+            let video = configuration.video.as_ref().map(|v| {
+                format!(
+                    "{:?} {}x{} {} b/s {} fps hdr {:?} gamut {:?} tf {:?}",
+                    v.content_type,
+                    v.width,
+                    v.height,
+                    v.bitrate,
+                    v.framerate,
+                    v.hdr_metadata_type,
+                    v.color_gamut,
+                    v.transfer_function
+                )
+            });
+            let audio = configuration
+                .audio
+                .as_ref()
+                .map(|a| format!("{:?} channels {:?}", a.content_type, a.channels));
+            let keys = configuration.key_system_configuration.as_ref().map(|k| {
+                crate::media::eme::describe_configuration(&encrypted_decoding_configuration(
+                    &configuration,
+                    k,
+                )) + " of "
+                    + &k.key_system
+            });
+            eprintln!(
+                "[eme] {:.3} decodingInfo({:?} video {video:?} audio {audio:?} keys {keys:?}) = \
+                 supported {supported} efficient {efficient}",
+                crate::media::trace_clock(),
+                configuration.type_
+            );
+        }
         let resolve = p.clone();
         self.queue_task(TaskSource::DomManipulation, move |e, cx| {
             let key_system_access = match access {

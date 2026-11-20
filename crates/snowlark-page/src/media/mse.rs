@@ -837,7 +837,14 @@ impl MediaSourceImpl for Engine {
         false
     }
     fn static_is_type_supported(&self, _cx: &mut Cx, type_: &str) -> rt::Result<bool> {
-        Ok(!type_.is_empty() && self.mse_types_supported(type_))
+        let supported = !type_.is_empty() && self.mse_types_supported(type_);
+        if super::trace_on() {
+            eprintln!(
+                "[eme] {:.3} MediaSource.isTypeSupported({type_:?}) = {supported}",
+                super::trace_clock()
+            );
+        }
+        Ok(supported)
     }
 }
 

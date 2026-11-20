@@ -104,6 +104,31 @@ fn cdm_error(e: CdmError) -> rt::Error {
     }
 }
 
+/// A configuration as a `SNOWLARK_TRACE=1` `[eme]` line shows it.
+pub(crate) fn describe_configuration(c: &MediaKeySystemConfiguration) -> String {
+    let caps = |list: &[MediaKeySystemMediaCapability]| {
+        list.iter()
+            .map(|m| {
+                format!(
+                    "{:?}/{:?}/{:?}",
+                    m.content_type, m.robustness, m.encryption_scheme
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    format!(
+        "{{label {:?} init {:?} id {:?} state {:?} sessions {:?} video [{}] audio [{}]}}",
+        c.label,
+        c.init_data_types,
+        c.distinctive_identifier,
+        c.persistent_state,
+        c.session_types,
+        caps(&c.video_capabilities),
+        caps(&c.audio_capabilities)
+    )
+}
+
 /// The module key system that a key system with a robustness string names. A module's key systems
 /// are named by their security level (PlayReady's `com.microsoft.playready.recommendation.3000` is
 /// its hardware level), and the robustness string of a capability is that level: the level asked
@@ -504,6 +529,17 @@ impl Engine {
         let answer = configurations
             .iter()
             .find_map(|c| self.eme_supported_configuration(key_system, c));
+        if super::trace_on() {
+            let asked: Vec<String> = configurations.iter().map(describe_configuration).collect();
+            eprintln!(
+                "[eme] {:.3} requestMediaKeySystemAccess({key_system:?}, [{}]) = {}",
+                super::trace_clock(),
+                asked.join(", "),
+                answer
+                    .as_ref()
+                    .map_or("NotSupportedError".into(), describe_configuration)
+            );
+        }
         let key_system = key_system.to_string();
         let resolve = p.clone();
         self.queue_task(TaskSource::DomManipulation, move |e, cx| match answer {
@@ -940,6 +976,13 @@ impl MediaKeysImpl for Engine {
         policy: MediaKeysPolicy,
     ) -> rt::Result<JsPromise> {
         // (no HDCP restriction applies to Clear Key: any valid policy is usable)
+        if super::trace_on() {
+            eprintln!(
+                "[eme] {:.3} getStatusForPolicy({:?})",
+                super::trace_clock(),
+                policy.min_hdcp_version
+            );
+        }
         let Some(v) = policy.min_hdcp_version else {
             return self.eme_rejected(cx, rt::Error::Type("The policy is empty".into()));
         };

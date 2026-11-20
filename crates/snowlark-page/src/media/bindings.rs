@@ -301,7 +301,14 @@ impl HTMLMediaElementImpl for Engine {
         _this: Handle,
         type_: &str,
     ) -> rt::Result<CanPlayTypeResult> {
-        Ok(match snowlark_media::can_play_type(type_) {
+        let answer = snowlark_media::can_play_type(type_);
+        if super::trace_on() {
+            eprintln!(
+                "[eme] {:.3} canPlayType({type_:?}) = {answer:?}",
+                super::trace_clock()
+            );
+        }
+        Ok(match answer {
             CanPlay::No => CanPlayTypeResult::Empty,
             CanPlay::Maybe => CanPlayTypeResult::Maybe,
             CanPlay::Probably => CanPlayTypeResult::Probably,
