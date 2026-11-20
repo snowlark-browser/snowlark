@@ -501,7 +501,7 @@ h1{font:600 44px 'Segoe UI Variable Display','Segoe UI',sans-serif;letter-spacin
 p{margin:4px 0;color:#5f6368}kbd{font:13px Consolas,monospace;background:#f1f3f4;border-radius:4px;padding:2px 6px}\
 @media (prefers-color-scheme:dark){body{color:#bdc1c6;background:#202124}h1{color:#e8eaed}p{color:#9aa0a6}\
 kbd{background:#35363a}}\
-</style><h1>Snowlark</h1><p>A browser engine of its own, in Rust.</p>\
+</style><h1>Snowlark</h1><p>A fast, private web browser for Windows.</p>\
 <p>Type an address or a search in the bar above (<kbd>Ctrl</kbd>+<kbd>L</kbd>).</p>";
 
 impl TabDriver for RendererDriver {

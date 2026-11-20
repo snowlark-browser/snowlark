@@ -1,7 +1,7 @@
 Snowlark preview build
 ======================
 
-Snowlark is a web browser with an engine of its own, written in Rust.
+Snowlark is a fast, private web browser for Windows.
 https://snowlark.org
 
 This is an early preview. Many sites work, but expect pages that look wrong, features that are

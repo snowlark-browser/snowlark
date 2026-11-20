@@ -1,6 +1,6 @@
 # Snowlark
 
-Snowlark is a web browser with an engine of its own, written in Rust and built from the web's
+Snowlark is a fast, private web browser for Windows, written in Rust and built from the web's
 specifications. More at [snowlark.org](https://snowlark.org).
 
 The DOM, the JavaScript bindings (generated from the specifications' Web IDL), layout, painting, networking,
