@@ -401,6 +401,18 @@ the source; `git log -p vendor/stylo` shows the diff.
    a slot of its own in `ScopedTLS` (one more than the pool's threads) and the workers' local queue
    size; work goes to the pool only when a level of the tree has enough elements to share, as the
    traversal does on a thread of the pool. The embedder can then offer the pool to every restyle.
+72. **Running transitions applied over a kept base style** (`style_resolver.rs`
+   `cascade_style_and_visited`, `properties/cascade.rs` `apply_transitions_to_base`): an element with
+   a running transition was cascaded in full on every restyle (patch 66 keeps no style with animation
+   rules). Its rules without the transitions (`remove_animation_rules`) are its after-change rules,
+   whose style patch 66 keeps; the element now gets that style with the transitions' computed values
+   applied over it, as the cascade ends with the transitions origin. Only when the rules hold no
+   other animation level and every transitioning property is one no other property of the element
+   reads or adjusts (opacity, transforms, colors, shadows, filters, visibility, sizes, insets,
+   margins, paddings, radii, background position and size, clip path, spacing, SVG paint, flex and
+   gap; not the font properties, `line-height`, `zoom`, the writing mode, `display`, `position`,
+   `float`, border or outline styles, `overflow`, containment). Otherwise the rules are cascaded as
+   before. No style changes.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

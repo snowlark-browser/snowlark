@@ -181,6 +181,56 @@ fn transition_all_starts_only_what_changed() {
     assert!(!p.engine.animations_active());
 }
 
+/// An element with a running transition gets the style of its rules without the transition (kept
+/// from its after-change style) with the transition's value applied over it, as the cascade ends
+/// with the transitions origin (CSS Cascade 5 §6.1): its other values are not cascaded again.
+#[test]
+fn a_running_transition_is_applied_over_the_kept_base_style() {
+    let mut p = Page::new(
+        "<!DOCTYPE html><style>
+            #t { width: 100px; color: rgb(1, 2, 3); transition: width 1s linear; }
+            #t.wide { width: 200px; }
+          </style><div id=t></div>",
+    );
+    p.restyle_at(1.0);
+    let t = p.q("#t");
+    p.dom.set_attribute(t, "class", "wide").unwrap();
+    p.restyle_at(1.0);
+    p.restyle_at(1.25);
+    assert_eq!(p.get("#t", "width"), "125px");
+    let first = p.data.styles_arc(t).unwrap();
+    p.restyle_at(1.5);
+    assert_eq!(p.get("#t", "width"), "150px");
+    assert_eq!(p.get("#t", "color"), "rgb(1, 2, 3)");
+    let second = p.data.styles_arc(t).unwrap();
+    // (a cascade makes the struct the color rule sets anew; both frames have the base style's)
+    assert!(std::ptr::eq(
+        first.get_inherited_text(),
+        second.get_inherited_text()
+    ));
+    p.restyle_at(2.0);
+    assert_eq!(p.get("#t", "width"), "200px");
+}
+
+/// A transition of a property other values are computed from (here `font-size`, which `em` lengths
+/// read) is cascaded with the element's rules: those values follow the transition.
+#[test]
+fn a_transition_other_values_depend_on_is_cascaded() {
+    let mut p = Page::new(
+        "<!DOCTYPE html><style>
+            #t { font-size: 10px; padding-left: 2em; transition: font-size 1s linear; }
+            #t.big { font-size: 20px; }
+          </style><div id=t></div>",
+    );
+    p.restyle_at(1.0);
+    let t = p.q("#t");
+    p.dom.set_attribute(t, "class", "big").unwrap();
+    p.restyle_at(1.0);
+    p.restyle_at(1.5);
+    assert_eq!(p.get("#t", "font-size"), "15px");
+    assert_eq!(p.get("#t", "padding-left"), "30px");
+}
+
 /// The transition steps skip a property whose before-change and after-change computed values are
 /// equal (stylo patch 39) only when its animated values must be equal too: same zoom and font size.
 #[test]

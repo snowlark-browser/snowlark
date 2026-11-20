@@ -197,6 +197,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `SNOWLARK_PROFILE=1` is set and stderr is a pipe, after writing its output. `snowlark-cli.exe` works. (ref 54)
 - **Debug-build test timeouts.** The IndexedDB test `finished_requests_are_collected` times out in a debug build, and the
   deep-tree test `a_deep_tree_overflows_one_renderer_only` returns early in debug builds because the debug renderer is
-  too slow to crash. (ref 56, 91)
+  too slow to crash. The Media Source test `an_append_ends_once_however_the_media_side_reports_it` fails in a debug
+  build (its `update` and `updateend` events arrive after the check) and passes in optimised builds. (ref 56, 91, 560)
 - **Reftest hangs.** Two reftests, `background-size-near-zero-png` and the flexbox `flex-1-N-N-shrink` pages, hang in
   the runner in ways its watchdog cannot stop. (ref 39)
