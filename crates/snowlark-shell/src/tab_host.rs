@@ -1273,6 +1273,7 @@ fn start_process(
         muted: remote.muted,
         audio_out: context.audio_out.clone(),
         videos: context.videos.clone(),
+        cdm: context.cdm.clone(),
     };
     let window = WindowEnds {
         gpu: context.gpu,

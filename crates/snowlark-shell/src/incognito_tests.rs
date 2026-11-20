@@ -112,6 +112,7 @@ fn context_of(
         broadcast: p.broadcast.clone(),
         web_storage: p.local_storage.host(),
         idb: p.idb.clone(),
+        cdm: None,
     };
     (ctx, rx, comp_rx)
 }

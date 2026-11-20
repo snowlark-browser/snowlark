@@ -351,6 +351,7 @@ mod tests {
             broadcast: snowlark_page::BroadcastHub::default(),
             web_storage: snowlark_page::web_storage::WebStorageHost::new(),
             idb: snowlark_page::IdbBackend::in_memory(),
+            cdm: None,
         })
     }
 

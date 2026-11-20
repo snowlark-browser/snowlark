@@ -47,6 +47,7 @@ fn page_in_tab(
         silent,
         audio,
         audio_out: None,
+        cdm: None,
     });
     page.load_html(html, &fixtures().join("test.html").unwrap());
     page
@@ -1090,6 +1091,7 @@ fn the_ready_state_waits_for_the_text_tracks() {
         silent: true,
         audio: None,
         audio_out: None,
+        cdm: None,
     });
     page.load_html(
         &format!(

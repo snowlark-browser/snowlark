@@ -469,6 +469,7 @@ pub(crate) fn local() -> Local {
             audio_out: None,
             videos: None,
             site_lock: site_lock::Mode::Shadow,
+            cdm: None,
         },
         idb,
         broadcast,

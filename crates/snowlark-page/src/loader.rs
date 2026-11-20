@@ -1236,6 +1236,7 @@ impl Engine {
         progressed |= self.poll_workers(cx);
         progressed |= self.poll_websockets(cx);
         progressed |= self.poll_broadcasts(cx);
+        progressed |= self.poll_cdm(cx);
         progressed |= self.poll_storage();
         progressed |= self.poll_idb(cx);
         progressed |= self.poll_audio(cx);

@@ -114,6 +114,7 @@ Environment variables, in any mode that runs a page unless noted:
 | `SNOWLARK_SCALE=1.5` | Draws the window as on a monitor at that display scale (0.5 to 4). |
 | `SNOWLARK_PROCESS_MODEL=single` | Keeps every tab on a thread of the browser's process instead of a renderer process each (also `--process-model=single`). |
 | `SNOWLARK_IPC=loopback` | Puts every tab message through the wire format inside `send`, so the window and `snowlark-shell`'s tests run as if each crossed a process. |
+| `SNOWLARK_PLAYREADY=1` | Offers the `com.microsoft.playready.recommendation.3000` key system to pages in the window (Windows 10 2004 or later, hardware DRM); a test setting while protected playback is being built. |
 | `SNOWLARK_TAB_STATS=1`, `SNOWLARK_GPU_STATS=1`, `SNOWLARK_VSYNC_STATS=1` | In the window: a line per batch of input a tab handles, per raster and presented frame, and per second of vsyncs. |
 
 ## Web-platform-tests

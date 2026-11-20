@@ -16,7 +16,10 @@ pub mod decode;
 pub mod encode;
 pub mod mse;
 pub mod player;
+pub mod playready;
+pub mod playready_service;
 pub mod probe;
+pub mod protected_source;
 pub mod wasapi;
 
 use std::cell::Cell;

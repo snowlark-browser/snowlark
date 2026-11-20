@@ -251,6 +251,7 @@ impl PageDriver {
                 // (the tab strip's speaker and the tab's mute)
                 audio: ctx.audio.clone(),
                 audio_out: ctx.audio_out.clone(),
+                cdm: ctx.cdm.clone(),
                 ..Default::default()
             });
         // (console messages are kept for the developer tools, whenever they open)
@@ -1627,6 +1628,7 @@ mod tests {
             broadcast: snowlark_page::BroadcastHub::default(),
             web_storage: snowlark_page::web_storage::WebStorageHost::new(),
             idb: snowlark_page::IdbBackend::in_memory(),
+            cdm: None,
         });
         d.set_device(Device {
             viewport: Size::new(800.0, 600.0),

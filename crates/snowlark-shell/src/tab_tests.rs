@@ -171,6 +171,7 @@ fn a_memory_request_returns_at_once_and_is_answered_later() {
         broadcast: snowlark_page::BroadcastHub::default(),
         web_storage: snowlark_page::web_storage::WebStorageHost::new(),
         idb: snowlark_page::IdbBackend::in_memory(),
+        cdm: None,
     };
     let device = Device {
         viewport: Size::new(800.0, 600.0),
@@ -233,6 +234,7 @@ fn a_failing_tab_reports_a_crash_and_the_others_go_on() {
         broadcast: snowlark_page::BroadcastHub::default(),
         web_storage: snowlark_page::web_storage::WebStorageHost::new(),
         idb: snowlark_page::IdbBackend::in_memory(),
+        cdm: None,
     };
     let device = Device {
         viewport: Size::new(800.0, 600.0),
@@ -308,6 +310,7 @@ fn navigating_to_the_page_shown_still_reports_the_load_done() {
         broadcast: snowlark_page::BroadcastHub::default(),
         web_storage: snowlark_page::web_storage::WebStorageHost::new(),
         idb: snowlark_page::IdbBackend::in_memory(),
+        cdm: None,
     };
     let device = Device {
         viewport: Size::new(800.0, 600.0),
@@ -360,6 +363,7 @@ fn the_session_history_follows_the_page_and_a_restored_tab_loads_where_it_was() 
         broadcast: snowlark_page::BroadcastHub::default(),
         web_storage: snowlark_page::web_storage::WebStorageHost::new(),
         idb: snowlark_page::IdbBackend::in_memory(),
+        cdm: None,
     };
     let device = Device {
         viewport: Size::new(800.0, 600.0),
@@ -444,6 +448,7 @@ fn a_crashed_tab_keeps_its_history_on_a_new_renderer() {
         broadcast: snowlark_page::BroadcastHub::default(),
         web_storage: snowlark_page::web_storage::WebStorageHost::new(),
         idb: snowlark_page::IdbBackend::in_memory(),
+        cdm: None,
     };
     let device = Device {
         viewport: Size::new(800.0, 600.0),
@@ -512,6 +517,7 @@ fn a_tab_answers_the_find_box_and_runs_nothing_without_one() {
         broadcast: snowlark_page::BroadcastHub::default(),
         web_storage: snowlark_page::web_storage::WebStorageHost::new(),
         idb: snowlark_page::IdbBackend::in_memory(),
+        cdm: None,
     };
     let device = Device {
         viewport: Size::new(800.0, 600.0),
@@ -731,6 +737,7 @@ fn remote_context() -> (
         broadcast: snowlark_page::BroadcastHub::default(),
         web_storage: snowlark_page::web_storage::WebStorageHost::new(),
         idb: snowlark_page::IdbBackend::in_memory(),
+        cdm: None,
     };
     (ctx, net, rx, comp_rx)
 }
@@ -1124,6 +1131,7 @@ fn a_page_renders_at_the_begin_frames_it_asks_for() {
         broadcast: snowlark_page::BroadcastHub::default(),
         web_storage: snowlark_page::web_storage::WebStorageHost::new(),
         idb: snowlark_page::IdbBackend::in_memory(),
+        cdm: None,
     };
     let device = Device {
         viewport: Size::new(800.0, 600.0),
@@ -1895,6 +1903,7 @@ fn a_page_navigates_through_the_browser() {
         broadcast: snowlark_page::BroadcastHub::default(),
         web_storage: snowlark_page::web_storage::WebStorageHost::new(),
         idb: snowlark_page::IdbBackend::in_memory(),
+        cdm: None,
     };
     navigates_through_the_browser(
         ctx,

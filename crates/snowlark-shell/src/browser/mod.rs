@@ -473,6 +473,8 @@ impl Browser {
             broadcast: partition.broadcast.clone(),
             web_storage: partition.local_storage.host(),
             idb: partition.idb.clone(),
+            // (the partition's key systems: each origin's state in its store)
+            cdm: Some(partition.cdm.clone() as Arc<dyn snowlark_page::media::cdm::Cdm>),
         };
         let mut bookmarks = Bookmarks::load(
             &profile.bookmarks_file(),

@@ -16,6 +16,7 @@
 //! - [`vtt`]: WebVTT parsing for `<track>` elements.
 
 pub(crate) mod bindings;
+pub mod cdm;
 pub(crate) mod eme;
 pub(crate) mod mse;
 pub(crate) mod objects;
@@ -90,6 +91,9 @@ pub struct MediaConfig {
     /// through messages from a renderer). None: they render into a null sink at the clock rate, as
     /// in headless runs.
     pub audio_out: Option<Arc<dyn snowlark_audio::realtime::AudioOutputs>>,
+    /// The key systems whose modules are the embedder's (the browser's; reached through messages
+    /// from a renderer). None: only Clear Key, which the page runs itself.
+    pub cdm: Option<Arc<dyn cdm::Cdm>>,
 }
 
 /// How the resource selection algorithm picked its resource.
@@ -301,6 +305,14 @@ pub(crate) struct Media {
     pub cue_order: u64,
     /// Counts EME sessions given an id (their ids).
     pub eme_sessions: u64,
+    /// Where the embedder's modules report to this event loop ([`cdm::CdmInbox`]).
+    pub cdm_inbox: Option<Arc<cdm::CdmInbox>>,
+    /// Calls to the embedder's modules not answered yet, by request id.
+    pub cdm_pending: HashMap<u64, eme::CdmPending>,
+    /// The last request id given.
+    pub cdm_requests: u64,
+    /// Sessions of the embedder's modules, by their id there.
+    pub cdm_sessions: HashMap<u64, Handle>,
 }
 
 /// How often `timeupdate` fires while playing (HTML: every 15 to 250 ms).

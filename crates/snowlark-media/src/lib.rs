@@ -30,6 +30,7 @@
 pub mod audio;
 pub mod caps;
 pub mod cenc;
+pub mod fmp4;
 pub mod init_segment;
 pub mod ranges;
 pub mod resource;

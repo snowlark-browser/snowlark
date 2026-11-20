@@ -49,25 +49,31 @@ impl Keys for HashMap<KeyId, [u8; 16]> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Scheme {
+pub enum Scheme {
     Cenc,
     Cbcs,
     /// A scheme this does not decrypt (`cens`, `cbc1`, others): left as it is.
     Other,
 }
 
-/// A protected track's `tenc` and fragment defaults.
+/// A protected track's scheme and `tenc`.
 #[derive(Clone, Debug)]
-struct Track {
-    scheme: Scheme,
-    protected: bool,
-    kid: KeyId,
-    iv_size: u8,
-    constant_iv: Option<Vec<u8>>,
-    crypt: u8,
-    skip: u8,
-    /// `trex` default_sample_size.
-    default_size: u32,
+pub(crate) struct Track {
+    pub(crate) scheme: Scheme,
+    pub(crate) protected: bool,
+    pub(crate) kid: KeyId,
+    pub(crate) iv_size: u8,
+    pub(crate) constant_iv: Option<Vec<u8>>,
+    pub(crate) crypt: u8,
+    pub(crate) skip: u8,
+}
+
+/// A track's fragment defaults (`trex`).
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Trex {
+    pub(crate) duration: u32,
+    pub(crate) size: u32,
+    pub(crate) flags: u32,
 }
 
 /// What [`Decryptor::push`] found besides the bytes.
@@ -85,8 +91,8 @@ pub struct Found {
 pub struct Decryptor {
     /// Protected tracks of the last initialization segment, by track id.
     tracks: HashMap<u32, Track>,
-    /// `trex` default sample sizes of the last initialization segment.
-    defaults: HashMap<u32, u32>,
+    /// `trex` defaults of the last initialization segment.
+    defaults: HashMap<u32, Trex>,
     /// Bytes not released yet: an incomplete box this must see whole, or (while waiting for a key)
     /// everything from the segment that waits.
     pending: Vec<u8>,
@@ -99,7 +105,7 @@ pub struct Decryptor {
 }
 
 /// A box header: its size (0 when it runs to the end), type and header length.
-fn header(b: &[u8]) -> Option<(u64, [u8; 4], usize)> {
+pub(crate) fn header(b: &[u8]) -> Option<(u64, [u8; 4], usize)> {
     if b.len() < 8 {
         return None;
     }
@@ -116,7 +122,7 @@ fn header(b: &[u8]) -> Option<(u64, [u8; 4], usize)> {
 }
 
 /// The child boxes of `b[start..end]`: (start, end, type, header length).
-fn children(b: &[u8], start: usize, end: usize) -> Vec<(usize, usize, [u8; 4], usize)> {
+pub(crate) fn children(b: &[u8], start: usize, end: usize) -> Vec<(usize, usize, [u8; 4], usize)> {
     let mut out = Vec::new();
     let mut p = start;
     while p + 8 <= end {
@@ -134,19 +140,30 @@ fn children(b: &[u8], start: usize, end: usize) -> Vec<(usize, usize, [u8; 4], u
     out
 }
 
-fn child(b: &[u8], start: usize, end: usize, typ: &[u8; 4]) -> Option<(usize, usize, usize)> {
+/// The first child box of `b[start..end]` of type `typ`: (start, end, header length).
+pub(crate) fn child(
+    b: &[u8],
+    start: usize,
+    end: usize,
+    typ: &[u8; 4],
+) -> Option<(usize, usize, usize)> {
     children(b, start, end)
         .into_iter()
         .find(|c| &c.2 == typ)
         .map(|(s, e, _, h)| (s, e, h))
 }
 
-fn be32(b: &[u8], p: usize) -> Option<u32> {
+pub(crate) fn be32(b: &[u8], p: usize) -> Option<u32> {
     b.get(p..p + 4)
         .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
 }
 
-fn be16(b: &[u8], p: usize) -> Option<u16> {
+pub(crate) fn be64(b: &[u8], p: usize) -> Option<u64> {
+    b.get(p..p + 8)
+        .map(|s| u64::from_be_bytes(s.try_into().unwrap()))
+}
+
+pub(crate) fn be16(b: &[u8], p: usize) -> Option<u16> {
     b.get(p..p + 2)
         .map(|s| u16::from_be_bytes(s.try_into().unwrap()))
 }
@@ -396,24 +413,9 @@ impl Decryptor {
                     pssh.extend_from_slice(&b[s..e]);
                     psshs.push(s);
                 }
-                b"mvex" => {
-                    for (ts, _, ttyp, th) in children(b, s + ch, e) {
-                        if &ttyp == b"trex" {
-                            if let (Some(id), Some(size)) =
-                                (be32(b, ts + th + 4), be32(b, ts + th + 16))
-                            {
-                                self.defaults.insert(id, size);
-                            }
-                        }
-                    }
-                }
+                b"mvex" => self.defaults = read_mvex(b, s + ch, e),
                 b"trak" => self.read_trak(b, s + ch, e),
                 _ => {}
-            }
-        }
-        for (id, size) in &self.defaults {
-            if let Some(t) = self.tracks.get_mut(id) {
-                t.default_size = *size;
             }
         }
         if self.tracks.is_empty() {
@@ -449,67 +451,10 @@ impl Decryptor {
             }
             // The sample entry's own fields: VisualSampleEntry 78 bytes, AudioSampleEntry 28
             // (more for QuickTime sound descriptions version 1 and 2).
-            let fields = if video {
-                78
-            } else {
-                match be16(b, es + eh + 8) {
-                    Some(1) => 44,
-                    Some(2) => 64,
-                    _ => 28,
-                }
-            };
-            let Some((ss, se, sh)) = child(b, es + eh + fields, ee, b"sinf") else {
+            let Some((ss, _, format, track)) = read_sinf(b, es, ee, eh, video) else {
                 continue;
             };
-            let Some((fs, _, fh)) = child(b, ss + sh, se, b"frma") else {
-                continue;
-            };
-            let format: [u8; 4] = b[fs + fh..fs + fh + 4].try_into().unwrap();
-            let scheme = match child(b, ss + sh, se, b"schm") {
-                Some((cs, _, ch)) => match &b[cs + ch + 4..cs + ch + 8] {
-                    b"cenc" => Scheme::Cenc,
-                    b"cbcs" => Scheme::Cbcs,
-                    _ => Scheme::Other,
-                },
-                None => Scheme::Cenc,
-            };
-            let Some((is, ie, ih)) = child(b, ss + sh, se, b"schi") else {
-                continue;
-            };
-            let Some((ts, te, th)) = child(b, is + ih, ie, b"tenc") else {
-                continue;
-            };
-            let t = &b[ts + th..te];
-            if t.len() < 24 {
-                continue;
-            }
-            let (crypt, skip) = if t[0] > 0 {
-                (t[5] >> 4, t[5] & 15)
-            } else {
-                (0, 0)
-            };
-            let protected = t[6] != 0;
-            let iv_size = t[7];
-            let kid: KeyId = t[8..24].try_into().unwrap();
-            let constant_iv = if protected && iv_size == 0 && t.len() > 24 {
-                let n = t[24] as usize;
-                t.get(25..25 + n).map(|v| v.to_vec())
-            } else {
-                None
-            };
-            self.tracks.insert(
-                id,
-                Track {
-                    scheme,
-                    protected,
-                    kid,
-                    iv_size,
-                    constant_iv,
-                    crypt,
-                    skip,
-                    default_size: 0,
-                },
-            );
+            self.tracks.insert(id, track);
             b[es + 4..es + 8].copy_from_slice(&format);
             retype(b, ss, b"free");
         }
@@ -533,11 +478,13 @@ impl Decryptor {
             if &typ != b"traf" {
                 continue;
             }
-            let Some(traf) = self.read_traf(b, ts + th, te, prev_end, &mut retyped) else {
+            let lookup = |id| (self.tracks.get(&id), self.defaults.get(&id).copied());
+            let Some(traf) = read_traf(b, ts + th, te, prev_end, &lookup) else {
                 continue;
             };
             prev_end = traf.data_end;
             if let Some(track) = traf.track {
+                retyped.extend_from_slice(&traf.aux);
                 jobs.push((track, traf.samples));
             }
         }
@@ -575,199 +522,340 @@ impl Decryptor {
         }
         Ok(())
     }
+}
 
-    /// A track fragment's samples: where each is in the segment, with its IV and subsamples.
-    fn read_traf(
-        &self,
-        b: &[u8],
-        start: usize,
-        end: usize,
-        prev_end: Option<usize>,
-        retyped: &mut Vec<usize>,
-    ) -> Option<Traf> {
-        let kids = children(b, start, end);
-        let (hs, _, hh) = kids
-            .iter()
-            .find(|c| &c.2 == b"tfhd")
-            .map(|c| (c.0, c.1, c.3))?;
-        let flags = be32(b, hs + hh)? & 0xff_ffff;
-        let id = be32(b, hs + hh + 4)?;
-        let mut q = hs + hh + 8;
-        if flags & 1 != 0 {
-            // (base-data-offset counts from the file's start, which a byte stream does not know:
-            // read from the moof, as segments made for MSE place it)
-            q += 8;
+/// The `trex` defaults of an `mvex` box (`b[start..end]` its children), by track id.
+pub(crate) fn read_mvex(b: &[u8], start: usize, end: usize) -> HashMap<u32, Trex> {
+    let mut out = HashMap::new();
+    for (ts, _, ttyp, th) in children(b, start, end) {
+        if &ttyp != b"trex" {
+            continue;
         }
-        if flags & 2 != 0 {
-            q += 4;
+        // (version and flags, track_ID, default_sample_description_index, then the defaults)
+        if let (Some(id), Some(duration), Some(size), Some(flags)) = (
+            be32(b, ts + th + 4),
+            be32(b, ts + th + 12),
+            be32(b, ts + th + 16),
+            be32(b, ts + th + 20),
+        ) {
+            out.insert(
+                id,
+                Trex {
+                    duration,
+                    size,
+                    flags,
+                },
+            );
         }
-        if flags & 8 != 0 {
-            q += 4;
+    }
+    out
+}
+
+/// The protection of an `encv`/`enca` sample entry (`b[es..ee]`, header length `eh`): its `sinf`
+/// (start and end), the original format (`frma`) and the scheme with its `tenc`.
+pub(crate) fn read_sinf(
+    b: &[u8],
+    es: usize,
+    ee: usize,
+    eh: usize,
+    video: bool,
+) -> Option<(usize, usize, [u8; 4], Track)> {
+    // The sample entry's own fields: VisualSampleEntry 78 bytes, AudioSampleEntry 28 (more for
+    // QuickTime sound descriptions version 1 and 2).
+    let fields = if video {
+        78
+    } else {
+        match be16(b, es + eh + 8) {
+            Some(1) => 44,
+            Some(2) => 64,
+            _ => 28,
         }
-        let tfhd_size = if flags & 0x10 != 0 { be32(b, q) } else { None };
-        let track = self.tracks.get(&id).cloned();
-        let default_size = tfhd_size
-            .or(track.as_ref().map(|t| t.default_size))
-            .or(self.defaults.get(&id).copied())
-            .unwrap_or(0);
-        let base = if flags & 0x2_0000 != 0 {
-            0
+    };
+    let (ss, se, sh) = child(b, es + eh + fields, ee, b"sinf")?;
+    let (fs, _, fh) = child(b, ss + sh, se, b"frma")?;
+    let format: [u8; 4] = b.get(fs + fh..fs + fh + 4)?.try_into().unwrap();
+    let scheme = match child(b, ss + sh, se, b"schm") {
+        Some((cs, _, ch)) => match b.get(cs + ch + 4..cs + ch + 8)? {
+            b"cenc" => Scheme::Cenc,
+            b"cbcs" => Scheme::Cbcs,
+            _ => Scheme::Other,
+        },
+        None => Scheme::Cenc,
+    };
+    let (is, ie, ih) = child(b, ss + sh, se, b"schi")?;
+    let (ts, te, th) = child(b, is + ih, ie, b"tenc")?;
+    let t = &b[ts + th..te];
+    if t.len() < 24 {
+        return None;
+    }
+    let (crypt, skip) = if t[0] > 0 {
+        (t[5] >> 4, t[5] & 15)
+    } else {
+        (0, 0)
+    };
+    let protected = t[6] != 0;
+    let iv_size = t[7];
+    let kid: KeyId = t[8..24].try_into().unwrap();
+    let constant_iv = if protected && iv_size == 0 && t.len() > 24 {
+        let n = t[24] as usize;
+        t.get(25..25 + n).map(|v| v.to_vec())
+    } else {
+        None
+    };
+    Some((
+        ss,
+        se,
+        format,
+        Track {
+            scheme,
+            protected,
+            kid,
+            iv_size,
+            constant_iv,
+            crypt,
+            skip,
+        },
+    ))
+}
+
+/// A track fragment's samples (`b[start..end]` the children of a `traf`, `b` starting at its
+/// `moof`): where each is in the segment, its duration, flags and composition offset, with its IV
+/// and subsamples when its track is protected. `lookup` gives a track id's protection and `trex`.
+pub(crate) fn read_traf<'a>(
+    b: &[u8],
+    start: usize,
+    end: usize,
+    prev_end: Option<usize>,
+    lookup: &dyn Fn(u32) -> (Option<&'a Track>, Option<Trex>),
+) -> Option<Traf> {
+    let kids = children(b, start, end);
+    let (hs, _, hh) = kids
+        .iter()
+        .find(|c| &c.2 == b"tfhd")
+        .map(|c| (c.0, c.1, c.3))?;
+    let flags = be32(b, hs + hh)? & 0xff_ffff;
+    let id = be32(b, hs + hh + 4)?;
+    let (track, trex) = lookup(id);
+    let track = track.cloned();
+    let trex = trex.unwrap_or_default();
+    let mut q = hs + hh + 8;
+    if flags & 1 != 0 {
+        // (base-data-offset counts from the file's start, which a byte stream does not know:
+        // read from the moof, as segments made for MSE place it)
+        q += 8;
+    }
+    if flags & 2 != 0 {
+        q += 4;
+    }
+    let mut default_duration = trex.duration;
+    if flags & 8 != 0 {
+        default_duration = be32(b, q)?;
+        q += 4;
+    }
+    let mut default_size = trex.size;
+    if flags & 0x10 != 0 {
+        default_size = be32(b, q)?;
+        q += 4;
+    }
+    let mut default_flags = trex.flags;
+    if flags & 0x20 != 0 {
+        default_flags = be32(b, q)?;
+    }
+    let base = if flags & 0x2_0000 != 0 {
+        0
+    } else {
+        prev_end.unwrap_or(0)
+    };
+    let decode_time = kids.iter().find(|c| &c.2 == b"tfdt").and_then(|c| {
+        let at = c.0 + c.3;
+        if *b.get(at)? == 1 {
+            be64(b, at + 4)
         } else {
-            prev_end.unwrap_or(0)
-        };
-        // Samples in order: offset and size, from each trun.
-        let mut samples: Vec<Sample> = Vec::new();
-        let mut data_end = None;
-        let mut next = base;
-        for &(rs, _, ref typ, rh) in &kids {
-            if typ != b"trun" {
-                continue;
-            }
-            let rflags = be32(b, rs + rh)? & 0xff_ffff;
-            let count = be32(b, rs + rh + 4)?;
-            let mut q = rs + rh + 8;
-            let mut offset = next;
-            if rflags & 1 != 0 {
-                let d = be32(b, q)? as i32;
-                offset = (base as i64 + d as i64).max(0) as usize;
+            be32(b, at + 4).map(u64::from)
+        }
+    });
+    // Samples in order: offset, size, duration, flags and composition offset, from each trun.
+    let mut samples: Vec<Sample> = Vec::new();
+    let mut data_end = None;
+    let mut next = base;
+    for &(rs, _, ref typ, rh) in &kids {
+        if typ != b"trun" {
+            continue;
+        }
+        let rflags = be32(b, rs + rh)? & 0xff_ffff;
+        let count = be32(b, rs + rh + 4)?;
+        let mut q = rs + rh + 8;
+        let mut offset = next;
+        if rflags & 1 != 0 {
+            let d = be32(b, q)? as i32;
+            offset = (base as i64 + d as i64).max(0) as usize;
+            q += 4;
+        }
+        let mut first_flags = None;
+        if rflags & 4 != 0 {
+            first_flags = Some(be32(b, q)?);
+            q += 4;
+        }
+        for i in 0..count {
+            let mut duration = default_duration;
+            if rflags & 0x100 != 0 {
+                duration = be32(b, q)?;
                 q += 4;
             }
-            if rflags & 4 != 0 {
+            let mut size = default_size;
+            if rflags & 0x200 != 0 {
+                size = be32(b, q)?;
                 q += 4;
             }
-            for _ in 0..count {
-                if rflags & 0x100 != 0 {
-                    q += 4;
-                }
-                let size = if rflags & 0x200 != 0 {
-                    let s = be32(b, q)?;
-                    q += 4;
-                    s
-                } else {
-                    default_size
-                };
-                if rflags & 0x400 != 0 {
-                    q += 4;
-                }
-                if rflags & 0x800 != 0 {
-                    q += 4;
-                }
-                samples.push(Sample {
-                    offset,
-                    size: size as usize,
-                    iv: [0; 16],
-                    subsamples: Vec::new(),
-                });
-                offset += size as usize;
-            }
-            next = offset;
-            data_end = Some(offset);
-        }
-        let Some(track) = track else {
-            return Some(Traf {
-                track: None,
-                samples,
-                data_end,
-            });
-        };
-        // The sample auxiliary information: `senc`, else `saiz` with `saio`.
-        let senc = kids.iter().find(|c| &c.2 == b"senc");
-        let saiz = kids.iter().find(|c| &c.2 == b"saiz");
-        let saio = kids.iter().find(|c| &c.2 == b"saio");
-        for c in kids
-            .iter()
-            .filter(|c| matches!(&c.2, b"senc" | b"saiz" | b"saio"))
-        {
-            retyped.push(c.0);
-        }
-        let iv_size = track.iv_size as usize;
-        let read_entry = |b: &[u8], q: &mut usize, subs: bool, s: &mut Sample| -> Option<()> {
-            if iv_size > 0 {
-                s.iv[..iv_size].copy_from_slice(b.get(*q..*q + iv_size)?);
-                *q += iv_size;
-            } else if let Some(c) = &track.constant_iv {
-                s.iv[..c.len().min(16)].copy_from_slice(&c[..c.len().min(16)]);
-            }
-            if subs {
-                let n = be16(b, *q)? as usize;
-                *q += 2;
-                for _ in 0..n {
-                    let clear = be16(b, *q)? as usize;
-                    let enc = be32(b, *q + 2)? as usize;
-                    *q += 6;
-                    s.subsamples.push((clear, enc));
-                }
-            }
-            Some(())
-        };
-        if let Some(&(ss, _, _, sh)) = senc {
-            let sflags = be32(b, ss + sh)? & 0xff_ffff;
-            let count = be32(b, ss + sh + 4)? as usize;
-            let mut q = ss + sh + 8;
-            for s in samples.iter_mut().take(count) {
-                read_entry(b, &mut q, sflags & 2 != 0, s)?;
-            }
-        } else if let (Some(&(zs, _, _, zh)), Some(&(os, _, _, oh))) = (saiz, saio) {
-            let zflags = be32(b, zs + zh)? & 0xff_ffff;
-            let mut zq = zs + zh + 4;
-            if zflags & 1 != 0 {
-                zq += 8;
-            }
-            let default = *b.get(zq)? as usize;
-            let count = be32(b, zq + 1)? as usize;
-            let sizes_at = zq + 5;
-            let oflags = be32(b, os + oh)?;
-            let mut oq = os + oh + 4;
-            if oflags & 1 != 0 {
-                oq += 8;
-            }
-            let entries = be32(b, oq)?;
-            if entries != 1 {
-                return None;
-            }
-            let at = if oflags >> 24 == 1 {
-                u64::from_be_bytes(b.get(oq + 4..oq + 12)?.try_into().unwrap()) as usize
-            } else {
-                be32(b, oq + 4)? as usize
+            let mut sample_flags = match first_flags {
+                Some(f) if i == 0 => f,
+                _ => default_flags,
             };
-            let mut q = base + at;
-            for (i, s) in samples.iter_mut().take(count).enumerate() {
-                let size = if default == 0 {
-                    *b.get(sizes_at + i)? as usize
-                } else {
-                    default
-                };
-                let mut r = q;
-                read_entry(b, &mut r, size > iv_size, s)?;
-                q += size;
+            if rflags & 0x400 != 0 {
+                sample_flags = be32(b, q)?;
+                q += 4;
             }
-        } else if track.protected && track.constant_iv.is_some() {
-            // (cbcs with a constant IV and whole samples encrypted: no auxiliary information)
-            for s in samples.iter_mut() {
-                let mut q = 0;
-                read_entry(b, &mut q, false, s)?;
+            let mut composition_offset = 0;
+            if rflags & 0x800 != 0 {
+                // (unsigned in version 0, signed in version 1; read as signed either way)
+                composition_offset = be32(b, q)? as i32;
+                q += 4;
             }
+            samples.push(Sample {
+                offset,
+                size: size as usize,
+                duration,
+                flags: sample_flags,
+                composition_offset,
+                iv: [0; 16],
+                subsamples: Vec::new(),
+            });
+            offset += size as usize;
         }
-        Some(Traf {
-            track: Some(track),
+        next = offset;
+        data_end = Some(offset);
+    }
+    let Some(track) = track else {
+        return Some(Traf {
+            id,
+            track: None,
             samples,
             data_end,
-        })
+            decode_time,
+            aux: Vec::new(),
+        });
+    };
+    // The sample auxiliary information: `senc`, else `saiz` with `saio`.
+    let senc = kids.iter().find(|c| &c.2 == b"senc");
+    let saiz = kids.iter().find(|c| &c.2 == b"saiz");
+    let saio = kids.iter().find(|c| &c.2 == b"saio");
+    let aux = kids
+        .iter()
+        .filter(|c| matches!(&c.2, b"senc" | b"saiz" | b"saio"))
+        .map(|c| c.0)
+        .collect();
+    let iv_size = track.iv_size as usize;
+    let read_entry = |b: &[u8], q: &mut usize, subs: bool, s: &mut Sample| -> Option<()> {
+        if iv_size > 0 {
+            s.iv[..iv_size].copy_from_slice(b.get(*q..*q + iv_size)?);
+            *q += iv_size;
+        } else if let Some(c) = &track.constant_iv {
+            s.iv[..c.len().min(16)].copy_from_slice(&c[..c.len().min(16)]);
+        }
+        if subs {
+            let n = be16(b, *q)? as usize;
+            *q += 2;
+            for _ in 0..n {
+                let clear = be16(b, *q)? as usize;
+                let enc = be32(b, *q + 2)? as usize;
+                *q += 6;
+                s.subsamples.push((clear, enc));
+            }
+        }
+        Some(())
+    };
+    if let Some(&(ss, _, _, sh)) = senc {
+        let sflags = be32(b, ss + sh)? & 0xff_ffff;
+        let count = be32(b, ss + sh + 4)? as usize;
+        let mut q = ss + sh + 8;
+        for s in samples.iter_mut().take(count) {
+            read_entry(b, &mut q, sflags & 2 != 0, s)?;
+        }
+    } else if let (Some(&(zs, _, _, zh)), Some(&(os, _, _, oh))) = (saiz, saio) {
+        let zflags = be32(b, zs + zh)? & 0xff_ffff;
+        let mut zq = zs + zh + 4;
+        if zflags & 1 != 0 {
+            zq += 8;
+        }
+        let default = *b.get(zq)? as usize;
+        let count = be32(b, zq + 1)? as usize;
+        let sizes_at = zq + 5;
+        let oflags = be32(b, os + oh)?;
+        let mut oq = os + oh + 4;
+        if oflags & 1 != 0 {
+            oq += 8;
+        }
+        let entries = be32(b, oq)?;
+        if entries != 1 {
+            return None;
+        }
+        let at = if oflags >> 24 == 1 {
+            be64(b, oq + 4)? as usize
+        } else {
+            be32(b, oq + 4)? as usize
+        };
+        let mut q = base + at;
+        for (i, s) in samples.iter_mut().take(count).enumerate() {
+            let size = if default == 0 {
+                *b.get(sizes_at + i)? as usize
+            } else {
+                default
+            };
+            let mut r = q;
+            read_entry(b, &mut r, size > iv_size, s)?;
+            q += size;
+        }
+    } else if track.protected && track.constant_iv.is_some() {
+        // (cbcs with a constant IV and whole samples encrypted: no auxiliary information)
+        for s in samples.iter_mut() {
+            let mut q = 0;
+            read_entry(b, &mut q, false, s)?;
+        }
     }
+    Some(Traf {
+        id,
+        track: Some(track),
+        samples,
+        data_end,
+        decode_time,
+        aux,
+    })
 }
 
-struct Sample {
-    offset: usize,
-    size: usize,
-    iv: [u8; 16],
+/// One sample of a track fragment.
+pub(crate) struct Sample {
+    /// Where it is, counted from the start of the `moof`.
+    pub(crate) offset: usize,
+    pub(crate) size: usize,
+    pub(crate) duration: u32,
+    /// The sample flags (ISO/IEC 14496-12 8.8.3.1).
+    pub(crate) flags: u32,
+    pub(crate) composition_offset: i32,
+    pub(crate) iv: [u8; 16],
     /// (clear bytes, protected bytes) pairs; empty: the whole sample is protected.
-    subsamples: Vec<(usize, usize)>,
+    pub(crate) subsamples: Vec<(usize, usize)>,
 }
 
-struct Traf {
-    track: Option<Track>,
-    samples: Vec<Sample>,
-    data_end: Option<usize>,
+pub(crate) struct Traf {
+    pub(crate) id: u32,
+    /// The protection of its track; `None` for a clear track (then no IVs or subsamples were read).
+    pub(crate) track: Option<Track>,
+    pub(crate) samples: Vec<Sample>,
+    pub(crate) data_end: Option<usize>,
+    /// `tfdt`'s baseMediaDecodeTime.
+    pub(crate) decode_time: Option<u64>,
+    /// Where its sample auxiliary information boxes start.
+    pub(crate) aux: Vec<usize>,
 }
 
 /// The protected byte ranges of a sample.
@@ -788,7 +876,12 @@ fn protected_ranges(subsamples: &[(usize, usize)], len: usize) -> Vec<(usize, us
 
 /// `cenc`: AES-128 CTR, the counter block the IV (8-byte IVs padded with zeros) counting up in its
 /// low 64 bits, run continuously over the protected ranges of the sample.
-fn decrypt_cenc(cipher: &Aes128, iv: &[u8; 16], subsamples: &[(usize, usize)], data: &mut [u8]) {
+pub(crate) fn decrypt_cenc(
+    cipher: &Aes128,
+    iv: &[u8; 16],
+    subsamples: &[(usize, usize)],
+    data: &mut [u8],
+) {
     let mut counter = *iv;
     let mut stream = [0u8; 16];
     let mut used = 16;

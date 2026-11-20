@@ -17,6 +17,7 @@
 //! | script code cache | `code-cache\` | none |
 //! | `BroadcastChannel` | its own hub | its own hub |
 //! | history | `history.json` | none kept |
+//! | key systems' module state | `cdm\` | a temporary folder, deleted with it |
 //!
 //! Nothing is shared between two partitions, so no tab of one can see what a tab of the other
 //! stored: each tab's services (its network, storage, IndexedDB and channels) are its partition's.
@@ -41,6 +42,9 @@ pub struct Partition {
     pub broadcast: snowlark_page::BroadcastHub,
     /// The pages visited, shared with the history page and the address bar.
     pub history: Arc<Mutex<History>>,
+    /// The key systems' module state: per origin in the profile's `cdm` folder, or a temporary
+    /// folder deleted with an Incognito partition.
+    pub cdm: Arc<crate::cdm::BrowserCdm>,
 }
 
 impl Partition {
@@ -70,6 +74,7 @@ impl Partition {
             ),
             broadcast: snowlark_page::BroadcastHub::default(),
             history: Arc::new(Mutex::new(history)),
+            cdm: crate::cdm::BrowserCdm::persistent(profile.dir.join("cdm")),
         }
     }
 
@@ -89,6 +94,7 @@ impl Partition {
             idb: snowlark_page::IdbBackend::in_memory_with_quota(quota),
             broadcast: snowlark_page::BroadcastHub::default(),
             history: Arc::new(Mutex::new(History::in_memory())),
+            cdm: crate::cdm::BrowserCdm::off_the_record(),
         }
     }
 

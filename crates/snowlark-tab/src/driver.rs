@@ -219,6 +219,8 @@ pub struct DriverContext {
     pub web_storage: Arc<dyn snowlark_page::web_storage::WebStorage>,
     /// The browser's IndexedDB backend (its pages' databases, persisted in the profile).
     pub idb: snowlark_page::IdbBackend,
+    /// The browser's key systems (none: Clear Key only).
+    pub cdm: Option<Arc<dyn snowlark_page::media::cdm::Cdm>>,
 }
 
 /// Makes a tab's driver on the tab's thread (a driver need not be `Send`).

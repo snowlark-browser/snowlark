@@ -62,6 +62,7 @@ impl Remote {
             muted: true,
             audio_out: None,
             videos: None,
+            cdm: None,
         };
         Ok(Some(Remote {
             local,

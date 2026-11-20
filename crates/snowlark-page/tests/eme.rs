@@ -128,3 +128,127 @@ fn set_media_keys_attaches_to_one_element() {
     );
     assert_eq!(r, "null true QuotaExceededError null true cenc null");
 }
+
+/// A key system of the embedder's module (`MediaConfig::cdm`), here a fake that answers at once:
+/// the configurations it is offered with, its instance and session, the module's message, key
+/// statuses and expiration, and the page's close.
+#[test]
+fn a_key_system_of_the_embedders_module() {
+    use snowlark_page::media::cdm::{Cdm, CdmEvent, CdmInbox, KeyStatus, MessageKind};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Default)]
+    struct Fake {
+        inbox: Mutex<Option<Arc<CdmInbox>>>,
+        origin: Mutex<String>,
+        sessions: AtomicU64,
+    }
+    impl Fake {
+        fn send(&self, e: CdmEvent) {
+            self.inbox.lock().unwrap().as_ref().unwrap().deliver(e);
+        }
+    }
+    impl Cdm for Fake {
+        fn supports(&self, key_system: &str, content_type: &str) -> bool {
+            key_system == "org.test.module" && content_type.starts_with("video/mp4")
+        }
+        fn create_keys(&self, request: u64, _: &str, origin: &str, inbox: &Arc<CdmInbox>) -> u64 {
+            *self.inbox.lock().unwrap() = Some(inbox.clone());
+            *self.origin.lock().unwrap() = origin.to_owned();
+            self.send(CdmEvent::Done {
+                request,
+                result: Ok(String::new()),
+            });
+            7
+        }
+        fn create_session(&self, keys: u64) -> u64 {
+            assert_eq!(keys, 7);
+            70 + self.sessions.fetch_add(1, Ordering::Relaxed)
+        }
+        fn generate_request(&self, request: u64, session: u64, kind: &str, mut data: Vec<u8>) {
+            assert_eq!(kind, "cenc");
+            data.reverse();
+            self.send(CdmEvent::Message {
+                session,
+                kind: MessageKind::LicenseRequest,
+                data,
+            });
+            self.send(CdmEvent::Done {
+                request,
+                result: Ok("module-session".into()),
+            });
+        }
+        fn update(&self, request: u64, session: u64, response: Vec<u8>) {
+            self.send(CdmEvent::KeyStatuses {
+                session,
+                statuses: vec![(response, KeyStatus::Usable)],
+            });
+            self.send(CdmEvent::Expiration {
+                session,
+                time: 1234.0,
+            });
+            self.send(CdmEvent::Done {
+                request,
+                result: Ok(String::new()),
+            });
+        }
+        fn close(&self, request: u64, session: u64) {
+            self.send(CdmEvent::Closed { session });
+            self.send(CdmEvent::Done {
+                request,
+                result: Ok(String::new()),
+            });
+        }
+        fn remove(&self, _: u64, _: u64) {}
+        fn release(&self, _: u64) {}
+    }
+
+    let mut p = page();
+    let fake = Arc::new(Fake::default());
+    p.engine()
+        .set_media_config(snowlark_page::media::MediaConfig {
+            cdm: Some(fake.clone()),
+            ..Default::default()
+        });
+    let r = run_async(
+        &mut p,
+        r#"
+        const video = [{contentType: 'video/mp4; codecs="avc1.64001f"'}];
+        const out = [];
+        for (const c of [{videoCapabilities: video, distinctiveIdentifier: 'not-allowed'},
+                         {initDataTypes: ['keyids'], videoCapabilities: video},
+                         {videoCapabilities: [{contentType: 'audio/webm'}]}]) {
+            try { await navigator.requestMediaKeySystemAccess('org.test.module', [c]); out.push('yes'); }
+            catch (e) { out.push(e.name); }
+        }
+        const a = await navigator.requestMediaKeySystemAccess('org.test.module',
+            [{initDataTypes: ['cenc'], videoCapabilities: video}]);
+        const g = a.getConfiguration();
+        out.push(a.keySystem, g.initDataTypes.join('+'), g.distinctiveIdentifier, g.persistentState);
+        const keys = await a.createMediaKeys();
+        const s = keys.createSession();
+        const message = new Promise(r => s.onmessage = r);
+        const changed = new Promise(r => s.addEventListener('keystatuseschange', r));
+        await s.generateRequest('cenc', new Uint8Array([1, 2, 3]));
+        const m = await message;
+        out.push(s.sessionId, m.messageType, new Uint8Array(m.message).join(','));
+        const s2 = keys.createSession();
+        try { await s2.generateRequest('keyids', new Uint8Array([1])); } catch (e) { out.push(e.name); }
+        await s.update(new Uint8Array([9, 8]));
+        await changed;
+        const [[id, st]] = [...s.keyStatuses];
+        out.push(new Uint8Array(id).join(','), st, s.expiration);
+        await s.close();
+        out.push(await s.closed);
+        return out.join(' ');
+    "#,
+    );
+    assert_eq!(
+        r,
+        "NotSupportedError NotSupportedError NotSupportedError org.test.module cenc required \
+         required module-session license-request 3,2,1 NotSupportedError 9,8 usable 1234 \
+         closed-by-application"
+    );
+    assert_eq!(*fake.origin.lock().unwrap(), "https://example.test");
+}

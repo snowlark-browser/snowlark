@@ -6,8 +6,8 @@
 //! `MediaKeySystemAccess`, `MediaKeys`, `MediaKeySession`, `MediaKeyStatusMap`, the
 //! `MediaKeyMessageEvent` and `MediaEncryptedEvent`, and the media element's `setMediaKeys`.
 //!
-//! The one key system is Clear Key (EME §9.1, `org.w3.clearkey`): temporary sessions whose licence
-//! request is the JSON key id list (§9.1.3) and whose licence is a JSON Web Key Set (§9.1.4). Its
+//! The one key system is Clear Key (EME Ã‚Â§9.1, `org.w3.clearkey`): temporary sessions whose licence
+//! request is the JSON key id list (Ã‚Â§9.1.3) and whose licence is a JSON Web Key Set (Ã‚Â§9.1.4). Its
 //! keys decrypt Common Encryption MP4 appended through Media Source Extensions
 //! (`snowlark_media::cenc`, run by each `SourceBuffer` in `mse.rs`).
 
@@ -28,6 +28,7 @@ use snowlark_bindings::InterfaceId;
 use snowlark_dom::NodeId;
 use snowlark_media::cenc::{cenc_key_ids, KeyId};
 
+use super::cdm::{Cdm, CdmError, CdmEvent, KeyStatus, MessageKind};
 use super::objects::MediaObject;
 use crate::engine::events::EventExt;
 use crate::engine::{exception, Engine, Object};
@@ -36,15 +37,17 @@ use crate::event_loop::TaskSource;
 /// The Clear Key key system's name.
 pub const CLEAR_KEY: &str = "org.w3.clearkey";
 
-/// The largest initialization data or response a session takes (EME §6.? "a reasonable size").
+/// The largest initialization data or response a session takes (EME Ã‚Â§6.? "a reasonable size").
 const MAX_DATA: usize = 64 * 1024;
 
 /// A `MediaKeys` object's state.
 pub struct KeysData {
     /// Its sessions, in creation order.
     pub sessions: Vec<Handle>,
-    /// The media element using it (EME §? a CDM instance serves one element).
+    /// The media element using it (EME Ã‚Â§? a CDM instance serves one element).
     pub element: Option<NodeId>,
+    /// Its instance in the embedder's module ([`Cdm`]); none for Clear Key.
+    pub cdm: Option<u64>,
 }
 
 /// A `MediaKeySession`'s state.
@@ -61,6 +64,129 @@ pub struct SessionData {
     /// Its key statuses, sorted by key id, each with the key id's ArrayBuffer the map's
     /// iteration gives.
     pub statuses: Vec<(Vec<u8>, MediaKeyStatus, JsObject)>,
+    /// Its id in the embedder's module ([`Cdm`]); none for Clear Key.
+    pub cdm: Option<u64>,
+    /// EME `expiration`: milliseconds since 1970, NaN for none.
+    pub expiration: f64,
+}
+
+/// A call to the embedder's module waiting for its answer ([`CdmEvent::Done`]).
+pub enum CdmPending {
+    /// `createMediaKeys()`: the instance made for it.
+    Keys {
+        promise: JsPromise,
+        keys: u64,
+    },
+    /// `generateRequest()`, `update()`, `close()`, `remove()` of a session.
+    Generate {
+        promise: JsPromise,
+        session: Handle,
+    },
+    Update {
+        promise: JsPromise,
+    },
+    Close {
+        promise: JsPromise,
+        session: Handle,
+    },
+    Remove {
+        promise: JsPromise,
+    },
+}
+
+fn cdm_error(e: CdmError) -> rt::Error {
+    match e {
+        CdmError::NotSupported(m) => rt::Error::Dom(ExceptionName::NotSupportedError, m.into()),
+        CdmError::Type(m) => rt::Error::Type(m.into()),
+        CdmError::InvalidState(m) | CdmError::Module(m) => {
+            rt::Error::Dom(ExceptionName::InvalidStateError, m.into())
+        }
+    }
+}
+
+/// EME Ã‚Â§3.1.1.1 "Get Supported Configuration" for a key system of the embedder's module: `cenc`
+/// initialization data, temporary sessions, and the distinctive identifier and persistent state
+/// the system's module needs both of; each capability asked of the module.
+fn cdm_configuration(
+    cdm: &dyn Cdm,
+    key_system: &str,
+    candidate: &MediaKeySystemConfiguration,
+) -> Option<MediaKeySystemConfiguration> {
+    // 2-3.
+    let init_data_types: Vec<String> = candidate
+        .init_data_types
+        .iter()
+        .filter(|t| *t == "cenc")
+        .take(1)
+        .cloned()
+        .collect();
+    if !candidate.init_data_types.is_empty() && init_data_types.is_empty() {
+        return None;
+    }
+    // 4-9.
+    if candidate.distinctive_identifier == MediaKeysRequirement::NotAllowed
+        || candidate.persistent_state == MediaKeysRequirement::NotAllowed
+    {
+        return None;
+    }
+    // 10-12.
+    let session_types = candidate
+        .session_types
+        .clone()
+        .unwrap_or_else(|| vec!["temporary".to_string()]);
+    if session_types.iter().any(|t| t != "temporary") {
+        return None;
+    }
+    // 13.
+    if candidate.video_capabilities.is_empty() && candidate.audio_capabilities.is_empty() {
+        return None;
+    }
+    // 14-15.
+    let capabilities = |requested: &[MediaKeySystemMediaCapability]| {
+        let mut out: Vec<MediaKeySystemMediaCapability> = Vec::new();
+        for c in requested {
+            if c.content_type.is_empty() {
+                return None;
+            }
+            // (the key system's name says its robustness)
+            if !c.robustness.is_empty()
+                || c.encryption_scheme
+                    .as_deref()
+                    .is_some_and(|s| !matches!(s, "cenc" | "cbcs" | "cbcs-1-9"))
+            {
+                continue;
+            }
+            let seen = out.iter().any(|o| {
+                o.content_type == c.content_type
+                    && o.robustness == c.robustness
+                    && o.encryption_scheme == c.encryption_scheme
+            });
+            if !seen && cdm.supports(key_system, &c.content_type) {
+                out.push(c.clone());
+            }
+        }
+        (!out.is_empty()).then_some(out)
+    };
+    let video_capabilities = if candidate.video_capabilities.is_empty() {
+        Vec::new()
+    } else {
+        capabilities(&candidate.video_capabilities)?
+    };
+    let audio_capabilities = if candidate.audio_capabilities.is_empty() {
+        Vec::new()
+    } else {
+        capabilities(&candidate.audio_capabilities)?
+    };
+    // 16-22.
+    Some(MediaKeySystemConfiguration {
+        label: candidate.label.clone(),
+        init_data_types,
+        audio_capabilities,
+        video_capabilities,
+        distinctive_identifier: MediaKeysRequirement::Required,
+        persistent_state: MediaKeysRequirement::Required,
+        session_types: Some(session_types),
+    })
 }
 
 fn invalid(msg: &'static str) -> rt::Error {
@@ -122,7 +248,7 @@ fn content_type_supported(engine: &Engine, content_type: &str, video: bool) -> b
     engine.mse_types_supported(content_type)
 }
 
-/// EME §3.1.1.2 "Get Supported Capabilities for Audio/Video Type", for Clear Key.
+/// EME Ã‚Â§3.1.1.2 "Get Supported Capabilities for Audio/Video Type", for Clear Key.
 fn supported_capabilities(
     engine: &Engine,
     requested: &[MediaKeySystemMediaCapability],
@@ -161,7 +287,7 @@ fn supported_capabilities(
     }
 }
 
-/// EME §3.1.1.1 "Get Supported Configuration" (and its consent steps, which Clear Key does not
+/// EME Ã‚Â§3.1.1.1 "Get Supported Configuration" (and its consent steps, which Clear Key does not
 /// need), for Clear Key.
 fn supported_configuration(
     engine: &Engine,
@@ -220,7 +346,7 @@ fn supported_configuration(
     })
 }
 
-/// The key ids of Clear Key initialization data (EME §9.1.3 and the Initialization Data Format
+/// The key ids of Clear Key initialization data (EME Ã‚Â§9.1.3 and the Initialization Data Format
 /// Registry): `None` when it is not valid for the type.
 fn init_data_key_ids(init_data_type: &str, data: &[u8]) -> Option<Vec<Vec<u8>>> {
     match init_data_type {
@@ -246,7 +372,7 @@ fn init_data_key_ids(init_data_type: &str, data: &[u8]) -> Option<Vec<Vec<u8>>> 
     }
 }
 
-/// The Clear Key licence request (EME §9.1.3): `{"kids":[...],"type":"temporary"}`.
+/// The Clear Key licence request (EME Ã‚Â§9.1.3): `{"kids":[...],"type":"temporary"}`.
 fn license_request(kids: &[Vec<u8>]) -> Vec<u8> {
     let kids: Vec<String> = kids.iter().map(|k| URL_SAFE_NO_PAD.encode(k)).collect();
     serde_json::json!({ "kids": kids, "type": "temporary" })
@@ -254,7 +380,7 @@ fn license_request(kids: &[Vec<u8>]) -> Vec<u8> {
         .into_bytes()
 }
 
-/// The keys of a Clear Key licence (EME §9.1.4, a JSON Web Key Set of `oct` keys); `None` when
+/// The keys of a Clear Key licence (EME Ã‚Â§9.1.4, a JSON Web Key Set of `oct` keys); `None` when
 /// it is not one.
 fn license_keys(response: &[u8]) -> Option<Vec<(KeyId, [u8; 16])>> {
     let v: serde_json::Value = serde_json::from_slice(response).ok()?;
@@ -295,7 +421,7 @@ impl Engine {
         Ok(p)
     }
 
-    /// `navigator.requestMediaKeySystemAccess` (EME §3.1).
+    /// `navigator.requestMediaKeySystemAccess` (EME Ã‚Â§3.1).
     pub(crate) fn request_media_key_system_access(
         &self,
         cx: &mut Cx,
@@ -318,6 +444,10 @@ impl Engine {
             configurations
                 .iter()
                 .find_map(|c| supported_configuration(self, c))
+        } else if let Some(cdm) = self.cdm() {
+            configurations
+                .iter()
+                .find_map(|c| cdm_configuration(&*cdm, key_system, c))
         } else {
             None
         };
@@ -351,7 +481,7 @@ impl Engine {
         out
     }
 
-    /// EME §7.? "Initialization Data Encountered": `encrypted` at the element, with the
+    /// EME Ã‚Â§7.? "Initialization Data Encountered": `encrypted` at the element, with the
     /// initialization data (the media data came through the page, so it is same-origin).
     pub(crate) fn eme_init_data_encountered(&self, el: NodeId, init_data: Vec<u8>) {
         self.queue_task(TaskSource::DomManipulation, move |e, cx| {
@@ -373,13 +503,13 @@ impl Engine {
         });
     }
 
-    /// EME §7.? "Wait for Key": playback cannot go on without a key; `waitingforkey` at the
+    /// EME Ã‚Â§7.? "Wait for Key": playback cannot go on without a key; `waitingforkey` at the
     /// element.
     pub(crate) fn eme_wait_for_key(&self, el: NodeId) {
         self.media_fire(el, "waitingforkey");
     }
 
-    /// Keys were added to `media_keys`: media waiting for them goes on (EME §7.? "Attempt to
+    /// Keys were added to `media_keys`: media waiting for them goes on (EME Ã‚Â§7.? "Attempt to
     /// Resume Playback If Necessary").
     fn eme_keys_added(&self, media_keys: Handle) {
         if let Some(el) = self.ks(media_keys, |k| k.element) {
@@ -387,7 +517,7 @@ impl Engine {
         }
     }
 
-    /// EME §6.? "Update Key Statuses": the statuses replace the session's, and
+    /// EME Ã‚Â§6.? "Update Key Statuses": the statuses replace the session's, and
     /// `keystatuseschange` is queued.
     fn eme_update_statuses(
         &self,
@@ -409,7 +539,7 @@ impl Engine {
         });
     }
 
-    /// EME §6.? "Session Closed".
+    /// EME Ã‚Â§6.? "Session Closed".
     fn eme_session_closed(&self, cx: &mut Cx, session: Handle, reason: &'static str) {
         let (had, closed, mk) = self.sess(session, |s| {
             s.closing_or_closed = true;
@@ -421,6 +551,147 @@ impl Engine {
         }
         closed.resolve(cx, reason.to_string());
         let _ = mk;
+    }
+}
+
+impl Engine {
+    /// A new request id for a call to the embedder's module.
+    fn cdm_request(&self) -> u64 {
+        let mut m = self.media.borrow_mut();
+        m.cdm_requests += 1;
+        m.cdm_requests
+    }
+
+    /// Makes a call to the embedder's module, its answer awaited as `pending`; one with no module
+    /// any more is rejected now.
+    fn cdm_call(&self, pending: CdmPending, call: impl FnOnce(&dyn Cdm, u64)) {
+        let Some(cdm) = self.cdm() else {
+            return;
+        };
+        let request = self.cdm_request();
+        self.media.borrow_mut().cdm_pending.insert(request, pending);
+        call(&*cdm, request);
+        self.drain_cdm();
+    }
+
+    /// A module's event, in its task.
+    pub(crate) fn eme_cdm_event(&self, cx: &mut Cx, event: CdmEvent) {
+        let session_of = |id: u64| self.media.borrow().cdm_sessions.get(&id).copied();
+        match event {
+            CdmEvent::Done { request, result } => {
+                let pending = self.media.borrow_mut().cdm_pending.remove(&request);
+                let Some(pending) = pending else {
+                    return;
+                };
+                match (pending, result) {
+                    (CdmPending::Keys { promise, keys }, Ok(_)) => {
+                        let mk = self.alloc(Object::Media(Box::new(MediaObject::MediaKeys(
+                            Box::new(KeysData {
+                                sessions: Vec::new(),
+                                element: None,
+                                cdm: Some(keys),
+                            }),
+                        ))));
+                        promise.resolve(cx, mk);
+                    }
+                    (CdmPending::Keys { promise, keys }, Err(e)) => {
+                        if let Some(cdm) = self.cdm() {
+                            cdm.release(keys);
+                        }
+                        promise.reject(cx, cdm_error(e));
+                    }
+                    (CdmPending::Generate { promise, session }, Ok(id)) => {
+                        // EME Ã‚Â§6.6.2 step 10.10: the session id; the message came as its own event.
+                        self.sess(session, |s| {
+                            s.id = id;
+                            s.callable = true;
+                        });
+                        promise.resolve(cx, ());
+                    }
+                    (CdmPending::Close { promise, session }, Ok(_)) => {
+                        self.eme_session_closed(cx, session, "closed-by-application");
+                        promise.resolve(cx, ());
+                    }
+                    (
+                        CdmPending::Update { promise, .. } | CdmPending::Remove { promise, .. },
+                        Ok(_),
+                    ) => promise.resolve(cx, ()),
+                    (
+                        CdmPending::Generate { promise, .. }
+                        | CdmPending::Update { promise, .. }
+                        | CdmPending::Close { promise, .. }
+                        | CdmPending::Remove { promise, .. },
+                        Err(e),
+                    ) => promise.reject(cx, cdm_error(e)),
+                }
+            }
+            CdmEvent::Message {
+                session,
+                kind,
+                data,
+            } => {
+                let Some(session) = session_of(session) else {
+                    return;
+                };
+                let message_type = match kind {
+                    MessageKind::LicenseRequest => MediaKeyMessageType::LicenseRequest,
+                    MessageKind::LicenseRenewal => MediaKeyMessageType::LicenseRenewal,
+                    MessageKind::LicenseRelease => MediaKeyMessageType::LicenseRelease,
+                    MessageKind::IndividualizationRequest => {
+                        MediaKeyMessageType::IndividualizationRequest
+                    }
+                };
+                let message = crate::engine::blob::array_buffer(cx, data);
+                let ev = self.trusted_event(
+                    InterfaceId::MediaKeyMessageEvent,
+                    "message",
+                    false,
+                    false,
+                    EventExt::MediaKeyMessage {
+                        message_type,
+                        message: Some(crate::engine::held::Held::object(message)),
+                    },
+                );
+                self.dispatch(cx, ev, session, false);
+            }
+            CdmEvent::KeyStatuses { session, statuses } => {
+                let Some(session) = session_of(session) else {
+                    return;
+                };
+                let statuses = statuses
+                    .into_iter()
+                    .map(|(id, st)| {
+                        let st = match st {
+                            KeyStatus::Usable => MediaKeyStatus::Usable,
+                            KeyStatus::Expired => MediaKeyStatus::Expired,
+                            KeyStatus::Released => MediaKeyStatus::Released,
+                            KeyStatus::OutputRestricted => MediaKeyStatus::OutputRestricted,
+                            KeyStatus::OutputDownscaled => MediaKeyStatus::OutputDownscaled,
+                            KeyStatus::StatusPending => MediaKeyStatus::StatusPending,
+                            KeyStatus::InternalError => MediaKeyStatus::InternalError,
+                            KeyStatus::UsableInFuture => MediaKeyStatus::UsableInFuture,
+                        };
+                        (id, st)
+                    })
+                    .collect();
+                self.eme_update_statuses(cx, session, statuses);
+                let mk = self.sess(session, |s| s.media_keys);
+                self.eme_keys_added(mk);
+            }
+            CdmEvent::Expiration { session, time } => {
+                if let Some(session) = session_of(session) {
+                    self.sess(session, |s| s.expiration = time);
+                }
+            }
+            CdmEvent::Closed { session } => {
+                // (a session the page is closing closes when its `close()` is answered)
+                if let Some(session) = session_of(session) {
+                    if !self.sess(session, |s| s.closing_or_closed) {
+                        self.eme_session_closed(cx, session, "internal-error");
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -441,7 +712,7 @@ impl MediaKeySystemAccessImpl for Engine {
             _ => unreachable!(),
         }))
     }
-    fn create_media_keys(&self, cx: &mut Cx, _this: Handle) -> rt::Result<JsPromise> {
+    fn create_media_keys(&self, cx: &mut Cx, this: Handle) -> rt::Result<JsPromise> {
         // A CDM's state is kept per origin: an opaque origin (a sandboxed frame) has none to
         // keep it under.
         let doc = self.current_document(cx)?;
@@ -452,12 +723,36 @@ impl MediaKeySystemAccessImpl for Engine {
             );
         }
         let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
+        let key_system = self.mo(this, |o| match o {
+            MediaObject::KeySystemAccess { key_system, .. } => key_system.clone(),
+            _ => String::new(),
+        });
+        if key_system != CLEAR_KEY {
+            // The embedder's module: an instance for the document's origin, made in parallel.
+            let Some(cdm) = self.cdm() else {
+                p.reject(cx, not_supported("The key system is not available"));
+                return Ok(p);
+            };
+            let origin = self.net_origin_of_document(doc).ascii_serialization();
+            let request = self.cdm_request();
+            let keys = cdm.create_keys(request, &key_system, &origin, &self.cdm_inbox());
+            self.media.borrow_mut().cdm_pending.insert(
+                request,
+                CdmPending::Keys {
+                    promise: p.clone(),
+                    keys,
+                },
+            );
+            self.drain_cdm();
+            return Ok(p);
+        }
         let resolve = p.clone();
         self.queue_task(TaskSource::DomManipulation, move |e, cx| {
             let mk = e.alloc(Object::Media(Box::new(MediaObject::MediaKeys(Box::new(
                 KeysData {
                     sessions: Vec::new(),
                     element: None,
+                    cdm: None,
                 },
             )))));
             resolve.resolve(cx, mk);
@@ -473,10 +768,17 @@ impl MediaKeysImpl for Engine {
         this: Handle,
         session_type: MediaKeySessionType,
     ) -> rt::Result<Handle> {
-        // 1-2. Clear Key: temporary sessions only.
+        // 1-2. Clear Key and the embedder's modules: temporary sessions only.
         if session_type != MediaKeySessionType::Temporary {
             return Err(not_supported("The session type is not supported"));
         }
+        let cdm = match self.ks(this, |k| k.cdm) {
+            Some(keys) => match self.cdm() {
+                Some(cdm) => Some(cdm.create_session(keys)),
+                None => return Err(invalid("The key system is gone")),
+            },
+            None => None,
+        };
         let closed = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
         // (the map refers to the session: made first, then pointed at it)
         let map = self.alloc(Object::Media(Box::new(MediaObject::KeyStatusMap {
@@ -493,8 +795,13 @@ impl MediaKeysImpl for Engine {
                 status_map: map,
                 keys: Vec::new(),
                 statuses: Vec::new(),
+                cdm,
+                expiration: f64::NAN,
             },
         )))));
+        if let Some(id) = cdm {
+            self.media.borrow_mut().cdm_sessions.insert(id, session);
+        }
         self.mo_mut(map, |o| {
             if let MediaObject::KeyStatusMap { session: s } = o {
                 *s = session;
@@ -551,8 +858,8 @@ impl MediaKeySessionImpl for Engine {
     fn session_id(&self, this: Handle) -> DomStr<'_> {
         DomStr::Owned(self.sess(this, |s| s.id.clone()))
     }
-    fn expiration(&self, _this: Handle) -> f64 {
-        f64::NAN
+    fn expiration(&self, this: Handle) -> f64 {
+        self.sess(this, |s| s.expiration)
     }
     fn closed(&self, _cx: &mut Cx, this: Handle) -> rt::Result<JsPromise> {
         Ok(self.sess(this, |s| s.closed.clone()))
@@ -560,7 +867,7 @@ impl MediaKeySessionImpl for Engine {
     fn key_statuses(&self, this: Handle) -> Handle {
         self.sess(this, |s| s.status_map)
     }
-    /// EME §6.6.2.
+    /// EME Ã‚Â§6.6.2.
     fn generate_request(
         &self,
         cx: &mut Cx,
@@ -591,6 +898,21 @@ impl MediaKeySessionImpl for Engine {
             return self.eme_rejected(cx, not_supported("The initDataType is not supported"));
         }
         let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
+        if let Some(id) = self.sess(this, |s| s.cdm) {
+            // 10. The embedder's module: it sanitizes the data and makes the request.
+            if init_data_type != "cenc" || data.len() > MAX_DATA {
+                p.reject(cx, not_supported("The initData is not supported"));
+                return Ok(p);
+            }
+            self.cdm_call(
+                CdmPending::Generate {
+                    promise: p.clone(),
+                    session: this,
+                },
+                |cdm, request| cdm.generate_request(request, id, init_data_type, data),
+            );
+            return Ok(p);
+        }
         // 10. (in parallel) Sanitized initialization data.
         let kids = if data.len() > MAX_DATA {
             None
@@ -652,7 +974,7 @@ impl MediaKeySessionImpl for Engine {
         // (temporary sessions are not persistent)
         self.eme_rejected(cx, rt::Error::Type("The session is not persistent".into()))
     }
-    /// EME §6.6.4.
+    /// EME Ã‚Â§6.6.4.
     fn update(&self, cx: &mut Cx, this: Handle, response: BufferSource) -> rt::Result<JsPromise> {
         let data = buffer_source_bytes(cx, &response);
         let (closing, callable) = self.sess(this, |s| (s.closing_or_closed, s.callable));
@@ -666,6 +988,12 @@ impl MediaKeySessionImpl for Engine {
             return self.eme_rejected(cx, rt::Error::Type("The response is empty".into()));
         }
         let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
+        if let Some(id) = self.sess(this, |s| s.cdm) {
+            self.cdm_call(CdmPending::Update { promise: p.clone() }, |cdm, request| {
+                cdm.update(request, id, data)
+            });
+            return Ok(p);
+        }
         let keys = if data.len() > MAX_DATA {
             None
         } else {
@@ -704,7 +1032,7 @@ impl MediaKeySessionImpl for Engine {
         });
         Ok(p)
     }
-    /// EME §6.6.5.
+    /// EME Ã‚Â§6.6.5.
     fn close(&self, cx: &mut Cx, this: Handle) -> rt::Result<JsPromise> {
         let (closing, callable) = self.sess(this, |s| (s.closing_or_closed, s.callable));
         let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
@@ -717,6 +1045,16 @@ impl MediaKeySessionImpl for Engine {
             return Ok(p);
         }
         self.sess(this, |s| s.closing_or_closed = true);
+        if let Some(id) = self.sess(this, |s| s.cdm) {
+            self.cdm_call(
+                CdmPending::Close {
+                    promise: p.clone(),
+                    session: this,
+                },
+                |cdm, request| cdm.close(request, id),
+            );
+            return Ok(p);
+        }
         let resolve = p.clone();
         self.queue_task(TaskSource::DomManipulation, move |e, cx| {
             e.eme_session_closed(cx, this, "closed-by-application");
@@ -724,7 +1062,7 @@ impl MediaKeySessionImpl for Engine {
         });
         Ok(p)
     }
-    /// EME §6.6.6: a temporary session's keys are released.
+    /// EME Ã‚Â§6.6.6: a temporary session's keys are released.
     fn remove(&self, cx: &mut Cx, this: Handle) -> rt::Result<JsPromise> {
         let (closing, callable) = self.sess(this, |s| (s.closing_or_closed, s.callable));
         if closing {
@@ -734,6 +1072,12 @@ impl MediaKeySessionImpl for Engine {
             return self.eme_rejected(cx, invalid("The session has no request yet"));
         }
         let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
+        if let Some(id) = self.sess(this, |s| s.cdm) {
+            self.cdm_call(CdmPending::Remove { promise: p.clone() }, |cdm, request| {
+                cdm.remove(request, id)
+            });
+            return Ok(p);
+        }
         let resolve = p.clone();
         self.queue_task(TaskSource::DomManipulation, move |e, cx| {
             let statuses = e.sess(this, |s| {
@@ -880,7 +1224,7 @@ impl Engine {
         self.media_el(el, |m| m.media_keys)
     }
 
-    /// `HTMLMediaElement.setMediaKeys` (EME §7.?).
+    /// `HTMLMediaElement.setMediaKeys` (EME Ã‚Â§7.?).
     pub(crate) fn media_set_media_keys(
         &self,
         cx: &mut Cx,
