@@ -43,7 +43,7 @@ use std::rc::Rc;
 
 use rustc_hash::FxHashMap;
 use snowlark_bindings::rt::{self, Cx, Handle, Keep};
-use snowlark_dom::NodeId;
+use snowlark_dom::{Dom, NodeId};
 
 use super::cssom::Decl;
 use super::events::{EventData, EventExt};
@@ -1807,29 +1807,44 @@ impl Engine {
     /// A new wrapper for `h`: the wrapper that must stay strong until the next pass groups the new
     /// one with it (a detached node's opaque root, an owned object's owner).
     fn gc_on_wrap(&self, h: Handle) -> Option<Handle> {
-        let dom = self.dom.try_borrow().ok()?;
-        match handle_node(h) {
-            Some(n) => {
+        let Some(n) = handle_node(h) else {
+            let objects = self.objects.try_borrow().ok()?;
+            return match class(objects.get(h.get() as usize - 1)?) {
+                Class::Owned(owner) => Some(node_handle(owner)),
+                _ => None,
+            };
+        };
+        // (one borrow, which also sets the mark a moved subtree's summary reads: its descendants'
+        // wrappers are touched only when one of them has the mark)
+        match self.dom.try_borrow_mut() {
+            Ok(mut dom) => {
                 if !dom.is_alive(n) {
                     return None;
                 }
-                if dom.is_connected(n) {
-                    let doc = dom.node_document(n);
-                    if self.context_of_document(doc).is_some() {
-                        return None;
-                    }
-                }
-                let root = dom.opaque_root(n);
-                (root != n).then(|| node_handle(root))
+                dom.set_wrapped(n);
+                self.gc_wrap_anchor(&dom, n)
             }
-            None => {
-                let objects = self.objects.try_borrow().ok()?;
-                match class(objects.get(h.get() as usize - 1)?) {
-                    Class::Owned(owner) => Some(node_handle(owner)),
-                    _ => None,
+            Err(_) => {
+                self.wrap_marks_lost.set(true);
+                let dom = self.dom.try_borrow().ok()?;
+                if !dom.is_alive(n) {
+                    return None;
                 }
+                self.gc_wrap_anchor(&dom, n)
             }
         }
+    }
+
+    /// [`Engine::gc_on_wrap`] for a live node `n`.
+    fn gc_wrap_anchor(&self, dom: &Dom, n: NodeId) -> Option<Handle> {
+        if dom.is_connected(n) {
+            let doc = dom.node_document(n);
+            if self.context_of_document(doc).is_some() {
+                return None;
+            }
+        }
+        let root = dom.opaque_root(n);
+        (root != n).then(|| node_handle(root))
     }
 
     /// A node with a wrapper moved into or out of a tree: its wrapper (and its new group's anchor)
@@ -1861,6 +1876,34 @@ impl Engine {
                 "a parsed node inserted by fragment parsing has a wrapper"
             );
         }
+    }
+
+    /// Panics where one of `nodes` has a wrapper but not the mark [`Engine::gc_subtree_wrapped`]
+    /// relies on (the descendants of a moved node whose summary has no wrapped one).
+    #[cfg(debug_assertions)]
+    pub(crate) fn assert_wrappers_marked(
+        &self,
+        cx: &mut Cx,
+        nodes: impl IntoIterator<Item = NodeId>,
+    ) {
+        for n in nodes {
+            if rt::wrapper_state(cx.scope(), node_handle(n)) != rt::WrapperState::None
+                && !self.dom().is_wrapped(n)
+                && !self.wrap_marks_lost.get()
+            {
+                panic!("a node with a wrapper has no wrapped mark: {n:?}");
+            }
+        }
+    }
+
+    /// Whether the descendants of a moved node, whose summary is `held`
+    /// ([`snowlark_dom::subtree`]), may have wrappers to touch. The summary is what the move's walk
+    /// saw: a wrapper made since (script can run while the move's reactions wait, as for a
+    /// document `createHTMLDocument` builds) needs no touch, since every pass after it was made
+    /// saw the tree as the move left it.
+    #[inline]
+    pub(crate) fn gc_subtree_wrapped(&self, held: u8) -> bool {
+        held & snowlark_dom::subtree::WRAPPED != 0 || self.wrap_marks_lost.get()
     }
 
     /// The wrappers of `root`'s shadow-including descendants moved with it (see

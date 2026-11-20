@@ -64,11 +64,13 @@ pub enum Reaction {
     /// shadow-including tree order; `connected` is the node's connectedness after insertion (the
     /// "post-connection steps" and connectedCallback apply when it is true). `root` is true for the
     /// node inserted into a parent (each child of an inserted fragment) and false for its
-    /// descendants, which a [`ReactionFilter`] can leave out.
+    /// descendants, which a [`ReactionFilter`] can leave out. `subtree`, for a root, is what its
+    /// shadow-including descendants (not itself) hold, as [`subtree`] bits; 0 for a descendant.
     Inserted {
         node: NodeId,
         connected: bool,
         root: bool,
+        subtree: u8,
     },
     /// "Removing steps": `old_parent` is set for the removed node itself and null for its descendants,
     /// as are its old siblings (what live ranges and NodeIterators adjust by, DOM §4.2.3 "remove" steps
@@ -76,7 +78,8 @@ pub enum Reaction {
     /// removed node itself, is its shadow-including descendants at its removal, in tree order, as a
     /// range of the list [`Dom::take_removed_descendants`] returns with the batch (empty for the
     /// descendants' own reactions): the walk that disconnects them collects them, so a layer that
-    /// visits each of them does not walk the subtree again.
+    /// visits each of them does not walk the subtree again. `subtree`, for the removed node itself,
+    /// is what those descendants hold, as [`subtree`] bits; 0 for a descendant.
     Removed {
         node: NodeId,
         old_parent: Option<NodeId>,
@@ -84,6 +87,7 @@ pub enum Reaction {
         old_next: Option<NodeId>,
         was_connected: bool,
         descendants: (u32, u32),
+        subtree: u8,
     },
     /// "Children changed steps" for `parent`.
     ChildrenChanged { parent: NodeId },
@@ -124,14 +128,28 @@ pub enum Reaction {
     },
 }
 
+/// What a node is to the walk of an inserted or removed subtree ([`ReactionFilter::descendant`]),
+/// and what the subtree holds (the `subtree` of [`Reaction::Inserted`] and [`Reaction::Removed`]:
+/// the OR of its descendants' bits but [`REPORT`]).
+pub mod subtree {
+    /// The descendant gets a reaction of its own (never in a summary).
+    pub const REPORT: u8 = 1;
+    /// The bits a [`super::ReactionFilter`] gives meaning to (all of them without a filter).
+    pub const LAYER: u8 = 0x7E;
+    /// A descendant was marked with [`crate::Dom::set_wrapped`].
+    pub const WRAPPED: u8 = 0x80;
+}
+
 /// Which nodes the layer above wants per-node reactions for, besides the nodes a mutation is about
 /// ([`Dom::set_reaction_filter`]). Without a filter every node gets its reactions.
 #[derive(Clone, Copy, Debug)]
 pub struct ReactionFilter {
-    /// Whether a descendant element of an inserted, removed or adopted node gets an `Inserted`,
-    /// `Removed` or `Adopted` reaction of its own. Descendants that are not elements get none: the
-    /// layer above walks the subtree of the reported node for what it needs of them.
-    pub descendant: fn(&ElementData) -> bool,
+    /// [`subtree`] bits for a descendant element of an inserted, removed or adopted node:
+    /// [`subtree::REPORT`] when it gets an `Inserted`, `Removed` or `Adopted` reaction of its own,
+    /// and any of the layer's own bits ([`subtree::LAYER`]), which the walk ORs into the `subtree`
+    /// summary of the inserted or removed node's reaction. Descendants that are not elements get no
+    /// reaction: the layer above walks the subtree of the reported node for what it needs of them.
+    pub descendant: fn(&ElementData) -> u8,
     /// Whether an attribute that the parser or cloning gives a new element, before anything can
     /// observe it, gets an `AttributeChanged` reaction.
     pub new_attribute: fn(&ElementData, &Attr) -> bool,
@@ -147,13 +165,40 @@ impl Dom {
     /// Whether `id`, a descendant of the node a tree mutation is about, gets its own reaction.
     #[inline]
     pub(crate) fn reports_descendant(&self, id: NodeId) -> bool {
-        match self.reaction_filter {
-            None => true,
-            Some(f) => match &self.n(id).data {
-                crate::node::NodeData::Element(e) => (f.descendant)(e),
-                _ => false,
-            },
-        }
+        self.descendant_bits(id) & subtree::REPORT != 0
+    }
+
+    /// The [`subtree`] bits of `id`, a descendant of the node a tree mutation is about: whether it
+    /// gets its own reaction, the reaction filter's bits for it, and [`subtree::WRAPPED`].
+    #[inline]
+    pub(crate) fn descendant_bits(&self, id: NodeId) -> u8 {
+        let n = self.n(id);
+        let wrapped = if n.flags & flags::WRAPPED != 0 {
+            subtree::WRAPPED
+        } else {
+            0
+        };
+        wrapped
+            | match self.reaction_filter {
+                None => subtree::REPORT | subtree::LAYER,
+                Some(f) => match &n.data {
+                    crate::node::NodeData::Element(e) => (f.descendant)(e),
+                    _ => 0,
+                },
+            }
+    }
+
+    /// Marks `node` as having (had) a script wrapper, for [`subtree::WRAPPED`]. The mark stays for
+    /// the node's lifetime.
+    #[inline]
+    pub fn set_wrapped(&mut self, node: NodeId) {
+        self.n_mut(node).flags |= flags::WRAPPED;
+    }
+
+    /// Whether [`Dom::set_wrapped`] marked `node`.
+    #[inline]
+    pub fn is_wrapped(&self, node: NodeId) -> bool {
+        self.n(node).flags & flags::WRAPPED != 0
     }
 
     /// Marks `node` as having (or no longer having) registered MutationObservers.

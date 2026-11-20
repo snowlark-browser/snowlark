@@ -2742,6 +2742,7 @@ impl StyleEngine {
                 node,
                 connected: true,
                 root: true,
+                ..
             } if !dom.parent(*node).is_some_and(|p| inserted.contains(&p)) => Some(*node),
             _ => None,
         };
@@ -2781,6 +2782,7 @@ impl StyleEngine {
                     node,
                     connected,
                     root,
+                    ..
                 } => {
                     // Preparing the inserted node covers its descendants (whose reactions, if any,
                     // need nothing), and a node inserted into one inserted earlier in the batch;

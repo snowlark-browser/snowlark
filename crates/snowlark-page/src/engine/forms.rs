@@ -16,7 +16,7 @@ use snowlark_bindings::generated::{
 };
 use snowlark_bindings::rt::{self, Cx, DomStr, ExceptionName, Handle, JsObject};
 use snowlark_bindings::InterfaceId;
-use snowlark_dom::{local_name, ns, Dom, LocalName, NodeId};
+use snowlark_dom::{local_name, ns, Dom, ElementData, LocalName, NodeId};
 use snowlark_style::ElementState;
 
 use super::collections::{form_owner, Filter};
@@ -108,9 +108,26 @@ pub(crate) enum FormSync {
 /// Elements with a state of [`Engine::sync_form_states`]: the listed elements, options and
 /// optgroups, and forms.
 fn has_form_state(dom: &Dom, id: NodeId) -> bool {
-    let Some(e) = dom.element(id) else {
-        return false;
-    };
+    dom.element(id).is_some_and(element_has_form_state)
+}
+
+/// The [`snowlark_dom::subtree`] bit of the engine's reaction filter for a subtree that holds an
+/// element that has (or, an undefined custom element, may come to have) a form state: without it,
+/// an inserted or removed subtree's descendants are not searched for them.
+pub(crate) const SUBTREE_FORM_STATE: u8 = 2;
+
+/// [`SUBTREE_FORM_STATE`] for `e` (the reaction filter's one match gives it with its other bits).
+#[cfg(test)]
+pub(crate) fn form_state_bit(e: &ElementData) -> u8 {
+    if element_has_form_state(e) || e.custom_state() == snowlark_dom::CustomElementState::Undefined
+    {
+        SUBTREE_FORM_STATE
+    } else {
+        0
+    }
+}
+
+fn element_has_form_state(e: &ElementData) -> bool {
     e.name().ns == ns!(html)
         && (matches!(
             e.name().local,
@@ -124,7 +141,7 @@ fn has_form_state(dom: &Dom, id: NodeId) -> bool {
                 | local_name!("option")
                 | local_name!("optgroup")
                 | local_name!("form")
-        ) || dom.element_flags(id) & snowlark_dom::element_flags::FORM_ASSOCIATED_CUSTOM != 0)
+        ) || e.flags() & snowlark_dom::element_flags::FORM_ASSOCIATED_CUSTOM != 0)
 }
 
 /// The select an option or optgroup is in (its parent, or its optgroup parent's).

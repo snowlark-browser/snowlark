@@ -50,7 +50,7 @@ pub use node::{
     SlotAssignmentMode, INLINE_ATTRS,
 };
 pub use parser::{AdjacentPosition, DomSink, HtmlParser, ParseOptions, ParseStep};
-pub use records::{MutationKind, MutationRecord, Reaction, ReactionFilter};
+pub use records::{subtree, MutationKind, MutationRecord, Reaction, ReactionFilter};
 pub use serialize::SerializeOptions;
 pub use shadow::ShadowRootInit;
 pub use tree::{position, Ancestors, Children, ChildrenRev, Descendants, Preceding};

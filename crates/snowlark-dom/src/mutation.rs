@@ -14,7 +14,7 @@ use smallvec::SmallVec;
 use crate::dom::Dom;
 use crate::error::{DomError, DomResult};
 use crate::node::{NodeData, NodeId, NodeType};
-use crate::records::Reaction;
+use crate::records::{subtree, Reaction};
 
 /// An argument of `ParentNode.append()` and friends: `(Node or DOMString)`.
 #[derive(Clone, Debug)]
@@ -113,24 +113,47 @@ impl Dom {
     }
 
     /// Sets the CONNECTED flag on `root`'s shadow-including inclusive descendants and raises insertion
-    /// reactions for them.
+    /// reactions for them; the root's carries what its descendants hold.
     fn after_insert_walk(&mut self, root: NodeId, connected: bool) {
         if !connected && !self.reactions_enabled {
             return;
         }
-        let mut cur = Some(root);
+        // (the root's reaction, if queued, is the first the walk queues)
+        let root_reaction = self.reactions.len();
+        let mut summary = 0;
+        if connected {
+            self.set_connected(root, true);
+        }
+        self.react(|| Reaction::Inserted {
+            node: root,
+            connected,
+            root: true,
+            subtree: 0,
+        });
+        let mut cur = self.next_in_shadow_including_order(root, root);
         while let Some(id) = cur {
             if connected {
                 self.set_connected(id, true);
             }
-            if id == root || self.reports_descendant(id) {
+            let bits = self.descendant_bits(id);
+            summary |= bits;
+            if bits & subtree::REPORT != 0 {
                 self.react(|| Reaction::Inserted {
                     node: id,
                     connected,
-                    root: id == root,
+                    root: false,
+                    subtree: 0,
                 });
             }
             cur = self.next_in_shadow_including_order(id, root);
+        }
+        if let Some(Reaction::Inserted {
+            node, subtree: own, ..
+        }) = self.reactions.get_mut(root_reaction)
+        {
+            if *node == root {
+                *own = summary & !subtree::REPORT;
+            }
         }
     }
 
@@ -149,41 +172,50 @@ impl Dom {
         let root_reaction = self.reactions.len();
         let collect = self.reactions_enabled;
         let start = self.removed_descendants.len() as u32;
-        let mut cur = Some(root);
+        let mut summary = 0;
+        self.set_connected(root, false);
+        self.react(|| Reaction::Removed {
+            node: root,
+            old_parent: Some(old_parent),
+            old_previous: old_siblings.0,
+            old_next: old_siblings.1,
+            was_connected,
+            descendants: (start, start),
+            subtree: 0,
+        });
+        let mut cur = self.next_in_shadow_including_order(root, root);
         while let Some(id) = cur {
             self.set_connected(id, false);
-            if collect && id != root {
+            if collect {
                 self.removed_descendants.push(id);
             }
-            if id == root || self.reports_descendant(id) {
-                let parent = (id == root).then_some(old_parent);
-                let (old_previous, old_next) = if id == root {
-                    old_siblings
-                } else {
-                    (None, None)
-                };
+            let bits = self.descendant_bits(id);
+            summary |= bits;
+            if bits & subtree::REPORT != 0 {
                 self.react(|| Reaction::Removed {
                     node: id,
-                    old_parent: parent,
-                    old_previous,
-                    old_next,
+                    old_parent: None,
+                    old_previous: None,
+                    old_next: None,
                     was_connected,
                     descendants: (start, start),
+                    subtree: 0,
                 });
             }
             cur = self.next_in_shadow_including_order(id, root);
         }
         let end = self.removed_descendants.len() as u32;
-        let own = self.reactions.get_mut(root_reaction..).and_then(|queued| {
-            queued.iter_mut().find_map(|r| match r {
-                Reaction::Removed {
-                    node, descendants, ..
-                } if *node == root => Some(descendants),
-                _ => None,
-            })
-        });
-        if let Some(descendants) = own {
-            *descendants = (start, end);
+        if let Some(Reaction::Removed {
+            node,
+            descendants,
+            subtree: own,
+            ..
+        }) = self.reactions.get_mut(root_reaction)
+        {
+            if *node == root {
+                *descendants = (start, end);
+                *own = summary & !subtree::REPORT;
+            }
         }
     }
 

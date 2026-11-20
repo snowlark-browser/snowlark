@@ -589,6 +589,9 @@ pub struct Engine {
     pub(crate) selector_lists_parsed: Cell<u64>,
     /// Wrapper lifetime and freeing bookkeeping.
     pub(crate) gc: RefCell<gc::GcState>,
+    /// A node got a wrapper while the DOM was borrowed, so its [`Dom::set_wrapped`] mark is missing:
+    /// moved subtrees' wrappers are touched whatever their summary says.
+    pub(crate) wrap_marks_lost: Cell<bool>,
     /// Profiling (`SNOWLARK_PROFILE=1`): binding counters, forced layouts, rendering statistics.
     pub profile: Option<crate::profile::PageProfile>,
     /// The `performance.mark` calls the native sampler tags its samples with: the profile's under
@@ -733,6 +736,7 @@ impl Engine {
             selector_cache: RefCell::default(),
             selector_lists_parsed: Cell::new(0),
             gc: RefCell::new(gc::GcState::default()),
+            wrap_marks_lost: Cell::new(false),
             sample_marks: match &profile {
                 Some(p) => Some(p.marks.clone()),
                 None => crate::profile::native_only().then(Default::default),

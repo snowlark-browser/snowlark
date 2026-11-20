@@ -2861,6 +2861,7 @@ impl Renderer {
                     node,
                     connected: true,
                     root,
+                    ..
                 } => {
                     // A new `link` (inserted descendants have reactions of their own, see
                     // `wants_descendant_reaction`), a new base URL, or, before the first rendering,
@@ -2957,6 +2958,7 @@ impl Renderer {
                     node,
                     connected,
                     root,
+                    ..
                 } => {
                     if *connected && dom.is_style_element(*node) {
                         style_blocks.push(*node);

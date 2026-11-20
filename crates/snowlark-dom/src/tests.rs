@@ -1254,6 +1254,7 @@ fn reactions_report_hook_points() {
         node: p,
         connected: true,
         root: true,
+        subtree: 0,
     }));
     assert!(r.iter().any(|x| matches!(x, Reaction::Removed {
         node,
@@ -1794,6 +1795,8 @@ fn inner_html_reports_its_nodes_once_where_they_land() {
                 node: n,
                 connected: true,
                 root: n == ul,
+                // (without a filter: every layer bit for a root with element descendants)
+                subtree: if n == ul { subtree::LAYER } else { 0 },
             }]
         );
         assert!(!r
@@ -1861,8 +1864,12 @@ fn tokenizer_tag_scan_matches_state_machine() {
 /// when the filter takes them. Connectedness is kept for every node all the same.
 #[test]
 fn reaction_filter_limits_descendant_and_new_attribute_reactions() {
-    fn descendant(e: &ElementData) -> bool {
-        &*e.name().local == "script"
+    fn descendant(e: &ElementData) -> u8 {
+        match &*e.name().local {
+            "script" => subtree::REPORT,
+            "li" => 2,
+            _ => 0,
+        }
     }
     fn new_attribute(_: &ElementData, a: &Attr) -> bool {
         a.local_name().starts_with("on")
@@ -1893,6 +1900,20 @@ fn reaction_filter_limits_descendant_and_new_attribute_reactions() {
         })
         .collect();
     assert_eq!(inserted, [(ul, true), (script, false), (p, true)]);
+    // The roots' reactions carry what their descendants hold: the filter's bits, not REPORT.
+    let summaries: Vec<(NodeId, u8)> = r
+        .iter()
+        .filter_map(|x| match x {
+            Reaction::Inserted {
+                node,
+                root: true,
+                subtree,
+                ..
+            } => Some((*node, *subtree)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(summaries, [(ul, 2), (p, 0)]);
     let attrs: Vec<&str> = r
         .iter()
         .filter_map(|x| match x {
@@ -1902,16 +1923,24 @@ fn reaction_filter_limits_descendant_and_new_attribute_reactions() {
         .collect();
     assert_eq!(attrs, ["onclick"]);
     assert!(dom.is_connected(li) && dom.is_connected(dom.first_child(li).unwrap()));
+    // A wrapped descendant (of any type) shows in the summary; the root's own mark does not.
+    dom.set_wrapped(ul);
+    dom.set_wrapped(dom.first_child(li).unwrap());
     dom.remove_node(ul);
-    let removed: Vec<NodeId> = dom
-        .take_reactions()
+    let r = dom.take_reactions();
+    let removed: Vec<(NodeId, u8)> = r
         .iter()
         .filter_map(|x| match x {
-            Reaction::Removed { node, .. } => Some(*node),
+            Reaction::Removed { node, subtree, .. } => Some((*node, *subtree)),
             _ => None,
         })
         .collect();
-    assert_eq!(removed, [ul, script]);
+    assert_eq!(removed, [(ul, 2 | subtree::WRAPPED), (script, 0)]);
+    dom.remove_node(p);
+    assert!(dom
+        .take_reactions()
+        .iter()
+        .any(|x| matches!(x, Reaction::Removed { node, subtree: 0, .. } if *node == p)));
     assert!(!dom.is_connected(li));
     // Without a filter, every node is reported again.
     dom.set_reaction_filter(None);

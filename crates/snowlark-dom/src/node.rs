@@ -422,6 +422,11 @@ impl ElementData {
     pub fn custom_state(&self) -> CustomElementState {
         self.custom_state
     }
+    /// The [`element_flags`] bits.
+    #[inline]
+    pub fn flags(&self) -> u8 {
+        self.flags
+    }
 }
 
 /// Data of a Document node (DOM §4.5).
@@ -543,6 +548,8 @@ pub(crate) mod flags {
     pub const OBSERVED: u8 = 2;
     /// A transient registered observer is on this node (DOM §4.3.1).
     pub const TRANSIENT_OBSERVED: u8 = 4;
+    /// The layer above made a script wrapper for this node ([`crate::Dom::set_wrapped`]).
+    pub const WRAPPED: u8 = 8;
 }
 
 /// One arena slot.

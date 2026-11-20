@@ -8,7 +8,8 @@
 
 use snowlark_bindings::rt::{self, Cx};
 use snowlark_dom::{
-    local_name, ns, Attr, CustomElementState, Dom, ElementData, NodeId, Reaction, ReactionFilter,
+    local_name, ns, subtree, Attr, CustomElementState, Dom, ElementData, NodeId, Reaction,
+    ReactionFilter,
 };
 
 use super::custom::CbArg;
@@ -53,34 +54,72 @@ fn microtask_callback(
 /// matters (wrappers, the focused element, slots, live ranges) the engine finds from the reported
 /// node.
 pub(crate) const REACTION_FILTER: ReactionFilter = ReactionFilter {
-    descendant: wants_descendant_reaction,
+    descendant: descendant_bits,
     new_attribute: wants_new_attribute_reaction,
 };
 
-fn wants_descendant_reaction(e: &ElementData) -> bool {
-    matches!(
-        e.custom_state(),
-        CustomElementState::Undefined | CustomElementState::Custom
-    ) || (e.name().ns == ns!(html)
-        && matches!(
-            e.name().local,
+/// The [`REACTION_FILTER`]'s answer for a descendant element: [`subtree::REPORT`] for the elements
+/// with insertion, removing or adopting steps of their own (custom elements, scripts, frames,
+/// `link`, media, and the renderer's: see `snowlark_render::renderer::wants_descendant_reaction`),
+/// and [`super::forms::SUBTREE_FORM_STATE`] for those with a form state (or, an undefined custom
+/// element, that may come to have one). One match on the name: it runs for every element of every
+/// inserted and removed subtree.
+fn descendant_bits(e: &ElementData) -> u8 {
+    use super::forms::SUBTREE_FORM_STATE as FORM;
+    const REPORT: u8 = subtree::REPORT;
+    let face = if e.flags() & snowlark_dom::element_flags::FORM_ASSOCIATED_CUSTOM != 0 {
+        FORM
+    } else {
+        0
+    };
+    match e.custom_state() {
+        CustomElementState::Undefined => return REPORT | FORM,
+        CustomElementState::Custom => return REPORT | face,
+        _ => {}
+    }
+    let name = e.name();
+    let own = if name.ns == ns!(html) {
+        match name.local {
             local_name!("script")
-                | local_name!("iframe")
-                | local_name!("frame")
-                | local_name!("object")
-                | local_name!("embed")
-                | local_name!("link")
-                | local_name!("video")
-                | local_name!("audio")
-                | local_name!("source")
-                | local_name!("track")
-                | local_name!("img")
-                | local_name!("canvas")
-                | local_name!("details")
-        ))
-        || super::svg::smil::is_animation_element(e)
-        || (e.name().ns == ns!(svg) && matches!(&*e.name().local, "script" | "image" | "use"))
-        || snowlark_render::renderer::wants_descendant_reaction(e)
+            | local_name!("iframe")
+            | local_name!("frame")
+            | local_name!("embed")
+            | local_name!("link")
+            | local_name!("style")
+            | local_name!("video")
+            | local_name!("audio")
+            | local_name!("source")
+            | local_name!("track")
+            | local_name!("img")
+            | local_name!("canvas")
+            | local_name!("details") => REPORT,
+            local_name!("object") => REPORT | FORM,
+            local_name!("button")
+            | local_name!("fieldset")
+            | local_name!("input")
+            | local_name!("output")
+            | local_name!("select")
+            | local_name!("textarea")
+            | local_name!("option")
+            | local_name!("optgroup")
+            | local_name!("form") => FORM,
+            _ => 0,
+        }
+    } else if name.ns == ns!(svg)
+        && (super::svg::smil::is_animation_element(e)
+            || matches!(&*name.local, "script" | "image" | "use" | "style"))
+    {
+        REPORT
+    } else {
+        0
+    };
+    own | face
+}
+
+/// Whether a descendant element gets an `Inserted`, `Removed` or `Adopted` reaction of its own.
+#[cfg(test)]
+fn wants_descendant_reaction(e: &ElementData) -> bool {
+    descendant_bits(e) & subtree::REPORT != 0
 }
 
 fn wants_new_attribute_reaction(e: &ElementData, a: &Attr) -> bool {
@@ -305,6 +344,7 @@ impl Engine {
                 node,
                 connected,
                 root,
+                subtree: held,
             } => {
                 if !self.dom().is_alive(node) {
                     return;
@@ -317,7 +357,16 @@ impl Engine {
                         self.assert_unwrapped(cx, node);
                     } else {
                         self.gc_node_moved(cx, node, false);
-                        self.gc_touch_descendants(cx, node);
+                        if self.gc_subtree_wrapped(held) {
+                            self.gc_touch_descendants(cx, node);
+                        } else {
+                            #[cfg(debug_assertions)]
+                            {
+                                let d: Vec<NodeId> =
+                                    self.dom().shadow_including_descendants(node).collect();
+                                self.assert_wrappers_marked(cx, d);
+                            }
+                        }
                     }
                     // Live ranges move for the nodes inserted into a parent (not one inserted
                     // earlier in this batch), not for their descendants.
@@ -338,9 +387,11 @@ impl Engine {
                 // an `Element`; the others skip them)
                 let particular = kind == Kind::Element;
                 let plain = kind == Kind::PlainHtml;
-                // (a subtree's form-state elements; the node's own, which only those have)
+                // (a subtree's form-state elements, if it holds any; the node's own, which only
+                // those have)
                 if root || particular {
-                    self.form_state_inserted(node, root);
+                    let walk = root && held & super::forms::SUBTREE_FORM_STATE != 0;
+                    self.form_state_inserted(node, walk);
                 }
                 if plain {
                     // (an HTML element is no animation element nor `use`)
@@ -395,22 +446,39 @@ impl Engine {
                 old_next,
                 was_connected,
                 descendants: (start, end),
+                subtree: held,
             } => {
                 if !self.dom().is_alive(node) {
                     return;
                 }
                 let kind = kind(&self.dom(), node);
+                let descendants = &removed[start as usize..end as usize];
                 if old_parent.is_some() {
                     // The removed node, its descendants' wrappers (descendants may have no
                     // reactions of their own; the removal collected them), and the focused
                     // element if it went with them.
                     self.gc_node_moved(cx, node, true);
-                    self.gc_touch_nodes(cx, &removed[start as usize..end as usize]);
+                    if self.gc_subtree_wrapped(held) {
+                        self.gc_touch_nodes(cx, descendants);
+                    } else {
+                        #[cfg(debug_assertions)]
+                        {
+                            let d: Vec<NodeId> = descendants
+                                .iter()
+                                .copied()
+                                .filter(|&d| self.dom().is_alive(d))
+                                .collect();
+                            self.assert_wrappers_marked(cx, d);
+                        }
+                    }
                     self.unfocus_if_removed(node);
                 }
                 if let Some(p) = old_parent.filter(|&p| self.dom().is_alive(p)) {
                     if kind != Kind::Other {
-                        self.form_state_removed(node, p, &removed[start as usize..end as usize]);
+                        // (the descendants are searched only when one has a form state)
+                        let held_form_state = held & super::forms::SUBTREE_FORM_STATE != 0;
+                        let descendants = if held_form_state { descendants } else { &[] };
+                        self.form_state_removed(node, p, descendants);
                     }
                     if kind == Kind::Element {
                         self.option_tree_changed(node, p);
@@ -982,5 +1050,61 @@ mod tests {
             let data = dom.element(el).unwrap();
             assert!(!wants_descendant_reaction(data), "{name}");
         }
+    }
+
+    /// The filter's one match agrees with the predicates it stands for: the renderer's
+    /// descendants, the SVG elements with steps of their own, and the elements with a form state.
+    #[test]
+    fn descendant_bits_cover_the_renderer_and_form_states() {
+        let mut dom = Dom::new();
+        let doc = dom.parse_html_str(
+            "<div></div><style></style><link><input><object></object><option></option><form>             </form><x-a></x-a><span is=x-b></span><svg><style/><script/><use/><g/><animate/>             </svg><math><mi/></math>",
+            ParseOptions::default(),
+        );
+        let mut seen = 0;
+        for el in dom
+            .inclusive_descendants(doc)
+            .filter(|&n| dom.is_element(n))
+        {
+            let data = dom.element(el).unwrap();
+            let bits = descendant_bits(data);
+            let name = format!("{:?}", data.name());
+            if snowlark_render::renderer::wants_descendant_reaction(data)
+                || super::super::svg::smil::is_animation_element(data)
+            {
+                assert!(bits & subtree::REPORT != 0, "{name}");
+            }
+            let form = super::super::forms::SUBTREE_FORM_STATE;
+            let undefined = data.custom_state() == CustomElementState::Undefined;
+            assert_eq!(
+                bits & form != 0,
+                super::super::forms::form_state_bit(data) != 0,
+                "{name}"
+            );
+            assert_eq!(
+                bits & form != 0,
+                undefined || is_form_state_name(data),
+                "{name}"
+            );
+            seen += 1;
+        }
+        assert!(seen > 15);
+    }
+
+    fn is_form_state_name(e: &ElementData) -> bool {
+        e.name().ns == ns!(html)
+            && matches!(
+                &*e.name().local,
+                "button"
+                    | "fieldset"
+                    | "input"
+                    | "object"
+                    | "output"
+                    | "select"
+                    | "textarea"
+                    | "option"
+                    | "optgroup"
+                    | "form"
+            )
     }
 }
