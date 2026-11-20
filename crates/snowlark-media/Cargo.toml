@@ -10,6 +10,7 @@ aes = "0.8"
 snowlark-audio = { path = "../snowlark-audio" }
 snowlark-net = { path = "../snowlark-net" }
 snowlark-paint = { path = "../snowlark-paint" }
+serde = { version = "1", features = ["derive"] }
 windows-core = "0.62"
 windows-collections = "0.3"
 

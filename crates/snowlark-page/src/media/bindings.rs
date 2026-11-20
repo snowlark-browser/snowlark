@@ -455,13 +455,17 @@ impl HTMLVideoElementImpl for Engine {
     }
     /// Media Playback Quality: the frames presented so far.
     fn get_video_playback_quality(&self, _cx: &mut Cx, this: Handle) -> rt::Result<Handle> {
-        let total = self.media_el(self.n(this), |m| m.presented) as u32;
+        // (a protected player's frames are counted where they are drawn)
+        let (total, dropped) = self.media_el(self.n(this), |m| match &m.protected {
+            Some(p) => (p.rendered + p.dropped, p.dropped),
+            None => (m.presented as u32, 0),
+        });
         let creation = self.now();
         Ok(
             self.alloc(Object::Media(Box::new(MediaObject::PlaybackQuality {
                 creation,
                 total,
-                dropped: 0,
+                dropped,
             }))),
         )
     }

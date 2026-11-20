@@ -48,7 +48,7 @@ impl Keys for HashMap<KeyId, [u8; 16]> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Scheme {
     Cenc,
     Cbcs,
@@ -102,6 +102,8 @@ pub struct Decryptor {
     missing: Option<KeyId>,
     /// The start of a box header split across appends, passed already (clear streams).
     head: Vec<u8>,
+    /// Media segments pass as they are ([`Decryptor::keep_media`]).
+    keep_media: bool,
 }
 
 /// A box header: its size (0 when it runs to the end), type and header length.
@@ -225,6 +227,18 @@ impl Decryptor {
         !self.tracks.is_empty()
     }
 
+    /// From now on, media segments pass as they are, still encrypted (a module elsewhere decrypts
+    /// their samples); initialization segments are still rewritten and their `pssh` boxes found.
+    pub fn keep_media(&mut self) {
+        self.keep_media = true;
+        self.missing = None;
+    }
+
+    /// Whether media segments are decrypted here.
+    fn decrypts(&self) -> bool {
+        self.encrypted() && !self.keep_media
+    }
+
     /// The key the stream waits for, if any.
     pub fn waiting_for(&self) -> Option<KeyId> {
         self.missing
@@ -290,14 +304,14 @@ impl Decryptor {
             let Some((size, typ, _)) = header(&data[p..]) else {
                 // A clear stream's bytes are never held back: a split header passes, and a copy
                 // is kept to find the box's end (an encrypted stream must see its segments whole).
-                if self.encrypted() {
+                if self.decrypts() {
                     return false;
                 }
                 self.skip = 0;
                 self.head = data[p..].to_vec();
                 return true;
             };
-            if &typ == b"moov" || (&typ == b"moof" && self.encrypted()) || size == 0 {
+            if &typ == b"moov" || (&typ == b"moof" && self.decrypts()) || size == 0 {
                 return false;
             }
             skip = size;
@@ -355,7 +369,7 @@ impl Decryptor {
                     out.extend_from_slice(&buf[p..e]);
                     p = e;
                 }
-                b"moof" if self.encrypted() => {
+                b"moof" if self.decrypts() => {
                     if (avail as u64) < size {
                         break;
                     }

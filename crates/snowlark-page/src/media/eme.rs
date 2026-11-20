@@ -485,6 +485,12 @@ impl Engine {
 
     /// EME Ã‚Â§7.? "Initialization Data Encountered": `encrypted` at the element, with the
     /// initialization data (the media data came through the page, so it is same-origin).
+    /// The instance of the embedder's module that `el`'s `MediaKeys` are, if they are one.
+    pub(crate) fn eme_module_keys(&self, el: NodeId) -> Option<u64> {
+        let mk = self.media_el(el, |m| m.media_keys)?;
+        self.ks(mk, |k| k.cdm)
+    }
+
     pub(crate) fn eme_init_data_encountered(&self, el: NodeId, init_data: Vec<u8>) {
         self.queue_task(TaskSource::DomManipulation, move |e, cx| {
             if !e.dom().is_alive(el) {
@@ -733,6 +739,7 @@ impl Engine {
                     self.sess(session, |s| s.expiration = time);
                 }
             }
+            CdmEvent::Player { player, report } => self.media_protected_report(player, report),
             CdmEvent::Closed { session } => {
                 // (a session the page is closing closes when its `close()` is answered)
                 if let Some(session) = session_of(session) {

@@ -18,7 +18,10 @@ use windows::core::{HSTRING, PWSTR};
 use windows::Win32::Foundation::{HANDLE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Media::MediaFoundation::{
     IMFContentDecryptionModule, IMFContentDecryptionModuleSession, IMFMediaEngineEx,
-    MF_E_UNSUPPORTED_FORMAT, MF_MEDIA_ENGINE_EVENT_ERROR, MF_MEDIA_ENGINE_STATISTIC_FRAMES_DROPPED,
+    MF_E_UNSUPPORTED_FORMAT, MF_MEDIA_ENGINE_EVENT, MF_MEDIA_ENGINE_EVENT_ENDED,
+    MF_MEDIA_ENGINE_EVENT_ERROR, MF_MEDIA_ENGINE_EVENT_FIRSTFRAMEREADY,
+    MF_MEDIA_ENGINE_EVENT_PAUSE, MF_MEDIA_ENGINE_EVENT_PLAYING, MF_MEDIA_ENGINE_EVENT_SEEKED,
+    MF_MEDIA_ENGINE_EVENT_WAITING, MF_MEDIA_ENGINE_STATISTIC_FRAMES_DROPPED,
     MF_MEDIA_ENGINE_STATISTIC_FRAMES_RENDERED,
 };
 
@@ -63,6 +66,9 @@ pub type Sink = Arc<dyn Fn(Event) + Send + Sync>;
 pub enum Control {
     Play,
     Pause,
+    /// Pauses and drops the samples not yet played, before a seek (the samples from the new
+    /// position follow the [`Control::Seek`]).
+    Flush,
     /// To this time, in seconds.
     Seek(f64),
     Rate(f64),
@@ -88,8 +94,8 @@ pub enum PlayerEvent {
     /// The engine's picture: a composition surface handle of this process (the player's own
     /// duplicate, the receiver's to close) for DirectComposition to show.
     Surface(std::os::windows::io::OwnedHandle),
-    /// A media engine event (`MF_MEDIA_ENGINE_EVENT_*`) and the time when it came, in seconds.
-    Engine { event: u32, time: f64 },
+    /// The engine's playback changed, and its time then, in seconds.
+    Engine { state: EngineState, time: f64 },
     /// While it has a picture, every [`PROGRESS`]: its time and its counts of frames rendered and
     /// dropped (protected frames cannot be read back: these are the measure).
     Progress {
@@ -97,6 +103,34 @@ pub enum PlayerEvent {
         rendered: u32,
         dropped: u32,
     },
+}
+
+/// What a protected player's engine reports (the media engine events a page's element follows).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EngineState {
+    /// The first frame is ready.
+    FirstFrame,
+    Playing,
+    /// Playback stopped for want of data.
+    Waiting,
+    Paused,
+    Seeked,
+    Ended,
+}
+
+impl EngineState {
+    fn of(event: u32) -> Option<EngineState> {
+        let e = MF_MEDIA_ENGINE_EVENT(event as i32);
+        Some(match e {
+            MF_MEDIA_ENGINE_EVENT_FIRSTFRAMEREADY => EngineState::FirstFrame,
+            MF_MEDIA_ENGINE_EVENT_PLAYING => EngineState::Playing,
+            MF_MEDIA_ENGINE_EVENT_WAITING => EngineState::Waiting,
+            MF_MEDIA_ENGINE_EVENT_PAUSE => EngineState::Paused,
+            MF_MEDIA_ENGINE_EVENT_SEEKED => EngineState::Seeked,
+            MF_MEDIA_ENGINE_EVENT_ENDED => EngineState::Ended,
+            _ => return None,
+        })
+    }
 }
 
 /// How often a player reports [`PlayerEvent::Progress`].
@@ -473,6 +507,11 @@ impl Player {
             match control {
                 Control::Play => self.engine.Play(),
                 Control::Pause => self.engine.Pause(),
+                Control::Flush => {
+                    let paused = self.engine.Pause();
+                    self.feed.flush();
+                    paused
+                }
                 Control::Seek(t) => self.engine.SetCurrentTime(t),
                 Control::Rate(r) => self.engine.SetPlaybackRate(r),
                 Control::Volume(v) => self.engine.SetVolume(v),
@@ -513,7 +552,9 @@ impl Player {
         unsafe {
             while let Ok((event, _, _)) = self.events.try_recv() {
                 let time = self.engine.GetCurrentTime();
-                (self.sink)(PlayerEvent::Engine { event, time });
+                if let Some(state) = EngineState::of(event) {
+                    (self.sink)(PlayerEvent::Engine { state, time });
+                }
                 if event == MF_MEDIA_ENGINE_EVENT_ERROR.0 as u32 {
                     let why = self
                         .engine
@@ -910,14 +951,32 @@ mod tests {
                 let _ = ptx.lock().unwrap().send(e);
             }),
         );
-        for o in out {
-            if let Output::Sample(id, sample) = o {
-                service.sample(30, id, sample);
+        let samples: Vec<(u32, crate::fmp4::Sample)> = out
+            .into_iter()
+            .filter_map(|o| match o {
+                Output::Sample(id, sample) => Some((id, sample)),
+                _ => None,
+            })
+            .collect();
+        let feed = |from: i64| {
+            // (each track from its last key frame at or before `from`, as a page refeeds)
+            for t in &tracks {
+                let mine: Vec<&crate::fmp4::Sample> = samples
+                    .iter()
+                    .filter(|(id, _)| *id == t.id)
+                    .map(|(_, s)| s)
+                    .collect();
+                let start = mine
+                    .iter()
+                    .rposition(|s| s.key && s.time <= from)
+                    .unwrap_or(0);
+                for s in &mine[start..] {
+                    service.sample(30, t.id, (*s).clone());
+                }
+                service.control(30, Control::End(t.id));
             }
-        }
-        for t in &tracks {
-            service.control(30, Control::End(t.id));
-        }
+        };
+        feed(0);
         let (w, h) = (960, 540);
         service.control(30, Control::Muted(true));
         service.control(
@@ -969,7 +1028,18 @@ mod tests {
             let start = Instant::now();
             let mut surface_at = None;
             let mut last = (0.0, 0, 0);
+            // A seek back after 5 s: the player is flushed, sent to 1 s, and handed the samples
+            // again from the key frame before it.
+            let (mut sought, mut seeked, mut after) = (false, false, (0.0, 0));
             while start.elapsed() < Duration::from_secs(14) {
+                if !sought && start.elapsed() > Duration::from_secs(5) {
+                    sought = true;
+                    after = (last.0, last.1);
+                    service.control(30, Control::Flush);
+                    service.control(30, Control::Seek(1.0));
+                    feed(10_000_000);
+                    service.control(30, Control::Play);
+                }
                 let mut msg = MSG::default();
                 while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
                     let _ = DispatchMessageW(&msg);
@@ -991,6 +1061,13 @@ mod tests {
                             dropped,
                         } => last = (time, rendered, dropped),
                         PlayerEvent::Error(why) => panic!("{why}"),
+                        PlayerEvent::Engine {
+                            state: EngineState::Seeked,
+                            time,
+                        } => {
+                            eprintln!("seeked at {time:.2}");
+                            seeked = sought;
+                        }
                         PlayerEvent::Engine { .. } => {}
                     }
                 }
@@ -1000,11 +1077,23 @@ mod tests {
             service.release(10);
             let _ = DestroyWindow(hwnd);
             eprintln!(
-                "surface at {surface_at:?}; time {:.2} frames rendered {} dropped {}",
-                last.0, last.1, last.2
+                "surface at {surface_at:?}; time {:.2} frames rendered {} dropped {}; before the \
+                 seek {:.2} and {} frames",
+                last.0, last.1, last.2, after.0, after.1
             );
             assert!(surface_at.is_some(), "no composition surface");
             assert!(last.1 > 100, "{} frames", last.1);
+            assert!(seeked, "no seeked event");
+            // (playing on from 1 s after the seek, not from where it was)
+            assert!(
+                after.0 > 3.5 && last.0 < after.0 + 7.0,
+                "{after:?} {last:?}"
+            );
+            assert!(
+                last.1 > after.1 + 60,
+                "{} frames after the seek",
+                last.1 - after.1
+            );
         }
     }
 }

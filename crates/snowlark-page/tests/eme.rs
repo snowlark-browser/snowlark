@@ -32,7 +32,10 @@ fn run_async(page: &mut Page, js: &str) -> String {
     page.eval("out", "test.js").unwrap()
 }
 
-use snowlark_page::media::cdm::{Cdm, CdmEvent, CdmInbox, KeyStatus, MessageKind};
+use snowlark_media::fmp4::{Sample, Track};
+use snowlark_page::media::cdm::{
+    Cdm, CdmEvent, CdmInbox, KeyStatus, MessageKind, PlayerControl, PlayerReport, PlayerState,
+};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -44,6 +47,9 @@ struct Fake {
     instances: AtomicU64,
     sessions: AtomicU64,
     released: Mutex<Vec<u64>>,
+    /// What its protected players were told: "play <keys> <tracks>", "sample <track> <time>
+    /// <key>", "<control>", "stop".
+    player: Mutex<Vec<String>>,
 }
 impl Fake {
     fn send(&self, e: CdmEvent) {
@@ -107,6 +113,56 @@ impl Cdm for Fake {
         assert!(!r.contains(&keys), "instance {keys} released twice");
         r.push(keys);
     }
+    fn play(&self, keys: u64, tracks: Vec<Track>) -> u64 {
+        let t: Vec<String> = tracks
+            .iter()
+            .map(|t| format!("{}:{}", t.id, if t.video { "video" } else { "audio" }))
+            .collect();
+        let mut log = self.player.lock().unwrap();
+        log.push(format!("play {keys} {}", t.join(",")));
+        500
+    }
+    fn sample(&self, player: u64, track: u32, sample: Sample) {
+        assert_eq!(player, 500);
+        self.player.lock().unwrap().push(format!(
+            "sample {track} {} {}",
+            sample.time,
+            if sample.key { "key" } else { "-" }
+        ));
+    }
+    fn control(&self, player: u64, control: PlayerControl) {
+        assert_eq!(player, 500);
+        self.player.lock().unwrap().push(format!("{control:?}"));
+    }
+    fn stop(&self, player: u64) {
+        assert_eq!(player, 500);
+        self.player.lock().unwrap().push("stop".into());
+    }
+}
+
+/// A page that renders and plays media, as in a window, with the fake module.
+fn media_page(fake: &Arc<Fake>) -> Page {
+    let mut p = Page::new(PageOptions {
+        viewport: (800, 600),
+        render: Some(snowlark_page::RenderSetup::new().unwrap()),
+        ..Default::default()
+    });
+    p.engine()
+        .set_media_config(snowlark_page::media::MediaConfig {
+            videos: snowlark_paint::Gpu::new()
+                .ok()
+                .map(|g| snowlark_paint::video::VideoStore::new(Some(g))),
+            autoplay: snowlark_page::media::AutoplayPolicy::Allowed,
+            silent: true,
+            cdm: Some(fake.clone()),
+            ..Default::default()
+        });
+    p.load_html(
+        "<!doctype html>",
+        &url::Url::parse("https://example.test/").unwrap(),
+    );
+    p.run_until_settled(Duration::from_secs(5));
+    p
 }
 
 fn page_with(fake: &Arc<Fake>) -> Page {
@@ -296,4 +352,175 @@ fn module_instances_are_released_with_their_document() {
     assert_eq!(*fake.released.lock().unwrap(), vec![7]);
     drop(p);
     assert_eq!(*fake.released.lock().unwrap(), vec![7, 8]);
+}
+
+/// A media element whose `MediaKeys` are the embedder's module's and whose source is a
+/// `MediaSource` plays through the module's protected player: it is made with the tracks of the
+/// initialization segment, handed every sample and the element's play, seek and end of stream; a
+/// seek hands it the samples again from the key frame at or before the new position; what it
+/// reports becomes the element's state (`playing`, `currentTime`, `seeked`, the playback quality).
+#[test]
+fn a_modules_player_plays_a_media_source() {
+    let clip = std::fs::read(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../snowlark-media/tests/fixtures/pattern-frag.mp4"),
+    )
+    .unwrap();
+    let bytes: Vec<String> = clip.iter().map(|b| b.to_string()).collect();
+    let fake = Arc::new(Fake::default());
+    let mut p = media_page(&fake);
+    let r = run_async(
+        &mut p,
+        &format!(
+            r#"
+        const clip = new Uint8Array([{}]);
+        const v = window.v = document.createElement('video');
+        v.muted = true;
+        document.body.append(v);
+        window.log = [];
+        for (const e of ['playing', 'seeked', 'waiting', 'ended', 'error'])
+            v.addEventListener(e, () => log.push(e));
+        const a = await navigator.requestMediaKeySystemAccess('org.test.module',
+            [{{initDataTypes: ['cenc'], videoCapabilities: [{{contentType: 'video/mp4; codecs="avc1.64001f"'}}]}}]);
+        await v.setMediaKeys(await a.createMediaKeys());
+        const ms = window.ms = new MediaSource();
+        v.src = URL.createObjectURL(ms);
+        await new Promise(r => ms.addEventListener('sourceopen', r, {{once: true}}));
+        const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.42C00D"');
+        sb.appendBuffer(clip);
+        await new Promise(r => sb.addEventListener('updateend', r, {{once: true}}));
+        v.play().catch(() => {{}});
+        return [v.readyState, sb.buffered.length, v.paused].join();
+    "#,
+            bytes.join(",")
+        ),
+    );
+    assert_eq!(r, "1,1,false");
+    let log = || fake.player.lock().unwrap().clone();
+    let first = log();
+    assert_eq!(first[0], "play 7 1:video");
+    let samples: Vec<&String> = first.iter().filter(|l| l.starts_with("sample")).collect();
+    assert!(samples.len() > 10, "{first:?}");
+    assert!(samples[0].starts_with("sample 1 ") && samples[0].ends_with(" key"));
+    assert!(first.contains(&"Play".to_string()), "{first:?}");
+
+    // The player reports: the element plays from its time, its frames counted.
+    let send = |report| {
+        fake.send(CdmEvent::Player {
+            player: 500,
+            report,
+        })
+    };
+    send(PlayerReport::State {
+        state: PlayerState::Playing,
+        time: 0.5,
+    });
+    send(PlayerReport::Progress {
+        time: 1.0,
+        rendered: 24,
+        dropped: 1,
+    });
+    let r = run_async(
+        &mut p,
+        "await new Promise(r => setTimeout(r, 50));
+         const q = v.getVideoPlaybackQuality();
+         return [log.join('+'), v.readyState, v.currentTime >= 1, q.totalVideoFrames, q.droppedVideoFrames].join();",
+    );
+    // (`waiting` first: playing at HAVE_METADATA, before the player's first frame)
+    assert_eq!(r, "waiting+playing,4,true,25,1");
+
+    // A seek: the player drops what it has and is handed the samples again from a key frame.
+    fake.player.lock().unwrap().clear();
+    let r = run_async(&mut p, "v.currentTime = 3.5; return v.seeking;");
+    assert_eq!(r, "true");
+    let again = log();
+    assert_eq!(again[..2], ["Flush".to_string(), "Seek(3.5)".to_string()]);
+    let resent: Vec<i64> = again
+        .iter()
+        .filter_map(|l| l.strip_prefix("sample 1 "))
+        .map(|l| l.split(' ').next().unwrap().parse().unwrap())
+        .collect();
+    assert!(again[2].ends_with(" key"), "{again:?}");
+    // (the clip's key frames are 3 s apart: from the one at 3 s)
+    assert_eq!(resent[0], 30_000_000, "{again:?}");
+    assert!(resent.len() < samples.len(), "{again:?}");
+    send(PlayerReport::State {
+        state: PlayerState::Seeked,
+        time: 3.5,
+    });
+    let r = run_async(
+        &mut p,
+        "await new Promise(r => setTimeout(r, 50)); ms.endOfStream(); return [log.join('+'), v.seeking].join();",
+    );
+    assert!(
+        r.starts_with("waiting+playing+") && r.contains("seeked") && r.ends_with(",false"),
+        "{r}"
+    );
+    assert!(log().contains(&"End(1)".to_string()), "{:?}", log());
+
+    // A new source: the player is stopped.
+    run_async(&mut p, "v.removeAttribute('src'); v.load(); return 1;");
+    assert!(log().contains(&"stop".to_string()), "{:?}", log());
+}
+
+/// By hand (`SNOWLARK_WPT`): the WPT `encrypted-media` H.264 file appended to a `MediaSource` of
+/// an element with the module's keys: the media side keeps the encrypted stream without an error
+/// (no `error` or `sourceclose`), and the player is handed its samples.
+#[test]
+#[ignore]
+fn an_encrypted_stream_stays_with_the_media_side() {
+    let Some(wpt) = std::env::var_os("SNOWLARK_WPT") else {
+        eprintln!("SNOWLARK_WPT is not set: skipped");
+        return;
+    };
+    let clip = std::fs::read(
+        std::path::Path::new(&wpt)
+            .join("encrypted-media/content/video_512x288_h264-360k_enc_dashinit.mp4"),
+    )
+    .unwrap();
+    let bytes: Vec<String> = clip.iter().map(|b| b.to_string()).collect();
+    let fake = Arc::new(Fake::default());
+    let mut p = media_page(&fake);
+    let r = run_async(
+        &mut p,
+        &format!(
+            r#"
+        const clip = new Uint8Array([{}]);
+        const v = window.v = document.createElement('video');
+        v.muted = true;
+        document.body.append(v);
+        const log = window.log = [];
+        for (const e of ['error', 'encrypted', 'waitingforkey', 'loadedmetadata'])
+            v.addEventListener(e, () => log.push(e));
+        const a = await navigator.requestMediaKeySystemAccess('org.test.module',
+            [{{initDataTypes: ['cenc'], videoCapabilities: [{{contentType: 'video/mp4; codecs="avc1.64001f"'}}]}}]);
+        await v.setMediaKeys(await a.createMediaKeys());
+        const ms = new MediaSource();
+        ms.addEventListener('sourceclose', () => log.push('sourceclose'));
+        v.src = URL.createObjectURL(ms);
+        await new Promise(r => ms.addEventListener('sourceopen', r, {{once: true}}));
+        const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.64001f"');
+        sb.addEventListener('error', () => log.push('sb error'));
+        sb.addEventListener('updateend', () => log.push('updateend'));
+        sb.appendBuffer(clip);
+        log.push('appended');
+        await new Promise(r => sb.addEventListener('updateend', r, {{once: true}}));
+        await new Promise(r => setTimeout(r, 3000));
+        return [log.join('+'), ms.readyState, sb.buffered.length && sb.buffered.end(0).toFixed(1), v.error && v.error.code].join();
+    "#,
+            bytes.join(",")
+        ),
+    );
+    let log = fake.player.lock().unwrap().clone();
+    let samples = log.iter().filter(|l| l.starts_with("sample")).count();
+    let events = p.eval("log.join('+')", "test.js").unwrap();
+    eprintln!(
+        "{r} ({events}); {samples} samples; {:?}",
+        &log[..log.len().min(3)]
+    );
+    assert!(
+        !r.contains("error") && !r.contains("sourceclose") && r != "pending",
+        "{r} ({events})"
+    );
+    assert!(samples > 50, "{samples}");
 }

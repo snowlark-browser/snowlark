@@ -182,10 +182,43 @@ impl Shared {
     }
 }
 
+/// A player whose media plays elsewhere (a key system module's protected player): the page tells
+/// it what its element does, and reports what it does through the [`Reporter`] of
+/// [`Player::remote`].
+pub trait Remote: Send + Sync {
+    fn play(&self);
+    fn pause(&self);
+    fn seek(&self, t: f64);
+    fn set_rate(&self, rate: f64);
+    fn set_volume(&self, volume: f64, muted: bool);
+    fn close(&self);
+}
+
+/// How a [`Remote`] player's reports reach its [`Player`].
+#[derive(Clone)]
+pub struct Reporter(Arc<Shared>);
+
+impl Reporter {
+    /// Queues an event (and wakes the page).
+    pub fn event(&self, e: PlayerEvent) {
+        self.0.push(e);
+    }
+
+    /// Changes the status.
+    pub fn status(&self, f: impl FnOnce(&mut Status)) {
+        f(&mut self.0.status.lock().unwrap());
+    }
+}
+
+enum Backend {
+    #[cfg(windows)]
+    Win(win::player::WinPlayer),
+    Remote(Box<dyn Remote>),
+}
+
 /// One media element's playback (see the crate documentation).
 pub struct Player {
-    #[cfg(windows)]
-    inner: win::player::WinPlayer,
+    inner: Backend,
     shared: Arc<Shared>,
     resource: Option<MediaResource>,
 }
@@ -206,36 +239,82 @@ impl Player {
             Source::Mse(_) => None,
         };
         Player {
-            inner: win::player::WinPlayer::open(options, source, shared.clone()),
+            inner: Backend::Win(win::player::WinPlayer::open(
+                options,
+                source,
+                shared.clone(),
+            )),
             shared,
             resource,
         }
     }
 
+    /// A player that plays through `remote` (see [`Remote`]).
+    pub fn remote(options: &PlayerOptions, remote: Box<dyn Remote>) -> (Player, Reporter) {
+        let shared = Arc::new(Shared {
+            events: Mutex::new(Vec::new()),
+            status: Mutex::new(Status {
+                rate: options.rate,
+                ..Status::default()
+            }),
+            wake: options.wake.clone(),
+        });
+        let player = Player {
+            inner: Backend::Remote(remote),
+            shared: shared.clone(),
+            resource: None,
+        };
+        (player, Reporter(shared))
+    }
+
+    /// Whether it plays through a [`Remote`].
+    pub fn is_remote(&self) -> bool {
+        matches!(self.inner, Backend::Remote(_))
+    }
+
     pub fn play(&self) {
-        self.inner.play();
+        match &self.inner {
+            Backend::Win(p) => p.play(),
+            Backend::Remote(r) => r.play(),
+        }
     }
 
     pub fn pause(&self) {
-        self.inner.pause();
+        match &self.inner {
+            Backend::Win(p) => p.pause(),
+            Backend::Remote(r) => r.pause(),
+        }
     }
 
     /// Seeks to `t` seconds (a [`PlayerEvent::Seeked`] follows).
     pub fn seek(&self, t: f64) {
-        self.inner.seek(t);
+        match &self.inner {
+            Backend::Win(p) => p.seek(t),
+            Backend::Remote(r) => r.seek(t),
+        }
     }
 
     pub fn set_rate(&self, rate: f64) {
-        self.inner.set_rate(rate);
+        match &self.inner {
+            Backend::Win(p) => p.set_rate(rate),
+            Backend::Remote(r) => r.set_rate(rate),
+        }
     }
 
     pub fn set_volume(&self, volume: f64, muted: bool) {
-        self.inner.set_volume(volume, muted);
+        match &self.inner {
+            Backend::Win(p) => p.set_volume(volume, muted),
+            Backend::Remote(r) => r.set_volume(volume, muted),
+        }
     }
 
-    /// The slot the video's frames go to.
+    /// The slot the video's frames go to (none for a [`Remote`] player: its pictures do not
+    /// pass through the page).
     pub fn video(&self) -> Option<VideoId> {
-        self.inner.video()
+        match &self.inner {
+            Backend::Win(p) => p.video(),
+            Backend::Remote(_) => None,
+        }
     }
 
     pub fn status(&self) -> Status {
@@ -254,7 +333,10 @@ impl Player {
 
     /// Stops playback and lets go of the decoder and the fetch (also on drop).
     pub fn close(&self) {
-        self.inner.close();
+        match &self.inner {
+            Backend::Win(p) => p.close(),
+            Backend::Remote(r) => r.close(),
+        }
         if let Some(r) = &self.resource {
             r.close();
         }

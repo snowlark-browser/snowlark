@@ -9,11 +9,17 @@
 //!
 //! Calls return at once; what they lead to comes back as [`CdmEvent`]s in the [`CdmInbox`] given to
 //! [`Cdm::create_keys`], which the event loop turns into tasks ([`Engine::poll_cdm`]).
+//!
+//! A module whose keys never leave it also plays the media they decrypt: the page hands a
+//! protected player the coded samples of its `SourceBuffer`s ([`Cdm::play`], [`Cdm::sample`]) and
+//! follows what the player reports ([`CdmEvent::Player`]); the pictures go from the module to the
+//! screen without passing through the page.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
+use snowlark_media::fmp4::{Sample, Track};
 
 use crate::engine::Engine;
 
@@ -73,6 +79,53 @@ pub enum CdmEvent {
     Expiration { session: u64, time: f64 },
     /// EME Ã‚Â§6.? "Session Closed", for a reason of the module's own.
     Closed { session: u64 },
+    /// A protected player of [`Cdm::play`] reports.
+    Player { player: u64, report: PlayerReport },
+}
+
+/// What a protected player is told (its media element's state).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum PlayerControl {
+    Play,
+    Pause,
+    /// Pauses and drops the samples not yet played, before a seek: the samples from the new
+    /// position follow the [`PlayerControl::Seek`].
+    Flush,
+    /// To this time, in seconds.
+    Seek(f64),
+    Rate(f64),
+    Volume(f64),
+    Muted(bool),
+    /// The track with this id has no more samples (the MediaSource ended).
+    End(u32),
+}
+
+/// A protected player's playback state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlayerState {
+    FirstFrame,
+    Playing,
+    /// Playback stopped for want of data.
+    Waiting,
+    Paused,
+    Seeked,
+    Ended,
+}
+
+/// What a protected player reports.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum PlayerReport {
+    /// Its playback reached `state` at `time` (seconds).
+    State { state: PlayerState, time: f64 },
+    /// While it shows pictures, now and then: its time and its frames rendered and dropped
+    /// (`getVideoPlaybackQuality()`).
+    Progress {
+        time: f64,
+        rendered: u32,
+        dropped: u32,
+    },
+    /// It failed: why. Nothing else follows.
+    Error(String),
 }
 
 /// The modules of the key systems the embedder offers (see the module).
@@ -102,8 +155,28 @@ pub trait Cdm: Send + Sync {
     fn update(&self, request: u64, session: u64, response: Vec<u8>);
     fn close(&self, request: u64, session: u64);
     fn remove(&self, request: u64, session: u64);
-    /// Instance `keys` and its sessions are no longer used.
+    /// Instance `keys` and its sessions are no longer used (its players end with it).
     fn release(&self, keys: u64);
+
+    /// A protected player of instance `keys` for these tracks (track ids unique among them),
+    /// its reports going where the instance's events go. Returns its id. A module that plays
+    /// nothing reports an error at once.
+    fn play(&self, keys: u64, tracks: Vec<Track>) -> u64 {
+        let _ = (keys, tracks);
+        0
+    }
+    /// The next sample of track `track` (in presentation order per track, from the position of
+    /// the last seek).
+    fn sample(&self, player: u64, track: u32, sample: Sample) {
+        let _ = (player, track, sample);
+    }
+    fn control(&self, player: u64, control: PlayerControl) {
+        let _ = (player, control);
+    }
+    /// The player is no longer used.
+    fn stop(&self, player: u64) {
+        let _ = player;
+    }
 }
 
 /// One event loop's inbox, and how to wake its thread.

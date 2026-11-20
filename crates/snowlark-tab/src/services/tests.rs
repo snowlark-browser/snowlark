@@ -358,8 +358,10 @@ fn child_main() {
         | "forge-audio-out-credits"
         | "forge-audio-out-id" => audio_out_forge(&port, &role),
         "cdm" => cdm_child(&port),
+        "cdm-player" => cdm_player_child(&port),
         "forge-cdm-session" | "forge-cdm-keys" | "forge-cdm-size" | "forge-cdm-twice"
-        | "forge-cdm-release" => cdm_forge(&port, &role),
+        | "forge-cdm-release" | "forge-cdm-player" | "forge-cdm-track" | "forge-cdm-tracks"
+        | "forge-cdm-sample" => cdm_forge(&port, &role),
         other => panic!("role {other}"),
     };
     std::process::exit(code);
@@ -2681,6 +2683,110 @@ impl snowlark_page::media::cdm::Cdm for FakeCdm {
     fn release(&self, keys: u64) {
         self.log(format!("release {keys}"));
     }
+    /// Players are 5000 more than their instance; each reports its progress at once (and one for
+    /// a player the renderer never had, which is not forwarded).
+    fn play(&self, keys: u64, tracks: Vec<snowlark_media::fmp4::Track>) -> u64 {
+        use snowlark_page::media::cdm::{CdmEvent, PlayerReport};
+        let ids: Vec<String> = tracks.iter().map(|t| t.id.to_string()).collect();
+        self.log(format!("play {keys} {}", ids.join(",")));
+        let player = keys + 5000;
+        let report = PlayerReport::Progress {
+            time: 1.5,
+            rendered: 30,
+            dropped: 2,
+        };
+        self.send(CdmEvent::Player {
+            player: 9999,
+            report: report.clone(),
+        });
+        self.send(CdmEvent::Player { player, report });
+        player
+    }
+    fn sample(&self, player: u64, track: u32, sample: snowlark_media::fmp4::Sample) {
+        self.log(format!(
+            "sample {player} {track} {} {}",
+            sample.data.len(),
+            sample.time
+        ));
+    }
+    fn control(&self, player: u64, control: snowlark_page::media::cdm::PlayerControl) {
+        self.log(format!("control {player} {control:?}"));
+    }
+    fn stop(&self, player: u64) {
+        self.log(format!("stop {player}"));
+    }
+}
+
+/// A track for the player tests.
+fn test_track(id: u32) -> snowlark_media::fmp4::Track {
+    snowlark_media::fmp4::Track {
+        id,
+        video: id == 1,
+        timescale: 1000,
+        codec: snowlark_media::fmp4::Codec::Other(*b"test"),
+        width: 0,
+        height: 0,
+        channels: 0,
+        sample_rate: 0,
+        start: 0,
+        encryption: None,
+    }
+}
+
+fn test_sample(len: usize, time: i64) -> snowlark_media::fmp4::Sample {
+    snowlark_media::fmp4::Sample {
+        data: vec![7; len],
+        time,
+        duration: 1,
+        key: true,
+        encryption: None,
+    }
+}
+
+/// A renderer's protected player in its own ids: made with two tracks, its progress reported back
+/// in the renderer's player id, a large sample (in a section) and a small one, its controls, and
+/// its stop; it exits with its instance still made.
+fn cdm_player_child(port: &RendererPort) -> i32 {
+    use snowlark_page::media::cdm::{Cdm, CdmEvent, CdmInbox, PlayerControl, PlayerReport};
+    let services = remote(port);
+    let cdm: &dyn Cdm = &*services.cdm;
+    let (tx, woken) = mpsc::channel();
+    let inbox = Arc::new(CdmInbox::new(Arc::new(move || {
+        let _ = tx.send(());
+    })));
+    let events = |n: usize| {
+        let mut got = Vec::new();
+        while got.len() < n {
+            if woken.recv_timeout(WAIT).is_err() {
+                break;
+            }
+            got.extend(inbox.take());
+        }
+        got
+    };
+    let keys = cdm.create_keys(1, "org.test.module", "https://a.test", &inbox);
+    if events(1).len() != 1 {
+        return 12;
+    }
+    let player = cdm.play(keys, vec![test_track(1), test_track(2)]);
+    let progress = CdmEvent::Player {
+        player,
+        report: PlayerReport::Progress {
+            time: 1.5,
+            rendered: 30,
+            dropped: 2,
+        },
+    };
+    if events(1) != [progress] {
+        return 13;
+    }
+    cdm.sample(player, 1, test_sample(100_000, 10));
+    cdm.sample(player, 2, test_sample(10, 20));
+    cdm.control(player, PlayerControl::Play);
+    cdm.control(player, PlayerControl::End(2));
+    cdm.stop(player);
+    port.flush(WAIT).unwrap();
+    0
 }
 
 /// A renderer's EME calls in its own ids: two instances, a session's request, update and key
@@ -2782,6 +2888,45 @@ fn cdm_forge(port: &RendererPort, role: &str) -> i32 {
             send(keys(2, 1));
         }
         "forge-cdm-release" => send(C::Release { keys: 4 }),
+        // a player of an instance it never made
+        "forge-cdm-player" => send(C::Play {
+            keys: 3,
+            player: 1,
+            tracks: vec![test_track(1)],
+        }),
+        // a sample of a track it never gave its player
+        "forge-cdm-track" => {
+            send(keys(1, 1));
+            send(C::Play {
+                keys: 1,
+                player: 2,
+                tracks: vec![test_track(1)],
+            });
+            let sample = super::pack(port, &test_sample(4, 0)).unwrap();
+            send(C::Sample {
+                player: 2,
+                track: 5,
+                sample,
+            });
+        }
+        // two tracks of one id
+        "forge-cdm-tracks" => {
+            send(keys(1, 1));
+            send(C::Play {
+                keys: 1,
+                player: 2,
+                tracks: vec![test_track(1), test_track(1)],
+            });
+        }
+        // a sample for a player it never made
+        "forge-cdm-sample" => {
+            let sample = super::pack(port, &test_sample(4, 0)).unwrap();
+            send(C::Sample {
+                player: 8,
+                track: 1,
+                sample,
+            });
+        }
         other => panic!("role {other}"),
     }
     linger()
@@ -2828,6 +2973,21 @@ fn a_renderer_that_breaks_the_key_system_rules_dies() {
             &["create 1001 https://a.test", "release 1001"],
         ),
         ("forge-cdm-release", &[]),
+        ("forge-cdm-player", &[]),
+        (
+            "forge-cdm-track",
+            &[
+                "create 1001 https://a.test",
+                "play 1001 1",
+                "stop 6001",
+                "release 1001",
+            ],
+        ),
+        (
+            "forge-cdm-tracks",
+            &["create 1001 https://a.test", "release 1001"],
+        ),
+        ("forge-cdm-sample", &[]),
     ] {
         let mut l = local();
         let fake = Arc::new(FakeCdm::default());
@@ -2840,4 +3000,27 @@ fn a_renderer_that_breaks_the_key_system_rules_dies() {
         );
         assert_eq!(fake.calls(), calls, "{role}");
     }
+}
+
+#[test]
+fn a_renderers_protected_players_cross_in_its_own_ids() {
+    let mut l = local();
+    let fake = Arc::new(FakeCdm::default());
+    l.services.cdm = Some(fake.clone());
+    let child = start("cdm-player", &l.services);
+    assert_eq!(child.process.wait(WAIT), Some(0), "the renderer's checks");
+    assert!(matches!(child.served.join().unwrap(), Error::Closed));
+    assert_eq!(
+        fake.calls(),
+        [
+            "create 1001 https://a.test",
+            "play 1001 1,2",
+            "sample 6001 1 100000 10",
+            "sample 6001 2 10 20",
+            "control 6001 Play",
+            "control 6001 End(2)",
+            "stop 6001",
+            "release 1001",
+        ]
+    );
 }

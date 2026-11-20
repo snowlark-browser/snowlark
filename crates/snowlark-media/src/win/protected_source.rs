@@ -93,6 +93,11 @@ struct StreamState {
     ended: bool,
     eos_sent: bool,
     selected: bool,
+    /// The source has announced it (`MENewStream`): later starts update it (`MEUpdatedStream`).
+    announced: bool,
+    /// Flushed and not started since: samples wait for the start or seek that follows (the
+    /// engine's requests from before it must not take samples of the new position).
+    holding: bool,
 }
 
 // SAFETY (the four impls below): Media Foundation calls a source and its streams from its own
@@ -172,7 +177,7 @@ impl Shared {
         let mut end = false;
         {
             let mut st = self.state.lock().unwrap();
-            while !st.tokens.is_empty() && !st.samples.is_empty() {
+            while !st.holding && !st.tokens.is_empty() && !st.samples.is_empty() {
                 let token = st.tokens.pop_front().unwrap();
                 let s = st.samples.pop_front().unwrap();
                 match mf_sample(&s) {
@@ -193,7 +198,12 @@ impl Shared {
                     Err(e) => super::playready::trace_error("sample", &e),
                 }
             }
-            if st.ended && st.samples.is_empty() && !st.tokens.is_empty() && !st.eos_sent {
+            if !st.holding
+                && st.ended
+                && st.samples.is_empty()
+                && !st.tokens.is_empty()
+                && !st.eos_sent
+            {
                 st.eos_sent = true;
                 // SAFETY: queueing an event on a live queue.
                 let _ = unsafe {
@@ -309,6 +319,12 @@ struct Source {
     states: Vec<Arc<Mutex<StreamState>>>,
     protected: Vec<bool>,
     trust: Arc<Trust>,
+    /// Whether it is started or paused (a start then with a position is a seek).
+    running: Mutex<bool>,
+    /// The streams' samples (a start hands over those held since a flush).
+    shareds: Vec<Arc<Shared>>,
+    /// (its `ended` is cleared by a start: the presentation can end again)
+    presentation: Arc<Presentation>,
     /// The source as its streams return it from `GetMediaSource`: cleared at `Shutdown`, which
     /// ends the reference cycle between the source and its streams.
     own: Arc<SourceSlot>,
@@ -318,7 +334,8 @@ event_generator!(Source_Impl);
 
 impl IMFMediaSource_Impl for Source_Impl {
     fn GetCharacteristics(&self) -> Result<u32> {
-        Ok(MFMEDIASOURCE_CAN_PAUSE.0 as u32)
+        // (seekable: a seek flushes the streams and starts them at the new position)
+        Ok((MFMEDIASOURCE_CAN_SEEK.0 | MFMEDIASOURCE_CAN_PAUSE.0) as u32)
     }
 
     fn CreatePresentationDescriptor(&self) -> Result<IMFPresentationDescriptor> {
@@ -333,6 +350,18 @@ impl IMFMediaSource_Impl for Source_Impl {
         position: *const PROPVARIANT,
     ) -> Result<()> {
         let pd = descriptor.ok()?;
+        // IMFMediaSource::Start: a start of a started or paused source at a new position is a
+        // seek (`MESourceSeeked`, `MEStreamSeeked`); a stream announced before is updated.
+        let mut running = self.running.lock().unwrap();
+        // SAFETY: reading the caller's live variant (a null pointer is an empty one).
+        let empty = position.is_null() || {
+            let v: &PROPVARIANT = unsafe { &*position };
+            // SAFETY: `vt` is the tag every variant starts with.
+            let vt = unsafe { v.Anonymous.Anonymous.vt };
+            vt == windows::Win32::System::Variant::VT_EMPTY
+        };
+        let seeked = *running && !empty;
+        *running = true;
         // SAFETY: descriptor queries and queue calls on live objects; `position` is the caller's
         // variant, passed through to the event.
         unsafe {
@@ -341,23 +370,49 @@ impl IMFMediaSource_Impl for Source_Impl {
                 let mut sd = None;
                 pd.GetStreamDescriptorByIndex(i as u32, &mut selected, &mut sd)?;
                 let selected = selected.as_bool();
-                self.states[i].lock().unwrap().selected = selected;
+                let announced = {
+                    let mut st = self.states[i].lock().unwrap();
+                    st.selected = selected;
+                    st.holding = false;
+                    let was = st.announced;
+                    st.announced |= selected;
+                    was
+                };
                 if selected {
-                    self.queue.QueueEventParamUnk(
-                        MENewStream.0 as u32,
-                        &GUID::zeroed(),
-                        S_OK,
-                        stream,
-                    )?;
-                    stream.QueueEvent(MEStreamStarted.0 as u32, &GUID::zeroed(), S_OK, position)?;
+                    let kind = if announced {
+                        MEUpdatedStream
+                    } else {
+                        MENewStream
+                    };
+                    self.queue
+                        .QueueEventParamUnk(kind.0 as u32, &GUID::zeroed(), S_OK, stream)?;
+                    let kind = if seeked {
+                        MEStreamSeeked
+                    } else {
+                        MEStreamStarted
+                    };
+                    stream.QueueEvent(kind.0 as u32, &GUID::zeroed(), S_OK, position)?;
                 }
             }
+            *self.presentation.ended.lock().unwrap() = false;
+            let kind = if seeked {
+                MESourceSeeked
+            } else {
+                MESourceStarted
+            };
             self.queue
-                .QueueEventParamVar(MESourceStarted.0 as u32, &GUID::zeroed(), S_OK, position)
+                .QueueEventParamVar(kind.0 as u32, &GUID::zeroed(), S_OK, position)?;
         }
+        drop(running);
+        // (the samples held since a flush, now for the new position)
+        for s in &self.shareds {
+            s.pump();
+        }
+        Ok(())
     }
 
     fn Stop(&self) -> Result<()> {
+        *self.running.lock().unwrap() = false;
         // SAFETY: queue calls on live objects.
         unsafe {
             for (i, stream) in self.streams.iter().enumerate() {
@@ -537,6 +592,19 @@ impl Feed {
         self.streams[i].state.lock().unwrap().ended = true;
         self.streams[i].pump();
     }
+
+    /// Drops every queued sample and the streams' ends, before a seek: the samples from the new
+    /// position follow, held until the engine starts the source there (the engine's requests
+    /// stay, answered by them then).
+    pub fn flush(&self) {
+        for s in &self.streams {
+            let mut st = s.state.lock().unwrap();
+            st.samples.clear();
+            st.ended = false;
+            st.eos_sent = false;
+            st.holding = st.selected;
+        }
+    }
 }
 
 /// Creates a source with these streams.
@@ -574,6 +642,8 @@ pub fn create(specs: Vec<StreamSpec>, trust: Arc<Trust>) -> Result<(IMFMediaSour
                 ended: false,
                 eos_sent: false,
                 selected: true,
+                announced: false,
+                holding: false,
             }));
             let shared = Arc::new(Shared {
                 queue: MFCreateEventQueue()?,
@@ -599,6 +669,9 @@ pub fn create(specs: Vec<StreamSpec>, trust: Arc<Trust>) -> Result<(IMFMediaSour
             states: states.clone(),
             protected: specs.iter().map(|s| s.protected).collect(),
             trust,
+            running: Mutex::new(false),
+            shareds: shareds.clone(),
+            presentation: presentation.clone(),
             own: source_ref.clone(),
         }
         .into();

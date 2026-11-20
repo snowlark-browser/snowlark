@@ -101,6 +101,16 @@ fn invalid(msg: &'static str) -> rt::Error {
 }
 
 impl Engine {
+    /// The `SourceBuffer`s of `ms`, in order.
+    pub(crate) fn mse_buffers(&self, ms: Handle) -> Vec<Handle> {
+        self.ms(ms, |s| s.buffers.clone())
+    }
+
+    /// A `SourceBuffer`'s `timestampOffset`.
+    pub(crate) fn mse_timestamp_offset(&self, sb: Handle) -> f64 {
+        self.sb(sb, |b| b.timestamp_offset)
+    }
+
     fn ms<R>(&self, h: Handle, f: impl FnOnce(&mut SourceData) -> R) -> R {
         self.mo_mut(h, |o| match o {
             MediaObject::MediaSource(s) => f(s),
@@ -183,12 +193,17 @@ impl Engine {
         self.media_el(el, |m| {
             m.mse = Some(ms);
             m.player = Some(player);
+            m.protected = None;
         });
+        self.media_protected_check(el);
     }
 
     /// MSE §2.4.? "detaching from a media element".
     pub(crate) fn media_detach_source(&self, el: NodeId) {
-        let Some(ms) = self.media_el(el, |m| m.mse.take()) else {
+        let Some(ms) = self.media_el(el, |m| {
+            m.protected = None;
+            m.mse.take()
+        }) else {
             return;
         };
         let buffers = self.ms(ms, |s| {
@@ -368,6 +383,8 @@ impl Engine {
         let Some(ms) = self.media_el(el, |m| m.mse) else {
             return;
         };
+        // (keys of the embedder's module: the media plays through its player)
+        self.media_protected_check(el);
         let keys = self.eme_keys_of(el);
         for sb in self.ms(ms, |s| s.buffers.clone()) {
             let released = self.sb(sb, |b| b.crypt.as_mut().map(|d| d.retry(&keys)));
@@ -393,6 +410,9 @@ impl Engine {
         self.fire_at(ms, "sourceended");
         if let Some(n) = self.ms(ms, |s| s.native.clone()) {
             n.end_of_stream(error);
+        }
+        if let (None, Some(el)) = (error, self.ms(ms, |s| s.media)) {
+            self.media_protected_end(el);
         }
         // MSE §3.5.? with an error: before the metadata, the element's dedicated media source
         // failure steps; after, its network or decode error steps.
@@ -980,9 +1000,14 @@ impl SourceBufferImpl for Engine {
         self.fire_at(this, "updatestart");
         self.mse_trace(source, format_args!("append sb{id} {} bytes", bytes.len()));
         // EME: an MP4 stream's Common Encryption is decrypted here; segments whose key is not
-        // known yet wait in the decryptor.
+        // known yet wait in the decryptor. With keys of the embedder's module, the module's player
+        // takes the samples, and the bytes go to the media side as they are.
         let media = self.ms(source, |s| s.media);
+        let protected = media.is_some_and(|el| self.media_protected_append(el, this, &bytes));
         let mut crypt = self.sb(this, |b| b.crypt.take());
+        if let (true, Some(d)) = (protected, &mut crypt) {
+            d.keep_media();
+        }
         let (out, found) = match &mut crypt {
             Some(d) => {
                 let keys = media.map(|el| self.eme_keys_of(el)).unwrap_or_default();
@@ -1121,6 +1146,9 @@ impl SourceBufferImpl for Engine {
         self.sb(this, |b| b.updating = true);
         self.fire_at(this, "updatestart");
         self.mse_trace(source, format_args!("remove sb{id} {start:.3}-{end:.3}"));
+        if let Some(el) = self.ms(source, |s| s.media) {
+            self.media_protected_remove(el, this, start, end);
+        }
         if native.remove(id, start, end).is_err() {
             self.sb(this, |b| b.updating = false);
             self.fire_at(this, "update");

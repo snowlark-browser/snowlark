@@ -17,10 +17,12 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::cenc::{self, be16, be32, be64, child, children, header, KeyId, Scheme, Trex};
 
 /// How one sample is encrypted (ISO/IEC 23001-7).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SampleEncryption {
     /// `cenc` (AES-CTR) when false, `cbcs` (AES-CBC with a pattern) when true.
     pub cbc: bool,
@@ -35,7 +37,7 @@ pub struct SampleEncryption {
 }
 
 /// One coded sample.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sample {
     pub data: Vec<u8>,
     /// Presentation time and duration in 100 ns units.
@@ -46,7 +48,7 @@ pub struct Sample {
 }
 
 /// A track's codec and its configuration.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Codec {
     /// H.264 (`avc1`, `avc3`): the `avcC`'s sequence and picture parameter sets as Annex B, and
     /// the size of the length prefixes of the samples' NAL units.
@@ -61,14 +63,14 @@ pub enum Codec {
 }
 
 /// A protected track's scheme and default key.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrackEncryption {
     pub scheme: Scheme,
     pub key_id: KeyId,
 }
 
 /// One track of an initialization segment.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Track {
     pub id: u32,
     pub video: bool,
@@ -86,7 +88,7 @@ pub struct Track {
 }
 
 /// What [`SampleReader::push`] found.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Output {
     /// An initialization segment's tracks.
     Tracks(Vec<Track>),

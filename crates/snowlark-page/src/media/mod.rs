@@ -20,6 +20,7 @@ pub mod cdm;
 pub(crate) mod eme;
 pub(crate) mod mse;
 pub(crate) mod objects;
+pub(crate) mod protected;
 pub mod vtt;
 
 use std::collections::HashMap;
@@ -191,6 +192,9 @@ pub(crate) struct El {
     pub presented: u64,
     pub painted: Option<snowlark_render::source::MediaState>,
     pub frames_copied: u64,
+    /// Playback through a protected player of the embedder's module (its `MediaKeys`'), which
+    /// then is the element's player.
+    pub protected: Option<Box<protected::Protected>>,
 }
 
 impl El {
@@ -253,6 +257,7 @@ impl El {
             presented: 0,
             painted: None,
             frames_copied: 0,
+            protected: None,
         }
     }
 
@@ -316,6 +321,8 @@ pub(crate) struct Media {
     /// Instances of the embedder's modules not released yet, by their id there: the document
     /// that made each and its `MediaKeys` (none while being made).
     pub cdm_keys: HashMap<u64, (NodeId, Option<Handle>)>,
+    /// Protected players of the embedder's modules, by their id there: their element.
+    pub cdm_players: HashMap<u64, NodeId>,
 }
 
 impl Drop for Media {

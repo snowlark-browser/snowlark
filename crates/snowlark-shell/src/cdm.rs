@@ -17,9 +17,15 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
+use snowlark_media::fmp4::{Sample, Track};
 use snowlark_media::win::playready::{type_supported, RECOMMENDATION_3000};
-use snowlark_media::win::playready_service::{system_supports, Event, Service};
-use snowlark_page::media::cdm::{Cdm, CdmError, CdmEvent, CdmInbox, KeyStatus, MessageKind};
+use snowlark_media::win::playready_service::{
+    system_supports, Control, EngineState, Event, PlayerEvent, Service,
+};
+use snowlark_page::media::cdm::{
+    Cdm, CdmError, CdmEvent, CdmInbox, KeyStatus, MessageKind, PlayerControl, PlayerReport,
+    PlayerState,
+};
 
 /// See the module.
 pub struct BrowserCdm {
@@ -34,6 +40,9 @@ pub struct BrowserCdm {
     /// Each module instance's inbox, and each session's instance.
     inboxes: Mutex<HashMap<u64, Arc<CdmInbox>>>,
     sessions: Mutex<HashMap<u64, u64>>,
+    /// Each protected player's picture, once its engine has one: a composition surface for the
+    /// compositor to show.
+    surfaces: Arc<Mutex<HashMap<u64, std::os::windows::io::OwnedHandle>>>,
 }
 
 /// 128 random bits as hex (the standard library's random hash keys, from the system's generator).
@@ -82,6 +91,7 @@ impl BrowserCdm {
             next: AtomicU64::new(0),
             inboxes: Mutex::default(),
             sessions: Mutex::default(),
+            surfaces: Arc::default(),
         }
     }
 
@@ -193,6 +203,34 @@ fn page_event(event: Event) -> CdmEvent {
     }
 }
 
+/// A player event as the page's report (none: it stays in the browser).
+fn player_report(event: PlayerEvent) -> Option<PlayerReport> {
+    Some(match event {
+        PlayerEvent::Error(why) => PlayerReport::Error(why),
+        PlayerEvent::Surface(_) => return None,
+        PlayerEvent::Engine { state, time } => PlayerReport::State {
+            state: match state {
+                EngineState::FirstFrame => PlayerState::FirstFrame,
+                EngineState::Playing => PlayerState::Playing,
+                EngineState::Waiting => PlayerState::Waiting,
+                EngineState::Paused => PlayerState::Paused,
+                EngineState::Seeked => PlayerState::Seeked,
+                EngineState::Ended => PlayerState::Ended,
+            },
+            time,
+        },
+        PlayerEvent::Progress {
+            time,
+            rendered,
+            dropped,
+        } => PlayerReport::Progress {
+            time,
+            rendered,
+            dropped,
+        },
+    })
+}
+
 impl Cdm for BrowserCdm {
     fn supports(&self, key_system: &str, content_type: &str) -> bool {
         self.offered(key_system) && type_supported(key_system, content_type)
@@ -284,6 +322,69 @@ impl Cdm for BrowserCdm {
             .retain(|_, k| *k != keys);
         if let Some(service) = self.service.get().and_then(|s| s.as_ref()) {
             service.release(keys);
+        }
+    }
+
+    fn play(&self, keys: u64, tracks: Vec<Track>) -> u64 {
+        let player = self.next.fetch_add(1, Ordering::Relaxed) + 1;
+        let inbox = self
+            .inboxes
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&keys)
+            .cloned();
+        let (Some(inbox), Some(service)) = (inbox, self.service.get().and_then(|s| s.as_ref()))
+        else {
+            return player;
+        };
+        let surfaces = self.surfaces.clone();
+        service.play(
+            player,
+            keys,
+            tracks,
+            Arc::new(move |e| {
+                if let PlayerEvent::Surface(h) = e {
+                    surfaces
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .insert(player, h);
+                } else if let Some(report) = player_report(e) {
+                    inbox.deliver(CdmEvent::Player { player, report });
+                }
+            }),
+        );
+        player
+    }
+
+    fn sample(&self, player: u64, track: u32, sample: Sample) {
+        if let Some(service) = self.service.get().and_then(|s| s.as_ref()) {
+            service.sample(player, track, sample);
+        }
+    }
+
+    fn control(&self, player: u64, control: PlayerControl) {
+        let control = match control {
+            PlayerControl::Play => Control::Play,
+            PlayerControl::Pause => Control::Pause,
+            PlayerControl::Flush => Control::Flush,
+            PlayerControl::Seek(t) => Control::Seek(t),
+            PlayerControl::Rate(r) => Control::Rate(r),
+            PlayerControl::Volume(v) => Control::Volume(v),
+            PlayerControl::Muted(m) => Control::Muted(m),
+            PlayerControl::End(t) => Control::End(t),
+        };
+        if let Some(service) = self.service.get().and_then(|s| s.as_ref()) {
+            service.control(player, control);
+        }
+    }
+
+    fn stop(&self, player: u64) {
+        self.surfaces
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&player);
+        if let Some(service) = self.service.get().and_then(|s| s.as_ref()) {
+            service.stop(player);
         }
     }
 }

@@ -1,25 +1,32 @@
-﻿// This Source Code Form is subject to the terms of the Mozilla Public
+// This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! The browser's key systems for a renderer ([`Cdm`]): every call is a message, every module
 //! event comes back as one. A renderer names its module instances and sessions by its own ids,
 //! which the host maps to the browser's; an id it never made, or an origin outside its site lock,
-//! kills it.
+//! kills it. So do the protected players of its instances: their tracks and samples are checked
+//! against what it said when it made them, and bounded.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
 use serde::{Deserialize, Serialize};
-use snowlark_ipc::{Error, Replier};
-use snowlark_page::media::cdm::{Cdm, CdmError, CdmEvent, CdmInbox};
+use snowlark_ipc::{Bulk, Error, Replier};
+use snowlark_media::fmp4::{Sample, Track};
+use snowlark_page::media::cdm::{Cdm, CdmError, CdmEvent, CdmInbox, PlayerControl};
 
-use super::{answer, ask, BrowserPort, RendererPort};
+use super::{answer, ask, pack, unpack, BrowserPort, RendererPort};
 
 /// The largest initialization data, response or message that crosses (a licence server's
 /// answers and the module's requests are a few tens of KiB).
 pub const MAX_DATA: usize = 512 * 1024;
+/// The largest coded sample that crosses (a key frame of 4K video is a few MiB).
+pub const MAX_SAMPLE: usize = 16 << 20;
+/// The most tracks a protected player plays, and players a renderer has at once.
+pub const MAX_TRACKS: usize = 8;
+pub const MAX_PLAYERS: usize = 64;
 
 /// Renderer to browser: the calls of [`Cdm`].
 #[derive(Debug, Serialize, Deserialize)]
@@ -60,6 +67,25 @@ pub enum Up {
     },
     Release {
         keys: u64,
+    },
+    /// [`Cdm::play`]: player `player` of instance `keys`.
+    Play {
+        keys: u64,
+        player: u64,
+        tracks: Vec<Track>,
+    },
+    /// [`Cdm::sample`]: a [`Sample`], encoded, as bulk.
+    Sample {
+        player: u64,
+        track: u32,
+        sample: Bulk,
+    },
+    Control {
+        player: u64,
+        control: PlayerControl,
+    },
+    Stop {
+        player: u64,
     },
 }
 
@@ -175,6 +201,44 @@ impl Cdm for RemoteCdm {
             .remove(&keys);
         self.send(Up::Release { keys });
     }
+
+    fn play(&self, keys: u64, tracks: Vec<Track>) -> u64 {
+        let player = self.next.fetch_add(1, Ordering::Relaxed) + 1;
+        self.send(Up::Play {
+            keys,
+            player,
+            tracks,
+        });
+        player
+    }
+
+    fn sample(&self, player: u64, track: u32, sample: Sample) {
+        // (a sample that cannot be packed is lost: the player waits, as for missing data)
+        if let Ok(sample) = pack(&self.port, &sample) {
+            self.send(Up::Sample {
+                player,
+                track,
+                sample,
+            });
+        }
+    }
+
+    fn control(&self, player: u64, control: PlayerControl) {
+        self.send(Up::Control { player, control });
+    }
+
+    fn stop(&self, player: u64) {
+        self.send(Up::Stop { player });
+    }
+}
+
+/// One of the renderer's protected players.
+struct PlayerIds {
+    /// The browser's player; none once its instance was released (what still comes for it is
+    /// dropped).
+    browser: Option<u64>,
+    keys: u64,
+    tracks: Vec<u32>,
 }
 
 #[derive(Default)]
@@ -188,7 +252,16 @@ struct Ids {
     sessions_back: HashMap<u64, (u64, u64)>,
     /// Each request waiting for its answer: the renderer's instance it is for.
     requests: HashMap<u64, u64>,
+    /// The renderer's players, and the browser's to the renderer's.
+    players: HashMap<u64, PlayerIds>,
+    players_back: HashMap<u64, u64>,
+    /// Reports of browser players not known yet: a player can report before its making returns
+    /// here (the oldest go beyond [`HELD`]).
+    held: std::collections::VecDeque<CdmEvent>,
 }
+
+/// The most reports held for players not known yet.
+const HELD: usize = 64;
 
 /// The browser's end of one renderer's key systems.
 pub struct CdmHost {
@@ -229,7 +302,9 @@ impl CdmHost {
     /// Sends what the modules reported, in the renderer's ids.
     fn forward(&self) {
         let mut ids = self.ids();
-        for event in self.inbox.take() {
+        let mut events: Vec<CdmEvent> = ids.held.drain(..).collect();
+        events.extend(self.inbox.take());
+        for event in events {
             let (keys, event) = match event {
                 CdmEvent::Done { request, result } => {
                     let Some(keys) = ids.requests.remove(&request) else {
@@ -270,6 +345,25 @@ impl CdmHost {
                     };
                     (keys, CdmEvent::Closed { session })
                 }
+                CdmEvent::Player { player, report } => {
+                    let Some(&mine) = ids.players_back.get(&player) else {
+                        if ids.held.len() == HELD {
+                            ids.held.pop_front();
+                        }
+                        ids.held.push_back(CdmEvent::Player { player, report });
+                        continue;
+                    };
+                    let Some(p) = ids.players.get(&mine) else {
+                        continue;
+                    };
+                    (
+                        p.keys,
+                        CdmEvent::Player {
+                            player: mine,
+                            report,
+                        },
+                    )
+                }
             };
             let _ = self
                 .port
@@ -304,6 +398,21 @@ impl CdmHost {
             return Err(self.bad(format!("{len} bytes for a key system")));
         }
         Ok(())
+    }
+
+    /// The browser's player for the renderer's `player` (none: its instance is released); a
+    /// player it never made, or a track it did not give it, kills it.
+    fn player(&self, player: u64, track: Option<u32>) -> Result<Option<u64>, Error> {
+        let ids = self.ids();
+        let Some(p) = ids.players.get(&player) else {
+            drop(ids);
+            return Err(self.bad(format!("a call on player {player}, which it never made")));
+        };
+        if let Some(t) = track.filter(|t| !p.tracks.contains(t)) {
+            drop(ids);
+            return Err(self.bad(format!("track {t} of player {player}, which it never gave")));
+        }
+        Ok(p.browser)
     }
 
     pub(super) fn serve(&self, message: Up, replier: Option<Replier>) -> Result<(), Error> {
@@ -427,17 +536,115 @@ impl CdmHost {
                         ids.sessions_back.remove(&b);
                     }
                 }
+                // (its players end with it; what the renderer still sends them is dropped)
+                let mut ended = Vec::new();
+                for p in ids.players.values_mut().filter(|p| p.keys == keys) {
+                    ended.extend(p.browser.take());
+                }
+                for b in ended {
+                    ids.players_back.remove(&b);
+                }
                 drop(ids);
                 backend.release(browser);
+                Ok(())
+            }
+            Up::Play {
+                keys,
+                player,
+                tracks,
+            } => {
+                let ids = self.ids();
+                let Some(&browser_keys) = ids.keys.get(&keys) else {
+                    drop(ids);
+                    return Err(self.bad(format!("a player of media keys {keys}, never made")));
+                };
+                if ids.players.contains_key(&player) || ids.players.len() >= MAX_PLAYERS {
+                    drop(ids);
+                    return Err(self.bad(format!("player {player} made twice, or too many")));
+                }
+                drop(ids);
+                let mut seen: Vec<u32> = tracks.iter().map(|t| t.id).collect();
+                seen.sort_unstable();
+                seen.dedup();
+                if tracks.is_empty() || tracks.len() > MAX_TRACKS || seen.len() != tracks.len() {
+                    return Err(self.bad(format!("a player of {} tracks", tracks.len())));
+                }
+                let browser = backend.play(browser_keys, tracks);
+                let mut ids = self.ids();
+                ids.players.insert(
+                    player,
+                    PlayerIds {
+                        browser: Some(browser),
+                        keys,
+                        tracks: seen,
+                    },
+                );
+                ids.players_back.insert(browser, player);
+                drop(ids);
+                // (what it reported while being made)
+                self.forward();
+                Ok(())
+            }
+            Up::Sample {
+                player,
+                track,
+                sample,
+            } => {
+                if sample.len() > MAX_SAMPLE as u64 + 4096 {
+                    return Err(self.bad(format!("a sample of {} bytes", sample.len())));
+                }
+                let browser = self.player(player, Some(track))?;
+                let sample: Sample = unpack(&self.port, sample)?;
+                let bounded = sample.data.len() <= MAX_SAMPLE
+                    && sample
+                        .encryption
+                        .as_ref()
+                        .is_none_or(|e| e.iv.len() <= 16 && e.subsamples.len() <= 4096);
+                if !bounded {
+                    return Err(self.bad("a sample out of bounds".into()));
+                }
+                if let Some(b) = browser {
+                    backend.sample(b, track, sample);
+                }
+                Ok(())
+            }
+            Up::Control { player, control } => {
+                let track = match control {
+                    PlayerControl::End(t) => Some(t),
+                    _ => None,
+                };
+                if let Some(b) = self.player(player, track)? {
+                    backend.control(b, control);
+                }
+                Ok(())
+            }
+            Up::Stop { player } => {
+                self.player(player, None)?;
+                let mut ids = self.ids();
+                let p = ids.players.remove(&player);
+                if let Some(b) = p.and_then(|p| p.browser) {
+                    ids.players_back.remove(&b);
+                    drop(ids);
+                    backend.stop(b);
+                }
                 Ok(())
             }
         }
     }
 
-    /// The renderer is gone: so are its module instances.
+    /// The renderer is gone: so are its module instances and players.
     pub(super) fn gone(&self) {
+        let players: Vec<u64> = self
+            .ids()
+            .players
+            .drain()
+            .filter_map(|(_, p)| p.browser)
+            .collect();
         let keys: Vec<u64> = self.ids().keys.drain().map(|(_, b)| b).collect();
         if let Some(backend) = &self.backend {
+            for p in players {
+                backend.stop(p);
+            }
             for k in keys {
                 backend.release(k);
             }
