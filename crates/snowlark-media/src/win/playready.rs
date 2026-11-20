@@ -863,6 +863,29 @@ pub(crate) mod tests {
         panic!("no usable key");
     }
 
+    /// What the system's hardware PlayReady answers for the content types players ask about (the
+    /// answer depends on the machine's decoders; run by hand).
+    #[test]
+    #[ignore]
+    fn types_the_system_module_plays() {
+        for t in [
+            "video/mp4; codecs=\"avc1.640028\"",
+            "video/mp4;codecs=\"avc1.4d401e\"",
+            "video/mp4",
+            "audio/mp4; codecs=\"mp4a.40.2\"",
+            "audio/mp4;codecs=\"mp4a.40.5\"",
+            "audio/mp4; codecs=\"ec-3\"",
+            "audio/mp4",
+            "video/mp4; codecs=\"hev1.2.6.L153.B0\"",
+            "video/mp4; codecs=\"vp09.00.10.08\"",
+            "video/mp4; codecs=\"av01.0.08M.08\"",
+            "video/mp4; codecs=\"avc1.640028\"; features=\"hdcp=1\"",
+            "video/mp4; codecs=\"avc1.640028,mp4a.40.2\"",
+        ] {
+            println!("{t}: {}", type_supported(RECOMMENDATION_3000, t));
+        }
+    }
+
     /// A licence round trip with the system's PlayReady against Microsoft's public test server
     /// (network; run by hand).
     #[test]

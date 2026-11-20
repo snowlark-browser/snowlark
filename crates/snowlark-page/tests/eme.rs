@@ -52,6 +52,9 @@ struct Fake {
     /// What its protected players were told: "play <keys> <tracks>", "sample <track> <time>
     /// <key>", "<control>", "stop".
     player: Mutex<Vec<String>>,
+    /// Offers only its hardware level (`org.test.module.3000`), for MP4 video and audio, as the
+    /// window offers PlayReady.
+    hardware_only: bool,
 }
 impl Fake {
     fn send(&self, e: CdmEvent) {
@@ -60,6 +63,11 @@ impl Fake {
 }
 impl Cdm for Fake {
     fn supports(&self, key_system: &str, content_type: &str) -> bool {
+        if self.hardware_only {
+            return key_system == "org.test.module.3000"
+                && (content_type.starts_with("video/mp4")
+                    || content_type.starts_with("audio/mp4"));
+        }
         matches!(key_system, "org.test.module" | "org.test.module.3000")
             && content_type.starts_with("video/mp4")
     }
@@ -368,6 +376,56 @@ fn a_robustness_names_the_modules_security_level() {
             "org.test.module.3000",
             "org.test.module"
         ]
+    );
+}
+
+/// An empty robustness has no requirement: with a module that offers only its hardware level, a
+/// configuration of the name without the level whose video asks `"3000"` and whose audio asks
+/// nothing (PlayReady's `com.microsoft.playready.recommendation` as a streaming service asks it)
+/// is supported, audio included, and played by the hardware level; the level is the one a
+/// supported capability names, so without one an empty robustness asks the name as given.
+#[test]
+fn an_empty_robustness_takes_the_configurations_level() {
+    let fake = Arc::new(Fake {
+        hardware_only: true,
+        ..Fake::default()
+    });
+    let mut p = page_with(&fake);
+    let r = run_async(
+        &mut p,
+        r#"
+        const v = (codecs, robustness, encryptionScheme) =>
+            ({contentType: `video/mp4; codecs="${codecs}"`, robustness, encryptionScheme});
+        const a = (codecs, encryptionScheme) =>
+            ({contentType: `audio/mp4; codecs="${codecs}"`, robustness: '', encryptionScheme});
+        const out = [];
+        for (const [ks, c] of [
+            ['org.test.module', {initDataTypes: ['cenc'],
+                videoCapabilities: [v('avc1.4d400d', '3000'), v('avc1.4d400d', '3000', 'cbcs')],
+                audioCapabilities: [a('mp4a.40.5'), a('mp4a.40.2'), a('mp4a.40.2', 'cbcs')]}],
+            ['org.test.module', {videoCapabilities: [v('avc1.4d400d', '')], audioCapabilities: [a('mp4a.40.2')]}],
+            ['org.test.module', {videoCapabilities: [{contentType: 'video/webm', robustness: '3000'}],
+                audioCapabilities: [a('mp4a.40.2')]}],
+            ['org.test.module.3000', {videoCapabilities: [v('avc1.4d400d', '')], audioCapabilities: [a('mp4a.40.2')]}]]) {
+            try {
+                const access = await navigator.requestMediaKeySystemAccess(ks, [c]);
+                const g = access.getConfiguration();
+                out.push(g.videoCapabilities.map(c => c.robustness || 'empty').join('+') + '/' +
+                         g.audioCapabilities.map(c => c.contentType.slice(19, -1) + (c.encryptionScheme ? ':' + c.encryptionScheme : '')).join('+'));
+                await access.createMediaKeys();
+            } catch (e) { out.push(e.name); }
+        }
+        return out.join(' ');
+    "#,
+    );
+    assert_eq!(
+        r,
+        "3000+3000/mp4a.40.5+mp4a.40.2+mp4a.40.2:cbcs NotSupportedError NotSupportedError \
+         empty/mp4a.40.2"
+    );
+    assert_eq!(
+        *fake.systems.lock().unwrap(),
+        ["org.test.module.3000", "org.test.module.3000"]
     );
 }
 

@@ -157,10 +157,13 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 ## Media
 
 - **DRM.** Encrypted Media Extensions offer Clear Key and, in the window on Windows 10 2004 or later with hardware
-  DRM, PlayReady (`com.microsoft.playready.recommendation.3000`); Widevine is not offered, so services that need it
-  cannot play. Protected video plays through Media Source Extensions only, with temporary sessions only, and stays
+  DRM, PlayReady (`com.microsoft.playready.recommendation.3000`, or the name without `.3000` with robustness
+  `"3000"`); Widevine is not offered, so services that need it cannot play. Netflix asks for Widevine only and shows
+  error D7701-1003. Protected video plays through Media Source Extensions only, with temporary sessions only, and stays
   black with the GPU process (`--gpu-process`). Clear Key decrypts `cenc` and `cbcs` MP4 through Media Source
   Extensions only (not a `src` file or WebM). (ref 548)
+- **xHE-AAC.** `canPlayType`, `MediaSource.isTypeSupported` and `decodingInfo` answer `mp4a.40.42` (xHE-AAC) as
+  plain AAC, without asking whether the system can decode it. (ref 574)
 - **`changeType()` to a different decoder.** Media Source Extensions `changeType()` cannot switch a set-up
   `SourceBuffer` to a stream that needs another decoder. Dolby AC-3 and E-AC-3 are not offered through MSE for that
   reason. (ref 150)

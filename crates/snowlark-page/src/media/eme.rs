@@ -197,17 +197,29 @@ fn cdm_configuration(
         return None;
     }
     // 14-15.
-    // (the robustness is asked of the module's key system it names: see `module_key_system`)
+    // (a robustness is asked of the module's key system it names, see `module_key_system`; an
+    // empty robustness has no requirement and is asked in combination with the configuration:
+    // of the level a supported capability names, or of the key system as named without one)
+    let scheme_ok = |c: &MediaKeySystemMediaCapability| {
+        c.encryption_scheme
+            .as_deref()
+            .is_none_or(|s| matches!(s, "cenc" | "cbcs" | "cbcs-1-9"))
+    };
+    let level = candidate
+        .video_capabilities
+        .iter()
+        .chain(&candidate.audio_capabilities)
+        .filter(|c| !c.robustness.is_empty() && !c.content_type.is_empty() && scheme_ok(c))
+        .map(|c| (module_key_system(key_system, &c.robustness), c))
+        .find(|(system, c)| cdm.supports(system, &c.content_type))
+        .map(|(system, _)| system);
     let capabilities = |requested: &[MediaKeySystemMediaCapability]| {
         let mut out: Vec<MediaKeySystemMediaCapability> = Vec::new();
         for c in requested {
             if c.content_type.is_empty() {
                 return None;
             }
-            if c.encryption_scheme
-                .as_deref()
-                .is_some_and(|s| !matches!(s, "cenc" | "cbcs" | "cbcs-1-9"))
-            {
+            if !scheme_ok(c) {
                 continue;
             }
             let seen = out.iter().any(|o| {
@@ -215,7 +227,10 @@ fn cdm_configuration(
                     && o.robustness == c.robustness
                     && o.encryption_scheme == c.encryption_scheme
             });
-            let system = module_key_system(key_system, &c.robustness);
+            let system = match &level {
+                Some(level) if c.robustness.is_empty() => level.clone(),
+                _ => module_key_system(key_system, &c.robustness),
+            };
             if !seen && cdm.supports(&system, &c.content_type) {
                 out.push(c.clone());
             }
