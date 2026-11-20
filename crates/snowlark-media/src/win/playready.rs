@@ -747,15 +747,15 @@ pub fn protected_engine(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// Microsoft's public PlayReady test content and licence server.
     const TEST_MP4: &str = "https://test.playready.microsoft.com/media/profficialsite/tearsofsteel_1080p_60s_24fps.6000kbps.1920x1080.h264-8b.2ch.128kbps.aac.avsep.cenc.mp4";
-    const TEST_SERVER: &str =
+    pub(crate) const TEST_SERVER: &str =
         "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:150)";
 
-    fn curl(args: &[&str]) -> Vec<u8> {
+    pub(crate) fn curl(args: &[&str]) -> Vec<u8> {
         let out = std::process::Command::new("curl.exe")
             .args(["-s", "--fail"])
             .args(args)
@@ -766,7 +766,7 @@ mod tests {
     }
 
     /// The first `pssh` box of the test file's `moov`.
-    fn pssh_of_test_file() -> Vec<u8> {
+    pub(crate) fn pssh_of_test_file() -> Vec<u8> {
         let head = curl(&["-r", "0-4095", TEST_MP4]);
         let mut at = 0;
         let mut out = Vec::new();
@@ -789,7 +789,7 @@ mod tests {
 
     /// The challenge inside the module's message: a UTF-16 `PlayReadyKeyMessage` envelope with the
     /// challenge in base64 (and the headers to send), or the bare challenge.
-    fn challenge_of(msg: &[u8]) -> Vec<u8> {
+    pub(crate) fn challenge_of(msg: &[u8]) -> Vec<u8> {
         let text: String = if msg.len() > 2 && msg[1] == 0 {
             String::from_utf16_lossy(
                 &msg.as_chunks::<2>()

@@ -313,6 +313,20 @@ pub(crate) struct Media {
     pub cdm_requests: u64,
     /// Sessions of the embedder's modules, by their id there.
     pub cdm_sessions: HashMap<u64, Handle>,
+    /// Instances of the embedder's modules not released yet, by their id there: the document
+    /// that made each and its `MediaKeys` (none while being made).
+    pub cdm_keys: HashMap<u64, (NodeId, Option<Handle>)>,
+}
+
+impl Drop for Media {
+    /// The engine is gone: so are its module instances.
+    fn drop(&mut self) {
+        if let Some(cdm) = &self.config.cdm {
+            for &keys in self.cdm_keys.keys() {
+                cdm.release(keys);
+            }
+        }
+    }
 }
 
 /// How often `timeupdate` fires while playing (HTML: every 15 to 250 ms).

@@ -796,6 +796,7 @@ impl Engine {
             self.fullscreen_unloaded(cx, old_doc);
             self.gc_document_unloaded(cx, old_doc);
             self.audio_window_unloaded(old_window);
+            self.eme_document_unloaded(old_doc);
             if !reuse {
                 // (the old Window's IndexedDB connections close with its execution context)
                 self.idb_global_destroyed(old_window);
@@ -1753,6 +1754,9 @@ impl Engine {
         for w in windows {
             self.idb_global_destroyed(w);
             self.audio_window_unloaded(w);
+        }
+        for &d in &docs {
+            self.eme_document_unloaded(d);
         }
         self.render_detach_documents(&docs);
     }

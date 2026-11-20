@@ -110,6 +110,9 @@ pub enum MediaObject {
     KeySystemAccess {
         key_system: String,
         config: Box<g::MediaKeySystemConfiguration>,
+        /// The associated document of the `navigator` it was asked of (none when that has no
+        /// window): its media keys are that document's.
+        document: Option<snowlark_dom::NodeId>,
     },
     MediaKeys(Box<super::eme::KeysData>),
     KeySession(Box<super::eme::SessionData>),

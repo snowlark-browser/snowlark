@@ -32,6 +32,93 @@ fn run_async(page: &mut Page, js: &str) -> String {
     page.eval("out", "test.js").unwrap()
 }
 
+use snowlark_page::media::cdm::{Cdm, CdmEvent, CdmInbox, KeyStatus, MessageKind};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+
+/// An embedder's module that answers at once. Its instances are 7, 8, ...; its sessions 70, 71, ...
+#[derive(Default)]
+struct Fake {
+    inbox: Mutex<Option<Arc<CdmInbox>>>,
+    origin: Mutex<String>,
+    instances: AtomicU64,
+    sessions: AtomicU64,
+    released: Mutex<Vec<u64>>,
+}
+impl Fake {
+    fn send(&self, e: CdmEvent) {
+        self.inbox.lock().unwrap().as_ref().unwrap().deliver(e);
+    }
+}
+impl Cdm for Fake {
+    fn supports(&self, key_system: &str, content_type: &str) -> bool {
+        key_system == "org.test.module" && content_type.starts_with("video/mp4")
+    }
+    fn create_keys(&self, request: u64, _: &str, origin: &str, inbox: &Arc<CdmInbox>) -> u64 {
+        *self.inbox.lock().unwrap() = Some(inbox.clone());
+        *self.origin.lock().unwrap() = origin.to_owned();
+        self.send(CdmEvent::Done {
+            request,
+            result: Ok(String::new()),
+        });
+        7 + self.instances.fetch_add(1, Ordering::Relaxed)
+    }
+    fn create_session(&self, keys: u64) -> u64 {
+        assert!(!self.released.lock().unwrap().contains(&keys));
+        70 + self.sessions.fetch_add(1, Ordering::Relaxed)
+    }
+    fn generate_request(&self, request: u64, session: u64, kind: &str, mut data: Vec<u8>) {
+        assert_eq!(kind, "cenc");
+        data.reverse();
+        self.send(CdmEvent::Message {
+            session,
+            kind: MessageKind::LicenseRequest,
+            data,
+        });
+        self.send(CdmEvent::Done {
+            request,
+            result: Ok("module-session".into()),
+        });
+    }
+    fn update(&self, request: u64, session: u64, response: Vec<u8>) {
+        self.send(CdmEvent::KeyStatuses {
+            session,
+            statuses: vec![(response, KeyStatus::Usable)],
+        });
+        self.send(CdmEvent::Expiration {
+            session,
+            time: 1234.0,
+        });
+        self.send(CdmEvent::Done {
+            request,
+            result: Ok(String::new()),
+        });
+    }
+    fn close(&self, request: u64, session: u64) {
+        self.send(CdmEvent::Closed { session });
+        self.send(CdmEvent::Done {
+            request,
+            result: Ok(String::new()),
+        });
+    }
+    fn remove(&self, _: u64, _: u64) {}
+    fn release(&self, keys: u64) {
+        let mut r = self.released.lock().unwrap();
+        assert!(!r.contains(&keys), "instance {keys} released twice");
+        r.push(keys);
+    }
+}
+
+fn page_with(fake: &Arc<Fake>) -> Page {
+    let p = page();
+    p.engine()
+        .set_media_config(snowlark_page::media::MediaConfig {
+            cdm: Some(fake.clone()),
+            ..Default::default()
+        });
+    p
+}
+
 #[test]
 fn clear_key_configuration() {
     let mut p = page();
@@ -134,83 +221,8 @@ fn set_media_keys_attaches_to_one_element() {
 /// statuses and expiration, and the page's close.
 #[test]
 fn a_key_system_of_the_embedders_module() {
-    use snowlark_page::media::cdm::{Cdm, CdmEvent, CdmInbox, KeyStatus, MessageKind};
-    use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::{Arc, Mutex};
-
-    #[derive(Default)]
-    struct Fake {
-        inbox: Mutex<Option<Arc<CdmInbox>>>,
-        origin: Mutex<String>,
-        sessions: AtomicU64,
-    }
-    impl Fake {
-        fn send(&self, e: CdmEvent) {
-            self.inbox.lock().unwrap().as_ref().unwrap().deliver(e);
-        }
-    }
-    impl Cdm for Fake {
-        fn supports(&self, key_system: &str, content_type: &str) -> bool {
-            key_system == "org.test.module" && content_type.starts_with("video/mp4")
-        }
-        fn create_keys(&self, request: u64, _: &str, origin: &str, inbox: &Arc<CdmInbox>) -> u64 {
-            *self.inbox.lock().unwrap() = Some(inbox.clone());
-            *self.origin.lock().unwrap() = origin.to_owned();
-            self.send(CdmEvent::Done {
-                request,
-                result: Ok(String::new()),
-            });
-            7
-        }
-        fn create_session(&self, keys: u64) -> u64 {
-            assert_eq!(keys, 7);
-            70 + self.sessions.fetch_add(1, Ordering::Relaxed)
-        }
-        fn generate_request(&self, request: u64, session: u64, kind: &str, mut data: Vec<u8>) {
-            assert_eq!(kind, "cenc");
-            data.reverse();
-            self.send(CdmEvent::Message {
-                session,
-                kind: MessageKind::LicenseRequest,
-                data,
-            });
-            self.send(CdmEvent::Done {
-                request,
-                result: Ok("module-session".into()),
-            });
-        }
-        fn update(&self, request: u64, session: u64, response: Vec<u8>) {
-            self.send(CdmEvent::KeyStatuses {
-                session,
-                statuses: vec![(response, KeyStatus::Usable)],
-            });
-            self.send(CdmEvent::Expiration {
-                session,
-                time: 1234.0,
-            });
-            self.send(CdmEvent::Done {
-                request,
-                result: Ok(String::new()),
-            });
-        }
-        fn close(&self, request: u64, session: u64) {
-            self.send(CdmEvent::Closed { session });
-            self.send(CdmEvent::Done {
-                request,
-                result: Ok(String::new()),
-            });
-        }
-        fn remove(&self, _: u64, _: u64) {}
-        fn release(&self, _: u64) {}
-    }
-
-    let mut p = page();
     let fake = Arc::new(Fake::default());
-    p.engine()
-        .set_media_config(snowlark_page::media::MediaConfig {
-            cdm: Some(fake.clone()),
-            ..Default::default()
-        });
+    let mut p = page_with(&fake);
     let r = run_async(
         &mut p,
         r#"
@@ -251,4 +263,37 @@ fn a_key_system_of_the_embedders_module() {
          closed-by-application"
     );
     assert_eq!(*fake.origin.lock().unwrap(), "https://example.test");
+}
+
+/// A module instance is released when the document that made it unloads (a removed frame, a
+/// navigation) or the engine goes, once: its `MediaKeys` makes no session after that and its
+/// sessions are closed.
+#[test]
+fn module_instances_are_released_with_their_document() {
+    let fake = Arc::new(Fake::default());
+    let mut p = page_with(&fake);
+    let r = run_async(
+        &mut p,
+        r#"
+        const f = document.createElement('iframe');
+        document.body.append(f);
+        const w = f.contentWindow;
+        const config = [{initDataTypes: ['cenc'], videoCapabilities: [{contentType: 'video/mp4; codecs="avc1.64001f"'}]}];
+        const a = await w.navigator.requestMediaKeySystemAccess('org.test.module', config);
+        const keys = await a.createMediaKeys();
+        const s = keys.createSession();
+        const out = [];
+        f.remove();
+        try { keys.createSession(); out.push('made'); } catch (e) { out.push(e.name); }
+        try { await s.generateRequest('cenc', new Uint8Array([1])); out.push('asked'); } catch (e) { out.push(e.name); }
+        const own = await navigator.requestMediaKeySystemAccess('org.test.module', config);
+        window.mine = await own.createMediaKeys();
+        mine.createSession();
+        return out.join(' ');
+    "#,
+    );
+    assert_eq!(r, "InvalidStateError InvalidStateError");
+    assert_eq!(*fake.released.lock().unwrap(), vec![7]);
+    drop(p);
+    assert_eq!(*fake.released.lock().unwrap(), vec![7, 8]);
 }

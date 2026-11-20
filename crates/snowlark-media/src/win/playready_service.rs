@@ -15,11 +15,15 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
 use windows::core::{HSTRING, PWSTR};
+use windows::Win32::Foundation::{HANDLE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Media::MediaFoundation::{
-    IMFContentDecryptionModule, IMFContentDecryptionModuleSession,
+    IMFContentDecryptionModule, IMFContentDecryptionModuleSession, IMFMediaEngineEx,
+    MF_E_UNSUPPORTED_FORMAT, MF_MEDIA_ENGINE_EVENT_ERROR, MF_MEDIA_ENGINE_STATISTIC_FRAMES_DROPPED,
+    MF_MEDIA_ENGINE_STATISTIC_FRAMES_RENDERED,
 };
 
 use super::playready::{self, SessionEvent};
+use super::protected_source;
 
 /// What the service reports for one module's caller.
 #[derive(Debug, Clone, PartialEq)]
@@ -53,6 +57,53 @@ pub enum Event {
 
 /// Where one module's events go (from any thread).
 pub type Sink = Arc<dyn Fn(Event) + Send + Sync>;
+
+/// What a protected player is told to do.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Control {
+    Play,
+    Pause,
+    /// To this time, in seconds.
+    Seek(f64),
+    Rate(f64),
+    Volume(f64),
+    Muted(bool),
+    /// The track with this id has no more samples.
+    End(u32),
+    /// Where the video shows, in screen pixels: the protection window takes this place (the
+    /// monitor and adapter the output is protected on) and the engine's picture this size.
+    Output {
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+    },
+}
+
+/// What a protected player reports.
+#[derive(Debug)]
+pub enum PlayerEvent {
+    /// It could not be made, or its engine failed: why.
+    Error(String),
+    /// The engine's picture: a composition surface handle of this process (the player's own
+    /// duplicate, the receiver's to close) for DirectComposition to show.
+    Surface(std::os::windows::io::OwnedHandle),
+    /// A media engine event (`MF_MEDIA_ENGINE_EVENT_*`) and the time when it came, in seconds.
+    Engine { event: u32, time: f64 },
+    /// While it has a picture, every [`PROGRESS`]: its time and its counts of frames rendered and
+    /// dropped (protected frames cannot be read back: these are the measure).
+    Progress {
+        time: f64,
+        rendered: u32,
+        dropped: u32,
+    },
+}
+
+/// How often a player reports [`PlayerEvent::Progress`].
+pub const PROGRESS: std::time::Duration = std::time::Duration::from_millis(250);
+
+/// Where one player's events go (from the service's thread).
+pub type PlayerSink = Arc<dyn Fn(PlayerEvent) + Send + Sync>;
 
 enum Job {
     Create {
@@ -89,6 +140,24 @@ enum Job {
     /// A session's key statuses changed (from Media Foundation's thread).
     Changed {
         session: u64,
+    },
+    Play {
+        player: u64,
+        keys: u64,
+        tracks: Vec<crate::fmp4::Track>,
+        sink: PlayerSink,
+    },
+    Sample {
+        player: u64,
+        track: u32,
+        sample: crate::fmp4::Sample,
+    },
+    Control {
+        player: u64,
+        control: Control,
+    },
+    End {
+        player: u64,
     },
     /// The service is dropped.
     Stop,
@@ -169,9 +238,39 @@ impl Service {
         self.send(Job::Remove { request, session });
     }
 
-    /// Module `keys` and its sessions are no longer used.
+    /// Module `keys` and its sessions are no longer used (nor its players).
     pub fn release(&self, keys: u64) {
         self.send(Job::Release { keys });
+    }
+
+    /// Makes protected player `player` of module `keys` for these tracks (each one Media
+    /// Foundation is given a type for becomes a stream), playing in a media engine whose picture
+    /// is a composition surface ([`PlayerEvent::Surface`]). Its events go to `sink`.
+    pub fn play(&self, player: u64, keys: u64, tracks: Vec<crate::fmp4::Track>, sink: PlayerSink) {
+        self.send(Job::Play {
+            player,
+            keys,
+            tracks,
+            sink,
+        });
+    }
+
+    /// Queues a sample of track `track` (an id of [`Service::play`]'s tracks).
+    pub fn sample(&self, player: u64, track: u32, sample: crate::fmp4::Sample) {
+        self.send(Job::Sample {
+            player,
+            track,
+            sample,
+        });
+    }
+
+    pub fn control(&self, player: u64, control: Control) {
+        self.send(Job::Control { player, control });
+    }
+
+    /// Player `player` ends.
+    pub fn stop(&self, player: u64) {
+        self.send(Job::End { player });
     }
 }
 
@@ -237,13 +336,337 @@ fn session_id(s: &IMFContentDecryptionModuleSession) -> Option<String> {
     }
 }
 
+/// The window a protected media engine checks its output protection against: a window of this
+/// thread that is never shown, placed where the video shows so that the protection (and, on a
+/// machine with several adapters, the adapter) is the one of that monitor.
+struct ProtectionWindow(HWND);
+
+impl ProtectionWindow {
+    fn new() -> windows::core::Result<ProtectionWindow> {
+        use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+        use windows::Win32::UI::WindowsAndMessaging::*;
+        unsafe extern "system" fn proc_(h: HWND, m: u32, w: WPARAM, l: LPARAM) -> LRESULT {
+            // SAFETY: the default handling of a message for a window of ours.
+            unsafe { DefWindowProcW(h, m, w, l) }
+        }
+        let class = windows::core::w!("SnowlarkVideoProtection");
+        // SAFETY: a window class of this module and a window of it on this thread; the window is
+        // destroyed in Drop on the same thread (the service's), which pumps its messages.
+        unsafe {
+            let instance = GetModuleHandleW(None)?;
+            let wc = WNDCLASSW {
+                lpfnWndProc: Some(proc_),
+                hInstance: instance.into(),
+                lpszClassName: class,
+                ..Default::default()
+            };
+            // (registered once per process: a second registration fails, and the first stands)
+            RegisterClassW(&wc);
+            let hwnd = CreateWindowExW(
+                WS_EX_NOPARENTNOTIFY
+                    | WS_EX_LAYERED
+                    | WS_EX_TRANSPARENT
+                    | WS_EX_NOREDIRECTIONBITMAP,
+                class,
+                windows::core::w!(""),
+                WS_POPUP | WS_DISABLED | WS_CLIPSIBLINGS,
+                0,
+                0,
+                1,
+                1,
+                None,
+                None,
+                Some(instance.into()),
+                None,
+            )?;
+            Ok(ProtectionWindow(hwnd))
+        }
+    }
+
+    fn place(&self, x: i32, y: i32, width: i32, height: i32) {
+        use windows::Win32::UI::WindowsAndMessaging::*;
+        // SAFETY: our own live window, moved without activation or showing.
+        let _ = unsafe {
+            SetWindowPos(
+                self.0,
+                Some(HWND_BOTTOM),
+                x,
+                y,
+                width.max(1),
+                height.max(1),
+                SWP_NOACTIVATE,
+            )
+        };
+    }
+}
+
+impl Drop for ProtectionWindow {
+    fn drop(&mut self) {
+        // SAFETY: our own window, destroyed on the thread that made it.
+        let _ = unsafe { windows::Win32::UI::WindowsAndMessaging::DestroyWindow(self.0) };
+    }
+}
+
+/// A protected player on the service's thread.
+struct Player {
+    keys: u64,
+    engine: IMFMediaEngineEx,
+    feed: protected_source::Feed,
+    /// The track id of each stream.
+    streams: Vec<u32>,
+    sink: PlayerSink,
+    events: Receiver<(u32, usize, u32)>,
+    /// (dropped after the engine: the engine is shut down first)
+    window: ProtectionWindow,
+    surface: bool,
+    size: (i32, i32),
+    progress: std::time::Instant,
+}
+
+impl Player {
+    fn new(
+        cdm: &IMFContentDecryptionModule,
+        keys: u64,
+        tracks: &[crate::fmp4::Track],
+        sink: PlayerSink,
+    ) -> windows::core::Result<Player> {
+        use protected_source::{StreamSpec, Trust};
+        let mut streams = Vec::new();
+        let mut specs = Vec::new();
+        for t in tracks {
+            if let Some(media_type) = protected_source::media_type(t) {
+                streams.push(t.id);
+                specs.push(StreamSpec {
+                    media_type: media_type?,
+                    protected: t.encryption.is_some(),
+                });
+            }
+        }
+        if specs.is_empty() {
+            return Err(windows::core::Error::from(MF_E_UNSUPPORTED_FORMAT));
+        }
+        let (source, feed) = protected_source::create(specs, Arc::new(Trust::new(cdm.clone())))?;
+        let extension = protected_source::extension(source);
+        let window = ProtectionWindow::new()?;
+        let (tx, events) = channel();
+        let engine =
+            playready::protected_engine(cdm, tx, Some(&extension), Some(window.0 .0 as isize))?;
+        // SAFETY: a plain call on the live engine.
+        unsafe { engine.SetSource(&windows::core::BSTR::from(protected_source::URL))? };
+        Ok(Player {
+            keys,
+            engine,
+            feed,
+            streams,
+            sink,
+            events,
+            window,
+            surface: false,
+            size: (0, 0),
+            progress: std::time::Instant::now(),
+        })
+    }
+
+    fn control(&mut self, control: Control) -> windows::core::Result<()> {
+        // SAFETY: plain calls on the live engine with live data.
+        unsafe {
+            match control {
+                Control::Play => self.engine.Play(),
+                Control::Pause => self.engine.Pause(),
+                Control::Seek(t) => self.engine.SetCurrentTime(t),
+                Control::Rate(r) => self.engine.SetPlaybackRate(r),
+                Control::Volume(v) => self.engine.SetVolume(v),
+                Control::Muted(m) => self.engine.SetMuted(m),
+                Control::End(track) => {
+                    if let Some(i) = self.streams.iter().position(|&s| s == track) {
+                        self.feed.end(i);
+                    }
+                    Ok(())
+                }
+                Control::Output {
+                    x,
+                    y,
+                    width,
+                    height,
+                } => {
+                    self.window.place(x, y, width, height);
+                    let size = (width.max(1), height.max(1));
+                    if size != self.size {
+                        let rect = RECT {
+                            left: 0,
+                            top: 0,
+                            right: size.0,
+                            bottom: size.1,
+                        };
+                        self.engine.UpdateVideoStream(None, Some(&rect), None)?;
+                        self.size = size;
+                    }
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    /// Reports what the engine did since the last call.
+    fn poll(&mut self) {
+        // SAFETY: plain calls on the live engine.
+        unsafe {
+            while let Ok((event, _, _)) = self.events.try_recv() {
+                let time = self.engine.GetCurrentTime();
+                (self.sink)(PlayerEvent::Engine { event, time });
+                if event == MF_MEDIA_ENGINE_EVENT_ERROR.0 as u32 {
+                    let why = self
+                        .engine
+                        .GetError()
+                        .map(|e| {
+                            format!(
+                                "media engine error {} ({:#010x})",
+                                e.GetErrorCode(),
+                                e.GetExtendedErrorCode()
+                                    .err()
+                                    .map_or(0, |x| x.code().0 as u32)
+                            )
+                        })
+                        .unwrap_or_else(|e| error(&e));
+                    (self.sink)(PlayerEvent::Error(why));
+                }
+            }
+            if !self.surface {
+                if let Ok(handle) = self.engine.GetVideoSwapchainHandle() {
+                    if !handle.is_invalid() && !handle.0.is_null() {
+                        self.surface = true;
+                        match duplicate(handle) {
+                            Ok(h) => (self.sink)(PlayerEvent::Surface(h)),
+                            Err(e) => (self.sink)(PlayerEvent::Error(error(&e))),
+                        }
+                    }
+                }
+            }
+            if self.surface && self.progress.elapsed() >= PROGRESS {
+                self.progress = std::time::Instant::now();
+                let stat = |id| {
+                    self.engine
+                        .GetStatistics(id)
+                        .map(|v| v.Anonymous.Anonymous.Anonymous.ulVal)
+                        .unwrap_or(0)
+                };
+                (self.sink)(PlayerEvent::Progress {
+                    time: self.engine.GetCurrentTime(),
+                    rendered: stat(MF_MEDIA_ENGINE_STATISTIC_FRAMES_RENDERED),
+                    dropped: stat(MF_MEDIA_ENGINE_STATISTIC_FRAMES_DROPPED),
+                });
+            }
+        }
+    }
+}
+
+impl Drop for Player {
+    fn drop(&mut self) {
+        // SAFETY: a plain call on the live engine; it releases the source and its streams.
+        let _ = unsafe { self.engine.Shutdown() };
+    }
+}
+
+/// This process's own handle to what `handle` names.
+fn duplicate(handle: HANDLE) -> windows::core::Result<std::os::windows::io::OwnedHandle> {
+    use std::os::windows::io::FromRawHandle;
+    use windows::Win32::Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS};
+    use windows::Win32::System::Threading::GetCurrentProcess;
+    let mut out = HANDLE::default();
+    // SAFETY: duplicating a live handle within this process into an out parameter, which then
+    // becomes an OwnedHandle (closed with it).
+    unsafe {
+        DuplicateHandle(
+            GetCurrentProcess(),
+            handle,
+            GetCurrentProcess(),
+            &mut out,
+            0,
+            false,
+            DUPLICATE_SAME_ACCESS,
+        )?;
+        Ok(std::os::windows::io::OwnedHandle::from_raw_handle(out.0))
+    }
+}
+
+/// Handles the messages of this thread's windows (the players' protection windows).
+fn pump() {
+    use windows::Win32::UI::WindowsAndMessaging::*;
+    let mut msg = MSG::default();
+    // SAFETY: the standard message loop of this thread, with a live MSG.
+    unsafe {
+        while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+            let _ = DispatchMessageW(&msg);
+        }
+    }
+}
+
+/// How long the service's thread waits for a job while players play (their events, surface and
+/// progress are looked at in between).
+const TICK: std::time::Duration = std::time::Duration::from_millis(15);
+
 fn run(rx: Receiver<Job>, tx: Sender<Job>) {
     super::ensure_com();
     let mut modules: HashMap<u64, Module> = HashMap::new();
     let mut sessions: HashMap<u64, Session> = HashMap::new();
+    let mut players: HashMap<u64, Player> = HashMap::new();
     let tx = Arc::new(Mutex::new(tx));
-    while let Ok(job) = rx.recv() {
+    loop {
+        let job = if players.is_empty() {
+            match rx.recv() {
+                Ok(job) => job,
+                Err(_) => break,
+            }
+        } else {
+            pump();
+            for p in players.values_mut() {
+                p.poll();
+            }
+            match rx.recv_timeout(TICK) {
+                Ok(job) => job,
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(_) => break,
+            }
+        };
         match job {
+            Job::Play {
+                player,
+                keys,
+                tracks,
+                sink,
+            } => {
+                let Some(m) = modules.get(&keys) else {
+                    sink(PlayerEvent::Error("no such module".into()));
+                    continue;
+                };
+                match Player::new(&m.cdm, keys, &tracks, sink.clone()) {
+                    Ok(p) => {
+                        players.insert(player, p);
+                    }
+                    Err(e) => sink(PlayerEvent::Error(error(&e))),
+                }
+            }
+            Job::Sample {
+                player,
+                track,
+                sample,
+            } => {
+                if let Some(p) = players.get(&player) {
+                    if let Some(i) = p.streams.iter().position(|&s| s == track) {
+                        p.feed.push(i, sample);
+                    }
+                }
+            }
+            Job::Control { player, control } => {
+                if let Some(p) = players.get_mut(&player) {
+                    if let Err(e) = p.control(control) {
+                        (p.sink)(PlayerEvent::Error(error(&e)));
+                    }
+                }
+            }
+            Job::End { player } => {
+                players.remove(&player);
+            }
             Job::Create {
                 request,
                 keys,
@@ -353,6 +776,7 @@ fn run(rx: Receiver<Job>, tx: Sender<Job>) {
                 }
             }
             Job::Release { keys } => {
+                players.retain(|_, p| p.keys != keys);
                 sessions.retain(|_, s| {
                     if s.keys != keys {
                         return true;
@@ -381,8 +805,206 @@ fn run(rx: Receiver<Job>, tx: Sender<Job>) {
             }
         }
     }
+    players.clear();
     for (_, s) in sessions {
         // SAFETY: a plain call on the live session.
         let _ = unsafe { s.session.Close() };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    /// Microsoft's encrypted test file (`SNOWLARK_PLAYREADY_MP4`: a local copy of the file
+    /// `playready`'s tests name) licensed and played through the service as a page's messages
+    /// drive it: the module and session by the caller's ids, the licence from Microsoft's test
+    /// server, then a player fed the tracks and samples a `SourceBuffer`'s reader gives. Its
+    /// picture is shown in a window off every monitor that never takes the foreground; protected
+    /// frames cannot be read back, so the engine's own counts are the check (network and hardware
+    /// DRM; run by hand).
+    #[test]
+    #[ignore]
+    fn protected_playback_through_the_service() {
+        use crate::fmp4::{Output, SampleReader};
+        use playready::tests::{challenge_of, curl, pssh_of_test_file, TEST_SERVER};
+        use windows::Win32::Graphics::DirectComposition::*;
+        use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+        use windows::Win32::UI::WindowsAndMessaging::*;
+        let Some(path) = std::env::var_os("SNOWLARK_PLAYREADY_MP4") else {
+            eprintln!("SNOWLARK_PLAYREADY_MP4 is not set: skipped");
+            return;
+        };
+        let service = Service::start().unwrap();
+        let (tx, rx) = mpsc::channel();
+        let tx = Mutex::new(tx);
+        let sink: Sink = Arc::new(move |e| {
+            let _ = tx.lock().unwrap().send(e);
+        });
+        let next = || {
+            rx.recv_timeout(Duration::from_secs(30))
+                .expect("a module event")
+        };
+        let store = std::env::temp_dir().join("snowlark-playready-test");
+        service.create(
+            1,
+            10,
+            playready::RECOMMENDATION_3000,
+            "test-origin",
+            store,
+            sink,
+        );
+        let created = Event::Created {
+            request: 1,
+            result: Ok(()),
+        };
+        assert_eq!(next(), created);
+        service.generate_request(2, 10, 20, "cenc", pssh_of_test_file());
+        let (mut message, mut done) = (None, false);
+        while message.is_none() || !done {
+            match next() {
+                Event::Message { data, .. } => message = Some(data),
+                Event::Done { request: 2, result } => done = result.is_ok(),
+                e => eprintln!("{e:?}"),
+            }
+        }
+        let dir = std::env::temp_dir().join("snowlark-playready-service-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("challenge.xml"), challenge_of(&message.unwrap())).unwrap();
+        let body = format!("@{}", dir.join("challenge.xml").display());
+        let licence = curl(&[
+            "-X",
+            "POST",
+            "-H",
+            "Content-Type: text/xml; charset=utf-8",
+            "-H",
+            "SOAPAction: \"http://schemas.microsoft.com/DRM/2007/03/protocols/AcquireLicense\"",
+            "--data-binary",
+            &body,
+            TEST_SERVER,
+        ]);
+        service.update(3, 20, licence);
+        loop {
+            if let Event::Statuses { statuses, .. } = next() {
+                if statuses.iter().any(|s| s.1 == "usable") {
+                    break;
+                }
+            }
+        }
+        let bytes = std::fs::read(path).unwrap();
+        let mut reader = SampleReader::new();
+        let mut out = Vec::new();
+        for piece in bytes.chunks(1 << 20) {
+            out.extend(reader.push(piece));
+        }
+        let tracks = reader.tracks().to_vec();
+        let (ptx, prx) = mpsc::channel();
+        let ptx = Mutex::new(ptx);
+        service.play(
+            30,
+            10,
+            tracks.clone(),
+            Arc::new(move |e| {
+                let _ = ptx.lock().unwrap().send(e);
+            }),
+        );
+        for o in out {
+            if let Output::Sample(id, sample) = o {
+                service.sample(30, id, sample);
+            }
+        }
+        for t in &tracks {
+            service.control(30, Control::End(t.id));
+        }
+        let (w, h) = (960, 540);
+        service.control(30, Control::Muted(true));
+        service.control(
+            30,
+            Control::Output {
+                x: -4000,
+                y: -4000,
+                width: w,
+                height: h,
+            },
+        );
+        service.control(30, Control::Play);
+        // SAFETY: test code: a plain window, DirectComposition calls and a message loop with
+        // live handles.
+        unsafe {
+            unsafe extern "system" fn proc_(h: HWND, m: u32, w: WPARAM, l: LPARAM) -> LRESULT {
+                // SAFETY: the default handling of a message for our own window.
+                unsafe { DefWindowProcW(h, m, w, l) }
+            }
+            let class = windows::core::w!("SnowlarkPlayReadyServiceTest");
+            let instance = GetModuleHandleW(None).unwrap();
+            let wc = WNDCLASSW {
+                lpfnWndProc: Some(proc_),
+                hInstance: instance.into(),
+                lpszClassName: class,
+                ..Default::default()
+            };
+            RegisterClassW(&wc);
+            let hwnd = CreateWindowExW(
+                WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP,
+                class,
+                windows::core::w!("playready"),
+                WS_POPUP,
+                -4000,
+                -4000,
+                w,
+                h,
+                None,
+                None,
+                Some(instance.into()),
+                None,
+            )
+            .unwrap();
+            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+            let dcomp: IDCompositionDevice = DCompositionCreateDevice(None).unwrap();
+            let target = dcomp.CreateTargetForHwnd(hwnd, true).unwrap();
+            let visual = dcomp.CreateVisual().unwrap();
+            target.SetRoot(&visual).unwrap();
+            let start = Instant::now();
+            let mut surface_at = None;
+            let mut last = (0.0, 0, 0);
+            while start.elapsed() < Duration::from_secs(14) {
+                let mut msg = MSG::default();
+                while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                    let _ = DispatchMessageW(&msg);
+                }
+                while let Ok(e) = prx.try_recv() {
+                    match e {
+                        PlayerEvent::Surface(handle) => {
+                            use std::os::windows::io::AsRawHandle;
+                            surface_at = Some(start.elapsed());
+                            let surface = dcomp
+                                .CreateSurfaceFromHandle(HANDLE(handle.as_raw_handle()))
+                                .unwrap();
+                            visual.SetContent(&surface).unwrap();
+                            dcomp.Commit().unwrap();
+                        }
+                        PlayerEvent::Progress {
+                            time,
+                            rendered,
+                            dropped,
+                        } => last = (time, rendered, dropped),
+                        PlayerEvent::Error(why) => panic!("{why}"),
+                        PlayerEvent::Engine { .. } => {}
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(15));
+            }
+            service.stop(30);
+            service.release(10);
+            let _ = DestroyWindow(hwnd);
+            eprintln!(
+                "surface at {surface_at:?}; time {:.2} frames rendered {} dropped {}",
+                last.0, last.1, last.2
+            );
+            assert!(surface_at.is_some(), "no composition surface");
+            assert!(last.1 > 100, "{} frames", last.1);
+        }
     }
 }

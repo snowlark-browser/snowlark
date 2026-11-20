@@ -2032,11 +2032,18 @@ impl NavigatorImpl for Engine {
     fn request_media_key_system_access(
         &self,
         cx: &mut Cx,
-        _this: Handle,
+        this: Handle,
         key_system: &str,
         supported_configurations: Vec<snowlark_bindings::generated::MediaKeySystemConfiguration>,
     ) -> rt::Result<JsPromise> {
-        Engine::request_media_key_system_access(self, cx, key_system, supported_configurations)
+        let document = self.associated_document(self.navigator_window(this));
+        Engine::request_media_key_system_access(
+            self,
+            cx,
+            document,
+            key_system,
+            supported_configurations,
+        )
     }
     /// Media Capabilities `navigator.mediaCapabilities` (one per navigator).
     fn media_capabilities(&self, this: Handle) -> Handle {

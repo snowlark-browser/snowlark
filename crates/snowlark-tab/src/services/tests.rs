@@ -357,6 +357,9 @@ fn child_main() {
         | "forge-audio-out-size"
         | "forge-audio-out-credits"
         | "forge-audio-out-id" => audio_out_forge(&port, &role),
+        "cdm" => cdm_child(&port),
+        "forge-cdm-session" | "forge-cdm-keys" | "forge-cdm-size" | "forge-cdm-twice"
+        | "forge-cdm-release" => cdm_forge(&port, &role),
         other => panic!("role {other}"),
     };
     std::process::exit(code);
@@ -2594,4 +2597,247 @@ fn a_renderers_streams_end_with_it() {
     assert_eq!(child.process.wait(WAIT), Some(0));
     assert!(matches!(child.served.join().unwrap(), Error::Closed));
     assert_eq!(child.host.audio_out.streams(), 0);
+}
+
+/// The browser's key systems for the tests: one, `org.test.module`, whose instances are 1001,
+/// 1002, ... and sessions 2001, ... (never the renderer's ids), answering every call at once and
+/// logging it.
+#[derive(Default)]
+struct FakeCdm {
+    inbox: std::sync::Mutex<Option<Arc<snowlark_page::media::cdm::CdmInbox>>>,
+    next: std::sync::atomic::AtomicU64,
+    calls: std::sync::Mutex<Vec<String>>,
+}
+
+impl FakeCdm {
+    fn log(&self, call: String) {
+        self.calls.lock().unwrap().push(call);
+    }
+    fn send(&self, e: snowlark_page::media::cdm::CdmEvent) {
+        let inbox = self.inbox.lock().unwrap().clone();
+        inbox.unwrap().deliver(e);
+    }
+    fn calls(&self) -> Vec<String> {
+        self.calls.lock().unwrap().clone()
+    }
+}
+
+impl snowlark_page::media::cdm::Cdm for FakeCdm {
+    fn supports(&self, key_system: &str, _: &str) -> bool {
+        key_system == "org.test.module"
+    }
+    fn create_keys(
+        &self,
+        request: u64,
+        _: &str,
+        origin: &str,
+        inbox: &Arc<snowlark_page::media::cdm::CdmInbox>,
+    ) -> u64 {
+        use std::sync::atomic::Ordering;
+        let keys = 1001 + self.next.fetch_add(1, Ordering::Relaxed);
+        self.log(format!("create {keys} {origin}"));
+        *self.inbox.lock().unwrap() = Some(inbox.clone());
+        self.send(snowlark_page::media::cdm::CdmEvent::Done {
+            request,
+            result: Ok(String::new()),
+        });
+        keys
+    }
+    fn create_session(&self, keys: u64) -> u64 {
+        let session = keys + 1000;
+        self.log(format!("session {keys} {session}"));
+        session
+    }
+    fn generate_request(&self, request: u64, session: u64, _: &str, mut data: Vec<u8>) {
+        use snowlark_page::media::cdm::{CdmEvent, MessageKind};
+        self.log(format!("generate {session}"));
+        data.reverse();
+        self.send(CdmEvent::Message {
+            session,
+            kind: MessageKind::LicenseRequest,
+            data,
+        });
+        self.send(CdmEvent::Done {
+            request,
+            result: Ok(format!("module-{session}")),
+        });
+    }
+    fn update(&self, request: u64, session: u64, response: Vec<u8>) {
+        use snowlark_page::media::cdm::{CdmEvent, KeyStatus};
+        self.log(format!("update {session}"));
+        self.send(CdmEvent::KeyStatuses {
+            session,
+            statuses: vec![(response, KeyStatus::Usable)],
+        });
+        // (an event for a session the renderer never had is not forwarded)
+        self.send(CdmEvent::Closed { session: 9999 });
+        self.send(CdmEvent::Done {
+            request,
+            result: Ok(String::new()),
+        });
+    }
+    fn close(&self, _: u64, _: u64) {}
+    fn remove(&self, _: u64, _: u64) {}
+    fn release(&self, keys: u64) {
+        self.log(format!("release {keys}"));
+    }
+}
+
+/// A renderer's EME calls in its own ids: two instances, a session's request, update and key
+/// statuses; it releases the first and exits with the second still made.
+fn cdm_child(port: &RendererPort) -> i32 {
+    use snowlark_page::media::cdm::{Cdm, CdmEvent, CdmInbox, KeyStatus, MessageKind};
+    let services = remote(port);
+    let cdm: &dyn Cdm = &*services.cdm;
+    let (tx, woken) = mpsc::channel();
+    let inbox = Arc::new(CdmInbox::new(Arc::new(move || {
+        let _ = tx.send(());
+    })));
+    let events = |n: usize| {
+        let mut got = Vec::new();
+        while got.len() < n {
+            if woken.recv_timeout(WAIT).is_err() {
+                break;
+            }
+            got.extend(inbox.take());
+        }
+        got
+    };
+    if !cdm.supports("org.test.module", "video/mp4") || cdm.supports("org.other", "video/mp4") {
+        return 11;
+    }
+    let done = |request: u64, id: &str| CdmEvent::Done {
+        request,
+        result: Ok(id.to_owned()),
+    };
+    let keys = cdm.create_keys(1, "org.test.module", "https://a.test", &inbox);
+    if events(1) != [done(1, "")] {
+        return 12;
+    }
+    let session = cdm.create_session(keys);
+    cdm.generate_request(2, session, "cenc", vec![1, 2, 3]);
+    let message = CdmEvent::Message {
+        session,
+        kind: MessageKind::LicenseRequest,
+        data: vec![3, 2, 1],
+    };
+    if events(2) != [message, done(2, "module-2001")] {
+        return 13;
+    }
+    cdm.update(3, session, vec![9]);
+    let statuses = CdmEvent::KeyStatuses {
+        session,
+        statuses: vec![(vec![9], KeyStatus::Usable)],
+    };
+    if events(2) != [statuses, done(3, "")] {
+        return 14;
+    }
+    let other = cdm.create_keys(4, "org.test.module", "https://a.test", &inbox);
+    if other == keys || events(1) != [done(4, "")] {
+        return 15;
+    }
+    cdm.release(keys);
+    port.flush(WAIT).unwrap();
+    0
+}
+
+/// Calls no honest renderer makes.
+fn cdm_forge(port: &RendererPort, role: &str) -> i32 {
+    use cdm::Up as C;
+    let send = |m: C| port.send(&Up::Cdm(m)).unwrap();
+    let keys = |request: u64, keys: u64| C::CreateKeys {
+        request,
+        keys,
+        key_system: "org.test.module".into(),
+        origin: "https://a.test".into(),
+    };
+    match role {
+        // a session it never made
+        "forge-cdm-session" => send(C::Generate {
+            request: 1,
+            session: 5,
+            init_data_type: "cenc".into(),
+            data: vec![1],
+        }),
+        // a session of an instance it never made
+        "forge-cdm-keys" => send(C::CreateSession {
+            keys: 3,
+            session: 1,
+        }),
+        // more than any licence
+        "forge-cdm-size" => {
+            send(keys(1, 1));
+            send(C::CreateSession {
+                keys: 1,
+                session: 2,
+            });
+            send(C::Update {
+                request: 3,
+                session: 2,
+                response: vec![0; cdm::MAX_DATA + 1],
+            });
+        }
+        "forge-cdm-twice" => {
+            send(keys(1, 1));
+            send(keys(2, 1));
+        }
+        "forge-cdm-release" => send(C::Release { keys: 4 }),
+        other => panic!("role {other}"),
+    }
+    linger()
+}
+
+#[test]
+fn a_renderers_key_systems_cross_in_its_own_ids() {
+    let mut l = local();
+    let fake = Arc::new(FakeCdm::default());
+    l.services.cdm = Some(fake.clone());
+    let child = start("cdm", &l.services);
+    assert_eq!(child.process.wait(WAIT), Some(0), "the renderer's checks");
+    assert!(matches!(child.served.join().unwrap(), Error::Closed));
+    assert_eq!(
+        fake.calls(),
+        [
+            "create 1001 https://a.test",
+            "session 1001 2001",
+            "generate 2001",
+            "update 2001",
+            "create 1002 https://a.test",
+            "release 1001",
+            // (the one it left is released with it)
+            "release 1002",
+        ]
+    );
+}
+
+#[test]
+fn a_renderer_that_breaks_the_key_system_rules_dies() {
+    for (role, calls) in [
+        ("forge-cdm-session", &[][..]),
+        ("forge-cdm-keys", &[]),
+        (
+            "forge-cdm-size",
+            &[
+                "create 1001 https://a.test",
+                "session 1001 2001",
+                "release 1001",
+            ],
+        ),
+        (
+            "forge-cdm-twice",
+            &["create 1001 https://a.test", "release 1001"],
+        ),
+        ("forge-cdm-release", &[]),
+    ] {
+        let mut l = local();
+        let fake = Arc::new(FakeCdm::default());
+        l.services.cdm = Some(fake.clone());
+        let child = start(role, &l.services);
+        assert_eq!(child.process.wait(WAIT), Some(9), "{role}");
+        assert!(
+            matches!(child.served.join().unwrap(), Error::BadMessage(_)),
+            "{role}"
+        );
+        assert_eq!(fake.calls(), calls, "{role}");
+    }
 }

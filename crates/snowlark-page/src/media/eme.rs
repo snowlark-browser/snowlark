@@ -425,6 +425,7 @@ impl Engine {
     pub(crate) fn request_media_key_system_access(
         &self,
         cx: &mut Cx,
+        document: Option<NodeId>,
         key_system: &str,
         configurations: Vec<MediaKeySystemConfiguration>,
     ) -> rt::Result<JsPromise> {
@@ -458,6 +459,7 @@ impl Engine {
                 let access = e.alloc(Object::Media(Box::new(MediaObject::KeySystemAccess {
                     key_system,
                     config: Box::new(config),
+                    document,
                 })));
                 resolve.resolve(cx, access);
             }
@@ -574,6 +576,45 @@ impl Engine {
         self.drain_cdm();
     }
 
+    /// `doc` unloaded: the module instances it made are released, and their sessions are closed
+    /// (no call reaches the module for them again).
+    pub(crate) fn eme_document_unloaded(&self, doc: NodeId) {
+        let gone: Vec<(u64, Option<Handle>)> = {
+            let mut m = self.media.borrow_mut();
+            if m.cdm_keys.is_empty() {
+                return;
+            }
+            let gone: Vec<(u64, Option<Handle>)> = m
+                .cdm_keys
+                .iter()
+                .filter(|(_, (d, _))| *d == doc)
+                .map(|(&k, &(_, mk))| (k, mk))
+                .collect();
+            for (k, _) in &gone {
+                m.cdm_keys.remove(k);
+            }
+            gone
+        };
+        let cdm = self.cdm();
+        for (keys, mk) in gone {
+            if let Some(cdm) = &cdm {
+                cdm.release(keys);
+            }
+            let Some(mk) = mk else {
+                continue;
+            };
+            for session in self.ks(mk, |k| k.sessions.clone()) {
+                let id = self.sess(session, |s| {
+                    s.closing_or_closed = true;
+                    s.cdm.take()
+                });
+                if let Some(id) = id {
+                    self.media.borrow_mut().cdm_sessions.remove(&id);
+                }
+            }
+        }
+    }
+
     /// A module's event, in its task.
     pub(crate) fn eme_cdm_event(&self, cx: &mut Cx, event: CdmEvent) {
         let session_of = |id: u64| self.media.borrow().cdm_sessions.get(&id).copied();
@@ -585,6 +626,10 @@ impl Engine {
                 };
                 match (pending, result) {
                     (CdmPending::Keys { promise, keys }, Ok(_)) => {
+                        // (an instance whose document unloaded meanwhile is released already)
+                        if !self.media.borrow().cdm_keys.contains_key(&keys) {
+                            return;
+                        }
                         let mk = self.alloc(Object::Media(Box::new(MediaObject::MediaKeys(
                             Box::new(KeysData {
                                 sessions: Vec::new(),
@@ -592,11 +637,16 @@ impl Engine {
                                 cdm: Some(keys),
                             }),
                         ))));
+                        if let Some(entry) = self.media.borrow_mut().cdm_keys.get_mut(&keys) {
+                            entry.1 = Some(mk);
+                        }
                         promise.resolve(cx, mk);
                     }
                     (CdmPending::Keys { promise, keys }, Err(e)) => {
-                        if let Some(cdm) = self.cdm() {
-                            cdm.release(keys);
+                        if self.media.borrow_mut().cdm_keys.remove(&keys).is_some() {
+                            if let Some(cdm) = self.cdm() {
+                                cdm.release(keys);
+                            }
                         }
                         promise.reject(cx, cdm_error(e));
                     }
@@ -714,8 +764,16 @@ impl MediaKeySystemAccessImpl for Engine {
     }
     fn create_media_keys(&self, cx: &mut Cx, this: Handle) -> rt::Result<JsPromise> {
         // A CDM's state is kept per origin: an opaque origin (a sandboxed frame) has none to
-        // keep it under.
-        let doc = self.current_document(cx)?;
+        // keep it under. The instance is the document's that asked for the access (it is
+        // released when that document unloads).
+        let asked_by = self.mo(this, |o| match o {
+            MediaObject::KeySystemAccess { document, .. } => *document,
+            _ => None,
+        });
+        let doc = match asked_by {
+            Some(d) => d,
+            None => self.current_document(cx)?,
+        };
         if !self.net_origin_of_document(doc).is_tuple() {
             return self.eme_rejected(
                 cx,
@@ -736,13 +794,16 @@ impl MediaKeySystemAccessImpl for Engine {
             let origin = self.net_origin_of_document(doc).ascii_serialization();
             let request = self.cdm_request();
             let keys = cdm.create_keys(request, &key_system, &origin, &self.cdm_inbox());
-            self.media.borrow_mut().cdm_pending.insert(
+            let mut m = self.media.borrow_mut();
+            m.cdm_keys.insert(keys, (doc, None));
+            m.cdm_pending.insert(
                 request,
                 CdmPending::Keys {
                     promise: p.clone(),
                     keys,
                 },
             );
+            drop(m);
             self.drain_cdm();
             return Ok(p);
         }
@@ -774,8 +835,11 @@ impl MediaKeysImpl for Engine {
         }
         let cdm = match self.ks(this, |k| k.cdm) {
             Some(keys) => match self.cdm() {
-                Some(cdm) => Some(cdm.create_session(keys)),
-                None => return Err(invalid("The key system is gone")),
+                // (an instance is released with the document that made it)
+                Some(cdm) if self.media.borrow().cdm_keys.contains_key(&keys) => {
+                    Some(cdm.create_session(keys))
+                }
+                _ => return Err(invalid("The key system is gone")),
             },
             None => None,
         };
