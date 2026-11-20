@@ -89,12 +89,13 @@ pub enum MediaKind {
 /// Whether restyles use stylo's thread pool.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Parallelism {
-    /// Parallel when a restyle is expected to touch many elements (initial style, a stylesheet or device
-    /// change), sequential for the small incremental restyles script mutations cause.
+    /// Every restyle is offered the pool: the traversal starts on the calling thread and shares a level
+    /// of the tree with the pool's threads once that level has enough elements, so a small restyle
+    /// never leaves the calling thread and a large one (however its elements became dirty) is shared.
     #[default]
-    Auto,
-    Sequential,
     Parallel,
+    /// Every restyle runs on the calling thread.
+    Sequential,
 }
 
 /// Whether `element` is a `style` element whose text is a style sheet: HTML's (HTML §4.2.6) or
@@ -274,6 +275,7 @@ static PARALLEL_TRAVERSAL: Mutex<()> = Mutex::new(());
 
 /// Creates stylo's thread pool from a short-lived thread. The pool adopts the thread that creates it as
 /// worker 0 (`use_current_thread`); a page thread adopted that way would carry the worker thread state.
+/// That worker never takes work: the thread that starts a traversal styles in its place.
 fn ensure_pool() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
@@ -283,14 +285,6 @@ fn ensure_pool() {
         .join();
     });
 }
-
-/// A restyle is expected to touch at least this many elements before it goes parallel. Handing a
-/// traversal to the pool costs about 10 µs; from about 128 elements traversed the pool styles them
-/// faster than the page thread alone (1.4-1.6x at 256-1024 elements, measured on the Speedometer
-/// suites). The estimate counts inserted elements and global changes but not what selector
-/// invalidation adds, so it is often below the elements traversed: hence a threshold under the
-/// break-even point.
-const PARALLEL_MIN_ELEMENTS: usize = 64;
 
 /// An attribute's value before the first change since the last restyle: namespace, local name, value
 /// (`None` when it was absent).
@@ -675,8 +669,6 @@ pub struct StyleEngine {
     font_face_handler: Option<FontFaceHandler>,
     parallelism: Parallelism,
     prepared: bool,
-    /// Elements newly needing style since the last restyle (an estimate for [`Parallelism::Auto`]).
-    pending_work: usize,
     viewport_changed: bool,
     /// The device was replaced: the next restyle records the root's style on it first
     /// ([`StyleEngine::replace_device`]).
@@ -1027,9 +1019,8 @@ impl StyleEngine {
             animations_updated_at: 0.0,
             import_loader: None,
             font_face_handler: None,
-            parallelism: Parallelism::Auto,
+            parallelism: Parallelism::Parallel,
             prepared: false,
-            pending_work: 0,
             viewport_changed: false,
             reseed_root: false,
             restyle_all: false,
@@ -1086,7 +1077,6 @@ impl StyleEngine {
             self.apply_device(data);
         }
         self.viewport_changed |= viewport_changed;
-        self.pending_work = usize::MAX / 2;
         self.sync_noscript();
     }
 
@@ -1220,7 +1210,6 @@ impl StyleEngine {
         let quirks_mode = quirks_of(dom, self.document);
         if quirks_mode != self.stylist.quirks_mode() {
             self.stylist.set_quirks_mode(quirks_mode);
-            self.pending_work = usize::MAX / 2;
         }
         let want = quirks_mode == QuirksMode::Quirks;
         let ua_lock = SharedRwLock::read_only();
@@ -1351,7 +1340,6 @@ impl StyleEngine {
         self.stylist
             .append_stylesheet(sheet.0.clone(), &data.lock.read());
         self.user_sheets.push(sheet);
-        self.pending_work = usize::MAX / 2;
     }
 
     /// Adds `sheet` as owned by `owner` (a `style` or `link` element, or the node a processing
@@ -1588,7 +1576,6 @@ impl StyleEngine {
             .force_stylesheet_origins_dirty(Origin::Author.into());
         let roots: Vec<NodeId> = self.shadow_sheets.keys().copied().collect();
         self.dirty_shadows.extend(roots);
-        self.pending_work = usize::MAX / 2;
     }
 
     /// Rebuilds the cascade data of the shadow roots whose sheets changed, and restyles their hosts'
@@ -1636,7 +1623,6 @@ impl StyleEngine {
                 mark_ancestors_dirty(dom, data, host);
             }
         }
-        self.pending_work = self.pending_work.saturating_add(PARALLEL_MIN_ELEMENTS);
     }
 
     // ----- element preparation -------------------------------------------------------------------------
@@ -1935,7 +1921,7 @@ impl StyleEngine {
                 // (a host's child keeps the slot its insertion assigned it: preparing it again
                 // clears that, and the slot still lists it)
                 let assigned = data.slot(root).and_then(|s| s.assigned_slot);
-                self.pending_work += self.prepare_subtree(dom, data, root);
+                self.prepare_subtree(dom, data, root);
                 if let Some(slot) = data.slot_mut(root) {
                     slot.assigned_slot = assigned;
                 }
@@ -1998,7 +1984,7 @@ impl StyleEngine {
         }
         data.reserve(dom.arena_len());
         for id in missing {
-            self.pending_work += self.prepare_subtree(dom, data, id);
+            self.prepare_subtree(dom, data, id);
         }
     }
 
@@ -2050,17 +2036,15 @@ impl StyleEngine {
     }
 
     /// Prepares `root` and its shadow-including descendants, then computes the slot assignment of every
-    /// shadow root in it. Returns the number of elements prepared.
-    fn prepare_subtree(&self, dom: &Dom, data: &mut StyleData, root: NodeId) -> usize {
+    /// shadow root in it.
+    fn prepare_subtree(&self, dom: &Dom, data: &mut StyleData, root: NodeId) {
         let tree_root = dom.root(root);
         let shadow = dom.is_shadow_root(tree_root).then_some(tree_root);
         let mut stack = vec![(root, shadow)];
         let mut shadows = Vec::new();
-        let mut count = 0;
         while let Some((id, shadow)) = stack.pop() {
             if dom.is_element(id) {
                 self.prepare_element(dom, data, id, shadow);
-                count += 1;
                 if let Some(sr) = dom.shadow_root(id) {
                     shadows.push(sr);
                     stack.extend(dom.children_rev(sr).map(|c| (c, Some(sr))));
@@ -2075,7 +2059,6 @@ impl StyleEngine {
         for sr in shadows {
             apply_slot_assignment(dom, data, sr);
         }
-        count
     }
 
     // ----- change hooks ------------------------------------------------------------------------------------
@@ -2415,7 +2398,6 @@ impl StyleEngine {
                     }
                 }
                 self.deferred.push(node);
-                self.pending_work += 1;
                 if self.deferred.len() >= self.deferred_prune_at {
                     // (no restyle for a while: drop the entries removed since)
                     let deferred = std::mem::take(&mut self.deferred);
@@ -2426,7 +2408,7 @@ impl StyleEngine {
                     self.deferred_prune_at = (self.deferred.len() * 2).max(DEFERRED_PRUNE_MIN);
                 }
             } else {
-                self.pending_work += self.prepare_subtree(dom, data, node);
+                self.prepare_subtree(dom, data, node);
             }
         }
     }
@@ -4034,7 +4016,7 @@ impl StyleEngine {
             return RestyleStats::default();
         };
         if !self.prepared || data.slot(root).is_none() {
-            self.pending_work += self.prepare_subtree(dom, data, self.document);
+            self.prepare_subtree(dom, data, self.document);
             self.prepared = true;
             self.deferred.clear();
         }
@@ -4054,7 +4036,6 @@ impl StyleEngine {
         if std::mem::take(&mut self.color_schemes_changed) | std::mem::take(&mut self.restyle_all) {
             add_hint(data, root, RestyleHint::restyle_subtree());
             mark_ancestors_dirty(dom, data, root);
-            self.pending_work = self.pending_work.saturating_add(data.slots.len());
         }
         self.flush_shadows(dom, data);
         self.build_snapshot_attrs(dom);
@@ -4068,11 +4049,7 @@ impl StyleEngine {
             author: &author_guard,
             ua_or_user: &ua_guard,
         };
-        let sheets_changed = self.stylist.stylesheets_have_changed();
         let invalidations = self.stylist.flush(&guards);
-        if sheets_changed {
-            self.pending_work = self.pending_work.saturating_add(data.slots.len());
-        }
 
         let scripted = self.has_script_effects();
         let animating = scripted || !self.animations.sets.read().is_empty();
@@ -4102,11 +4079,7 @@ impl StyleEngine {
                 matched_properties_sink: Some(&self.matched_properties_sink),
             };
             let token = Recalc::pre_traverse(root_el, &shared);
-            let parallel = match self.parallelism {
-                Parallelism::Sequential => false,
-                Parallelism::Parallel => true,
-                Parallelism::Auto => self.pending_work >= PARALLEL_MIN_ELEMENTS,
-            };
+            let parallel = self.parallelism == Parallelism::Parallel;
             if token.should_traverse() {
                 let traversal = Recalc::new(shared);
                 data.restyled_len
@@ -4119,7 +4092,7 @@ impl StyleEngine {
                 } else {
                     style::driver::traverse_dom(&traversal, token, None);
                 }
-                traversal.stats(parallel)
+                traversal.stats()
             } else {
                 RestyleStats::default()
             }
@@ -4158,7 +4131,6 @@ impl StyleEngine {
             }
         }
         self.snapshots.clear();
-        self.pending_work = 0;
         self.stylist.rule_tree().maybe_gc();
         stats
     }

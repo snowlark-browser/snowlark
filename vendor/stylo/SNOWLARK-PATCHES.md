@@ -394,6 +394,13 @@ the source; `git log -p vendor/stylo` shows the diff.
    `::-webkit-meter-optimum-value`, `::-webkit-meter-suboptimum-value` and
    `::-webkit-meter-even-less-good-value`, which pages style and the embedder lays out as the parts of
    an element with `appearance: none`.
+71. **The caller styles the top of a parallel traversal** (`driver.rs`, `scoped_tls.rs`): a traversal
+   started from a thread outside the pool ran entirely on a worker (`spawn_fifo` of the whole
+   closure) while the caller only waited, so every traversal given the pool paid a worker's wake-up
+   and the caller's own wake-up at the end. The closure now runs in place on the caller, which has
+   a slot of its own in `ScopedTLS` (one more than the pool's threads) and the workers' local queue
+   size; work goes to the pool only when a level of the tree has enough elements to share, as the
+   traversal does on a thread of the pool. The embedder can then offer the pool to every restyle.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

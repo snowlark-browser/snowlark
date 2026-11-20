@@ -284,6 +284,16 @@ pub enum EventExt {
     Storage(super::storage::StorageFields),
     /// `TrackEvent.track` (HTML §4.8.11.11.?).
     Track(Option<Handle>),
+    /// EME `MediaKeyMessageEvent`: its type and `message` ArrayBuffer.
+    MediaKeyMessage {
+        message_type: snowlark_bindings::generated::MediaKeyMessageType,
+        message: Option<super::held::Held<v8::Object>>,
+    },
+    /// EME `MediaEncryptedEvent`: `initDataType` and the `initData` ArrayBuffer.
+    Encrypted {
+        init_data_type: String,
+        init_data: Option<super::held::Held<v8::Object>>,
+    },
     /// A `SecurityPolicyViolationEvent`'s fields.
     Csp(Box<snowlark_net::report::ViolationReport>),
     /// An `AnimationPlaybackEvent`'s fields.
@@ -319,6 +329,12 @@ impl EventExt {
             | EventExt::PopState(Some(v))
             | EventExt::Error { error: Some(v), .. }
             | EventExt::Message { data: Some(v), .. } => v.trace(scope, owner),
+            EventExt::MediaKeyMessage {
+                message: Some(o), ..
+            }
+            | EventExt::Encrypted {
+                init_data: Some(o), ..
+            } => o.trace(scope, owner),
             EventExt::Rejection { promise, reason } => {
                 promise.trace(scope, owner);
                 if let Some(r) = reason {

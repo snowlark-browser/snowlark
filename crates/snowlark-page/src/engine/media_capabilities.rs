@@ -202,6 +202,7 @@ impl MediaCapabilitiesImpl for Engine {
                     smooth: supported,
                     power_efficient: efficient,
                     configuration,
+                    key_system_access: None,
                 },
             );
         });

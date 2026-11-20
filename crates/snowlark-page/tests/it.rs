@@ -36,6 +36,7 @@ mod dispatch_path;
 mod drag_and_drop;
 mod editing;
 mod elements_from_point;
+mod eme;
 mod exec_command;
 mod fetch_body;
 mod fetch_streaming;

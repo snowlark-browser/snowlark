@@ -14,6 +14,7 @@ use snowlark_bindings::generated::{
 };
 use snowlark_bindings::rt::{self, Cx, ExceptionName, Handle};
 use snowlark_dom::NodeId;
+use snowlark_media::cenc::Decryptor;
 use snowlark_media::init_segment::{Container, InitScanner, InitSegment};
 use snowlark_media::mse::{MseEvent, MseSource};
 use snowlark_media::{Player, Ranges, Source};
@@ -74,6 +75,16 @@ pub struct BufferData {
     pub first_init: bool,
     /// The natural size of its video, from that initialization segment.
     pub video_size: Option<(u32, u32)>,
+    /// MP4 streams: Common Encryption, decrypted with the element's MediaKeys before the media
+    /// side parses the bytes (EME; `snowlark_media::cenc`).
+    pub crypt: Option<Decryptor>,
+    /// Bytes the decryptor released while the media side was busy: appended when it is done.
+    pub queued: Vec<u8>,
+    /// A native append of released bytes is in progress (its completion is not the page's).
+    pub flushing: bool,
+    /// The page's append in progress gave the media side nothing (its bytes wait for a key, or
+    /// for a native append of released bytes): it ends in a task instead.
+    pub held_op: bool,
 }
 
 impl BufferData {
@@ -237,6 +248,14 @@ impl Engine {
                         // ends it, so a report of an operation that already ended for the page can
                         // never end the next one, which the page may have started in between.
                         let end = self.sb(sb, |b| {
+                            // A native append of bytes the decryptor released ends without
+                            // the page seeing it.
+                            if b.flushing {
+                                if matches!(e, MseEvent::UpdateEnd(_)) {
+                                    b.flushing = false;
+                                }
+                                return None;
+                            }
                             if b.swallow > 0 {
                                 if matches!(e, MseEvent::UpdateEnd(_)) {
                                     b.swallow -= 1;
@@ -257,6 +276,9 @@ impl Engine {
                         });
                         if !matches!(e, MseEvent::Update(_)) {
                             self.mse_trace(ms, format_args!("{e:?} ends={end:?}"));
+                        }
+                        if matches!(e, MseEvent::UpdateEnd(_)) {
+                            self.mse_flush(sb);
                         }
                         let Some(failed) = end else {
                             continue;
@@ -284,6 +306,85 @@ impl Engine {
             }
         }
         any
+    }
+
+    /// Ends, in a task, the page's append whose bytes the media side did not get (they wait for a
+    /// key, or behind a native append of released bytes): the segment parser loop's end, as for
+    /// a native append.
+    fn mse_end_held_append(&self, sb: Handle) {
+        self.sb(sb, |b| b.held_op = true);
+        self.queue_task(TaskSource::DomManipulation, move |e, cx| {
+            let (ended, init) = e.sb(sb, |b| {
+                if !std::mem::take(&mut b.held_op) {
+                    return (false, None);
+                }
+                b.updating = false;
+                (true, b.init_pending.take())
+            });
+            if !ended {
+                return;
+            }
+            let ms = e.sb(sb, |b| b.source);
+            if let Some(init) = init {
+                e.mse_init_segment_received(cx, ms, sb, init);
+            }
+            if let Some(el) = e.ms(ms, |s| s.media) {
+                e.media_seek_check(el);
+            }
+            e.fire_event(cx, sb, "update", false, false);
+            e.fire_event(cx, sb, "updateend", false, false);
+            e.mse_flush(sb);
+        });
+    }
+
+    /// Appends the bytes the decryptor released, unless the media side is busy (then it is
+    /// asked again when that operation ends).
+    fn mse_flush(&self, sb: Handle) {
+        let Some((native, id)) = self.sb_native(sb) else {
+            return;
+        };
+        let bytes = self.sb(sb, |b| {
+            let busy = b.flushing || b.swallow > 0 || (b.updating && !b.held_op);
+            if busy || b.queued.is_empty() {
+                return None;
+            }
+            b.flushing = true;
+            Some(std::mem::take(&mut b.queued))
+        });
+        if let Some(bytes) = bytes {
+            self.mse_trace(
+                self.sb(sb, |b| b.source),
+                format_args!("append sb{id} {} released bytes", bytes.len()),
+            );
+            if native.append(id, &bytes).is_err() {
+                self.sb(sb, |b| b.flushing = false);
+            }
+        }
+    }
+
+    /// EME: the keys of the element's MediaKeys changed; segments waiting for them are decrypted
+    /// and appended ("Attempt to Resume Playback If Necessary").
+    pub(crate) fn mse_keys_changed(&self, el: NodeId) {
+        let Some(ms) = self.media_el(el, |m| m.mse) else {
+            return;
+        };
+        let keys = self.eme_keys_of(el);
+        for sb in self.ms(ms, |s| s.buffers.clone()) {
+            let released = self.sb(sb, |b| b.crypt.as_mut().map(|d| d.retry(&keys)));
+            let Some((bytes, found)) = released else {
+                continue;
+            };
+            for init in found.init_data {
+                self.eme_init_data_encountered(el, init);
+            }
+            if found.waiting {
+                self.eme_wait_for_key(el);
+            }
+            if !bytes.is_empty() {
+                self.sb(sb, |b| b.queued.extend_from_slice(&bytes));
+                self.mse_flush(sb);
+            }
+        }
     }
 
     /// MSE "end of stream algorithm".
@@ -623,6 +724,10 @@ impl MediaSourceImpl for Engine {
                 init_pending: None,
                 first_init: false,
                 video_size: None,
+                crypt: (Container::of_type(type_) == Some(Container::Mp4)).then(Decryptor::new),
+                queued: Vec::new(),
+                flushing: false,
+                held_op: false,
             }),
         ))));
         let list = self.ms(this, |s| {
@@ -874,7 +979,38 @@ impl SourceBufferImpl for Engine {
         });
         self.fire_at(this, "updatestart");
         self.mse_trace(source, format_args!("append sb{id} {} bytes", bytes.len()));
-        if let Err(e) = native.append(id, &bytes) {
+        // EME: an MP4 stream's Common Encryption is decrypted here; segments whose key is not
+        // known yet wait in the decryptor.
+        let media = self.ms(source, |s| s.media);
+        let mut crypt = self.sb(this, |b| b.crypt.take());
+        let (out, found) = match &mut crypt {
+            Some(d) => {
+                let keys = media.map(|el| self.eme_keys_of(el)).unwrap_or_default();
+                d.push(&bytes, &keys)
+            }
+            None => (std::borrow::Cow::Borrowed(&bytes[..]), Default::default()),
+        };
+        self.sb(this, |b| b.crypt = crypt);
+        if let Some(el) = media {
+            for init in found.init_data {
+                self.eme_init_data_encountered(el, init);
+            }
+            if found.waiting {
+                self.eme_wait_for_key(el);
+            }
+        }
+        let behind = self.sb(this, |b| {
+            let behind = b.flushing || !b.queued.is_empty();
+            if behind {
+                b.queued.extend_from_slice(&out);
+            }
+            behind
+        });
+        if behind || out.is_empty() {
+            self.mse_end_held_append(this);
+            return Ok(());
+        }
+        if let Err(e) = native.append(id, &out) {
             self.mse_trace(source, format_args!("append sb{id} failed: {e}"));
             self.sb(this, |b| {
                 b.updating = false;
@@ -899,13 +1035,29 @@ impl SourceBufferImpl for Engine {
             self.sb(this, |b| {
                 b.updating = false;
                 b.failed = false;
-                b.swallow += 1;
+                // (an append the media side never saw ends with nothing to swallow)
+                if !std::mem::take(&mut b.held_op) {
+                    b.swallow += 1;
+                }
             });
             self.fire_at(this, "abort");
             self.fire_at(this, "updateend");
         }
+        // "Reset parser state" of the decryptor: a partly appended box is dropped (segments
+        // waiting for a key were appended whole, and stay).
+        let flushing = self.sb(this, |b| {
+            if let Some(d) = &mut b.crypt {
+                if d.waiting_for().is_none() {
+                    d.reset();
+                }
+            }
+            b.flushing
+        });
         if let Some((n, id)) = self.sb_native(this) {
-            n.abort(id);
+            // (a native append of released bytes is not the page's to abort)
+            if !flushing {
+                n.abort(id);
+            }
         }
         self.sb(this, |b| {
             // "Reset parser state": an initialization segment of the aborted append is not received.

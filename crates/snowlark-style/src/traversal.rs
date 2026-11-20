@@ -28,7 +28,7 @@ pub struct RestyleStats {
     pub matched: u32,
     /// Styles shared through the style sharing cache.
     pub shared: u32,
-    /// Whether the traversal ran on stylo's thread pool.
+    /// Whether some of the traversal's elements were styled on stylo's thread pool.
     pub parallel: bool,
 }
 
@@ -47,6 +47,7 @@ pub(crate) struct Recalc<'a> {
     restyled: AtomicU32,
     matched: AtomicU32,
     styles_shared: AtomicU32,
+    on_pool: AtomicBool,
 }
 
 impl<'a> Recalc<'a> {
@@ -57,16 +58,17 @@ impl<'a> Recalc<'a> {
             restyled: AtomicU32::new(0),
             matched: AtomicU32::new(0),
             styles_shared: AtomicU32::new(0),
+            on_pool: AtomicBool::new(false),
         }
     }
 
-    pub fn stats(&self, parallel: bool) -> RestyleStats {
+    pub fn stats(&self) -> RestyleStats {
         RestyleStats {
             traversed: self.traversed.load(Ordering::Relaxed),
             restyled: self.restyled.load(Ordering::Relaxed),
             matched: self.matched.load(Ordering::Relaxed),
             shared: self.styles_shared.load(Ordering::Relaxed),
-            parallel,
+            parallel: self.on_pool.load(Ordering::Relaxed),
         }
     }
 }
@@ -122,6 +124,9 @@ impl<'a, 'dom> DomTraversal<StyleElement<'dom>> for Recalc<'a> {
 
         let after = &context.thread_local.statistics;
         self.traversed.fetch_add(1, Ordering::Relaxed);
+        if rayon::current_thread_index().is_some() && !self.on_pool.load(Ordering::Relaxed) {
+            self.on_pool.store(true, Ordering::Relaxed);
+        }
         self.matched.fetch_add(
             after.elements_matched - before.elements_matched,
             Ordering::Relaxed,

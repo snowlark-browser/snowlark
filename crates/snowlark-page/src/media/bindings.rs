@@ -34,6 +34,19 @@ impl Engine {
 }
 
 impl HTMLMediaElementImpl for Engine {
+    /// EME `mediaKeys`.
+    fn media_keys(&self, this: Handle) -> Option<Handle> {
+        self.media_media_keys(self.n(this))
+    }
+    /// EME `setMediaKeys`.
+    fn set_media_keys(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        media_keys: Option<Handle>,
+    ) -> rt::Result<JsPromise> {
+        self.media_set_media_keys(cx, self.n(this), media_keys)
+    }
     fn error(&self, this: Handle) -> Option<Handle> {
         self.media_el(self.n(this), |m| m.error)
     }

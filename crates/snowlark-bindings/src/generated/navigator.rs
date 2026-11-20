@@ -169,6 +169,25 @@ pub trait NavigatorImpl {
     ) -> Result<bool> {
         rt::stub("Navigator.send_beacon")
     }
+    /// [SecureContext] Promise<MediaKeySystemAccess> requestMediaKeySystemAccess(DOMString keySystem, sequence<MediaKeySystemConfiguration> supportedConfigurations);
+    #[cfg(not(feature = "stubs"))]
+    fn request_media_key_system_access(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        key_system: &str,
+        supported_configurations: Vec<MediaKeySystemConfiguration>,
+    ) -> Result<JsPromise>;
+    #[cfg(feature = "stubs")]
+    fn request_media_key_system_access(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        key_system: &str,
+        supported_configurations: Vec<MediaKeySystemConfiguration>,
+    ) -> Result<JsPromise> {
+        rt::stub("Navigator.request_media_key_system_access")
+    }
     /// Promise<undefined> deprecatedReplaceInURN(UrnOrConfig urnOrConfig, record<USVString, USVString> replacements);
     #[cfg(not(feature = "stubs"))]
     fn deprecated_replace_in_urn(
@@ -770,6 +789,77 @@ pub(crate) fn op_send_beacon<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
     });
     let Some(v) = v else { return };
     call.return_bool(v);
+}
+
+/// `[SecureContext] Promise<MediaKeySystemAccess> requestMediaKeySystemAccess(DOMString keySystem, sequence<MediaKeySystemConfiguration> supportedConfigurations);`
+fn op_request_media_key_system_access_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    this: Handle,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let mut a0_buf = [std::mem::MaybeUninit::<u8>::uninit(); 64];
+    let a0 = {
+        let v = args.get(0);
+        rt::to_dom_str(scope, v, &mut a0_buf)
+    }?;
+    let a1 = {
+        let v = args.get(1);
+        {
+            let mut out = Vec::new();
+            rt::iterate(scope, v, |scope, item| {
+                out.push(MediaKeySystemConfiguration::from_js(scope, item)?);
+                Some(())
+            })
+            .map(|_| out)
+        }
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as NavigatorImpl>::request_media_key_system_access(dom, &mut cx, this, &a0, a1)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `Navigator.requestMediaKeySystemAccess` (Web IDL §3.7.6).
+fn op_request_media_key_system_access_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let Some(this) = rt::unwrap(&args.this(), LO, HI) else {
+        return rt::illegal_invocation(scope);
+    };
+    let argc = args.length();
+    if argc < 2 {
+        return rt::not_enough_arguments(scope, "Navigator.requestMediaKeySystemAccess", 2, argc);
+    }
+    op_request_media_key_system_access_0::<D, LO, HI>(scope, args, this, argc)
+}
+
+/// `Navigator.requestMediaKeySystemAccess`.
+pub(crate) fn op_request_media_key_system_access<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "Navigator.requestMediaKeySystemAccess");
+    v8::tc_scope!(let tc, scope);
+    match op_request_media_key_system_access_dispatch::<D, LO, HI>(tc, &args) {
+        Some(v) => rv.set(v),
+        None => {
+            if let Some(e) = tc.exception() {
+                if let Some(r) = v8::PromiseResolver::new(tc) {
+                    r.reject(tc, e);
+                    rv.set(r.get_promise(tc).into());
+                }
+            }
+        }
+    }
 }
 
 /// `Promise<undefined> deprecatedReplaceInURN(UrnOrConfig urnOrConfig, record<USVString, USVString> replacements);`
@@ -1738,6 +1828,16 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         );
         rt::operation(scope, &proto, "sendBeacon", f, false);
+    }
+    if options.secure_context {
+        let f = rt::method(
+            scope,
+            rt::builder(super::navigator::op_request_media_key_system_access::<D, LO, HI>),
+            "requestMediaKeySystemAccess",
+            2,
+            None,
+        );
+        rt::operation(scope, &proto, "requestMediaKeySystemAccess", f, false);
     }
     {
         let f = rt::method(

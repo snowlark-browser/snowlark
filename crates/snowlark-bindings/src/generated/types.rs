@@ -3137,6 +3137,215 @@ impl ToJs for MediaEncodingType {
     }
 }
 
+/// `enum MediaKeyMessageType` (encrypted-media.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MediaKeyMessageType {
+    /// `"license-request"`
+    LicenseRequest,
+    /// `"license-renewal"`
+    LicenseRenewal,
+    /// `"license-release"`
+    LicenseRelease,
+    /// `"individualization-request"`
+    IndividualizationRequest,
+}
+
+impl MediaKeyMessageType {
+    pub const VALUES: &'static [&'static str] = &[
+        "license-request",
+        "license-renewal",
+        "license-release",
+        "individualization-request",
+    ];
+    const ALL: &'static [MediaKeyMessageType] = &[
+        MediaKeyMessageType::LicenseRequest,
+        MediaKeyMessageType::LicenseRenewal,
+        MediaKeyMessageType::LicenseRelease,
+        MediaKeyMessageType::IndividualizationRequest,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "MediaKeyMessageType").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for MediaKeyMessageType {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
+/// `enum MediaKeySessionClosedReason` (encrypted-media.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MediaKeySessionClosedReason {
+    /// `"internal-error"`
+    InternalError,
+    /// `"closed-by-application"`
+    ClosedByApplication,
+    /// `"release-acknowledged"`
+    ReleaseAcknowledged,
+    /// `"hardware-context-reset"`
+    HardwareContextReset,
+    /// `"resource-evicted"`
+    ResourceEvicted,
+}
+
+impl MediaKeySessionClosedReason {
+    pub const VALUES: &'static [&'static str] = &[
+        "internal-error",
+        "closed-by-application",
+        "release-acknowledged",
+        "hardware-context-reset",
+        "resource-evicted",
+    ];
+    const ALL: &'static [MediaKeySessionClosedReason] = &[
+        MediaKeySessionClosedReason::InternalError,
+        MediaKeySessionClosedReason::ClosedByApplication,
+        MediaKeySessionClosedReason::ReleaseAcknowledged,
+        MediaKeySessionClosedReason::HardwareContextReset,
+        MediaKeySessionClosedReason::ResourceEvicted,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "MediaKeySessionClosedReason").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for MediaKeySessionClosedReason {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
+/// `enum MediaKeySessionType` (encrypted-media.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MediaKeySessionType {
+    /// `"temporary"`
+    Temporary,
+    /// `"persistent-license"`
+    PersistentLicense,
+}
+
+impl MediaKeySessionType {
+    pub const VALUES: &'static [&'static str] = &["temporary", "persistent-license"];
+    const ALL: &'static [MediaKeySessionType] = &[
+        MediaKeySessionType::Temporary,
+        MediaKeySessionType::PersistentLicense,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "MediaKeySessionType").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for MediaKeySessionType {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
+/// `enum MediaKeyStatus` (encrypted-media.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MediaKeyStatus {
+    /// `"usable"`
+    Usable,
+    /// `"expired"`
+    Expired,
+    /// `"released"`
+    Released,
+    /// `"output-restricted"`
+    OutputRestricted,
+    /// `"output-downscaled"`
+    OutputDownscaled,
+    /// `"usable-in-future"`
+    UsableInFuture,
+    /// `"status-pending"`
+    StatusPending,
+    /// `"internal-error"`
+    InternalError,
+}
+
+impl MediaKeyStatus {
+    pub const VALUES: &'static [&'static str] = &[
+        "usable",
+        "expired",
+        "released",
+        "output-restricted",
+        "output-downscaled",
+        "usable-in-future",
+        "status-pending",
+        "internal-error",
+    ];
+    const ALL: &'static [MediaKeyStatus] = &[
+        MediaKeyStatus::Usable,
+        MediaKeyStatus::Expired,
+        MediaKeyStatus::Released,
+        MediaKeyStatus::OutputRestricted,
+        MediaKeyStatus::OutputDownscaled,
+        MediaKeyStatus::UsableInFuture,
+        MediaKeyStatus::StatusPending,
+        MediaKeyStatus::InternalError,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "MediaKeyStatus").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for MediaKeyStatus {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
 /// `enum MediaKeysRequirement` (encrypted-media.idl).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MediaKeysRequirement {
@@ -26506,6 +26715,8 @@ pub struct MediaCapabilitiesDecodingInfo {
     pub supported: bool,
     /// `required MediaDecodingConfiguration configuration`
     pub configuration: MediaDecodingConfiguration,
+    /// `required MediaKeySystemAccess? keySystemAccess`
+    pub key_system_access: Option<Handle>,
 }
 
 impl MediaCapabilitiesDecodingInfo {
@@ -26515,11 +26726,13 @@ impl MediaCapabilitiesDecodingInfo {
         let m_smooth = match obj { Some(o) => { let v = rt::get_named_member(scope, o, { static K: rt::Name = rt::Name::new("smooth"); &K })?; if v.is_undefined() { return rt::type_error(scope, "Failed to read the 'smooth' property from 'MediaCapabilitiesDecodingInfo': Required member is undefined.") } else { Some(rt::to_boolean(scope, v))? } } None => { return rt::type_error(scope, "Failed to read the 'smooth' property from 'MediaCapabilitiesDecodingInfo': Required member is undefined.") } };
         let m_supported = match obj { Some(o) => { let v = rt::get_named_member(scope, o, { static K: rt::Name = rt::Name::new("supported"); &K })?; if v.is_undefined() { return rt::type_error(scope, "Failed to read the 'supported' property from 'MediaCapabilitiesDecodingInfo': Required member is undefined.") } else { Some(rt::to_boolean(scope, v))? } } None => { return rt::type_error(scope, "Failed to read the 'supported' property from 'MediaCapabilitiesDecodingInfo': Required member is undefined.") } };
         let m_configuration = match obj { Some(o) => { let v = rt::get_named_member(scope, o, { static K: rt::Name = rt::Name::new("configuration"); &K })?; if v.is_undefined() { return rt::type_error(scope, "Failed to read the 'configuration' property from 'MediaCapabilitiesDecodingInfo': Required member is undefined.") } else { MediaDecodingConfiguration::from_js(scope, v)? } } None => { return rt::type_error(scope, "Failed to read the 'configuration' property from 'MediaCapabilitiesDecodingInfo': Required member is undefined.") } };
+        let m_key_system_access = match obj { Some(o) => { let v = rt::get_named_member(scope, o, { static K: rt::Name = rt::Name::new("keySystemAccess"); &K })?; if v.is_undefined() { return rt::type_error(scope, "Failed to read the 'keySystemAccess' property from 'MediaCapabilitiesDecodingInfo': Required member is undefined.") } else { { if v.is_null_or_undefined() { Some(None) } else { (rt::to_interface(scope, v, ids::MEDIA_KEY_SYSTEM_ACCESS, ids::MEDIA_KEY_SYSTEM_ACCESS_END, "MediaCapabilitiesDecodingInfo.keySystemAccess", "MediaKeySystemAccess")).map(Some) } }? } } None => { return rt::type_error(scope, "Failed to read the 'keySystemAccess' property from 'MediaCapabilitiesDecodingInfo': Required member is undefined.") } };
         Some(MediaCapabilitiesDecodingInfo {
             power_efficient: m_power_efficient,
             smooth: m_smooth,
             supported: m_supported,
             configuration: m_configuration,
+            key_system_access: m_key_system_access,
         })
     }
 }
@@ -26576,7 +26789,7 @@ impl ToJs for MediaCapabilitiesDecodingInfo {
             )?;
         }
         {
-            let v = v8::null(scope).into();
+            let v = self.key_system_access.to_js(scope)?;
             o.create_data_property(
                 scope,
                 rt::cached_name(scope, {
@@ -27099,6 +27312,782 @@ impl ToJs for MediaEncodingConfiguration {
                 scope,
                 rt::cached_name(scope, {
                     static K: rt::Name = rt::Name::new("type");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary MediaEncryptedEventInit : EventInit` (encrypted-media.idl).
+#[derive(Clone)]
+pub struct MediaEncryptedEventInit {
+    /// `boolean bubbles = false`
+    pub bubbles: bool,
+    /// `boolean cancelable = false`
+    pub cancelable: bool,
+    /// `boolean composed = false`
+    pub composed: bool,
+    /// `ArrayBuffer? initData = null`
+    pub init_data: Option<JsObject>,
+    /// `DOMString initDataType = ""`
+    pub init_data_type: String,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for MediaEncryptedEventInit {
+    fn default() -> Self {
+        MediaEncryptedEventInit {
+            bubbles: false,
+            cancelable: false,
+            composed: false,
+            init_data: None,
+            init_data_type: String::from(""),
+        }
+    }
+}
+
+impl MediaEncryptedEventInit {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "MediaEncryptedEventInit")?;
+        let m_bubbles = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("bubbles");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_cancelable = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("cancelable");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_composed = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("composed");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_init_data = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("initData");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    {
+                        if v.is_null_or_undefined() {
+                            Some(None)
+                        } else {
+                            (rt::to_buffer(scope, v, false, "MediaEncryptedEventInit.initData"))
+                                .map(Some)
+                        }
+                    }?
+                }
+            }
+            None => None,
+        };
+        let m_init_data_type = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("initDataType");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    String::from("")
+                } else {
+                    rt::to_dom_string(scope, v)?
+                }
+            }
+            None => String::from(""),
+        };
+        Some(MediaEncryptedEventInit {
+            bubbles: m_bubbles,
+            cancelable: m_cancelable,
+            composed: m_composed,
+            init_data: m_init_data,
+            init_data_type: m_init_data_type,
+        })
+    }
+}
+
+impl ToJs for MediaEncryptedEventInit {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.bubbles.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("bubbles");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.cancelable.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("cancelable");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.composed.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("composed");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.init_data.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("initData");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.init_data_type.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("initDataType");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary MediaKeyMessageEventInit : EventInit` (encrypted-media.idl).
+#[derive(Clone)]
+pub struct MediaKeyMessageEventInit {
+    /// `boolean bubbles = false`
+    pub bubbles: bool,
+    /// `boolean cancelable = false`
+    pub cancelable: bool,
+    /// `boolean composed = false`
+    pub composed: bool,
+    /// `required ArrayBuffer message`
+    pub message: JsObject,
+    /// `required MediaKeyMessageType messageType`
+    pub message_type: MediaKeyMessageType,
+}
+
+impl MediaKeyMessageEventInit {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "MediaKeyMessageEventInit")?;
+        let m_bubbles = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("bubbles");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_cancelable = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("cancelable");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_composed = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("composed");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_message = match obj { Some(o) => { let v = rt::get_named_member(scope, o, { static K: rt::Name = rt::Name::new("message"); &K })?; if v.is_undefined() { return rt::type_error(scope, "Failed to read the 'message' property from 'MediaKeyMessageEventInit': Required member is undefined.") } else { rt::to_buffer(scope, v, false, "MediaKeyMessageEventInit.message")? } } None => { return rt::type_error(scope, "Failed to read the 'message' property from 'MediaKeyMessageEventInit': Required member is undefined.") } };
+        let m_message_type = match obj { Some(o) => { let v = rt::get_named_member(scope, o, { static K: rt::Name = rt::Name::new("messageType"); &K })?; if v.is_undefined() { return rt::type_error(scope, "Failed to read the 'messageType' property from 'MediaKeyMessageEventInit': Required member is undefined.") } else { MediaKeyMessageType::from_js(scope, v)? } } None => { return rt::type_error(scope, "Failed to read the 'messageType' property from 'MediaKeyMessageEventInit': Required member is undefined.") } };
+        Some(MediaKeyMessageEventInit {
+            bubbles: m_bubbles,
+            cancelable: m_cancelable,
+            composed: m_composed,
+            message: m_message,
+            message_type: m_message_type,
+        })
+    }
+}
+
+impl ToJs for MediaKeyMessageEventInit {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.bubbles.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("bubbles");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.cancelable.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("cancelable");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.composed.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("composed");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.message.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("message");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.message_type.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("messageType");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary MediaKeySystemConfiguration` (encrypted-media.idl).
+#[derive(Clone)]
+pub struct MediaKeySystemConfiguration {
+    /// `sequence<MediaKeySystemMediaCapability> audioCapabilities = []`
+    pub audio_capabilities: Vec<MediaKeySystemMediaCapability>,
+    /// `MediaKeysRequirement distinctiveIdentifier = "optional"`
+    pub distinctive_identifier: MediaKeysRequirement,
+    /// `sequence<DOMString> initDataTypes = []`
+    pub init_data_types: Vec<String>,
+    /// `DOMString label = ""`
+    pub label: String,
+    /// `MediaKeysRequirement persistentState = "optional"`
+    pub persistent_state: MediaKeysRequirement,
+    /// `sequence<DOMString> sessionTypes`
+    pub session_types: Option<Vec<String>>,
+    /// `sequence<MediaKeySystemMediaCapability> videoCapabilities = []`
+    pub video_capabilities: Vec<MediaKeySystemMediaCapability>,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for MediaKeySystemConfiguration {
+    fn default() -> Self {
+        MediaKeySystemConfiguration {
+            audio_capabilities: Vec::new(),
+            distinctive_identifier: MediaKeysRequirement::Optional,
+            init_data_types: Vec::new(),
+            label: String::from(""),
+            persistent_state: MediaKeysRequirement::Optional,
+            session_types: None,
+            video_capabilities: Vec::new(),
+        }
+    }
+}
+
+impl MediaKeySystemConfiguration {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "MediaKeySystemConfiguration")?;
+        let m_audio_capabilities = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("audioCapabilities");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    Vec::new()
+                } else {
+                    {
+                        let mut out = Vec::new();
+                        rt::iterate(scope, v, |scope, item| {
+                            out.push(MediaKeySystemMediaCapability::from_js(scope, item)?);
+                            Some(())
+                        })
+                        .map(|_| out)
+                    }?
+                }
+            }
+            None => Vec::new(),
+        };
+        let m_distinctive_identifier = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("distinctiveIdentifier");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    MediaKeysRequirement::Optional
+                } else {
+                    MediaKeysRequirement::from_js(scope, v)?
+                }
+            }
+            None => MediaKeysRequirement::Optional,
+        };
+        let m_init_data_types = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("initDataTypes");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    Vec::new()
+                } else {
+                    {
+                        let mut out = Vec::new();
+                        rt::iterate(scope, v, |scope, item| {
+                            out.push(rt::to_dom_string(scope, item)?);
+                            Some(())
+                        })
+                        .map(|_| out)
+                    }?
+                }
+            }
+            None => Vec::new(),
+        };
+        let m_label = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("label");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    String::from("")
+                } else {
+                    rt::to_dom_string(scope, v)?
+                }
+            }
+            None => String::from(""),
+        };
+        let m_persistent_state = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("persistentState");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    MediaKeysRequirement::Optional
+                } else {
+                    MediaKeysRequirement::from_js(scope, v)?
+                }
+            }
+            None => MediaKeysRequirement::Optional,
+        };
+        let m_session_types = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("sessionTypes");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some({
+                        let mut out = Vec::new();
+                        rt::iterate(scope, v, |scope, item| {
+                            out.push(rt::to_dom_string(scope, item)?);
+                            Some(())
+                        })
+                        .map(|_| out)
+                    }?)
+                }
+            }
+            None => None,
+        };
+        let m_video_capabilities = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("videoCapabilities");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    Vec::new()
+                } else {
+                    {
+                        let mut out = Vec::new();
+                        rt::iterate(scope, v, |scope, item| {
+                            out.push(MediaKeySystemMediaCapability::from_js(scope, item)?);
+                            Some(())
+                        })
+                        .map(|_| out)
+                    }?
+                }
+            }
+            None => Vec::new(),
+        };
+        Some(MediaKeySystemConfiguration {
+            audio_capabilities: m_audio_capabilities,
+            distinctive_identifier: m_distinctive_identifier,
+            init_data_types: m_init_data_types,
+            label: m_label,
+            persistent_state: m_persistent_state,
+            session_types: m_session_types,
+            video_capabilities: m_video_capabilities,
+        })
+    }
+}
+
+impl ToJs for MediaKeySystemConfiguration {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.audio_capabilities.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("audioCapabilities");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.distinctive_identifier.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("distinctiveIdentifier");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.init_data_types.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("initDataTypes");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.label.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("label");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.persistent_state.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("persistentState");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.session_types {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("sessionTypes");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.video_capabilities.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("videoCapabilities");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary MediaKeySystemMediaCapability` (encrypted-media.idl).
+#[derive(Clone)]
+pub struct MediaKeySystemMediaCapability {
+    /// `DOMString contentType = ""`
+    pub content_type: String,
+    /// `DOMString? encryptionScheme = null`
+    pub encryption_scheme: Option<String>,
+    /// `DOMString robustness = ""`
+    pub robustness: String,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for MediaKeySystemMediaCapability {
+    fn default() -> Self {
+        MediaKeySystemMediaCapability {
+            content_type: String::from(""),
+            encryption_scheme: None,
+            robustness: String::from(""),
+        }
+    }
+}
+
+impl MediaKeySystemMediaCapability {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "MediaKeySystemMediaCapability")?;
+        let m_content_type = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("contentType");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    String::from("")
+                } else {
+                    rt::to_dom_string(scope, v)?
+                }
+            }
+            None => String::from(""),
+        };
+        let m_encryption_scheme = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("encryptionScheme");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    {
+                        if v.is_null_or_undefined() {
+                            Some(None)
+                        } else {
+                            (rt::to_dom_string(scope, v)).map(Some)
+                        }
+                    }?
+                }
+            }
+            None => None,
+        };
+        let m_robustness = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("robustness");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    String::from("")
+                } else {
+                    rt::to_dom_string(scope, v)?
+                }
+            }
+            None => String::from(""),
+        };
+        Some(MediaKeySystemMediaCapability {
+            content_type: m_content_type,
+            encryption_scheme: m_encryption_scheme,
+            robustness: m_robustness,
+        })
+    }
+}
+
+impl ToJs for MediaKeySystemMediaCapability {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.content_type.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("contentType");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.encryption_scheme.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("encryptionScheme");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.robustness.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("robustness");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary MediaKeysPolicy` (encrypted-media.idl).
+#[derive(Clone)]
+pub struct MediaKeysPolicy {
+    /// `DOMString minHdcpVersion`
+    pub min_hdcp_version: Option<String>,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for MediaKeysPolicy {
+    fn default() -> Self {
+        MediaKeysPolicy {
+            min_hdcp_version: None,
+        }
+    }
+}
+
+impl MediaKeysPolicy {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "MediaKeysPolicy")?;
+        let m_min_hdcp_version = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("minHdcpVersion");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_dom_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        Some(MediaKeysPolicy {
+            min_hdcp_version: m_min_hdcp_version,
+        })
+    }
+}
+
+impl ToJs for MediaKeysPolicy {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        if let Some(x) = &self.min_hdcp_version {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("minHdcpVersion");
                     &K
                 })
                 .into(),
@@ -53487,6 +54476,29 @@ impl ToJs for Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32
             Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView::Float32Array(x) => x.to_js(scope),
             Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView::Float64Array(x) => x.to_js(scope),
             Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView::DataView(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(MediaKeyStatus or undefined)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum MediaKeyStatusOrUndefined {
+    MediaKeyStatus(MediaKeyStatus),
+    Undefined(()),
+}
+
+impl MediaKeyStatusOrUndefined {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        (MediaKeyStatus::from_js(scope, v)).map(MediaKeyStatusOrUndefined::MediaKeyStatus)
+    }
+}
+
+impl ToJs for MediaKeyStatusOrUndefined {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            MediaKeyStatusOrUndefined::MediaKeyStatus(x) => x.to_js(scope),
+            MediaKeyStatusOrUndefined::Undefined(x) => x.to_js(scope),
         }
     }
 }

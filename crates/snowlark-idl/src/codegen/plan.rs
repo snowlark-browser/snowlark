@@ -488,6 +488,13 @@ pub const SCOPE: &[&str] = &[
     "MediaSource",
     "SourceBuffer",
     "SourceBufferList",
+    // Encrypted Media Extensions (the Clear Key key system).
+    "MediaKeySystemAccess",
+    "MediaKeys",
+    "MediaKeySession",
+    "MediaKeyStatusMap",
+    "MediaKeyMessageEvent",
+    "MediaEncryptedEvent",
     // Web Animations, and the CSS Animations and Transitions objects and events.
     "AnimationTimeline",
     "DocumentTimeline",

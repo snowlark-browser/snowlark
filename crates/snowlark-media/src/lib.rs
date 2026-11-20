@@ -16,6 +16,8 @@
 //! - [`caps`] and [`probe`]: which types play (`canPlayType`, `isTypeSupported`), from the
 //!   containers and decoders installed.
 //! - [`ranges`]: normalized time ranges.
+//! - [`cenc`]: Common Encryption of fragmented MP4, decrypted before the media side parses it (the
+//!   Clear Key key system of Encrypted Media Extensions).
 //! - [`audio`]: which players make sound, per browser tab, and the tab's mute (below the page).
 //!
 //! Why `MediaPlayer` rather than `IMFMediaEngine`: both are Media Foundation's playback pipeline
@@ -27,6 +29,7 @@
 
 pub mod audio;
 pub mod caps;
+pub mod cenc;
 pub mod init_segment;
 pub mod ranges;
 pub mod resource;

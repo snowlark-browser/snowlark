@@ -16,6 +16,7 @@
 //! - [`vtt`]: WebVTT parsing for `<track>` elements.
 
 pub(crate) mod bindings;
+pub(crate) mod eme;
 pub(crate) mod mse;
 pub(crate) mod objects;
 pub mod vtt;
@@ -176,6 +177,9 @@ pub(crate) struct El {
     pub text_tracks: Option<Handle>,
     /// The attached MediaSource.
     pub mse: Option<Handle>,
+    /// EME `mediaKeys`, and its [[attaching media keys]] flag.
+    pub media_keys: Option<Handle>,
+    pub attaching_keys: bool,
     pub rvfc: Vec<(u32, JsObject)>,
     /// The position "time marches on" last ran at (none after a seek).
     pub marched: Option<f64>,
@@ -237,6 +241,8 @@ impl El {
             video_tracks: None,
             text_tracks: None,
             mse: None,
+            media_keys: None,
+            attaching_keys: false,
             rvfc: Vec::new(),
             marched: None,
             next_rvfc: 1,
@@ -293,6 +299,8 @@ pub(crate) struct Media {
     )>,
     /// Counts cues added to tracks (the last key of the list of cues' order).
     pub cue_order: u64,
+    /// Counts EME sessions given an id (their ids).
+    pub eme_sessions: u64,
 }
 
 /// How often `timeupdate` fires while playing (HTML: every 15 to 250 ms).

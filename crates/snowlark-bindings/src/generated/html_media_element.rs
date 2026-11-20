@@ -249,6 +249,13 @@ pub trait HTMLMediaElementImpl {
     fn sink_id(&self, this: Handle) -> DomStr<'_> {
         rt::stub("HTMLMediaElement.sink_id")
     }
+    /// [SecureContext] readonly attribute MediaKeys? mediaKeys;
+    #[cfg(not(feature = "stubs"))]
+    fn media_keys(&self, this: Handle) -> Option<Handle>;
+    #[cfg(feature = "stubs")]
+    fn media_keys(&self, this: Handle) -> Option<Handle> {
+        rt::stub("HTMLMediaElement.media_keys")
+    }
     /// [CEReactions] attribute boolean disableRemotePlayback;
     #[cfg(not(feature = "stubs"))]
     fn disable_remote_playback(&self, this: Handle) -> bool;
@@ -332,6 +339,23 @@ pub trait HTMLMediaElementImpl {
     #[cfg(feature = "stubs")]
     fn set_sink_id(&self, cx: &mut Cx, this: Handle, sink_id: &str) -> Result<JsPromise> {
         rt::stub("HTMLMediaElement.set_sink_id")
+    }
+    /// [SecureContext] Promise<undefined> setMediaKeys(MediaKeys? mediaKeys);
+    #[cfg(not(feature = "stubs"))]
+    fn set_media_keys(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        media_keys: Option<Handle>,
+    ) -> Result<JsPromise>;
+    #[cfg(feature = "stubs")]
+    fn set_media_keys(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        media_keys: Option<Handle>,
+    ) -> Result<JsPromise> {
+        rt::stub("HTMLMediaElement.set_media_keys")
     }
 }
 
@@ -1428,6 +1452,16 @@ pub(crate) fn attr_sink_id_get<D: Dom, const LO: u16, const HI: u16>(call: rt::C
     call.return_value(&v);
 }
 
+/// Getter of `[SecureContext] readonly attribute MediaKeys? mediaKeys;`.
+pub(crate) fn attr_media_keys_get<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
+    let _prof = call.prof("get HTMLMediaElement.mediaKeys");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { call.receiver() };
+    let dom = call.state().engine::<D>();
+    let v = <D as HTMLMediaElementImpl>::media_keys(dom, this);
+    call.return_handle(v);
+}
+
 /// Getter of `attribute EventHandler onencrypted;`.
 pub(crate) fn attr_onencrypted_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -1832,6 +1866,79 @@ pub(crate) fn op_set_sink_id<D: Dom, const LO: u16, const HI: u16>(
     let _prof = rt::prof::enter(scope, "HTMLMediaElement.setSinkId");
     v8::tc_scope!(let tc, scope);
     match op_set_sink_id_dispatch::<D, LO, HI>(tc, &args) {
+        Some(v) => rv.set(v),
+        None => {
+            if let Some(e) = tc.exception() {
+                if let Some(r) = v8::PromiseResolver::new(tc) {
+                    r.reject(tc, e);
+                    rv.set(r.get_promise(tc).into());
+                }
+            }
+        }
+    }
+}
+
+/// `[SecureContext] Promise<undefined> setMediaKeys(MediaKeys? mediaKeys);`
+fn op_set_media_keys_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    this: Handle,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        {
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_interface(
+                    scope,
+                    v,
+                    ids::MEDIA_KEYS,
+                    ids::MEDIA_KEYS_END,
+                    "Failed to execute 'setMediaKeys': parameter 1",
+                    "MediaKeys",
+                ))
+                .map(Some)
+            }
+        }
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as HTMLMediaElementImpl>::set_media_keys(dom, &mut cx, this, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `HTMLMediaElement.setMediaKeys` (Web IDL §3.7.6).
+fn op_set_media_keys_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let Some(this) = rt::unwrap(&args.this(), LO, HI) else {
+        return rt::illegal_invocation(scope);
+    };
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "HTMLMediaElement.setMediaKeys", 1, argc);
+    }
+    op_set_media_keys_0::<D, LO, HI>(scope, args, this, argc)
+}
+
+/// `HTMLMediaElement.setMediaKeys`.
+pub(crate) fn op_set_media_keys<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "HTMLMediaElement.setMediaKeys");
+    v8::tc_scope!(let tc, scope);
+    match op_set_media_keys_dispatch::<D, LO, HI>(tc, &args) {
         Some(v) => rv.set(v),
         None => {
             if let Some(e) = tc.exception() {
@@ -2431,6 +2538,18 @@ pub(crate) fn template<'s, D: Dom>(
         let s = None;
         rt::accessor(scope, proto, "sinkId", g, s, false);
     }
+    if options.secure_context {
+        let g = rt::getter(
+            scope,
+            rt::light_builder(super::html_media_element::attr_media_keys_get::<D, LO, HI>),
+            "mediaKeys",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = None;
+        rt::accessor(scope, proto, "mediaKeys", g, s, false);
+    }
     {
         let g = rt::getter(
             scope,
@@ -2563,6 +2682,16 @@ pub(crate) fn template<'s, D: Dom>(
             None,
         );
         rt::operation(scope, &proto, "setSinkId", f, false);
+    }
+    if options.secure_context {
+        let f = rt::method(
+            scope,
+            rt::builder(super::html_media_element::op_set_media_keys::<D, LO, HI>),
+            "setMediaKeys",
+            1,
+            None,
+        );
+        rt::operation(scope, &proto, "setMediaKeys", f, false);
     }
     t
 }

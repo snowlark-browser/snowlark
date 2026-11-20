@@ -106,6 +106,16 @@ pub enum MediaObject {
         source: Handle,
         active: bool,
     },
+    /// Encrypted Media Extensions (`eme.rs`).
+    KeySystemAccess {
+        key_system: String,
+        config: Box<g::MediaKeySystemConfiguration>,
+    },
+    MediaKeys(Box<super::eme::KeysData>),
+    KeySession(Box<super::eme::SessionData>),
+    KeyStatusMap {
+        session: Handle,
+    },
 }
 
 impl MediaObject {
@@ -132,6 +142,10 @@ impl MediaObject {
             MediaObject::MediaSource(_) => InterfaceId::MediaSource,
             MediaObject::SourceBuffer(_) => InterfaceId::SourceBuffer,
             MediaObject::SourceBufferList { .. } => InterfaceId::SourceBufferList,
+            MediaObject::KeySystemAccess { .. } => InterfaceId::MediaKeySystemAccess,
+            MediaObject::MediaKeys(_) => InterfaceId::MediaKeys,
+            MediaObject::KeySession(_) => InterfaceId::MediaKeySession,
+            MediaObject::KeyStatusMap { .. } => InterfaceId::MediaKeyStatusMap,
         }
     }
 
@@ -158,6 +172,12 @@ impl MediaObject {
             MediaObject::MediaSource(s) => s.refs(out),
             MediaObject::SourceBuffer(b) => b.refs(out),
             MediaObject::SourceBufferList { source, .. } => out.push(*source),
+            MediaObject::MediaKeys(k) => out.extend(&k.sessions),
+            MediaObject::KeySession(s) => {
+                out.push(s.media_keys);
+                out.push(s.status_map);
+            }
+            MediaObject::KeyStatusMap { session } => out.push(*session),
             _ => {}
         }
     }

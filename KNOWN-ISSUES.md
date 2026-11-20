@@ -156,6 +156,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## Media
 
+- **DRM.** Encrypted Media Extensions offer only the Clear Key key system, so services that need a DRM key system
+  (PlayReady, Widevine) cannot play. Clear Key decrypts `cenc` and `cbcs` MP4 through Media Source Extensions only
+  (not a `src` file or WebM), with temporary sessions only. (ref 548)
 - **`changeType()` to a different decoder.** Media Source Extensions `changeType()` cannot switch a set-up
   `SourceBuffer` to a stream that needs another decoder. Dolby AC-3 and E-AC-3 are not offered through MSE for that
   reason. (ref 150)

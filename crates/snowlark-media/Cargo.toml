@@ -6,6 +6,7 @@ license.workspace = true
 description = "Snowlark media playback: media resources fetched through snowlark-net, Windows Media Foundation players decoding into the compositor's GPU textures, Media Source Extensions"
 
 [dependencies]
+aes = "0.8"
 snowlark-audio = { path = "../snowlark-audio" }
 snowlark-net = { path = "../snowlark-net" }
 snowlark-paint = { path = "../snowlark-paint" }

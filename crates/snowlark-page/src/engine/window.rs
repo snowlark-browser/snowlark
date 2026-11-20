@@ -2028,6 +2028,16 @@ impl NavigatorImpl for Engine {
     fn get_gamepads(&self, _cx: &mut Cx, this: Handle) -> rt::Result<Vec<Option<Handle>>> {
         Engine::get_gamepads(self, this)
     }
+    /// EME `navigator.requestMediaKeySystemAccess`.
+    fn request_media_key_system_access(
+        &self,
+        cx: &mut Cx,
+        _this: Handle,
+        key_system: &str,
+        supported_configurations: Vec<snowlark_bindings::generated::MediaKeySystemConfiguration>,
+    ) -> rt::Result<JsPromise> {
+        Engine::request_media_key_system_access(self, cx, key_system, supported_configurations)
+    }
     /// Media Capabilities `navigator.mediaCapabilities` (one per navigator).
     fn media_capabilities(&self, this: Handle) -> Handle {
         Engine::media_capabilities(self, this)

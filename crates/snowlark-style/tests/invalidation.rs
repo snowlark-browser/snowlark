@@ -50,14 +50,38 @@ fn insert_paragraphs(p: &mut Page, n: usize) -> snowlark_style::RestyleStats {
 
 #[test]
 fn a_restyle_of_a_hundred_new_elements_runs_on_the_pool() {
-    // Parallel styling pays from about a hundred elements: an insertion of a hundred goes to the pool,
-    // a small one stays on the page thread.
+    // A level of a hundred new elements is shared with the pool; a small insertion stays on the page
+    // thread.
     let mut p = Page::new(&sections(2));
     let stats = insert_paragraphs(&mut p, 100);
     assert!(stats.restyled >= 100, "{stats:?}");
     assert!(stats.parallel, "{stats:?}");
     let stats = insert_paragraphs(&mut p, 10);
     assert!(stats.restyled >= 10, "{stats:?}");
+    assert!(!stats.parallel, "{stats:?}");
+}
+
+#[test]
+fn a_restyle_that_selectors_spread_over_many_elements_runs_on_the_pool() {
+    // One class change restyles every paragraph through a descendant selector: what goes to the pool
+    // is decided by the elements the traversal finds dirty, not by the size of the change.
+    let mut html =
+        String::from("<!DOCTYPE html><style>.wide p { margin-bottom: 2px; }</style><body>");
+    for i in 0..200 {
+        html.push_str(&format!("<section id=s{i}><p>a</p><p>b</p></section>"));
+    }
+    let mut p = Page::new(&html);
+    let body = p.q("body");
+    p.dom.set_attribute(body, "class", "wide").unwrap();
+    let stats = p.restyle();
+    assert_eq!(p.get("#s150 p", "margin-bottom"), "2px");
+    assert!(stats.restyled >= 400, "{stats:?}");
+    assert!(stats.parallel, "{stats:?}");
+
+    let s3 = p.q("#s3");
+    p.dom.set_attribute(s3, "class", "wide").unwrap();
+    let stats = p.restyle();
+    assert!(stats.restyled <= 3, "{stats:?}");
     assert!(!stats.parallel, "{stats:?}");
 }
 

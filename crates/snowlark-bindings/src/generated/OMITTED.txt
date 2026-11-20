@@ -134,9 +134,7 @@ HTMLGeolocationElement.position: interface GeolocationPosition is not generated
 HTMLIFrameElement.permissionsPolicy: interface PermissionsPolicy is not generated
 HTMLInputElement.webkitEntries: interface FileSystemEntry is not generated
 HTMLMediaElement.captureStream(): interface MediaStream is not generated
-HTMLMediaElement.mediaKeys: interface MediaKeys is not generated
 HTMLMediaElement.remote: interface RemotePlayback is not generated
-HTMLMediaElement.setMediaKeys(mediaKeys): interface MediaKeys is not generated
 HTMLMicrophoneElement.track: interface MediaStreamTrack is not generated
 HTMLUserMediaElement.stream: interface MediaStream is not generated
 HTMLVideoElement.requestPictureInPicture(): interface PictureInPictureWindow is not generated
@@ -169,7 +167,6 @@ Navigator.ml: interface ML is not generated
 Navigator.preferences: interface PreferenceManager is not generated
 Navigator.presentation: interface Presentation is not generated
 Navigator.requestMIDIAccess(options): interface MIDIAccess is not generated
-Navigator.requestMediaKeySystemAccess(keySystem, supportedConfigurations): interface MediaKeySystemAccess is not generated
 Navigator.serial: interface Serial is not generated
 Navigator.serviceWorker: interface ServiceWorkerContainer is not generated
 Navigator.storageBuckets: interface StorageBucketManager is not generated
