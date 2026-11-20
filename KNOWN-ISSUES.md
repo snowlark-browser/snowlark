@@ -111,8 +111,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   shadow boundary and `getComposedRanges()` crossing ranges do not work as in other browsers. (ref 62)
 - **`[SecureContext]` members on insecure pages.** `navigator.credentials`, `navigator.clipboard` and
   `PasswordCredential` exist on `http://` pages, although `isSecureContext` is false. (ref 82)
-- **`<progress>` with `appearance: none`.** Pages that style their own `<progress>` through
-  `::-webkit-progress-value` or `::-moz-progress-bar` show no fill, because those pseudo-elements are not known. (ref 79)
 - **`window.open()` is a stub.** It returns null, because auxiliary browsing contexts do not exist, so `opener` is
   always null. (ref 126)
 

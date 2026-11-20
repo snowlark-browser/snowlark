@@ -14,7 +14,8 @@ use std::sync::Arc;
 use servo_arc::Arc as ServoArc;
 use snowlark_dom::{local_name, ns, Dom, NodeId};
 use snowlark_layout::style::{
-    AnonymousBox, Color, Content, Image, PseudoElement, ReplacedContent, Style, StyleSource,
+    AnonymousBox, Color, Content, FormPart, Image, PseudoElement, ReplacedContent, Style,
+    StyleSource,
 };
 use snowlark_style::{StyleData, StyleEngine};
 use style::properties::{ComputedValues, StyleBuilder};
@@ -63,8 +64,22 @@ pub(crate) fn stylo_pseudo(p: PseudoElement) -> Option<StyloPseudo> {
         PseudoElement::FirstLetter => StyloPseudo::FirstLetter,
         PseudoElement::Backdrop => StyloPseudo::Backdrop,
         PseudoElement::DetailsContent => StyloPseudo::DetailsContent,
+        PseudoElement::Part(p) => stylo_part(p),
         PseudoElement::FirstLine | PseudoElement::DetailsSummary => return None,
     })
+}
+
+fn stylo_part(p: FormPart) -> StyloPseudo {
+    match p {
+        FormPart::ProgressInner => StyloPseudo::WebkitProgressInnerElement,
+        FormPart::ProgressBar => StyloPseudo::WebkitProgressBar,
+        FormPart::ProgressValue => StyloPseudo::WebkitProgressValue,
+        FormPart::MeterInner => StyloPseudo::WebkitMeterInnerElement,
+        FormPart::MeterBar => StyloPseudo::WebkitMeterBar,
+        FormPart::MeterOptimumValue => StyloPseudo::WebkitMeterOptimumValue,
+        FormPart::MeterSuboptimumValue => StyloPseudo::WebkitMeterSuboptimumValue,
+        FormPart::MeterEvenLessGoodValue => StyloPseudo::WebkitMeterEvenLessGoodValue,
+    }
 }
 
 /// Anonymous box styles by (parent values address, kind), each with the parent it was made from.
@@ -574,6 +589,10 @@ impl<'a> DocumentStyles<'a> {
                 | local_name!("progress")
                 | local_name!("meter") => {
                     let values = self.data.styles_arc(el)?;
+                    if self.has_form_parts(el) {
+                        // Not a native control: a box drawn by its parts.
+                        return None;
+                    }
                     // `::placeholder`'s color (the UA sheet's grey unless the page styles it), for
                     // the controls that show a placeholder (resolving it is a cascade).
                     let grey = Color::rgb(0x75, 0x75, 0x75);
@@ -810,6 +829,74 @@ impl StyleSource for DocumentStyles<'_> {
                 .collect(),
             open: dom.get_attribute(element, "open").is_some(),
         })
+    }
+
+    fn has_form_parts(&self, element: NodeId) -> bool {
+        use style::values::specified::box_::Appearance;
+        let dom = self.dom;
+        (dom.is_html_element_named(element, &local_name!("progress"))
+            || dom.is_html_element_named(element, &local_name!("meter")))
+            && self
+                .data
+                .styles(element)
+                .is_some_and(|s| s.get_box().clone_appearance() == Appearance::None)
+    }
+
+    /// HTML 15.5.14-15: the internal tree of a `progress` or `meter` element, an inner part holding
+    /// the bar, holding the value part. The element sets the value part's inline size, as a style
+    /// attribute would: a progress bar's position (zero while indeterminate), a meter's value
+    /// between its minimum and maximum; a meter's value part is the pseudo-element of the gauge
+    /// region the value is in.
+    fn form_parts(&self, element: NodeId) -> Option<Vec<(FormPart, RenderStyle)>> {
+        use snowlark_layout::style::{ControlKind, MeterLevel};
+        if !self.has_form_parts(element) {
+            return None;
+        }
+        let (parts, fraction) = if self
+            .dom
+            .is_html_element_named(element, &local_name!("progress"))
+        {
+            let position = crate::controls::progress_position(self.dom, element);
+            (
+                [
+                    FormPart::ProgressInner,
+                    FormPart::ProgressBar,
+                    FormPart::ProgressValue,
+                ],
+                position.unwrap_or(0.0),
+            )
+        } else {
+            let ControlKind::Meter { fraction, level } =
+                crate::controls::meter_kind(self.dom, element)
+            else {
+                return None;
+            };
+            let value = match level {
+                MeterLevel::Optimum => FormPart::MeterOptimumValue,
+                MeterLevel::Suboptimum => FormPart::MeterSuboptimumValue,
+                MeterLevel::EvenLessGood => FormPart::MeterEvenLessGoodValue,
+            };
+            ([FormPart::MeterInner, FormPart::MeterBar, value], fraction)
+        };
+        let inline = format!(
+            "inline-size: {}%; block-size: 100%",
+            f64::from(fraction) * 100.0
+        );
+        let mut parent = self.data.styles_arc(element)?;
+        let mut out = Vec::with_capacity(parts.len());
+        for (i, part) in parts.into_iter().enumerate() {
+            let values = self.engine.part_style(
+                self.dom,
+                self.data,
+                element,
+                &stylo_part(part),
+                &parent,
+                (i == parts.len() - 1).then_some(inline.as_str()),
+            )?;
+            parent = values.clone();
+            out.push((part, self.handle(values)));
+        }
+        Some(out)
     }
 
     fn flat_children(&self, parent: NodeId) -> Option<Vec<NodeId>> {

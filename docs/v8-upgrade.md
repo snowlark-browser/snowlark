@@ -34,6 +34,10 @@ cache and access check tests before anything else.
   base, `kPtrComprCageBaseAlignment`). A wrapper's 62-bit handle takes two fields (`snowlark-bindings`
   `rt/wrap.rs`). Its `verify` panics in every isolate the bindings install when V8's own
   `Get/SetInternalField` disagree.
+- `crates/snowlark-js/src/object_field.rs` (the wrapper group links in `snowlark-bindings` `rt/gc.rs`) declares the
+  v8 crate's glue functions `v8__Object__GetInternalField` and `v8__Object__SetInternalField` itself, to skip the
+  crate's field count check per call, and compares a field's tagged word inline with a handle's compressed
+  address (`undefined`'s for an empty field). `object_field::tests` checks it against the crate's accessors.
 
 V8 is built with pointer compression (the `v8_enable_pointer_compression` feature in the workspace `Cargo.toml`,
 and the pinned library): the inline field and Smi code assumes it.

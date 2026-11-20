@@ -201,6 +201,21 @@ impl Dom {
         self.n(node).flags & flags::WRAPPED != 0
     }
 
+    /// False only for a live node [`Dom::set_wrapped`] never marked; true for a marked one and for
+    /// an id that is no longer alive (whose mark says nothing).
+    #[inline]
+    pub fn may_be_wrapped(&self, node: NodeId) -> bool {
+        match self.nodes.get(node.index as usize) {
+            Some(n)
+                if n.generation == node.generation
+                    && !matches!(n.data, crate::node::NodeData::Free { .. }) =>
+            {
+                n.flags & flags::WRAPPED != 0
+            }
+            _ => true,
+        }
+    }
+
     /// Marks `node` as having (or no longer having) registered MutationObservers.
     pub fn set_observed(&mut self, node: NodeId, observed: bool) {
         let n = self.n_mut(node);

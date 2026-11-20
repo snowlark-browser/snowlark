@@ -310,8 +310,19 @@ fn select_kind(dom: &Dom, el: NodeId, state: Option<&ControlState>) -> ControlKi
     }
 }
 
+/// HTML §4.10.13: a progress bar's position, the current value over the maximum (`None`:
+/// indeterminate, without a `value` attribute). The maximum is 1 unless `max` parses to more than
+/// zero; the value is 0 unless it parses to more, and at most the maximum.
+pub(crate) fn progress_position(dom: &Dom, el: NodeId) -> Option<f32> {
+    let max = parse_float(dom.get_attribute(el, "max"))
+        .filter(|m| *m > 0.0)
+        .unwrap_or(1.0);
+    dom.get_attribute(el, "value")
+        .map(|v| (parse_float(Some(v)).unwrap_or(0.0).clamp(0.0, max) / max) as f32)
+}
+
 /// HTML §4.10.14: the region of the gauge a meter's value is in, and the fraction it fills.
-fn meter_kind(dom: &Dom, el: NodeId) -> ControlKind {
+pub(crate) fn meter_kind(dom: &Dom, el: NodeId) -> ControlKind {
     let attr = |n: &str| parse_float(dom.get_attribute(el, n));
     let min = attr("min").unwrap_or(0.0);
     let max = attr("max").unwrap_or(1.0).max(min);
@@ -538,14 +549,9 @@ pub fn control(
         }
         local_name!("progress") => {
             readonly_applies = false;
-            // §4.10.13: indeterminate without a value; else value / max (max > 0, default 1).
-            let max = parse_float(dom.get_attribute(el, "max"))
-                .filter(|m| *m > 0.0)
-                .unwrap_or(1.0);
-            let fraction = dom
-                .get_attribute(el, "value")
-                .map(|v| (parse_float(Some(v)).unwrap_or(0.0).clamp(0.0, max) / max) as f32);
-            ControlKind::Progress { fraction }
+            ControlKind::Progress {
+                fraction: progress_position(dom, el),
+            }
         }
         local_name!("meter") => {
             readonly_applies = false;

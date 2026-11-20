@@ -518,6 +518,67 @@ fn form_controls_render_with_the_native_look() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// HTML 15.5.14-15, CSS UI 4 §6.2: with `appearance: none`, a `progress` or `meter` element is
+/// drawn by its parts, which pages style through `::-webkit-progress-value` and the others: the
+/// bar fills the element, the value part takes the position's share of it, and it follows the
+/// `value` attribute.
+#[test]
+fn progress_and_meter_without_native_appearance_draw_their_parts() {
+    let dir = fixture_dir("progress-parts");
+    let html = "<!DOCTYPE html><style>
+          body { margin: 0 }
+          progress, meter { appearance: none; display: block; width: 200px; height: 20px;
+                            border: none; background: blue }
+          #p::-webkit-progress-value { background: rgb(255, 0, 0) }
+        </style>
+        <progress id=p value=50 max=100>fallback text</progress>
+        <progress id=i></progress>
+        <meter id=m value=0.25></meter>
+        <progress id=n value=0.5 style='appearance: auto'></progress>";
+    write(&dir, "page.html", html.as_bytes());
+    let url = Url::from_file_path(dir.join("page.html")).unwrap();
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut r = renderer(&net, 300.0, 120.0);
+    r.load_html(html.as_bytes(), &url, None);
+    r.render_until_settled(Duration::from_secs(10));
+    let viewport = Size::new(300.0, 120.0);
+    r.layout(viewport).unwrap();
+    let px = r.rasterize(viewport, Point::ZERO, 1.0).unwrap();
+    let red = Color::rgb(255, 0, 0);
+    let gray = Color::rgb(128, 128, 128);
+    // 50 of 100: the value part fills the first half of the bar, the bar (gray) the rest.
+    assert_eq!(px.pixel(50, 10), red);
+    assert_eq!(px.pixel(98, 10), red);
+    assert_eq!(px.pixel(102, 10), gray);
+    assert_eq!(px.pixel(190, 10), gray);
+    // Indeterminate: no value part, the bar only.
+    assert_eq!(px.pixel(10, 30), gray);
+    // The meter: the bar is the middle half of its height, the optimum value (green) a quarter
+    // of its width; above the bar the element's own background.
+    assert_eq!(px.pixel(100, 42), Color::rgb(0, 0, 255));
+    let value = px.pixel(25, 50);
+    assert!(value.g > value.r && value.g > value.b, "{value:?}");
+    let bar = px.pixel(150, 50);
+    assert!(bar.r == bar.g && bar.g == bar.b && bar.r > 0xc0, "{bar:?}");
+    // `appearance: auto` keeps the native look: the accent fill.
+    assert_eq!(px.pixel(50, 70), Color::rgb(0x00, 0x75, 0xff));
+
+    // Script sets the value: the value part follows.
+    let p = by_id(&r, "p");
+    let mut dom = r.dom_mut().unwrap();
+    dom.set_reactions_enabled(true);
+    dom.set_attribute(p, "value", "25").unwrap();
+    let reactions = dom.take_reactions();
+    drop(dom);
+    r.dom_changed(&reactions);
+    r.render_until_settled(Duration::from_secs(10));
+    r.layout(viewport).unwrap();
+    let px = r.rasterize(viewport, Point::ZERO, 1.0).unwrap();
+    assert_eq!(px.pixel(48, 10), red);
+    assert_eq!(px.pixel(52, 10), gray);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Needs the network.
 #[test]
 #[ignore]

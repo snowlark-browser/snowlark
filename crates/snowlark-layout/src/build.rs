@@ -500,6 +500,7 @@ impl<'a, Src: StyleSource> Builder<'a, Src> {
         // and the rendered legend of a fieldset depend on more than one child)
         if self.dom.shadow_root(node).is_some()
             || self.src.details_parts(node).is_some()
+            || self.src.has_form_parts(node)
             || self
                 .dom
                 .is_html_element_named(node, &local_name!("fieldset"))
@@ -643,6 +644,7 @@ impl<'a, Src: StyleSource> Builder<'a, Src> {
     ) -> Option<Decorations> {
         if self.src.flat_children(el).is_some()
             || self.src.details_parts(el).is_some()
+            || self.src.has_form_parts(el)
             || self.src.alt_text(el).is_some()
         {
             return None;
@@ -719,6 +721,8 @@ impl<'a, Src: StyleSource> Builder<'a, Src> {
         self.pseudo(parent, PseudoElement::Before, ctx, deco, out);
         if let Some(parts) = self.src.details_parts(parent) {
             self.details_children(parent, parent_style, &parts, ctx, deco, out);
+        } else if let Some(parts) = self.src.form_parts(parent) {
+            self.form_part_boxes(&parts, ctx, deco, out);
         } else {
             // The flat tree: a shadow host's shadow tree, a slot's assigned nodes.
             match self.src.flat_children(parent) {
@@ -861,6 +865,51 @@ impl<'a, Src: StyleSource> Builder<'a, Src> {
             false,
             raw,
         ) {
+            out.push(b);
+        }
+    }
+
+    /// The boxes of a `progress` or `meter` element's parts (each in the one before it), which it
+    /// renders in place of its children.
+    fn form_part_boxes(
+        &mut self,
+        parts: &[(FormPart, Src::Style)],
+        ctx: Ctx,
+        deco: &Decorations,
+        out: &mut Vec<BoxId>,
+    ) {
+        let Some(((part, style), inner)) = parts.split_first() else {
+            return;
+        };
+        let display = style.display();
+        if display == Display::None {
+            return;
+        }
+        if display == Display::Contents {
+            let d = self.decorations_for(style, deco, false);
+            self.form_part_boxes(inner, ctx, &d, out);
+            return;
+        }
+        let atomic = self.is_atomic(display, style, ctx, false);
+        let d = self.decorations_for(style, deco, atomic);
+        let child_ctx = match display {
+            Display::Box {
+                inside: DisplayInside::Flex | DisplayInside::Grid,
+                ..
+            } => Ctx::FlexGrid,
+            _ => Ctx::Flow,
+        };
+        let mut raw = Vec::new();
+        self.form_part_boxes(inner, child_ctx, &d, &mut raw);
+        if let Some(b) = self.principal_box(
+            None,
+            Some(PseudoElement::Part(*part)),
+            style.clone(),
+            ctx,
+            false,
+            raw,
+        ) {
+            self.tree.b_mut(b).decorations = deco.clone();
             out.push(b);
         }
     }

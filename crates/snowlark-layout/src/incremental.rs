@@ -35,7 +35,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use snowlark_dom::{Dom, NodeData, NodeId};
+use snowlark_dom::{local_name, Dom, NodeData, NodeId};
 
 use crate::boxes::*;
 use crate::build::Builder;
@@ -776,8 +776,13 @@ impl<S: Style> LayoutTree<S> {
         }
         // An `img` showing its alt text (whose text box takes its style), or one that stopped
         // being replaced (its style can make it show its alt text), is built again.
+        // A `progress` or `meter` drawn by its parts (whose styles inherit from it), or that is a
+        // native control again, is built again too.
         if (b.kind != BoxKind::Replaced && styles.alt_text(el).is_some())
             || (b.kind == BoxKind::Replaced && styles.replaced_content(el).is_none())
+            || (b.kind != BoxKind::Replaced
+                && (dom.is_html_element_named(el, &local_name!("progress"))
+                    || dom.is_html_element_named(el, &local_name!("meter"))))
         {
             return InPlace::Parent;
         }

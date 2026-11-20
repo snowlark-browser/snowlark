@@ -402,6 +402,60 @@ struct Discarded {
 
 /// A node whose document and opaque root are in different groups: [`NodeGroups`] asks again.
 const MIXED: u32 = u32::MAX;
+/// [`MIXED`] as a [`NodeMemo`] entry stores it.
+const MIXED_ENTRY: u64 = 0xFFFF;
+
+/// [`NodeGroups`]' answers by node slot, kept from one snapshot to the next so that a snapshot does not
+/// clear one entry per node slot: an entry holds the generation of the node it is for (32 bits), the
+/// snapshot that wrote it (16 bits, [`NodeMemo::epoch`]) and the group (16 bits, [`MIXED_ENTRY`] for
+/// [`MIXED`]). An entry of an earlier snapshot, or of a stale id, finds no answer.
+#[derive(Default)]
+struct NodeMemo {
+    slots: Vec<u64>,
+    /// The current snapshot's number, 1 and up (an entry never written has 0).
+    epoch: u16,
+}
+
+impl NodeMemo {
+    /// The memo for the next snapshot, covering `node_slots` slots.
+    fn next(mut self, node_slots: usize) -> NodeMemo {
+        self.epoch = self.epoch.wrapping_add(1);
+        if self.epoch == 0 {
+            // (every 65,535 snapshots, the old entries go)
+            self.slots.fill(0);
+            self.epoch = 1;
+        }
+        if self.slots.len() < node_slots {
+            self.slots.resize(node_slots, 0);
+        }
+        self
+    }
+
+    fn get(&self, n: NodeId) -> Option<u32> {
+        let e = *self.slots.get(n.index() as usize)?;
+        if e >> 32 != u64::from(n.generation()) || (e >> 16) as u16 != self.epoch {
+            return None;
+        }
+        Some(match e & 0xFFFF {
+            MIXED_ENTRY => MIXED,
+            group => group as u32,
+        })
+    }
+
+    fn set(&mut self, n: NodeId, group: u32) {
+        let group = if group == MIXED {
+            MIXED_ENTRY
+        } else if u64::from(group) < MIXED_ENTRY {
+            u64::from(group)
+        } else {
+            // (more discarded Windows than an entry counts: not remembered)
+            return;
+        };
+        if let Some(e) = self.slots.get_mut(n.index() as usize) {
+            *e = u64::from(n.generation()) << 32 | u64::from(self.epoch) << 16 | group;
+        }
+    }
+}
 
 /// The discarded group of each node, found once per snapshot. Objects that hold many nodes (the
 /// static lists `querySelectorAll` returns) share most of them, and a walk over them would otherwise
@@ -411,15 +465,16 @@ struct NodeGroups {
     /// Document → group (1 and up), which is an index into `windows` plus one.
     docs: FxHashMap<NodeId, u32>,
     windows: Vec<Handle>,
-    /// By slot: the generation of the node the entry is for (0: none, as generations are not), then
-    /// its group (0: none) or [`MIXED`]. A stale id's generation differs, so it finds no entry.
-    memo: Vec<u64>,
+    /// Each node's group (0: none) or [`MIXED`], once asked.
+    memo: NodeMemo,
 }
 
 impl NodeGroups {
-    fn new(dom: &snowlark_dom::Dom, docs: &FxHashMap<NodeId, Handle>) -> Self {
+    /// The groups of `docs`, remembering answers in `memo` (an earlier snapshot's, whose answers do
+    /// not count).
+    fn new(dom: &snowlark_dom::Dom, docs: &FxHashMap<NodeId, Handle>, memo: NodeMemo) -> Self {
         let mut g = NodeGroups {
-            memo: vec![0; dom.node_slots()],
+            memo: memo.next(dom.node_slots()),
             ..Default::default()
         };
         // (a Window can have several documents here, replaced ones: they are one group)
@@ -435,12 +490,8 @@ impl NodeGroups {
     }
 
     fn group(&mut self, dom: &snowlark_dom::Dom, n: NodeId) -> u32 {
-        let generation = u64::from(n.generation());
-        let slot = n.index() as usize;
-        if let Some(&e) = self.memo.get(slot) {
-            if e >> 32 == generation {
-                return e as u32;
-            }
+        if let Some(group) = self.memo.get(n) {
+            return group;
         }
         if !dom.is_alive(n) {
             return 0;
@@ -451,9 +502,7 @@ impl NodeGroups {
             (Some(a), Some(b)) if a != b => MIXED,
             (a, b) => a.or(b).unwrap_or(0),
         };
-        if let Some(e) = self.memo.get_mut(slot) {
-            *e = generation << 32 | u64::from(group);
-        }
+        self.memo.set(n, group);
         group
     }
 
@@ -580,6 +629,8 @@ pub struct GcState {
     /// The discarded browsing contexts' groups as the last snapshot found them, which the next
     /// ones bring up to date instead of walking every object again ([`Engine::discarded_realms`]).
     pub grouping: Option<Grouping>,
+    /// The last snapshot's [`NodeGroups`] answers, whose room the next one reuses.
+    node_memo: NodeMemo,
 }
 
 /// How long a [`Grouping`] is brought up to date before it is made again from every object.
@@ -774,7 +825,8 @@ impl Engine {
         // pins the group, and the group's strong wrappers keep that realm: a cycle V8 cannot see.
         // (Owned objects stay with their owner element.) A kept grouping asks only the objects
         // allocated since.
-        let mut groups = NodeGroups::new(dom, &d.docs);
+        let memo = std::mem::take(&mut self.gc.try_borrow_mut().ok()?.node_memo);
+        let mut groups = NodeGroups::new(dom, &d.docs, memo);
         let mut r = Refs::default();
         let mut joined = Vec::new();
         // (one walk: what could join later is what refers to objects, as nodes' groups stay)
@@ -1197,6 +1249,7 @@ impl Engine {
             }
         }
         if let Ok(mut g) = self.gc.try_borrow_mut() {
+            g.node_memo = std::mem::take(&mut groups.memo);
             g.pin_sizes = (pinned_roots.len(), pinned_objects.len());
             g.last_walked = walked;
         }
@@ -1853,6 +1906,11 @@ impl Engine {
         if removed {
             self.gc.borrow_mut().detached.push(node);
         }
+        if !self.gc_may_be_wrapped(&self.dom(), node) {
+            #[cfg(debug_assertions)]
+            self.assert_wrappers_marked(cx, [node]);
+            return;
+        }
         let scope = cx.scope();
         if !rt::touch(scope, node_handle(node)) {
             return;
@@ -1909,17 +1967,50 @@ impl Engine {
     /// The wrappers of `root`'s shadow-including descendants moved with it (see
     /// [`Engine::gc_node_moved`]).
     pub(crate) fn gc_touch_descendants(&self, cx: &mut Cx, root: NodeId) {
+        #[cfg(debug_assertions)]
+        {
+            let d: Vec<NodeId> = self.dom().shadow_including_descendants(root).collect();
+            self.assert_wrappers_marked(cx, d);
+        }
         let dom = self.dom();
         rt::touch_all(
             cx.scope(),
-            dom.shadow_including_descendants(root).map(node_handle),
+            dom.shadow_including_descendants(root)
+                .filter(|&n| self.gc_may_be_wrapped(&dom, n))
+                .map(node_handle),
         );
     }
 
     /// The wrappers of `nodes` (a removed node's descendants, as its removal collected them) moved
     /// with it, as [`Engine::gc_touch_descendants`].
     pub(crate) fn gc_touch_nodes(&self, cx: &mut Cx, nodes: &[NodeId]) {
-        rt::touch_all(cx.scope(), nodes.iter().map(|&n| node_handle(n)));
+        #[cfg(debug_assertions)]
+        {
+            let d: Vec<NodeId> = nodes
+                .iter()
+                .copied()
+                .filter(|&n| self.dom().is_alive(n))
+                .collect();
+            self.assert_wrappers_marked(cx, d);
+        }
+        let dom = self.dom();
+        rt::touch_all(
+            cx.scope(),
+            nodes
+                .iter()
+                .copied()
+                .filter(|&n| self.gc_may_be_wrapped(&dom, n))
+                .map(node_handle),
+        );
+    }
+
+    /// False when `node` is alive and never had a wrapper: its mark ([`Dom::set_wrapped`], set by
+    /// [`Engine::gc_on_wrap`] and cleared only when its slot is freed) answers without looking the
+    /// wrapper table up, where the bindings' bit per slot index stays set once any node in that slot
+    /// had one.
+    #[inline]
+    fn gc_may_be_wrapped(&self, dom: &Dom, node: NodeId) -> bool {
+        dom.may_be_wrapped(node) || self.wrap_marks_lost.get()
     }
 
     /// A navigation replaced `doc` as its browsing context's active document: its nodes' wrappers
@@ -2922,7 +3013,7 @@ mod tests {
         let mut docs = FxHashMap::default();
         docs.insert(a, wa);
         docs.insert(inert, wb);
-        let mut groups = NodeGroups::new(&dom, &docs);
+        let mut groups = NodeGroups::new(&dom, &docs, NodeMemo::default());
         // (each asked twice: the second answer comes from the memo)
         for _ in 0..2 {
             assert_eq!(groups.window(&dom, root), Some(wa));
@@ -2940,5 +3031,36 @@ mod tests {
         assert_eq!(reused.index(), detached.index());
         assert_eq!(groups.window(&dom, reused), None);
         assert_eq!(groups.window(&dom, detached), None);
+
+        // The next snapshot keeps the memo's room, not its answers: other groups now.
+        let mut docs = FxHashMap::default();
+        docs.insert(other, wa);
+        let mut groups = NodeGroups::new(&dom, &docs, std::mem::take(&mut groups.memo));
+        assert_eq!(groups.window(&dom, root), None);
+        assert_eq!(groups.window(&dom, outside), Some(wa));
+        assert_eq!(groups.window(&dom, reused), Some(wa));
+        assert_eq!(groups.window(&dom, mixed), None);
+    }
+
+    #[test]
+    fn a_kept_node_memo_answers_only_for_its_own_snapshot() {
+        let mut dom = snowlark_dom::Dom::new();
+        let doc = dom.create_document(snowlark_dom::DocumentKind::Html);
+        let n = dom.create_element(doc, "div", None).unwrap();
+        let mut memo = NodeMemo::default().next(dom.node_slots());
+        memo.set(n, 3);
+        assert_eq!(memo.get(n), Some(3));
+        memo.set(n, MIXED);
+        assert_eq!(memo.get(n), Some(MIXED));
+        let mut memo = memo.next(dom.node_slots());
+        assert_eq!(memo.get(n), None);
+        // After the snapshot number wraps, entries of every earlier snapshot are gone (this one was
+        // written by a snapshot numbered as the next one after the wrap).
+        memo.epoch = 1;
+        memo.set(n, 2);
+        memo.epoch = u16::MAX;
+        let memo = memo.next(dom.node_slots());
+        assert_eq!(memo.epoch, 1);
+        assert_eq!(memo.get(n), None);
     }
 }

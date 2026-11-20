@@ -35,6 +35,32 @@ fn sections(n: usize) -> String {
     html
 }
 
+/// Appends a `div` with `n` `p` children to the body and restyles.
+fn insert_paragraphs(p: &mut Page, n: usize) -> snowlark_style::RestyleStats {
+    let doc = p.doc;
+    let body = p.q("body");
+    let div = p.dom.create_element(doc, "div", None).unwrap();
+    for _ in 0..n {
+        let para = p.dom.create_element(doc, "p", None).unwrap();
+        p.dom.append_child(div, para).unwrap();
+    }
+    p.dom.append_child(body, div).unwrap();
+    p.restyle()
+}
+
+#[test]
+fn a_restyle_of_a_hundred_new_elements_runs_on_the_pool() {
+    // Parallel styling pays from about a hundred elements: an insertion of a hundred goes to the pool,
+    // a small one stays on the page thread.
+    let mut p = Page::new(&sections(2));
+    let stats = insert_paragraphs(&mut p, 100);
+    assert!(stats.restyled >= 100, "{stats:?}");
+    assert!(stats.parallel, "{stats:?}");
+    let stats = insert_paragraphs(&mut p, 10);
+    assert!(stats.restyled >= 10, "{stats:?}");
+    assert!(!stats.parallel, "{stats:?}");
+}
+
 #[test]
 fn hover_restyles_only_the_hovered_subtree() {
     let mut p = Page::new(&sections(50));

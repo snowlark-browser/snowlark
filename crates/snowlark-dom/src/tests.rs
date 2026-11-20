@@ -2396,3 +2396,18 @@ fn parsing_a_long_non_ascii_text_node_is_linear() {
         large.as_secs_f64() / small.as_secs_f64()
     );
 }
+
+#[test]
+fn a_node_in_a_freed_wrapped_nodes_slot_is_not_wrapped() {
+    let (mut dom, doc) = html_doc();
+    let a = el(&mut dom, doc, "div");
+    assert!(!dom.may_be_wrapped(a));
+    dom.set_wrapped(a);
+    assert!(dom.may_be_wrapped(a));
+    dom.free_subtree(a);
+    // A stale id says nothing about its slot's new node.
+    assert!(dom.may_be_wrapped(a));
+    let b = el(&mut dom, doc, "span");
+    assert_eq!(b.index, a.index, "the freed slot is reused");
+    assert!(!dom.may_be_wrapped(b) && !dom.is_wrapped(b));
+}

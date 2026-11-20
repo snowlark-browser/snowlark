@@ -1584,6 +1584,23 @@ pub enum PseudoElement {
     DetailsContent,
     /// The default summary of a `details` element without a `summary` child (HTML 15.5.5).
     DetailsSummary,
+    /// A part of a `progress` or `meter` element drawn without native appearance.
+    Part(FormPart),
+}
+
+/// The parts of the internal tree of a `progress` or `meter` element (HTML 15.5.14-15), which
+/// draw it when it has `appearance: none`: an inner element holding the bar, and in the bar the
+/// value. A meter's value part is named after the gauge region its value is in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum FormPart {
+    ProgressInner,
+    ProgressBar,
+    ProgressValue,
+    MeterInner,
+    MeterBar,
+    MeterOptimumValue,
+    MeterSuboptimumValue,
+    MeterEvenLessGoodValue,
 }
 
 /// Why layout needs an anonymous box's style (CSS 2 §9.2.1.1, CSS Tables 3 §3.2, Display 3 §2.5).
@@ -2587,6 +2604,18 @@ pub trait StyleSource {
     /// The slots of an HTML `details` element, `None` for any other element. A `details` element
     /// renders its summary, then a `::details-content` box around the rest.
     fn details_parts(&self, _element: snowlark_dom::NodeId) -> Option<DetailsParts> {
+        None
+    }
+
+    /// Whether `element` is drawn by the parts of its internal tree rather than its children: a
+    /// `progress` or `meter` element that is not a native control (`appearance: none`).
+    fn has_form_parts(&self, _element: snowlark_dom::NodeId) -> bool {
+        false
+    }
+
+    /// The parts of such an element, outermost first, each inside the one before it, with their
+    /// styles (`None` for other elements). They are rendered instead of the element's children.
+    fn form_parts(&self, _element: snowlark_dom::NodeId) -> Option<Vec<(FormPart, Self::Style)>> {
         None
     }
 

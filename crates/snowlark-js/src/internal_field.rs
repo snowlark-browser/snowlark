@@ -62,7 +62,7 @@ fn can_have_internal_field(instance_type: u16) -> bool {
 ///
 /// `index` is below `obj`'s internal field count.
 #[inline(always)]
-unsafe fn field_word(obj: &v8::Object, index: i32) -> Option<&AtomicU32> {
+pub(crate) unsafe fn field_word(obj: &v8::Object, index: i32) -> Option<&AtomicU32> {
     // SAFETY: a `&v8::Object` is the crate's view of a handle: a pointer to a slot holding the object's
     // full tagged address, alive while the handle is. A heap object's first word is its compressed map,
     // which is the map's offset from the cage base, and a map is far longer than the instance type's

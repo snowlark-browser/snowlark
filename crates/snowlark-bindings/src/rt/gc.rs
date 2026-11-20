@@ -438,64 +438,91 @@ const HEAD: usize = 4;
 const NEXT: usize = 5;
 const PREV: usize = 6;
 
-fn field<'s>(
-    scope: &v8::PinScope<'s, '_>,
-    obj: v8::Local<v8::Object>,
-    index: usize,
-) -> Option<v8::Local<'s, v8::Object>> {
-    let data = obj.get_internal_field(scope, index)?;
-    let value = v8::Local::<v8::Value>::try_from(data).ok()?;
-    v8::Local::<v8::Object>::try_from(value).ok()
+/// Group links of the wrappers one pass touches. Every object here has the link fields: a member or an
+/// anchor is checked once ([`Links::linkable`]) before its fields are used, and the members found in
+/// another's fields were linked, so they were checked. The fields hold `undefined` or a wrapper.
+struct Links<'s> {
+    fields: snowlark_js::object_field::Fields,
+    undefined: v8::Local<'s, v8::Data>,
 }
 
-fn set_field(obj: v8::Local<v8::Object>, index: usize, value: v8::Local<v8::Value>) {
-    obj.set_internal_field(index, value.into());
-}
+impl<'s> Links<'s> {
+    fn new(scope: &v8::PinScope<'s, '_>) -> Links<'s> {
+        Links {
+            fields: snowlark_js::object_field::Fields::new(scope),
+            undefined: v8::undefined(scope).into(),
+        }
+    }
 
-/// Takes `member` out of its group.
-fn unlink(scope: &v8::PinScope<'_, '_>, member: v8::Local<v8::Object>) {
-    let Some(anchor) = field(scope, member, ANCHOR) else {
-        return;
-    };
-    let undefined: v8::Local<v8::Value> = v8::undefined(scope).into();
-    let prev = field(scope, member, PREV).unwrap_or(anchor);
-    let next = field(scope, member, NEXT);
-    let next_value = next.map_or(undefined, Into::into);
-    if prev == anchor {
-        set_field(anchor, HEAD, next_value);
-    } else {
-        set_field(prev, NEXT, next_value);
+    /// Whether `obj` has the link fields (every wrapper template gives them; the check is one call).
+    fn linkable(obj: v8::Local<v8::Object>) -> bool {
+        obj.internal_field_count() >= WRAPPER_FIELDS
     }
-    if let Some(n) = next {
-        set_field(n, PREV, prev.into());
-    }
-    set_field(member, ANCHOR, undefined);
-    set_field(member, NEXT, undefined);
-    set_field(member, PREV, undefined);
-}
 
-/// Puts `member` in `anchor`'s group, out of the group it was in.
-fn link(
-    scope: &v8::PinScope<'_, '_>,
-    member: v8::Local<v8::Object>,
-    anchor: v8::Local<v8::Object>,
-) {
-    if field(scope, member, ANCHOR) == Some(anchor) {
-        return;
+    /// The object in field `index` of a linkable `obj`.
+    fn get(
+        &self,
+        scope: &v8::PinScope<'s, '_>,
+        obj: v8::Local<v8::Object>,
+        index: usize,
+    ) -> Option<v8::Local<'s, v8::Object>> {
+        debug_assert!(Self::linkable(obj));
+        // SAFETY: `obj` has the link fields (see the type), which hold `undefined` or a wrapper.
+        unsafe { self.fields.object(scope, &obj, index) }
     }
-    unlink(scope, member);
-    let head = field(scope, anchor, HEAD);
-    set_field(member, ANCHOR, anchor.into());
-    set_field(
-        member,
-        NEXT,
-        head.map_or_else(|| v8::undefined(scope).into(), Into::into),
-    );
-    set_field(member, PREV, anchor.into());
-    if let Some(h) = head {
-        set_field(h, PREV, member.into());
+
+    fn set(&self, obj: v8::Local<v8::Object>, index: usize, value: Option<v8::Local<v8::Object>>) {
+        debug_assert!(Self::linkable(obj));
+        let value = value.map_or(self.undefined, Into::into);
+        // SAFETY: `obj` has the link fields (see the type).
+        unsafe { snowlark_js::object_field::Fields::set(&obj, index, value) };
     }
-    set_field(anchor, HEAD, member.into());
+
+    /// Takes a linkable `member` out of its group. `clear`: also empty its own link fields (not
+    /// needed when it is linked again at once).
+    fn unlink(&self, scope: &v8::PinScope<'s, '_>, member: v8::Local<v8::Object>, clear: bool) {
+        let Some(anchor) = self.get(scope, member, ANCHOR) else {
+            return;
+        };
+        let prev = self.get(scope, member, PREV).unwrap_or(anchor);
+        let next = self.get(scope, member, NEXT);
+        if prev == anchor {
+            self.set(anchor, HEAD, next);
+        } else {
+            self.set(prev, NEXT, next);
+        }
+        if let Some(n) = next {
+            self.set(n, PREV, Some(prev));
+        }
+        if clear {
+            self.set(member, ANCHOR, None);
+            self.set(member, NEXT, None);
+            self.set(member, PREV, None);
+        }
+    }
+
+    /// Puts a linkable `member` in a linkable `anchor`'s group, out of the group it was in.
+    fn link(
+        &self,
+        scope: &v8::PinScope<'s, '_>,
+        member: v8::Local<v8::Object>,
+        anchor: v8::Local<v8::Object>,
+    ) {
+        debug_assert!(Self::linkable(member) && Self::linkable(anchor));
+        // SAFETY: `member` has the link fields (see the type).
+        if unsafe { self.fields.holds(scope, &member, ANCHOR, anchor) } {
+            return;
+        }
+        self.unlink(scope, member, false);
+        let head = self.get(scope, anchor, HEAD);
+        self.set(member, ANCHOR, Some(anchor));
+        self.set(member, NEXT, head);
+        self.set(member, PREV, Some(anchor));
+        if let Some(h) = head {
+            self.set(h, PREV, Some(member));
+        }
+        self.set(anchor, HEAD, Some(member));
+    }
 }
 
 /// Pending length that asks for the next pass, with `carried` wrappers still pending after this one.
@@ -524,6 +551,7 @@ pub fn pass(
     let pending = std::mem::take(&mut *st.gc.pending.borrow_mut());
     let mut carry = Vec::new();
     let mut weakened = Vec::new();
+    let links = Links::new(scope);
     for h in pending {
         let Some(obj) = (match st.wrappers.borrow().get(&h) {
             Some(w) if !w.is_weak() => w.get(scope),
@@ -534,7 +562,9 @@ pub fn pass(
         let keep = policy(Handle(h));
         let anchor = match keep {
             Keep::Strong => {
-                unlink(scope, obj);
+                if Links::linkable(obj) {
+                    links.unlink(scope, obj, true);
+                }
                 continue;
             }
             Keep::Pinned => {
@@ -555,7 +585,9 @@ pub fn pass(
                 carry.push(h);
                 continue;
             };
-            link(scope, obj, anchor_obj);
+            if Links::linkable(obj) && Links::linkable(anchor_obj) {
+                links.link(scope, obj, anchor_obj);
+            }
         }
         if let Some(w) = st.wrappers.borrow().get(&h) {
             // SAFETY: an entry stays where it is in the table until it is removed (dropped in place).

@@ -68,6 +68,15 @@ pub enum PseudoElement {
     SliderThumb,
     SliderTrack,
     MozProgressBar,
+    // Snowlark patch: the parts of a `progress` and a `meter` element's internal tree.
+    WebkitProgressInnerElement,
+    WebkitProgressBar,
+    WebkitProgressValue,
+    WebkitMeterInnerElement,
+    WebkitMeterBar,
+    WebkitMeterOptimumValue,
+    WebkitMeterSuboptimumValue,
+    WebkitMeterEvenLessGoodValue,
 
     // Private, Servo-specific implemented pseudos. Only matchable in UA sheet.
     ServoTextControlInnerContainer,
@@ -106,6 +115,14 @@ impl ToCss for PseudoElement {
             SliderTrack => "::slider-track",
             SliderThumb => "::slider-thumb",
             MozProgressBar => "::-moz-progress-bar",
+            WebkitProgressInnerElement => "::-webkit-progress-inner-element",
+            WebkitProgressBar => "::-webkit-progress-bar",
+            WebkitProgressValue => "::-webkit-progress-value",
+            WebkitMeterInnerElement => "::-webkit-meter-inner-element",
+            WebkitMeterBar => "::-webkit-meter-bar",
+            WebkitMeterOptimumValue => "::-webkit-meter-optimum-value",
+            WebkitMeterSuboptimumValue => "::-webkit-meter-suboptimum-value",
+            WebkitMeterEvenLessGoodValue => "::-webkit-meter-even-less-good-value",
             ServoTextControlInnerContainer => "::-servo-text-control-inner-container",
             ServoTextControlInnerEditor => "::-servo-text-control-inner-editor",
             ServoAnonymousBox => "::-servo-anonymous-box",
@@ -288,6 +305,14 @@ impl PseudoElement {
             | PseudoElement::SliderThumb
             | PseudoElement::SliderTrack
             | PseudoElement::MozProgressBar
+            | PseudoElement::WebkitProgressInnerElement
+            | PseudoElement::WebkitProgressBar
+            | PseudoElement::WebkitProgressValue
+            | PseudoElement::WebkitMeterInnerElement
+            | PseudoElement::WebkitMeterBar
+            | PseudoElement::WebkitMeterOptimumValue
+            | PseudoElement::WebkitMeterSuboptimumValue
+            | PseudoElement::WebkitMeterEvenLessGoodValue
             | PseudoElement::ServoTextControlInnerContainer
             | PseudoElement::ServoTextControlInnerEditor => PseudoElementCascadeType::Lazy,
             PseudoElement::ServoAnonymousBox
@@ -377,6 +402,14 @@ impl PseudoElement {
                     | Self::SliderThumb
                     | Self::SliderTrack
                     | Self::MozProgressBar
+                    | Self::WebkitProgressInnerElement
+                    | Self::WebkitProgressBar
+                    | Self::WebkitProgressValue
+                    | Self::WebkitMeterInnerElement
+                    | Self::WebkitMeterBar
+                    | Self::WebkitMeterOptimumValue
+                    | Self::WebkitMeterSuboptimumValue
+                    | Self::WebkitMeterEvenLessGoodValue
                     | Self::ServoTextControlInnerContainer
                     | Self::ServoTextControlInnerEditor,
             )
@@ -772,6 +805,14 @@ impl<'a, 'i> ::selectors::Parser<'i> for SelectorParser<'a> {
             "slider-thumb" => SliderThumb,
             "slider-track" => SliderTrack,
             "-moz-progress-bar" => MozProgressBar,
+            "-webkit-progress-inner-element" => WebkitProgressInnerElement,
+            "-webkit-progress-bar" => WebkitProgressBar,
+            "-webkit-progress-value" => WebkitProgressValue,
+            "-webkit-meter-inner-element" => WebkitMeterInnerElement,
+            "-webkit-meter-bar" => WebkitMeterBar,
+            "-webkit-meter-optimum-value" => WebkitMeterOptimumValue,
+            "-webkit-meter-suboptimum-value" => WebkitMeterSuboptimumValue,
+            "-webkit-meter-even-less-good-value" => WebkitMeterEvenLessGoodValue,
             "-servo-anonymous-box" => {
                 if !self.in_user_agent_stylesheet() {
                     return Err(ParseError::custom(SelectorParseErrorKind::UnexpectedIdent))

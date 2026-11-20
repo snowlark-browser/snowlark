@@ -427,6 +427,10 @@ impl Collection {
         if c.nodes.len() > want {
             return;
         }
+        // Reads in order (`item(0)`, `item(1)`, ... as script loops over a collection) find members
+        // ahead, as many again as are known: such a loop comes here a logarithmic number of times, not
+        // once per read, and a single read of the first member walks no further than it.
+        let want = want.max(c.nodes.len() * 2);
         let m = Matcher::new(dom, root, filter);
         loop {
             let after = walk.next(dom, root, next);
@@ -1052,13 +1056,47 @@ mod tests {
     }
 
     #[test]
+    fn indexed_reads_in_order_walk_ahead_by_what_is_known() {
+        let mut dom = Dom::new();
+        let doc = dom.create_document(snowlark_dom::DocumentKind::Html);
+        let root = dom.create_element(doc, "div", None).unwrap();
+        dom.append_child(doc, root).unwrap();
+        let mut ps = Vec::new();
+        for _ in 0..40 {
+            let p = dom.create_element(doc, "p", None).unwrap();
+            dom.append_child(root, p).unwrap();
+            ps.push(p);
+        }
+        let c = Collection::live(
+            root,
+            Filter::TagName {
+                qualified: "p".into(),
+                lower: "p".into(),
+            },
+        );
+        // The first member alone: no further.
+        assert_eq!(c.item(&dom, 0), Some(ps[0]));
+        assert_eq!(cached(&c), (1, true));
+        // Reading on: each walk finds as many again as are known.
+        let mut walks = 0;
+        for (i, &p) in ps.iter().enumerate() {
+            let before = cached(&c).0;
+            assert_eq!(c.item(&dom, i), Some(p));
+            walks += usize::from(cached(&c).0 != before);
+        }
+        assert_eq!(c.item(&dom, 40), None);
+        assert_eq!(cached(&c), (40, false));
+        assert!(walks <= 6, "{walks} walks for 40 reads in order");
+    }
+
+    #[test]
     fn indexed_reads_walk_only_as_far_as_their_index() {
         let mut dom = Dom::new();
         let doc = dom.create_document(snowlark_dom::DocumentKind::Html);
         let root = dom.create_element(doc, "div", None).unwrap();
         dom.append_child(doc, root).unwrap();
         let mut ps = Vec::new();
-        for _ in 0..5 {
+        for _ in 0..9 {
             let p = dom.create_element(doc, "p", None).unwrap();
             dom.append_child(root, p).unwrap();
             ps.push(p);
@@ -1076,15 +1114,16 @@ mod tests {
         dom.set_attribute(ps[0], "class", "x").unwrap();
         assert_eq!(c.item(&dom, 0), Some(ps[0]));
         assert_eq!(cached(&c), (2, true));
+        // (the read past what is known walks ahead by as many again)
         assert_eq!(c.item(&dom, 2), Some(ps[2]));
-        assert_eq!(cached(&c), (3, true));
+        assert_eq!(cached(&c), (5, true));
         // A tree change starts it again.
         dom.remove_child(root, ps[0]).unwrap();
         assert_eq!(c.item(&dom, 0), Some(ps[1]));
         assert_eq!(cached(&c), (1, true));
-        assert_eq!(c.with(&dom, |n| n.len()), 4);
-        assert_eq!(cached(&c), (4, false));
-        assert_eq!(c.item(&dom, 4), None);
+        assert_eq!(c.with(&dom, |n| n.len()), 8);
+        assert_eq!(cached(&c), (8, false));
+        assert_eq!(c.item(&dom, 8), None);
     }
 
     #[test]

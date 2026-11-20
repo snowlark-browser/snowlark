@@ -626,6 +626,35 @@ meter { appearance: auto; }
 /* "expected to render as an inline-block box with a block-size of 1em and an inline-size of 5em,
    a vertical-align of -0.2em" */
 meter { display: inline-block; block-size: 1em; inline-size: 5em; vertical-align: -0.2em; }
+meter { box-sizing: border-box; }
+
+/* With `appearance: none` (CSS UI 4 §6.2: "as if it was a regular element") a meter is drawn by its
+   parts: the gauge's track, and in it the value, its inline size the value's position between min
+   and max (set by the element itself, as a style attribute would) and its pseudo-element the gauge
+   region the value is in (HTML 4.10.14). */
+meter::-webkit-meter-inner-element {
+  appearance: inherit; box-sizing: inherit; display: grid;
+  grid-template-rows: 1fr [line1] 2fr [line2] 1fr; position: relative;
+  block-size: 100%; inline-size: 100%;
+}
+meter::-webkit-meter-bar {
+  display: block; box-sizing: border-box; inline-size: 100%; block-size: 100%;
+  align-self: unsafe center; grid-row-start: line1; grid-row-end: line2;
+  position: absolute; overflow: hidden;
+  background: linear-gradient(to bottom, #ddd, #eee 20%, #ccc 45%, #ccc 55%, #ddd);
+}
+meter::-webkit-meter-optimum-value {
+  display: block; box-sizing: border-box; block-size: 100%;
+  background: linear-gradient(to bottom, #ad7, #cea 20%, #7a3 45%, #7a3 55%, #ad7);
+}
+meter::-webkit-meter-suboptimum-value {
+  display: block; box-sizing: border-box; block-size: 100%;
+  background: linear-gradient(to bottom, #fe7, #ffc 20%, #db3 45%, #db3 55%, #fe7);
+}
+meter::-webkit-meter-even-less-good-value {
+  display: block; box-sizing: border-box; block-size: 100%;
+  background: linear-gradient(to bottom, #f77, #fcc 20%, #d44 45%, #d44 55%, #f77);
+}
 
 /* 15.5.15 The progress element */
 
@@ -634,6 +663,20 @@ progress { appearance: auto; }
 /* "expected to render as an inline-block box with a block-size of 1em and an inline-size of 10em,
    and a vertical-align of -0.2em" */
 progress { display: inline-block; block-size: 1em; inline-size: 10em; vertical-align: -0.2em; }
+progress { box-sizing: border-box; }
+
+/* With `appearance: none` a progress bar is drawn by its parts: the bar, and in it the value, its
+   inline size the element's position (set by the element itself, as a style attribute would; none
+   while indeterminate). */
+progress::-webkit-progress-inner-element {
+  display: block; box-sizing: inherit; block-size: 100%; inline-size: 100%;
+}
+progress::-webkit-progress-bar {
+  display: block; background-color: gray; block-size: 100%; inline-size: 100%; box-sizing: border-box;
+}
+progress::-webkit-progress-value {
+  display: block; block-size: 100%; inline-size: 50%; background-color: green; box-sizing: border-box;
+}
 
 /* 15.5.16 The select element (native appearance; rendered as a drop-down box unless `multiple` or
    `size` > 1 make it a list box) */

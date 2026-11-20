@@ -19,6 +19,7 @@ pub mod internal_field;
 pub mod module_graph;
 pub mod native_profile;
 pub mod object_clone;
+pub mod object_field;
 pub mod raw_callback;
 pub mod rust_heap;
 pub mod script_check;

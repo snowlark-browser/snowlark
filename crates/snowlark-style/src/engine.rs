@@ -284,8 +284,13 @@ fn ensure_pool() {
     });
 }
 
-/// An element is expected to touch at least this many elements before a restyle goes parallel.
-const PARALLEL_MIN_ELEMENTS: usize = 1024;
+/// A restyle is expected to touch at least this many elements before it goes parallel. Handing a
+/// traversal to the pool costs about 10 µs; from about 128 elements traversed the pool styles them
+/// faster than the page thread alone (1.4-1.6x at 256-1024 elements, measured on the Speedometer
+/// suites). The estimate counts inserted elements and global changes but not what selector
+/// invalidation adds, so it is often below the elements traversed: hence a threshold under the
+/// break-even point.
+const PARALLEL_MIN_ELEMENTS: usize = 64;
 
 /// An attribute's value before the first change since the last restyle: namespace, local name, value
 /// (`None` when it was absent).
@@ -4315,6 +4320,85 @@ impl StyleEngine {
         let style = style?;
         if pseudo.is_before_or_after() && !pseudo.should_exist(&style) {
             return None;
+        }
+        Some(style)
+    }
+
+    /// The style of a part of `element`'s internal tree (`::-webkit-progress-bar`, the meter's value
+    /// part...): the rules for `pseudo` matched against `element`, inheriting from `parent` (the part
+    /// it is in, or the element itself), with `inline`, the declarations the element sets on the part,
+    /// at the precedence of a style attribute (CSS Cascade 5 §6.1: above normal author rules, below
+    /// important ones). `None` for an element without a style.
+    pub fn part_style(
+        &self,
+        dom: &Dom,
+        data: &StyleData,
+        element: NodeId,
+        pseudo: &PseudoElement,
+        parent: &ComputedValues,
+        inline: Option<&str>,
+    ) -> Option<Arc<ComputedValues>> {
+        use style::applicable_declarations::ApplicableDeclarationList;
+        use style::context::CascadeInputs;
+        use style::rule_tree::RuleCascadeFlags;
+        let primary = self.computed_style(dom, data, element)?;
+        let inline = inline.map(|css| {
+            Arc::new(data.lock.wrap(parse_style_attribute(
+                css,
+                &self.url,
+                None,
+                self.stylist.quirks_mode(),
+                CssRuleType::Style,
+            )))
+        });
+        let entered = !thread_state::get().is_layout();
+        if entered {
+            thread_state::enter(ThreadState::LAYOUT);
+        }
+        let style = self.guards_and_view(dom, data, |shared, view| {
+            let e = view.element(element);
+            let mut declarations = ApplicableDeclarationList::new();
+            let mut caches = SelectorCaches::default();
+            let mut context = MatchingContext::<SelectorImpl>::new(
+                MatchingMode::ForStatelessPseudoElement,
+                None,
+                &mut caches,
+                self.stylist.quirks_mode(),
+                NeedsSelectorFlags::Yes,
+                MatchingForInvalidation::No,
+            );
+            context.extra_data.originating_element_style = Some(&primary);
+            self.stylist.push_applicable_declarations(
+                e,
+                Some(pseudo),
+                inline.as_ref().map(|b| b.borrow_arc()),
+                None,
+                Default::default(),
+                RuleInclusion::All,
+                &mut declarations,
+                &mut context,
+            );
+            let flags = context.extra_data.cascade_input_flags;
+            let rules = self
+                .stylist
+                .rule_tree()
+                .compute_rule_node(&mut declarations, &shared.guards);
+            let inputs = CascadeInputs {
+                rules: Some(rules),
+                visited_rules: None,
+                flags,
+                included_cascade_flags: RuleCascadeFlags::empty(),
+            };
+            self.stylist.compute_pseudo_element_style_with_inputs(
+                inputs,
+                pseudo,
+                &shared.guards,
+                Some(parent),
+                Some(e),
+            )
+        });
+        if entered {
+            thread_state::exit(ThreadState::LAYOUT);
         }
         Some(style)
     }

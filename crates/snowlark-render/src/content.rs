@@ -187,6 +187,7 @@ pub(crate) fn pseudo_key(p: PseudoElement) -> u8 {
         PseudoElement::Backdrop => 5,
         PseudoElement::DetailsContent => 6,
         PseudoElement::DetailsSummary => 7,
+        PseudoElement::Part(p) => 8 + p as u8,
     }
 }
 

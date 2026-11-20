@@ -388,6 +388,12 @@ the source; `git log -p vendor/stylo` shows the diff.
    it (normal or visited) declares `content` (`all` included), or declares `display` with
    something other than a plain value (`inherit`, `var()`: such styles are kept whatever their
    `content`). No style changes: only styles that were dropped are not computed.
+70. **The parts of `progress` and `meter`** (`servo/selector_parser.rs`): the lazily cascaded
+   pseudo-elements `::-webkit-progress-inner-element`, `::-webkit-progress-bar`,
+   `::-webkit-progress-value`, `::-webkit-meter-inner-element`, `::-webkit-meter-bar`,
+   `::-webkit-meter-optimum-value`, `::-webkit-meter-suboptimum-value` and
+   `::-webkit-meter-even-less-good-value`, which pages style and the embedder lays out as the parts of
+   an element with `appearance: none`.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.
