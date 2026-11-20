@@ -145,6 +145,7 @@ impl Browser {
         match hit {
             Hit::SideCollapse if self.settings.vertical_tabs_collapsed => Some("Expand tabs"),
             Hit::SideCollapse => Some("Collapse tabs"),
+            Hit::Incognito => Some(crate::chrome::INCOGNITO_TOOLTIP),
             _ => None,
         }
     }

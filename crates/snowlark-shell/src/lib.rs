@@ -45,6 +45,7 @@ mod gpu_compositor;
 pub mod gpu_process;
 pub mod history;
 pub mod history_page;
+pub mod incognito_page;
 pub mod local_storage;
 pub mod menu;
 pub mod partition;
@@ -74,10 +75,23 @@ pub mod window_state;
 use snowlark_paint::window::{self, WindowOptions};
 pub use tab_host::ProcessModel;
 
-/// Opens the browser window (at `start`, else the home page) with its tabs' renderers where `model`
-/// says (and a GPU process with `gpu_process`, `gpu_process::wanted`), and runs it until it is
-/// closed. Returns the process exit code.
-pub fn run(start: Option<&str>, model: ProcessModel, gpu_process: bool) -> i32 {
+/// How the browser's first window opens (the command line's switches).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct WindowFlags {
+    /// The windows composite in a GPU process (`--gpu-process`, `gpu_process::wanted`).
+    pub gpu_process: bool,
+    /// The first window is an Incognito window (`--incognito`).
+    pub incognito: bool,
+}
+
+/// Opens the browser window (at `start`, else its new tab page or the startup page) with its tabs'
+/// renderers where `model` says, and runs it until its last window is closed. Returns the process
+/// exit code.
+pub fn run(start: Option<&str>, model: ProcessModel, flags: WindowFlags) -> i32 {
+    let WindowFlags {
+        gpu_process,
+        incognito,
+    } = flags;
     let url = match start {
         Some(text) => match address::interpret(text) {
             Some(u) => Some(u),
@@ -94,9 +108,14 @@ pub fn run(start: Option<&str>, model: ProcessModel, gpu_process: bool) -> i32 {
     // Every panic, caught or not, goes to the profile's crash log first.
     crash::install_panic_hook(profile.dir.join("crash.log"));
     // Where the last run of this profile left the window (the window checks it against the monitors).
-    let options = WindowOptions {
-        placement: window_state::load(&profile.window_file()),
-        ..WindowOptions::default()
+    // (an Incognito window's placement is not the regular window's)
+    let options = if incognito {
+        browser::incognito::App::incognito_window_options()
+    } else {
+        WindowOptions {
+            placement: window_state::load(&profile.window_file()),
+            ..WindowOptions::default()
+        }
     };
     // A renderer process warms up while the window opens (`--process-model=tab`): the first tab
     // takes it.
@@ -110,7 +129,11 @@ pub fn run(start: Option<&str>, model: ProcessModel, gpu_process: bool) -> i32 {
     let app = browser::incognito::App::new(profile, model, gpu);
     let first = app.clone();
     let result = window::run(options, move |w| {
-        let partition = first.regular.clone();
+        let partition = if incognito {
+            first.off_the_record()
+        } else {
+            first.regular.clone()
+        };
         browser::Route::main(browser::Browser::new(w, first, partition, url, spares))
     });
     // (the regular partition's last writes reach the profile)

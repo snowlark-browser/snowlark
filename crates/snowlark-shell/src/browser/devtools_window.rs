@@ -139,8 +139,11 @@ impl Route {
         let rc = Rc::new(RefCell::new(browser));
         rc.borrow_mut().me = Rc::downgrade(&rc);
         if rc.borrow().partition.is_off_the_record() {
-            let app = rc.borrow().app.clone();
-            app.add_incognito(Rc::downgrade(&rc));
+            let (app, proxy) = {
+                let b = rc.borrow();
+                (b.app.clone(), b.main_proxy.clone())
+            };
+            app.add_incognito(Rc::downgrade(&rc), proxy);
         }
         Box::new(Route {
             browser: Rc::downgrade(&rc),

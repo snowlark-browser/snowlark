@@ -225,6 +225,8 @@ pub struct Browser {
     /// The profile's storage: its network, storage, databases and history (an Incognito
     /// window's is shared with the other Incognito windows).
     partition: std::rc::Rc<crate::partition::Partition>,
+    /// The count of open Incognito windows the Incognito button shows (an Incognito window's).
+    incognito_shown: usize,
     /// Content blocking (`None` with `SNOWLARK_BLOCK=0`).
     blocker: Option<Arc<snowlark_blocker::ContentBlocker>>,
     comp: CompositorThread,
@@ -439,6 +441,7 @@ impl Browser {
             } else {
                 crate::downloads::DownloadHistory::load(&profile.downloads_file())
             })),
+            off_the_record,
         }));
         // (content blocking: the windows' one, `App::new`)
         let blocker = app.blocker.clone();
@@ -490,6 +493,7 @@ impl Browser {
         let mut b = Browser {
             app,
             partition,
+            incognito_shown: 0,
             blocker,
             comp,
             windows,
@@ -722,6 +726,12 @@ impl Browser {
             Layout::with_side_tabs(w, n, zw, widths.as_deref(), &self.side_spec())
         } else {
             Layout::new(w, n, zw, widths.as_deref())
+        };
+        let layout = match self.incognito_label() {
+            Some(label) => {
+                layout.with_incognito(chrome::incognito_button_width(&self.fonts, &label))
+            }
+            None => layout,
         };
         layout
             .with_audio(audio)
@@ -1640,6 +1650,10 @@ impl Browser {
             .active()
             .filter(|e| (e.zoom - 1.0).abs() > 0.001)
             .map(|e| (e.zoom * 100.0).round() as u32);
+        if self.off_the_record() {
+            // (the count the Incognito button shows: a wake redraws it when it changes)
+            self.incognito_shown = self.app.incognito_windows();
+        }
         let active = self.tabs.active();
         let view = ChromeView {
             tabs: self
@@ -1679,7 +1693,7 @@ impl Browser {
                 zoom,
             },
             spinner: self.spinner,
-            theme: chrome::theme(self.chrome_dark()),
+            theme: self.chrome_theme(),
             bar: if self.settings.bookmarks_bar {
                 self.bar_views()
             } else {
@@ -1695,6 +1709,7 @@ impl Browser {
             },
             bar_drop: self.bar_drop_view(),
             blocker: self.blocker_badge(),
+            incognito: self.incognito_label(),
         };
         let list = chrome::build(&view, &layout, &self.fonts);
         let bg = view.theme.frame;
@@ -1724,7 +1739,7 @@ impl Browser {
             menu: self.menu.as_ref(),
             tooltip: self.tooltip.as_ref(),
         };
-        let theme = chrome::theme(self.chrome_dark());
+        let theme = self.chrome_theme();
         let area = self.page_dips();
         let overlay = chrome::build_overlay(&view, &layout, self.page_rect(), &self.fonts, &theme);
         let mut b = snowlark_paint::DisplayListBuilder::new();
@@ -2926,6 +2941,9 @@ impl WindowHandler for Browser {
             Event::Timer(downloads_ui::TIMER_DOWNLOADS) => self.downloads_tick(window),
             Event::Timer(_) => {}
             Event::Wake => {
+                if self.incognito_count_changed() {
+                    self.chrome_dirty = true;
+                }
                 self.drain_tab_events(window);
                 if self.current.is_none() {
                     // (chosen in the tools' window's menus)
@@ -3015,6 +3033,10 @@ impl Drop for Browser {
             .save();
         if let Some(b) = &self.blocker {
             b.stop_updater();
+        }
+        if self.off_the_record() {
+            // (the other Incognito windows show one fewer)
+            self.app.incognito_changed();
         }
     }
 }

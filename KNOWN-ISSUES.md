@@ -185,9 +185,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   downloads page, Ctrl+J, shows progress). A download cannot be paused or resumed (Retry starts it again), files are
   not checked for danger before they are saved, and clearing browsing data does not clear the download list.
   (ref 542)
-- **Incognito windows are not finished.** They keep nothing on disk, but have no Incognito new-tab page or badge
-  with the count of open Incognito windows yet, open the settings, history and bookmark pages in themselves rather
-  than in a regular window, and lose bookmarks added in them when they close. (ref 540)
+- **Incognito windows are not finished.** They keep nothing on disk, but open the settings, history and bookmark
+  pages in themselves rather than in a regular window, and lose bookmarks added in them when they close. (ref 540)
 
 ## Tooling
 

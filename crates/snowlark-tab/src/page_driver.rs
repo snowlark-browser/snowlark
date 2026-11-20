@@ -920,7 +920,14 @@ impl PageDriver {
             "about" => {
                 self.info.loading = false;
                 if url.as_str() == START_PAGE {
-                    self.show_html(START_HTML, &url);
+                    // (the browser's own new tab page when it has one, the built-in one else)
+                    let html = match self.ctx.internal.request(InternalQuery::Page {
+                        url: url.as_str().to_owned(),
+                    }) {
+                        InternalAnswer::Page { html: Some(h), .. } => Some(h),
+                        _ => None,
+                    };
+                    self.show_html(html.as_deref().unwrap_or(START_HTML), &url);
                 } else {
                     self.show_html("", &url);
                 }

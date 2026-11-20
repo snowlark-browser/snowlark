@@ -14,7 +14,7 @@ use std::sync::Arc;
 use snowlark_paint::window::CaptionButton;
 use snowlark_paint::{
     Color, DisplayList, DisplayListBuilder, FontListId, FontQuery, FontStretch, FontStyle, ImageId,
-    ImageRendering, Matrix, Point, Radii, Rect, ShapeOptions, ShapedText, Size, TextEngine,
+    ImageRendering, Matrix, PathEl, Point, Radii, Rect, ShapeOptions, ShapedText, Size, TextEngine,
 };
 
 use crate::address::TextField;
@@ -177,6 +177,101 @@ pub fn theme(dark: bool) -> Theme {
     }
 }
 
+/// An Incognito window's colours, whatever the theme: dark, in neutral greys with no tint (the
+/// toolbar a lighter grey than the regular dark theme's, the frame almost black), so the window
+/// is not mistaken for a regular one, and its new tab page ([`crate::incognito_page`]) is the
+/// toolbar's colour.
+pub fn incognito_theme() -> Theme {
+    Theme {
+        frame: Color::hex(0x1F2020),
+        frame_inactive: Color::hex(0x2B2B2B),
+        tab_active: Color::hex(0x3C3C3C),
+        tab_hover: Color::hex(0x343535),
+        text: Color::hex(0xE3E3E3),
+        text_dim: Color::hex(0xABABAB),
+        toolbar: Color::hex(0x3C3C3C),
+        field: Color::hex(0x282828),
+        field_hover: Color::hex(0x303030),
+        field_focused: Color::hex(0x282828),
+        accent: Color::hex(0xA8C7FA),
+        separator: Color::hex(0x474747),
+        selection: Color::hex(0x0842A0),
+        bubble: Color::hex(0x282828),
+        bubble_border: Color::hex(0x474747),
+        dropdown: Color::hex(0x303030),
+        dropdown_hover: Color::hex(0x474747),
+        ..theme(true)
+    }
+}
+
+/// The Incognito button's label: "Incognito", with the count of open Incognito windows when
+/// there is more than one.
+pub fn incognito_label(windows: usize) -> String {
+    if windows > 1 {
+        format!("Incognito ({windows})")
+    } else {
+        "Incognito".into()
+    }
+}
+
+/// The Incognito button's tooltip.
+pub const INCOGNITO_TOOLTIP: &str = "You\u{2019}re Incognito";
+
+/// The Incognito button's size for `label` (its mark, the label, the padding).
+pub fn incognito_button_width(fonts: &Fonts, label: &str) -> f32 {
+    10.0 + INCOGNITO_MARK + 6.0 + fonts.width(label, INCOGNITO_TEXT) + 12.0
+}
+
+const INCOGNITO_MARK: f32 = 18.0;
+const INCOGNITO_TEXT: f32 = 12.5;
+
+/// The Incognito mark (the same as the new tab page's, [`crate::incognito_page::MASK_SVG`]): a
+/// mask with two eye holes, `size` wide, centred on `c`; filled even-odd.
+pub fn incognito_mark(c: Point, size: f32) -> Vec<PathEl> {
+    // (the 24 x 24 box of the page's SVG)
+    let s = size / 24.0;
+    let p = |x: f32, y: f32| Point::new(c.x + (x - 12.0) * s, c.y + (y - 12.0) * s);
+    let mut path = vec![
+        PathEl::MoveTo(p(2.0, 8.5)),
+        PathEl::CurveTo(p(7.0, 6.0), p(17.0, 6.0), p(22.0, 8.5)),
+        PathEl::CurveTo(p(22.0, 14.5), p(18.5, 17.0), p(15.5, 16.5)),
+        PathEl::CurveTo(p(13.5, 16.2), p(13.0, 13.8), p(12.0, 13.8)),
+        PathEl::CurveTo(p(11.0, 13.8), p(10.5, 16.2), p(8.5, 16.5)),
+        PathEl::CurveTo(p(5.5, 17.0), p(2.0, 14.5), p(2.0, 8.5)),
+        PathEl::Close,
+    ];
+    // (the eyes: ellipses, each four quarter curves)
+    const K: f32 = 0.552_284_8;
+    for cx in [7.5, 16.5] {
+        let (cy, rx, ry) = (11.5, 2.4, 1.5);
+        path.extend([
+            PathEl::MoveTo(p(cx + rx, cy)),
+            PathEl::CurveTo(
+                p(cx + rx, cy + K * ry),
+                p(cx + K * rx, cy + ry),
+                p(cx, cy + ry),
+            ),
+            PathEl::CurveTo(
+                p(cx - K * rx, cy + ry),
+                p(cx - rx, cy + K * ry),
+                p(cx - rx, cy),
+            ),
+            PathEl::CurveTo(
+                p(cx - rx, cy - K * ry),
+                p(cx - K * rx, cy - ry),
+                p(cx, cy - ry),
+            ),
+            PathEl::CurveTo(
+                p(cx + K * rx, cy - ry),
+                p(cx + rx, cy - K * ry),
+                p(cx + rx, cy),
+            ),
+            PathEl::Close,
+        ]);
+    }
+    path
+}
+
 /// What a chrome point is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hit {
@@ -199,6 +294,8 @@ pub enum Hit {
     Menu,
     /// The content blocker's button (its panel, the blocked count).
     Shield,
+    /// An Incognito window's Incognito button.
+    Incognito,
     /// A bookmark (or folder) on the bookmarks bar.
     Bookmark(usize),
     /// The "»" button with the bookmarks that don't fit.
@@ -239,6 +336,9 @@ pub struct Layout {
     pub menu: Rect,
     /// The content blocker's button, before the menu.
     pub shield: Rect,
+    /// An Incognito window's Incognito button, between the content blocker's and the menu
+    /// ([`Layout::with_incognito`]).
+    pub incognito: Option<Rect>,
     /// The bookmarks bar, when it shows.
     pub bar: Option<BarLayout>,
     /// Which tabs show an audio indicator ([`Layout::with_audio`]).
@@ -497,6 +597,7 @@ impl Layout {
             star,
             menu,
             shield,
+            incognito: None,
             bar,
             audio: Vec::new(),
             maximized: false,
@@ -511,6 +612,23 @@ impl Layout {
     /// lands on a tab.
     pub fn with_maximized(mut self, maximized: bool) -> Layout {
         self.maximized = maximized;
+        self
+    }
+
+    /// The layout of an Incognito window: its Incognito button, `width` wide, before the menu; the
+    /// content blocker's button and the address bar's end move left to make room. A popup
+    /// window's location line has none.
+    pub fn with_incognito(mut self, width: f32) -> Layout {
+        if self.popup {
+            return self;
+        }
+        let room = width + 2.0;
+        let button = Rect::new(self.menu.x - room, self.menu.y, width, self.menu.height);
+        self.shield.x -= room;
+        self.address.width = (self.address.width - room).max(40.0);
+        self.star.x = self.address.right() - 4.0 - self.star.width;
+        self.address_text.width = (self.address_text.width - room).max(10.0);
+        self.incognito = Some(button);
         self
     }
 
@@ -649,6 +767,9 @@ impl Layout {
     }
 
     fn toolbar_hit(&self, p: Point) -> Hit {
+        if self.incognito.is_some_and(|r| r.contains(p)) {
+            return Hit::Incognito;
+        }
         for (r, h) in [
             (self.back, Hit::Back),
             (self.forward, Hit::Forward),
@@ -1011,6 +1132,9 @@ pub struct ChromeView<'a> {
     pub bar_drop: Option<(f32, Option<usize>)>,
     /// The content blocker's button (`None`: blocking is not running).
     pub blocker: Option<BlockerBadge>,
+    /// An Incognito window's Incognito button label ([`incognito_label`]), drawn where the layout
+    /// puts it ([`Layout::with_incognito`]).
+    pub incognito: Option<String>,
 }
 
 /// What the content blocker's button shows for the active tab.
@@ -1072,6 +1196,35 @@ fn blocker_button(
             f32::INFINITY,
         );
     }
+}
+
+/// An Incognito window's Incognito button: a pill in the field colour with the Incognito mark
+/// and the label.
+fn incognito_button(
+    b: &mut DisplayListBuilder,
+    r: Rect,
+    label: &str,
+    view: &ChromeView,
+    fonts: &Fonts,
+) {
+    let t = &view.theme;
+    let radii = Radii::uniform(r.height / 2.0);
+    b.fill_rounded_rect(r, radii, t.field);
+    button_bg(b, r, Hit::Incognito, view, true);
+    let center = Point::new(r.x + 10.0 + INCOGNITO_MARK / 2.0, r.y + r.height / 2.0);
+    if let Some(path) = b.add_path(&incognito_mark(center, INCOGNITO_MARK)) {
+        b.fill_path(path, t.text, true, true);
+    }
+    let x = r.x + 10.0 + INCOGNITO_MARK + 6.0;
+    fonts.label(
+        b,
+        label,
+        x,
+        r.y + r.height / 2.0,
+        INCOGNITO_TEXT,
+        t.text,
+        (r.right() - 8.0 - x).max(0.0),
+    );
 }
 
 fn button_bg(b: &mut DisplayListBuilder, r: Rect, hit: Hit, view: &ChromeView, round: bool) {
@@ -1292,6 +1445,9 @@ pub fn build(view: &ChromeView, layout: &Layout, fonts: &Fonts) -> DisplayList {
     );
     if let Some(badge) = view.blocker {
         blocker_button(&mut b, layout.shield, badge, view, fonts);
+    }
+    if let (Some(r), Some(label)) = (layout.incognito, &view.incognito) {
+        incognito_button(&mut b, r, label, view, fonts);
     }
     button_bg(&mut b, layout.menu, Hit::Menu, view, true);
     fonts.icon(
@@ -1713,6 +1869,70 @@ mod tests {
     use super::*;
 
     #[test]
+    fn incognito_button_sits_before_the_menu_and_says_how_many_windows() {
+        assert_eq!(incognito_label(1), "Incognito");
+        assert_eq!(incognito_label(3), "Incognito (3)");
+        for side in [false, true] {
+            let plain = if side {
+                let spec = SideSpec {
+                    width: 240.0,
+                    height: 800.0,
+                    scroll: 0.0,
+                    collapsed: false,
+                    active: 0,
+                    drag: None,
+                };
+                Layout::with_side_tabs(1280.0, 3, 0.0, None, &spec)
+            } else {
+                Layout::new(1280.0, 3, 0.0, None)
+            };
+            assert_eq!(plain.incognito, None);
+            let l = plain.clone().with_incognito(100.0);
+            let r = l.incognito.unwrap();
+            // Between the content blocker's button and the menu, on the toolbar's row.
+            assert_eq!(r.width, 100.0);
+            assert_eq!((r.y, r.height), (l.menu.y, l.menu.height));
+            assert!(l.shield.right() <= r.x && r.right() <= l.menu.x);
+            assert!(l.address.right() <= l.shield.x);
+            assert_eq!(l.address.width, plain.address.width - 102.0);
+            assert!(l.star.right() <= l.address.right());
+            assert_eq!(l.menu, plain.menu);
+            let mid = Point::new(r.x + r.width / 2.0, r.y + r.height / 2.0);
+            assert_eq!(l.hit(mid), Hit::Incognito);
+            assert_ne!(plain.hit(mid), Hit::Incognito);
+            assert_eq!(
+                l.hit(Point::new(l.shield.x + 5.0, l.shield.y + 5.0)),
+                Hit::Shield
+            );
+        }
+        // A popup window's location line has none.
+        assert_eq!(Layout::popup(800.0).with_incognito(100.0).incognito, None);
+        // The mark: the mask and its two eyes, inside its box.
+        let mark = incognito_mark(Point::new(50.0, 50.0), 18.0);
+        let closes = mark.iter().filter(|e| matches!(e, PathEl::Close)).count();
+        assert_eq!(closes, 3);
+        for e in &mark {
+            if let PathEl::MoveTo(p) | PathEl::LineTo(p) | PathEl::CurveTo(_, _, p) = e {
+                assert!((41.0..=59.0).contains(&p.x) && (41.0..=59.0).contains(&p.y));
+            }
+        }
+    }
+
+    #[test]
+    fn incognito_theme_is_dark_and_not_the_dark_theme() {
+        let t = incognito_theme();
+        let dark = theme(true);
+        assert!(t.dark);
+        assert_ne!(t.frame, dark.frame);
+        assert_ne!(t.toolbar, dark.toolbar);
+        assert_ne!(t.field, dark.field);
+        // (neutral greys: no tint)
+        for c in [t.frame, t.toolbar, t.field, t.tab_active] {
+            assert!(c.r.abs_diff(c.g) <= 1 && c.g.abs_diff(c.b) <= 1, "{c:?}");
+        }
+    }
+
+    #[test]
     fn layout_hits() {
         let l = Layout::new(1280.0, 3, 0.0, None);
         assert_eq!(l.tabs.len(), 3);
@@ -1828,6 +2048,7 @@ mod tests {
             open: Hit::None,
             bar_drop: None,
             blocker: None,
+            incognito: None,
         };
         let mut b = DisplayListBuilder::new();
         crate::side_tabs::paint(&mut b, &view, &l, &f);
@@ -1886,6 +2107,7 @@ mod tests {
             open: Hit::None,
             bar_drop: None,
             blocker: None,
+            incognito: None,
         };
         let list = build(&view, &l, &fonts);
         assert!(list.items.is_empty(), "{} items drawn", list.items.len());
@@ -2031,12 +2253,34 @@ mod tests {
                 count: 12,
                 up: true,
             }),
+            incognito: None,
         };
         let layout =
             Layout::new(1280.0, 2, 40.0, Some(&[120.0, 80.0])).with_audio(vec![true, true]);
         let list = build(&view, &layout, &fonts);
         list.validate().unwrap();
         assert!(list.items.len() > 20);
+        // An Incognito window's: its button (the mark is a path) in its own colours.
+        let label = incognito_label(2);
+        let incognito_view = ChromeView {
+            incognito: Some(label.clone()),
+            theme: incognito_theme(),
+            hover: Hit::Incognito,
+            ..view.clone()
+        };
+        let incognito_layout = layout
+            .clone()
+            .with_incognito(incognito_button_width(&fonts, &label));
+        let incognito_list = build(&incognito_view, &incognito_layout, &fonts);
+        incognito_list.validate().unwrap();
+        assert!(incognito_list.items.len() > list.items.len());
+        let fills = |l: &DisplayList| {
+            l.items
+                .iter()
+                .filter(|i| matches!(i, snowlark_paint::Item::FillPath { .. }))
+                .count()
+        };
+        assert_eq!(fills(&incognito_list), fills(&list) + 1);
         let suggestions = [Suggestion {
             search: false,
             title: "Hacker News".into(),

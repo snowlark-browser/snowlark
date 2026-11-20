@@ -9,7 +9,11 @@
 //! the last of them: its cookies, storage, databases and cache with it. Its tabs' renderers are
 //! its own, never a regular window's (its own spare pool; each tab's services are its
 //! partition's). It records no history, keeps no session for a restore, saves no settings and no
-//! window placement; it is drawn dark whatever the theme.
+//! window placement. It is told apart from a regular window at a glance: its frame and toolbar
+//! are in the Incognito theme whatever the theme ([`chrome::incognito_theme`]), its toolbar has
+//! an Incognito button with the count of open Incognito windows, its new tab page says what
+//! Incognito keeps and what it does not ([`crate::incognito_page`]), and its title says
+//! "(Incognito)".
 //!
 //! The browser's process ends when its last window (regular or Incognito) closes.
 
@@ -18,9 +22,10 @@ use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
 use snowlark_net::Url;
-use snowlark_paint::window::{self, WindowOptions};
+use snowlark_paint::window::{self, WindowOptions, WindowProxy};
 
 use super::{Browser, Route};
+use crate::chrome;
 use crate::partition::Partition;
 use crate::profile::Profile;
 use crate::tab_host::ProcessModel;
@@ -35,6 +40,28 @@ impl Browser {
     /// theme, and always in an Incognito window. Pages are told the theme alone.
     pub(super) fn chrome_dark(&self) -> bool {
         self.dark || self.off_the_record()
+    }
+
+    /// The colours of the window's own parts: the Incognito theme in an Incognito window, else
+    /// the light or dark theme.
+    pub(super) fn chrome_theme(&self) -> chrome::Theme {
+        if self.off_the_record() {
+            chrome::incognito_theme()
+        } else {
+            chrome::theme(self.dark)
+        }
+    }
+
+    /// An Incognito window's Incognito button label (with the count of open Incognito windows),
+    /// `None` in a regular window and a popup window.
+    pub(super) fn incognito_label(&self) -> Option<String> {
+        (self.off_the_record() && !self.popup_window)
+            .then(|| chrome::incognito_label(self.app.incognito_windows()))
+    }
+
+    /// The window was woken: an Incognito window opened or closed changes its button's count.
+    pub(super) fn incognito_count_changed(&self) -> bool {
+        self.off_the_record() && self.app.incognito_windows() != self.incognito_shown
     }
 
     /// Keeps the settings in the profile; an Incognito window's changes stay with it.
@@ -68,8 +95,8 @@ pub struct App {
     pub gpu_process: Option<Rc<crate::gpu_process::GpuHost>>,
     /// The off-the-record partition while an Incognito window holds it.
     off_the_record: RefCell<Weak<Partition>>,
-    /// The Incognito windows' browsers.
-    incognito: RefCell<Vec<Weak<RefCell<Browser>>>>,
+    /// The Incognito windows' browsers, and their windows to wake when their count changes.
+    incognito: RefCell<Vec<(Weak<RefCell<Browser>>, WindowProxy)>>,
 }
 
 impl App {
@@ -99,7 +126,7 @@ impl App {
     }
 
     /// The off-the-record partition: the open Incognito windows' one, or a new one.
-    fn off_the_record(&self) -> Rc<Partition> {
+    pub fn off_the_record(&self) -> Rc<Partition> {
         if let Some(p) = self.off_the_record.borrow().upgrade() {
             return p;
         }
@@ -116,13 +143,23 @@ impl App {
     /// How many Incognito windows are open.
     pub fn incognito_windows(&self) -> usize {
         let mut list = self.incognito.borrow_mut();
-        list.retain(|w| w.strong_count() > 0);
+        list.retain(|(w, _)| w.strong_count() > 0);
         list.len()
     }
 
-    /// An Incognito window's browser was made: it counts among them.
-    pub(super) fn add_incognito(&self, b: Weak<RefCell<Browser>>) {
-        self.incognito.borrow_mut().push(b);
+    /// An Incognito window's browser was made (`window`: its window): it counts among them, and
+    /// the others show the new count.
+    pub(super) fn add_incognito(&self, b: Weak<RefCell<Browser>>, window: WindowProxy) {
+        self.incognito.borrow_mut().push((b, window));
+        self.incognito_changed();
+    }
+
+    /// An Incognito window opened or closed: every one is woken to redraw its button's count
+    /// (a gone window's proxy does nothing).
+    pub(super) fn incognito_changed(&self) {
+        for (_, window) in self.incognito.borrow().iter() {
+            window.wake();
+        }
     }
 
     /// The spare renderer pool for a window of `partition`'s (its own: a spare never serves
@@ -134,15 +171,20 @@ impl App {
         })
     }
 
+    /// An Incognito window's: its title until its first tab has one, the default placement.
+    pub fn incognito_window_options() -> WindowOptions {
+        WindowOptions {
+            title: "Snowlark (Incognito)".into(),
+            ..WindowOptions::default()
+        }
+    }
+
     /// Opens a new Incognito window, at `url` or its new-tab page. Called on the window thread.
     pub fn open_incognito_window(self: &Rc<App>, url: Option<Url>) {
         let app = self.clone();
         let partition = self.off_the_record();
         let spares = self.spares();
-        let options = WindowOptions {
-            title: "Snowlark (Incognito)".into(),
-            ..WindowOptions::default()
-        };
+        let options = App::incognito_window_options();
         if let Err(e) = window::open_browser_window(options, move |w| {
             Route::main(Browser::new(w, app, partition, url, spares))
         }) {

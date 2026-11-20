@@ -29,6 +29,8 @@ pub struct InternalState {
     pub bookmark_toast: Option<(String, i64)>,
     /// The profile's downloads, for the downloads page (the same store the window records in).
     pub downloads: Arc<Mutex<crate::downloads::DownloadHistory>>,
+    /// An Incognito window's pages: its new tab page is the Incognito one.
+    pub off_the_record: bool,
 }
 
 /// The browser's own pages, made from `state` (and the cookie store for the sites with data, and
@@ -75,6 +77,18 @@ impl BrowserPages {
 
     /// The address a page of the browser's own is shown at, and its HTML.
     fn page(&self, url: &Url) -> (Url, Option<String>) {
+        if url.as_str() == crate::address::START_PAGE {
+            // (the new tab page: an Incognito window's own; a regular window's is the built-in one)
+            let incognito = self
+                .state
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .off_the_record;
+            return (
+                url.clone(),
+                incognito.then(crate::incognito_page::new_tab_html),
+            );
+        }
         let shown = match Self::kind_of(url) {
             InternalKind::Credits => {
                 Url::parse(crate::credits::CREDITS_PAGE).unwrap_or_else(|_| url.clone())
@@ -394,6 +408,55 @@ mod tests {
         assert_eq!(shown, "snowlark://downloads/?q=a");
         assert!(html.is_some_and(|h| h.contains("<title>Downloads</title>")));
         assert_eq!(kind("https://a.example/"), InternalKind::Other);
+    }
+
+    /// The new tab page: a regular window's is the built-in start page, an Incognito window's says
+    /// it is Incognito (the page driver asks the browser for it first).
+    #[test]
+    fn an_incognito_windows_new_tab_page_is_the_incognito_one() {
+        let net = NetThread::start(NetConfig::default()).unwrap();
+        let start = Url::parse(crate::address::START_PAGE).unwrap();
+        for incognito in [false, true] {
+            let state = InternalState {
+                off_the_record: incognito,
+                ..Default::default()
+            };
+            let p = internal_pages(
+                Arc::new(Mutex::new(state)),
+                Arc::new(Mutex::new(History::in_memory())),
+                net.client(),
+                None,
+            );
+            match p.request(InternalQuery::Page {
+                url: start.as_str().into(),
+            }) {
+                InternalAnswer::Page { shown, html } => {
+                    assert_eq!(shown, start.as_str());
+                    assert_eq!(html.is_some(), incognito);
+                }
+                other => panic!("{other:?}"),
+            }
+            // (it is no kind of the browser's other pages)
+            assert_eq!(p.kind(&start), InternalKind::Other);
+            let mut d = driver_with(&net, p);
+            d.navigate(start.clone());
+            let title = if incognito {
+                crate::incognito_page::TITLE
+            } else {
+                "New tab"
+            };
+            settle(&mut d, |d| !d.info().loading && d.info().title == title);
+            assert_eq!(d.info().title, title);
+            let h1 = d
+                .page()
+                .eval("document.querySelector('h1').textContent", "t")
+                .unwrap();
+            assert_eq!(
+                h1 == "You\u{2019}ve gone Incognito",
+                incognito,
+                "{incognito}: {h1}"
+            );
+        }
     }
 
     #[test]

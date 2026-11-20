@@ -34,6 +34,11 @@ pub fn main() {
     };
     // `--gpu-process`: the window composites in a GPU process (with `--process-model=tab`).
     let gpu_process = take_flag(&mut args, "--gpu-process");
+    // `--incognito`: the window opens as an Incognito window.
+    let flags = snowlark_shell::WindowFlags {
+        gpu_process,
+        incognito: take_flag(&mut args, "--incognito"),
+    };
     // The headless modes run their page on a thread with a page thread's stack (layout recurses
     // over the box tree, and the main thread's stack is 1 MiB on Windows); the window runs its pages
     // on tab threads of that size.
@@ -41,14 +46,14 @@ pub fn main() {
         let code = std::thread::Builder::new()
             .name("snowlark main".into())
             .stack_size(snowlark_page::PAGE_THREAD_STACK)
-            .spawn(move || run(args, model, gpu_process))
+            .spawn(move || run(args, model, flags))
             .expect("the main thread")
             .join()
             .unwrap_or(101);
         snowlark_js::write_pgo_profile();
         std::process::exit(code);
     }
-    let code = run(args, model, gpu_process);
+    let code = run(args, model, flags);
     snowlark_js::write_pgo_profile();
     std::process::exit(code);
 }
@@ -77,7 +82,11 @@ fn take_process_model(args: &mut Vec<String>) -> Result<snowlark_shell::ProcessM
     snowlark_shell::ProcessModel::choose(flag.as_deref(), env.as_deref())
 }
 
-fn run(args: Vec<String>, model: snowlark_shell::ProcessModel, gpu_process: bool) -> i32 {
+fn run(
+    args: Vec<String>,
+    model: snowlark_shell::ProcessModel,
+    flags: snowlark_shell::WindowFlags,
+) -> i32 {
     let window = match args.get(1).map(String::as_str) {
         None => true,
         Some(a) => !a.starts_with("--"),
@@ -167,10 +176,10 @@ fn run(args: Vec<String>, model: snowlark_shell::ProcessModel, gpu_process: bool
             media_types::run()
         }
         // The browser window: no arguments (the home page) or an address.
-        None => snowlark_shell::run(None, model, gpu_process),
-        Some(a) if !a.starts_with("--") => snowlark_shell::run(Some(a), model, gpu_process),
+        None => snowlark_shell::run(None, model, flags),
+        Some(a) if !a.starts_with("--") => snowlark_shell::run(Some(a), model, flags),
         _ => {
-            eprintln!("usage: snowlark [--process-model=tab|single] [--gpu-process] [<url>] | --eval <js> | --render <url> <png> [width] | --reftest <list> <outdir> | --video <url> <png> [--time T] [--wait S] | --media-types");
+            eprintln!("usage: snowlark [--process-model=tab|single] [--gpu-process] [--incognito] [<url>] | --eval <js> | --render <url> <png> [width] | --reftest <list> <outdir> | --video <url> <png> [--time T] [--wait S] | --media-types");
             2
         }
     }
