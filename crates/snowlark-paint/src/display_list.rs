@@ -515,6 +515,14 @@ pub enum Item {
         dest: Rect,
         clip: Rect,
     },
+    /// The picture of a protected player of the embedder's key system (`player`: the page's id
+    /// of it) in `dest`, clipped to `clip`, as [`Item::Video`]. Its frames never reach the page or
+    /// the rasterizer, which draws black; a compositor shows the player's own surface over it.
+    ProtectedVideo {
+        player: u64,
+        dest: Rect,
+        clip: Rect,
+    },
     /// Fills `rect` (rounded by `radii`) with a gradient along the line `start` → `end`.
     LinearGradient {
         rect: Rect,
@@ -640,6 +648,12 @@ pub enum Item {
 
 impl Item {
     /// Whether the item draws (as opposed to a push or pop).
+    /// A video's picture ([`Item::Video`] or [`Item::ProtectedVideo`]), which a compositor shows
+    /// over the tiles.
+    pub fn is_video(&self) -> bool {
+        matches!(self, Item::Video { .. } | Item::ProtectedVideo { .. })
+    }
+
     pub fn is_drawing(&self) -> bool {
         !matches!(
             self,
@@ -1120,7 +1134,9 @@ impl DisplayList {
                 }
                 Item::Image { dest, .. } => Some(*dest),
                 Item::FillPath { bounds, .. } | Item::StrokePath { bounds, .. } => Some(*bounds),
-                Item::Video { dest, clip, .. } => Some(dest.intersect(clip)),
+                Item::Video { dest, clip, .. } | Item::ProtectedVideo { dest, clip, .. } => {
+                    Some(dest.intersect(clip))
+                }
                 Item::BoxShadow(s) => Some(if s.inset {
                     s.rect
                 } else {
@@ -1631,11 +1647,8 @@ impl DisplayList {
                                     }
                                     _ => false,
                                 })
-                                && layer_end(i).is_some_and(|j| {
-                                    !items[i..j]
-                                        .iter()
-                                        .any(|it| matches!(it, Item::Video { .. }))
-                                })
+                                && layer_end(i)
+                                    .is_some_and(|j| !items[i..j].iter().any(|it| it.is_video()))
                         }
                     };
                     if !split {
@@ -2216,7 +2229,9 @@ fn item_finite(item: &Item) -> bool {
         Item::Image {
             dest, src, opacity, ..
         } => rect_finite(dest) && rect_finite(src) && opacity.is_finite(),
-        Item::Video { dest, clip, .. } => rect_finite(dest) && rect_finite(clip),
+        Item::Video { dest, clip, .. } | Item::ProtectedVideo { dest, clip, .. } => {
+            rect_finite(dest) && rect_finite(clip)
+        }
         Item::LinearGradient {
             rect,
             radii,
@@ -2458,6 +2473,16 @@ impl DisplayListBuilder {
             dest,
             clip,
         });
+    }
+
+    /// A protected player's picture into `dest`, clipped to `clip` (see [`Item::ProtectedVideo`]).
+    pub fn protected_video(&mut self, player: u64, dest: Rect, clip: Rect) {
+        if dest.intersect(&clip).is_empty() {
+            return;
+        }
+        self.list
+            .items
+            .push(Item::ProtectedVideo { player, dest, clip });
     }
 
     fn push_stops(&mut self, stops: &[GradientStop]) -> StopRange {
@@ -3403,6 +3428,13 @@ impl Enc<'_> {
                 self.rect(dest);
                 self.rect(clip);
             }
+            Item::ProtectedVideo { player, dest, clip } => {
+                self.u8(33);
+                self.u32(*player as u32);
+                self.u32((*player >> 32) as u32);
+                self.rect(dest);
+                self.rect(clip);
+            }
             Item::PushMask { bounds, luminance } => {
                 self.u8(20);
                 self.rect(bounds);
@@ -4023,6 +4055,15 @@ impl<'a> Dec<'a> {
                     clip: self.rect()?,
                 }
             }
+            33 => {
+                let low = u64::from(self.u32()?);
+                let high = u64::from(self.u32()?);
+                Item::ProtectedVideo {
+                    player: low | high << 32,
+                    dest: self.rect()?,
+                    clip: self.rect()?,
+                }
+            }
             22 => Item::PopMask,
             24 => Item::ConicGradient {
                 rect: self.rect()?,
@@ -4349,6 +4390,30 @@ mod tests {
         let mut bytes = Vec::new();
         list.encode(&mut bytes);
         assert_eq!(DisplayList::decode(&bytes), Ok(list));
+    }
+
+    #[test]
+    fn a_protected_video_round_trips_and_a_bad_one_is_refused() {
+        let mut b = DisplayListBuilder::new();
+        let r = Rect::new(4.0, 8.0, 320.0, 180.0);
+        b.protected_video(0x1_0000_0002, r, Rect::new(0.0, 0.0, 200.0, 100.0));
+        // (nothing of it shows: no item)
+        b.protected_video(3, r, Rect::new(500.0, 500.0, 10.0, 10.0));
+        let list = b.build();
+        assert_eq!(list.items.len(), 1);
+        assert!(list.items[0].is_video() && list.items[0].is_drawing());
+        let mut bytes = Vec::new();
+        list.encode(&mut bytes);
+        assert_eq!(DisplayList::decode(&bytes), Ok(list.clone()));
+        let mut bad = list;
+        bad.items[0] = Item::ProtectedVideo {
+            player: 1,
+            dest: Rect::new(f32::NAN, 0.0, 1.0, 1.0),
+            clip: r,
+        };
+        let mut bytes = Vec::new();
+        bad.encode(&mut bytes);
+        assert_eq!(DisplayList::decode(&bytes), Err(ListError::BadValue(0)));
     }
 
     #[test]

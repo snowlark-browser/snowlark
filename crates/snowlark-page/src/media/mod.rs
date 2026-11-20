@@ -1757,6 +1757,7 @@ impl Engine {
                     natural: (m.video_size.0 > 0).then_some(m.video_size),
                     show_poster: m.show_poster || m.ready < HAVE_CURRENT_DATA,
                     video,
+                    protected: m.protected.as_ref().and_then(|p| p.player()),
                     controls: controls.then(|| snowlark_layout::media::MediaControls {
                         paused: m.paused,
                         // (a second's resolution: the label changes once a second)

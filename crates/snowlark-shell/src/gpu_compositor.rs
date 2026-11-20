@@ -728,6 +728,8 @@ impl Proxy {
                 data.recycle();
             }
             CompInput::VSync(..) => {}
+            // (a GPU process shows no protected player: their pictures are the browser's)
+            CompInput::Protected(_) => {}
         }
         true
     }
@@ -2053,7 +2055,14 @@ mod tests {
             loop {
                 match frames.recv_timeout(WAIT).unwrap() {
                     CompInput::Frame(t, data) if t == tab => {
-                        let ids: Vec<VideoId> = data.videos.iter().map(|q| q.video).collect();
+                        let ids: Vec<VideoId> = data
+                            .videos
+                            .iter()
+                            .filter_map(|q| match q.picture {
+                                snowlark_tab::video::Picture::Frames(v) => Some(v),
+                                _ => None,
+                            })
+                            .collect();
                         data.recycle();
                         return ids;
                     }

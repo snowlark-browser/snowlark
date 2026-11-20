@@ -5,7 +5,9 @@
 //! The browser's key systems for pages ([`snowlark_page::media::cdm::Cdm`]): PlayReady at the
 //! hardware security level (`com.microsoft.playready.recommendation.3000`) through the module
 //! Windows ships, run by `snowlark_media::win::playready_service` in this process. It is offered
-//! only while `SNOWLARK_PLAYREADY=1` (a test setting): otherwise no page sees it.
+//! to pages in the window where Windows has it (Windows 10 2004 or later, with hardware DRM: the
+//! system's media engine plays H.264 under it), unless `SNOWLARK_PLAYREADY=0`; the headless modes
+//! have no key system of the browser's.
 //!
 //! Each origin's module state is kept in a folder of its own under the profile's `cdm` folder,
 //! named by a random id the browser keeps for that origin (`origins.json`); the module is given
@@ -13,9 +15,10 @@
 //! with the profile's partition, and its ids are never written down.
 
 use std::collections::HashMap;
+use std::os::windows::io::OwnedHandle;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use snowlark_media::fmp4::{Sample, Track};
 use snowlark_media::win::playready::{type_supported, RECOMMENDATION_3000};
@@ -26,6 +29,7 @@ use snowlark_page::media::cdm::{
     Cdm, CdmError, CdmEvent, CdmInbox, KeyStatus, MessageKind, PlayerControl, PlayerReport,
     PlayerState,
 };
+use snowlark_tab::comp::ProtectedPictures;
 
 /// See the module.
 pub struct BrowserCdm {
@@ -33,16 +37,79 @@ pub struct BrowserCdm {
     /// The profile's `cdm` folder, or the temporary folder of an Incognito profile.
     root: PathBuf,
     temporary: bool,
-    service: OnceLock<Option<Service>>,
+    service: OnceLock<Option<Arc<Service>>>,
     /// Each origin's id.
     origins: Mutex<HashMap<String, String>>,
     next: AtomicU64,
     /// Each module instance's inbox, and each session's instance.
     inboxes: Mutex<HashMap<u64, Arc<CdmInbox>>>,
     sessions: Mutex<HashMap<u64, u64>>,
-    /// Each protected player's picture, once its engine has one: a composition surface for the
-    /// compositor to show.
-    surfaces: Arc<Mutex<HashMap<u64, std::os::windows::io::OwnedHandle>>>,
+    /// Each protected player's picture, for the compositor of the windows of this profile.
+    pictures: Arc<Pictures>,
+}
+
+/// The pictures of a profile's protected players ([`ProtectedPictures`]): each one's composition
+/// surface once its engine has one, and where it shows.
+#[derive(Default)]
+pub struct Pictures {
+    players: Mutex<HashMap<u64, Picture>>,
+}
+
+struct Picture {
+    surface: Option<Arc<OwnedHandle>>,
+    /// Where it was last placed (screen device pixels).
+    placed: Option<(i32, i32, i32, i32)>,
+    service: Weak<Service>,
+}
+
+impl Pictures {
+    fn players(&self) -> std::sync::MutexGuard<'_, HashMap<u64, Picture>> {
+        self.players.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
+impl ProtectedPictures for Pictures {
+    fn surface(&self, player: u64) -> Option<Arc<OwnedHandle>> {
+        self.players().get(&player)?.surface.clone()
+    }
+
+    fn place(&self, player: u64, x: i32, y: i32, width: i32, height: i32) {
+        let service = {
+            let mut players = self.players();
+            let Some(p) = players.get_mut(&player) else {
+                return;
+            };
+            let at = Some((x, y, width, height));
+            if p.placed == at {
+                return;
+            }
+            p.placed = at;
+            p.service.upgrade()
+        };
+        // (the engine's output rectangle: the protection window goes there, the picture is
+        // drawn at its size)
+        if tracing() {
+            eprintln!("[cdm] player {player}: output at {x},{y} {width}x{height}");
+        }
+        if let Some(service) = service {
+            service.control(
+                player,
+                Control::Output {
+                    x,
+                    y,
+                    width,
+                    height,
+                },
+            );
+        }
+    }
+}
+
+/// Whether `SNOWLARK_CDM_TRACE=1`: a line on stderr for each protected player made, its controls,
+/// every 200th sample, and what its engine reports (`[cdm]`).
+fn tracing() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var("SNOWLARK_CDM_TRACE").is_ok_and(|v| v == "1"))
 }
 
 /// 128 random bits as hex (the standard library's random hash keys, from the system's generator).
@@ -83,7 +150,7 @@ impl BrowserCdm {
 
     fn new(root: PathBuf, temporary: bool, origins: HashMap<String, String>) -> BrowserCdm {
         BrowserCdm {
-            enabled: std::env::var("SNOWLARK_PLAYREADY").is_ok_and(|v| v == "1"),
+            enabled: std::env::var("SNOWLARK_PLAYREADY").map_or(true, |v| v != "0"),
             root,
             temporary,
             service: OnceLock::new(),
@@ -91,12 +158,19 @@ impl BrowserCdm {
             next: AtomicU64::new(0),
             inboxes: Mutex::default(),
             sessions: Mutex::default(),
-            surfaces: Arc::default(),
+            pictures: Arc::default(),
         }
     }
 
-    fn service(&self) -> Option<&Service> {
-        self.service.get_or_init(|| Service::start().ok()).as_ref()
+    /// The pictures of this profile's protected players, for its windows' compositors.
+    pub fn pictures(&self) -> Arc<dyn ProtectedPictures> {
+        self.pictures.clone()
+    }
+
+    fn service(&self) -> Option<&Arc<Service>> {
+        self.service
+            .get_or_init(|| Service::start().ok().map(Arc::new))
+            .as_ref()
     }
 
     /// The id the module knows `origin` by (made and kept on first use).
@@ -118,7 +192,13 @@ impl BrowserCdm {
 
     fn offered(&self, key_system: &str) -> bool {
         static SYSTEM: OnceLock<bool> = OnceLock::new();
-        self.enabled && key_system == RECOMMENDATION_3000 && *SYSTEM.get_or_init(system_supports)
+        // (offered where the system's media engine answers "probably" for H.264 under it)
+        self.enabled
+            && key_system == RECOMMENDATION_3000
+            && *SYSTEM.get_or_init(|| {
+                system_supports()
+                    && type_supported(RECOMMENDATION_3000, "video/mp4;codecs=\"avc1.42e01e\"")
+            })
     }
 
     fn inbox_of_session(&self, session: u64) -> Option<(u64, Arc<CdmInbox>)> {
@@ -333,21 +413,58 @@ impl Cdm for BrowserCdm {
             .unwrap_or_else(|e| e.into_inner())
             .get(&keys)
             .cloned();
+        if tracing() {
+            let kinds: Vec<String> = tracks
+                .iter()
+                .map(|t| format!("{t:?}").chars().take(160).collect())
+                .collect();
+            eprintln!(
+                "[cdm] player {player} of instance {keys}: {}",
+                kinds.join("; ")
+            );
+        }
         let (Some(inbox), Some(service)) = (inbox, self.service.get().and_then(|s| s.as_ref()))
         else {
+            if tracing() {
+                eprintln!("[cdm] player {player}: no instance or no service");
+            }
             return player;
         };
-        let surfaces = self.surfaces.clone();
+        self.pictures.players().insert(
+            player,
+            Picture {
+                surface: None,
+                placed: None,
+                service: Arc::downgrade(service),
+            },
+        );
+        let pictures = Arc::downgrade(&self.pictures);
         service.play(
             player,
             keys,
             tracks,
             Arc::new(move |e| {
+                if tracing() && !matches!(e, PlayerEvent::Progress { .. }) {
+                    eprintln!("[cdm] player {player}: {e:?}");
+                }
+                if let PlayerEvent::Progress {
+                    time,
+                    rendered,
+                    dropped,
+                } = &e
+                {
+                    if tracing() {
+                        eprintln!(
+                            "[cdm] player {player}: at {time:.2} s, {rendered} frames, {dropped} dropped"
+                        );
+                    }
+                }
                 if let PlayerEvent::Surface(h) = e {
-                    surfaces
-                        .lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .insert(player, h);
+                    if let Some(pictures) = pictures.upgrade() {
+                        if let Some(p) = pictures.players().get_mut(&player) {
+                            p.surface = Some(Arc::new(h));
+                        }
+                    }
                 } else if let Some(report) = player_report(e) {
                     inbox.deliver(CdmEvent::Player { player, report });
                 }
@@ -357,6 +474,16 @@ impl Cdm for BrowserCdm {
     }
 
     fn sample(&self, player: u64, track: u32, sample: Sample) {
+        if tracing() {
+            static SAMPLES: AtomicU64 = AtomicU64::new(0);
+            let n = SAMPLES.fetch_add(1, Ordering::Relaxed);
+            if n.is_multiple_of(200) {
+                eprintln!(
+                    "[cdm] sample {n}: player {player} track {track}, {} bytes",
+                    sample.data.len()
+                );
+            }
+        }
         if let Some(service) = self.service.get().and_then(|s| s.as_ref()) {
             service.sample(player, track, sample);
         }
@@ -373,16 +500,16 @@ impl Cdm for BrowserCdm {
             PlayerControl::Muted(m) => Control::Muted(m),
             PlayerControl::End(t) => Control::End(t),
         };
+        if tracing() {
+            eprintln!("[cdm] player {player}: {control:?}");
+        }
         if let Some(service) = self.service.get().and_then(|s| s.as_ref()) {
             service.control(player, control);
         }
     }
 
     fn stop(&self, player: u64) {
-        self.surfaces
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .remove(&player);
+        self.pictures.players().remove(&player);
         if let Some(service) = self.service.get().and_then(|s| s.as_ref()) {
             service.stop(player);
         }

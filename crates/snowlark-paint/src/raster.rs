@@ -950,6 +950,12 @@ impl<'a> Painter<'a> {
                         }
                     }
                 }
+                Item::ProtectedVideo { dest, clip, .. } => {
+                    // (black: its frames are the compositor's to show, never drawn here)
+                    let shown = self.snapped(&dest).intersect(&self.snapped(&clip));
+                    self.ctx
+                        .FillRectangle(&rect_f(&shown), self.brush(Color::BLACK));
+                }
                 Item::LinearGradient {
                     rect,
                     radii,

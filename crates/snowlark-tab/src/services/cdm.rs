@@ -263,6 +263,11 @@ struct Ids {
 /// The most reports held for players not known yet.
 const HELD: usize = 64;
 
+/// The browser's id of one of a renderer's protected players, whose picture its lists name
+/// ([`snowlark_paint::Item::ProtectedVideo`]); none for a player it did not make or whose
+/// instance is released.
+pub type RendererPlayers = Arc<dyn Fn(u64) -> Option<u64> + Send + Sync>;
+
 /// The browser's end of one renderer's key systems.
 pub struct CdmHost {
     port: BrowserPort,
@@ -293,6 +298,12 @@ impl CdmHost {
                 ids: Mutex::default(),
             }
         })
+    }
+
+    /// See [`RendererPlayers`].
+    pub fn player_ids(self: &Arc<Self>) -> RendererPlayers {
+        let host = Arc::downgrade(self);
+        Arc::new(move |player| host.upgrade()?.ids().players.get(&player)?.browser)
     }
 
     fn ids(&self) -> std::sync::MutexGuard<'_, Ids> {

@@ -282,6 +282,11 @@ impl ServiceHost {
         self.video.ids()
     }
 
+    /// The browser's id of each of the renderer's protected players, for its raster thread.
+    pub fn player_ids(&self) -> cdm::RendererPlayers {
+        self.cdm.player_ids()
+    }
+
     /// Serves the renderer until it is gone or breaks a rule (and dies for it). The browser's
     /// thread for this renderer's services. A renderer with no tab that sends the tab's messages dies.
     pub fn run(&self) -> Error {

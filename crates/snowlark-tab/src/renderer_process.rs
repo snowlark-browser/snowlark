@@ -393,6 +393,7 @@ impl RendererProcess {
         let video_ids = SeamVideos {
             renderer: tab,
             ids: host.video_ids(),
+            players: host.player_ids(),
         };
         let views = Views::default();
         let raster_ends = RasterEnds {

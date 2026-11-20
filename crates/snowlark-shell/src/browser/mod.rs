@@ -426,6 +426,10 @@ impl Browser {
             })));
         }
         comp.send(crate::composite::CompInput::videos(videos.clone()));
+        // (the profile's protected players' pictures, shown under its pages' videos)
+        comp.send(crate::composite::CompInput::Protected(
+            partition.cdm.pictures(),
+        ));
         let (events_tx, events) = snowlark_ipc::channel();
         let settings = profile.settings();
         let dark = settings.theme.is_dark(window::system_uses_dark_theme());

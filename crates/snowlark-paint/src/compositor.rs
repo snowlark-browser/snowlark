@@ -7,6 +7,8 @@
 //!
 //! ```text
 //! root
+//! ├── under     protected players' pictures under the content (underlays), over a black
+//! │             background; the content shows them through holes — `set_underlays`
 //! ├── content   a flip-model swap chain (waitable, frame latency 1) below the chrome: each frame
 //! │             it receives the active tab's tiles at the scroll position, then overlays (scroll
 //! │             bars, the status bubble) — `draw_content` + `present`
@@ -27,6 +29,13 @@
 //! at the display's steady rate: on a variable-refresh monitor a window swap chain made the refresh
 //! rate follow our frame pace while scrolling, and some panels then showed flickering lines.
 //!
+//! A protected player's frames cannot be drawn: its engine presents them into a composition surface
+//! of its own, which the tree shows under the content where the page's video is, and the content
+//! is cleared to transparent there ([`ContentPass::hole`]), so whatever the page or the browser
+//! draws over the video still shows over it. The content chain takes premultiplied alpha for that
+//! once a window first shows such a video ([`Compositor::allow_underlays`]); until then it stays
+//! opaque.
+//!
 //! Across processes ([`Compositor::on_surface`], `docs/process-isolation.md` M7) the window's process
 //! keeps the visual tree, with no Direct3D device ([`WindowSurface`]), and the compositor presents
 //! one swap chain for the whole client area through a composition surface handle bound to it. The
@@ -34,6 +43,7 @@
 //! chrome at one size and the content at another (two layers presented apart can: P0 measured 2.9%
 //! of compositions during a resize).
 
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
@@ -75,8 +85,54 @@ pub struct Compositor {
     back: Option<ID2D1Bitmap1>,
     content_size: (u32, u32),
     chrome_size: (u32, u32),
+    /// The content chain has premultiplied alpha ([`Compositor::allow_underlays`]).
+    alpha: bool,
+    /// A new chain to show with the next present, and visual changes to commit after it.
+    pending: Pending,
     _thread_affine: PhantomData<*const ()>,
 }
+
+#[derive(Default)]
+struct Pending {
+    chain: bool,
+    commit: bool,
+}
+
+/// A protected player's picture under the content ([`Compositor::set_underlays`]), in device
+/// pixels of the content area.
+pub struct Underlay {
+    /// The player (the same one from frame to frame).
+    pub key: u64,
+    /// Its engine's composition surface.
+    pub surface: Arc<OwnedHandle>,
+    /// Where the picture goes (the surface's size is the engine's).
+    pub dest: Rect,
+    /// What of it shows.
+    pub clip: Rect,
+}
+
+/// One underlay's visuals: a clip holding the picture.
+struct UnderlayVisual {
+    holder: IDCompositionVisual,
+    picture: IDCompositionVisual,
+    surface: Arc<OwnedHandle>,
+    /// Its surface as this device has it.
+    _content: IUnknown,
+    placed: (Rect, Rect),
+}
+
+/// The visuals under the content ([`Layers::Tree`]).
+struct Under {
+    visual: IDCompositionVisual,
+    /// A black surface scaled over the content area, under the pictures (none while there are
+    /// no pictures).
+    background: IDCompositionVisual,
+    black: Option<IDCompositionSurface>,
+    pictures: HashMap<u64, UnderlayVisual>,
+}
+
+/// The black background's surface size.
+const BLACK: u32 = 8;
 
 /// How the chain and the chrome reach the screen.
 enum Layers {
@@ -89,6 +145,7 @@ enum Layers {
         content: IDCompositionVisual,
         chrome: IDCompositionVisual,
         surface: Option<IDCompositionSurface>,
+        under: Box<Under>,
     },
     /// One chain for the whole client area, shown through a composition surface handle of the
     /// window's visual tree ([`Compositor::on_surface`]); the chrome is a bitmap drawn into each
@@ -285,6 +342,8 @@ impl Compositor {
             let root = dcomp.CreateVisual()?;
             let content = dcomp.CreateVisual()?;
             let chrome = dcomp.CreateVisual()?;
+            let under = dcomp.CreateVisual()?;
+            let background = dcomp.CreateVisual()?;
             let chain1 = gpu.dxgi_factory().CreateSwapChainForComposition(
                 gpu.d3d_device(),
                 &chain_desc(content_size.0, content_size.1),
@@ -295,8 +354,11 @@ impl Compositor {
             let waitable = chain.GetFrameLatencyWaitableObject();
             content.SetContent(&chain)?;
             content.SetOffsetY2(chrome_height as f32)?;
+            under.SetOffsetY2(chrome_height as f32)?;
+            under.AddVisual(&background, false, None)?;
             root.AddVisual(&content, false, None)?;
             root.AddVisual(&chrome, true, &content)?;
+            root.AddVisual(&under, false, &content)?;
             target.SetRoot(&root)?;
             let mut c = Compositor {
                 gpu,
@@ -309,6 +371,12 @@ impl Compositor {
                     content,
                     chrome,
                     surface: None,
+                    under: Box::new(Under {
+                        visual: under,
+                        background,
+                        black: None,
+                        pictures: HashMap::new(),
+                    }),
                 },
                 window,
                 chain,
@@ -317,6 +385,8 @@ impl Compositor {
                 back: None,
                 content_size,
                 chrome_size: (0, 0),
+                alpha: false,
+                pending: Pending::default(),
                 _thread_affine: PhantomData,
             };
             c.make_chrome_surface(width, chrome_height)?;
@@ -373,6 +443,8 @@ impl Compositor {
                 back: None,
                 content_size: (size.0, (size.1 - chrome_height).max(1)),
                 chrome_size: (size.0, chrome_height),
+                alpha: false,
+                pending: Pending::default(),
                 _thread_affine: PhantomData,
             })
         }
@@ -461,10 +533,14 @@ impl Compositor {
         }
         self.content_size = content;
         self.make_chrome_surface(width, chrome_height)?;
-        if let Layers::Tree { content, .. } = &self.layers {
-            // SAFETY: a property change on our own visual (committed by the caller).
-            unsafe { content.SetOffsetY2(chrome_height as f32)? };
+        if let Layers::Tree { content, under, .. } = &self.layers {
+            // SAFETY: property changes on our own visuals (committed by the caller).
+            unsafe {
+                content.SetOffsetY2(chrome_height as f32)?;
+                under.visual.SetOffsetY2(chrome_height as f32)?;
+            }
         }
+        self.cover()?;
         Ok(())
     }
 
@@ -603,12 +679,15 @@ impl Compositor {
         unsafe {
             if self.back.is_none() {
                 let surface: IDXGISurface = self.chain.GetBuffer(0)?;
-                self.back = Some(self.ctx.CreateBitmapFromDxgiSurface(
-                    &surface,
-                    Some(&bitmap_props(
-                        D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-                    )),
-                )?);
+                let mut props =
+                    bitmap_props(D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW);
+                if self.alpha {
+                    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+                }
+                self.back = Some(
+                    self.ctx
+                        .CreateBitmapFromDxgiSurface(&surface, Some(&props))?,
+                );
             }
             self.ctx.SetTarget(self.back.as_ref().unwrap());
             self.ctx.BeginDraw();
@@ -663,6 +742,11 @@ impl Compositor {
             ));
         };
         let (w, h) = self.chain_size;
+        let mut props =
+            bitmap_props(D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW);
+        if self.alpha {
+            props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+        }
         // SAFETY: a CPU-readable copy of our own back buffer, mapped and unmapped here.
         unsafe {
             let copy = self.ctx.CreateBitmap(
@@ -672,7 +756,7 @@ impl Compositor {
                 },
                 None,
                 0,
-                &bitmap_props(D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW),
+                &props,
             )?;
             copy.CopyFromBitmap(None, back, None)?;
             let map = copy.Map(D2D1_MAP_OPTIONS_READ)?;
@@ -701,8 +785,227 @@ impl Compositor {
         // SAFETY: presenting our own swap chain on a multithread-protected device (see above); the
         // caller waited for the frame-latency object, so this does not block on the display.
         unsafe { self.chain.Present(1, DXGI_PRESENT(0)).ok()? };
-        Ok(t.elapsed())
+        let elapsed = t.elapsed();
+        if let Layers::Tree { dcomp, content, .. } = &self.layers {
+            let pending = std::mem::take(&mut self.pending);
+            // SAFETY: changes to our own visuals, committed after the chain they show has its
+            // frame (a new chain shows nothing before its first present).
+            unsafe {
+                if pending.chain {
+                    content.SetContent(&self.chain)?;
+                }
+                if pending.chain || pending.commit {
+                    dcomp.Commit()?;
+                }
+            }
+        }
+        Ok(elapsed)
     }
+
+    /// Whether the content can show protected players' pictures under it ([`ContentPass::hole`],
+    /// [`Compositor::set_underlays`]): only with a visual tree of the compositor's own. The
+    /// first time, the content chain is made again with premultiplied alpha (shown from the next
+    /// present on), and stays so.
+    pub fn allow_underlays(&mut self) -> bool {
+        if !matches!(self.layers, Layers::Tree { .. }) {
+            return false;
+        }
+        if self.alpha {
+            return true;
+        }
+        let (w, h) = self.chain_size;
+        // SAFETY: a new chain on the shared device; ours stays until it is in hand.
+        let made = unsafe {
+            (|| -> Result<(IDXGISwapChain2, HANDLE)> {
+                let mut desc = chain_desc(w, h);
+                desc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
+                let chain1 = self.gpu.dxgi_factory().CreateSwapChainForComposition(
+                    self.gpu.d3d_device(),
+                    &desc,
+                    None,
+                )?;
+                let chain: IDXGISwapChain2 = chain1.cast()?;
+                chain.SetMaximumFrameLatency(1)?;
+                let waitable = chain.GetFrameLatencyWaitableObject();
+                Ok((chain, waitable))
+            })()
+        };
+        match made {
+            Ok((chain, waitable)) => {
+                // (no bitmap of the old chain's buffers is kept)
+                self.back = None;
+                self.chain = chain;
+                // SAFETY: the old chain's waitable object, ours to close (as in Drop).
+                unsafe {
+                    if !self.waitable.is_invalid() {
+                        let _ = CloseHandle(self.waitable);
+                    }
+                }
+                self.waitable = waitable;
+                self.alpha = true;
+                self.pending.chain = true;
+                true
+            }
+            Err(e) => {
+                eprintln!("[gpu] no content chain with alpha for protected video: {e}");
+                false
+            }
+        }
+    }
+
+    /// Shows `underlays` under the content in place of the ones before, from the next present
+    /// on. Only after [`Compositor::allow_underlays`]; the content must have holes where they
+    /// show ([`ContentPass::hole`]).
+    pub fn set_underlays(&mut self, underlays: &[Underlay]) -> Result<()> {
+        let Layers::Tree { dcomp, under, .. } = &mut self.layers else {
+            return Ok(());
+        };
+        let had = !under.pictures.is_empty();
+        let mut changed = false;
+        // SAFETY: our own device and visuals; each surface is made from a handle that its `Arc`
+        // keeps open while the visual shows it.
+        unsafe {
+            let mut gone: Vec<u64> = under.pictures.keys().copied().collect();
+            gone.retain(|k| !underlays.iter().any(|u| u.key == *k));
+            for k in gone {
+                if let Some(v) = under.pictures.remove(&k) {
+                    under.visual.RemoveVisual(&v.holder)?;
+                    changed = true;
+                }
+            }
+            for u in underlays {
+                let stale = under
+                    .pictures
+                    .get(&u.key)
+                    .is_some_and(|v| !Arc::ptr_eq(&v.surface, &u.surface));
+                if stale {
+                    if let Some(v) = under.pictures.remove(&u.key) {
+                        under.visual.RemoveVisual(&v.holder)?;
+                    }
+                }
+                let v = match under.pictures.entry(u.key) {
+                    std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+                    std::collections::hash_map::Entry::Vacant(e) => {
+                        let surface =
+                            dcomp.CreateSurfaceFromHandle(HANDLE(u.surface.as_raw_handle()))?;
+                        let holder = dcomp.CreateVisual()?;
+                        let picture = dcomp.CreateVisual()?;
+                        picture.SetContent(&surface)?;
+                        holder.AddVisual(&picture, false, None)?;
+                        under.visual.AddVisual(&holder, true, &under.background)?;
+                        e.insert(UnderlayVisual {
+                            holder,
+                            picture,
+                            surface: u.surface.clone(),
+                            _content: surface,
+                            placed: (Rect::new(0.0, 0.0, -1.0, -1.0), Rect::ZERO),
+                        })
+                    }
+                };
+                let at = (snap(&u.dest), snap(&u.clip));
+                if v.placed != at {
+                    v.picture.SetOffsetX2(at.0.x)?;
+                    v.picture.SetOffsetY2(at.0.y)?;
+                    v.holder.SetClip2(&D2D_RECT_F {
+                        left: at.1.x,
+                        top: at.1.y,
+                        right: at.1.right(),
+                        bottom: at.1.bottom(),
+                    })?;
+                    v.placed = at;
+                    changed = true;
+                }
+            }
+        }
+        if had == under.pictures.is_empty() {
+            changed = true;
+            self.cover()?;
+        }
+        self.pending.commit |= changed;
+        Ok(())
+    }
+
+    /// How many protected pictures show under the content.
+    pub fn underlays(&self) -> usize {
+        match &self.layers {
+            Layers::Tree { under, .. } => under.pictures.len(),
+            Layers::Surface { .. } => 0,
+        }
+    }
+
+    /// The black background under the pictures, over the whole content area while there are
+    /// any (a picture's engine may not cover its rectangle before its first frame).
+    fn cover(&mut self) -> Result<()> {
+        let (w, h) = self.content_size;
+        let Layers::Tree { dcomp, under, .. } = &mut self.layers else {
+            return Ok(());
+        };
+        // SAFETY: our own device, visuals and surface; the surface is drawn between its BeginDraw
+        // and EndDraw through a bitmap over the DXGI surface it hands out, and the context's
+        // target is reset before EndDraw.
+        unsafe {
+            if under.pictures.is_empty() {
+                if under.black.take().is_some() {
+                    under.background.SetContent(None)?;
+                }
+                return Ok(());
+            }
+            if under.black.is_none() {
+                let black = dcomp.CreateSurface(
+                    BLACK,
+                    BLACK,
+                    DXGI_FORMAT_B8G8R8A8_UNORM,
+                    DXGI_ALPHA_MODE_IGNORE,
+                )?;
+                let mut offset = POINT::default();
+                let dxgi: IDXGISurface = black.BeginDraw(None, &mut offset)?;
+                let r = (|| -> Result<()> {
+                    let bitmap = self.ctx.CreateBitmapFromDxgiSurface(
+                        &dxgi,
+                        Some(&bitmap_props(
+                            D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+                        )),
+                    )?;
+                    self.ctx.SetTarget(&bitmap);
+                    self.ctx.BeginDraw();
+                    self.ctx.SetTransform(&Matrix3x2::identity());
+                    let area =
+                        Rect::new(offset.x as f32, offset.y as f32, BLACK as f32, BLACK as f32);
+                    self.ctx
+                        .PushAxisAlignedClip(&rect_f(&area), D2D1_ANTIALIAS_MODE_ALIASED);
+                    self.ctx.Clear(Some(&color_f(Color::BLACK)));
+                    self.ctx.PopAxisAlignedClip();
+                    let r = self.ctx.EndDraw(None, None);
+                    self.ctx.SetTarget(None);
+                    r
+                })();
+                let end = black.EndDraw();
+                r?;
+                end?;
+                under.background.SetContent(&black)?;
+                under.black = Some(black);
+            }
+            let scale = Matrix3x2 {
+                M11: w as f32 / BLACK as f32,
+                M22: h as f32 / BLACK as f32,
+                ..Matrix3x2::identity()
+            };
+            under.background.SetTransform2(&scale)?;
+        }
+        self.pending.commit = true;
+        Ok(())
+    }
+}
+
+/// `r` with its edges on whole pixels.
+fn snap(r: &Rect) -> Rect {
+    let (x, y) = (r.x.round(), r.y.round());
+    Rect::new(
+        x,
+        y,
+        (r.right().round() - x).max(0.0),
+        (r.bottom().round() - y).max(0.0),
+    )
 }
 
 impl Drop for Compositor {
@@ -731,6 +1034,21 @@ impl ContentPass<'_> {
             self.ctx
                 .PushAxisAlignedClip(&rect_f(&area), D2D1_ANTIALIAS_MODE_ALIASED);
             self.ctx.Clear(Some(&color_f(color)));
+            self.ctx.PopAxisAlignedClip();
+        }
+    }
+
+    /// Clears `rect` (device pixels of the content area, to whole pixels) to transparent, where a
+    /// protected player's picture under the content shows ([`Compositor::set_underlays`]): only
+    /// in a pass of a compositor that [`Compositor::allow_underlays`].
+    pub fn hole(&mut self, rect: Rect) {
+        let area = self.at(snap(&rect));
+        // SAFETY: drawing on a context between BeginDraw and EndDraw; the clip is popped.
+        unsafe {
+            self.ctx.SetTransform(&Matrix3x2::identity());
+            self.ctx
+                .PushAxisAlignedClip(&rect_f(&area), D2D1_ANTIALIAS_MODE_ALIASED);
+            self.ctx.Clear(Some(&color_f(Color::TRANSPARENT)));
             self.ctx.PopAxisAlignedClip();
         }
     }
@@ -1326,6 +1644,60 @@ mod tests {
         assert_eq!((f.0, f.1), (200, 110));
         assert_eq!(pixel(&f, 5, 5), (0, 255, 0));
         assert_eq!(pixel(&f, 5, 45), (0, 0, 255));
+    }
+
+    /// A protected player's picture shows under the content: the chain takes alpha once, the
+    /// content is transparent in the hole and opaque elsewhere (what is drawn after the hole
+    /// covers it), and the picture's visual comes and goes with the list it is in.
+    #[test]
+    fn a_protected_picture_shows_under_a_hole_in_the_content() {
+        let gpu = Gpu::new().unwrap();
+        let fonts = FontTable::new().unwrap();
+        let images = ImageTable::new();
+        let window = HiddenWindow::new().unwrap();
+        let mut c = Compositor::new(gpu, &fonts, window.handle(), 200, 150, 40).unwrap();
+        assert!(c.allow_underlays());
+        assert!(c.allow_underlays());
+        let mut over = DisplayListBuilder::new();
+        over.fill_rect(Rect::new(20.0, 50.0, 10.0, 10.0), Color::rgb(0, 255, 0));
+        let over = over.build();
+        let sources = Sources {
+            text: &fonts,
+            images: &images,
+        };
+        c.draw_content(|p| {
+            p.clear(Color::rgb(0, 0, 255));
+            p.hole(Rect::new(10.2, 20.0, 99.6, 60.0));
+            p.list(&over, sources, 1.0, 0.0, 0.0);
+        })
+        .unwrap();
+        let f = c.read_back().unwrap();
+        let alpha = |x: u32, y: u32| f.2[((y * f.0 + x) * 4 + 3) as usize];
+        assert_eq!((alpha(5, 5), alpha(15, 25), alpha(25, 55)), (255, 0, 255));
+        assert_eq!(
+            (alpha(9, 25), alpha(10, 25), alpha(109, 79), alpha(110, 79)),
+            (255, 0, 0, 255)
+        );
+        // SAFETY: test code: a composition surface handle of our own, owned by `OwnedHandle`.
+        let surface = unsafe {
+            let raw = DCompositionCreateSurfaceHandle(COMPOSITIONOBJECT_ALL_ACCESS, None).unwrap();
+            Arc::new(OwnedHandle::from_raw_handle(raw.0))
+        };
+        let picture = |key, surface: &Arc<OwnedHandle>| Underlay {
+            key,
+            surface: surface.clone(),
+            dest: Rect::new(10.0, 20.0, 100.0, 60.0),
+            clip: Rect::new(10.0, 20.0, 100.0, 60.0),
+        };
+        c.set_underlays(&[picture(7, &surface)]).unwrap();
+        c.present().unwrap();
+        assert_eq!(c.underlays(), 1);
+        c.set_underlays(&[picture(7, &surface), picture(8, &surface)])
+            .unwrap();
+        assert_eq!(c.underlays(), 2);
+        c.set_underlays(&[]).unwrap();
+        c.present().unwrap();
+        assert_eq!(c.underlays(), 0);
     }
 
     /// A backdrop filter of a layer the compositor places (a fixed bar) is applied to

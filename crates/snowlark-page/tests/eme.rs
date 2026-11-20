@@ -58,7 +58,8 @@ impl Fake {
 }
 impl Cdm for Fake {
     fn supports(&self, key_system: &str, content_type: &str) -> bool {
-        key_system == "org.test.module" && content_type.starts_with("video/mp4")
+        matches!(key_system, "org.test.module" | "org.test.module.3000")
+            && content_type.starts_with("video/mp4")
     }
     fn create_keys(&self, request: u64, _: &str, origin: &str, inbox: &Arc<CdmInbox>) -> u64 {
         *self.inbox.lock().unwrap() = Some(inbox.clone());
@@ -319,6 +320,32 @@ fn a_key_system_of_the_embedders_module() {
          closed-by-application"
     );
     assert_eq!(*fake.origin.lock().unwrap(), "https://example.test");
+}
+
+/// A key system whose name ends in its security level (PlayReady's `.3000`) takes a robustness
+/// that repeats that level, and no other; one with no level in its name takes none.
+#[test]
+fn a_robustness_that_repeats_the_key_systems_level() {
+    let fake = Arc::new(Fake::default());
+    let mut p = page_with(&fake);
+    let r = run_async(
+        &mut p,
+        r#"
+        const out = [];
+        for (const [ks, robustness] of [['org.test.module.3000', '3000'],
+                                         ['org.test.module.3000', '2000'],
+                                         ['org.test.module', '3000'],
+                                         ['org.test.module.3000', '']]) {
+            const c = {videoCapabilities: [{contentType: 'video/mp4; codecs="avc1.64001f"', robustness}]};
+            try {
+                const a = await navigator.requestMediaKeySystemAccess(ks, [c]);
+                out.push(a.getConfiguration().videoCapabilities[0].robustness || 'empty');
+            } catch (e) { out.push(e.name); }
+        }
+        return out.join(' ');
+    "#,
+    );
+    assert_eq!(r, "3000 NotSupportedError NotSupportedError empty");
 }
 
 /// A module instance is released when the document that made it unloads (a removed frame, a

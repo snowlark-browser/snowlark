@@ -325,6 +325,20 @@ pub enum CompInput {
     /// undocked developer tools'), sent ahead of the list that needs it, as a renderer's raster seam
     /// sends its fonts and images ([`CompInput::resource`]).
     Resource(Resource),
+    /// The pictures of the browser's protected players, for the window's protected videos
+    /// ([`crate::video::Picture::Protected`]). Never crosses a process.
+    Protected(Arc<dyn ProtectedPictures>),
+}
+
+/// The pictures of the browser's protected players (its key systems' media engines), which a
+/// compositor in the browser's process shows for a [`crate::video::Picture::Protected`] quad under
+/// the content.
+pub trait ProtectedPictures: Send + Sync {
+    /// Player `player`'s composition surface, once its engine has a picture.
+    fn surface(&self, player: u64) -> Option<Arc<std::os::windows::io::OwnedHandle>>;
+    /// Player `player`'s picture shows at this rectangle of the screen (device pixels): where its
+    /// output is protected, and the size its engine draws at.
+    fn place(&self, player: u64, x: i32, y: i32, width: i32, height: i32);
 }
 
 impl CompInput {

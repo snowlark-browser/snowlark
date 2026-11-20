@@ -317,6 +317,7 @@ impl Browser {
         if let Some(v) = &self.tab_ctx.videos {
             comp.send(CompInput::videos(v.clone()));
         }
+        comp.send(CompInput::Protected(self.partition.cdm.pictures()));
         let tab_id = self.next_id;
         self.next_id += 1;
         // (what the opener's renderer sends for the tab reaches the main window's compositor,

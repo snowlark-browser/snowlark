@@ -14,9 +14,19 @@ use snowlark_paint::{
     DisplayList, Item, Matrix, Rect, Sources, TileRasterizer, TiledFrame, VideoId, Viewport,
 };
 
+/// What a video quad shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Picture {
+    /// A video's frames, in the window's video store.
+    Frames(VideoId),
+    /// A protected player's own surface ([`Item::ProtectedVideo`]): the list's id of the player,
+    /// the browser's once the raster thread has mapped it.
+    Protected(u64),
+}
+
 /// A video in a raster's device coordinates (the list's, at the raster's scale).
 pub struct VideoQuad {
-    pub video: VideoId,
+    pub picture: Picture,
     /// Where the frame goes (its `object-fit` rectangle).
     pub dest: Rect,
     /// What of it shows (its content box, cut by the clips around it and the raster's bounds).
@@ -27,9 +37,9 @@ pub struct VideoQuad {
 
 /// The video items of a list: (index, video, device dest, device visible rect). Videos under a
 /// transform that is not a translation or scale are left to the tiles.
-pub fn video_items(list: &DisplayList, scale: f32) -> Vec<(usize, VideoId, Rect, Rect)> {
+pub fn video_items(list: &DisplayList, scale: f32) -> Vec<(usize, Picture, Rect, Rect)> {
     let mut out = Vec::new();
-    if !list.items.iter().any(|i| matches!(i, Item::Video { .. })) {
+    if !list.items.iter().any(Item::is_video) {
         return out;
     }
     let mut transforms = vec![Matrix::scale(scale, scale)];
@@ -51,16 +61,19 @@ pub fn video_items(list: &DisplayList, scale: f32) -> Vec<(usize, VideoId, Rect,
             Item::PopTransform => {
                 transforms.pop();
             }
-            Item::Video {
-                video, dest, clip, ..
-            } => {
+            Item::Video { dest, clip, .. } | Item::ProtectedVideo { dest, clip, .. } => {
                 if !m.is_axis_aligned() {
                     continue;
                 }
+                let picture = match item {
+                    Item::Video { video, .. } => Picture::Frames(*video),
+                    Item::ProtectedVideo { player, .. } => Picture::Protected(*player),
+                    _ => unreachable!(),
+                };
                 let d = m.apply_rect(dest);
                 let visible = m.apply_rect(clip).intersect(&d).intersect(&c);
                 if !visible.is_empty() {
-                    out.push((i, *video, d, visible));
+                    out.push((i, picture, d, visible));
                 }
             }
             _ => {}
@@ -77,9 +90,7 @@ pub fn patch_list(list: &DisplayList, index: usize) -> DisplayList {
         .items
         .iter()
         .enumerate()
-        .filter(|(i, item)| {
-            !matches!(item, Item::Video { .. }) && (*i > index || !item.is_drawing())
-        })
+        .filter(|(i, item)| !item.is_video() && (*i > index || !item.is_drawing()))
         .map(|(_, item)| *item)
         .collect();
     patch
@@ -113,7 +124,7 @@ pub fn under_videos(list: &DisplayList, scale: f32) -> Option<DisplayList> {
             Item::PopFilter => filters = filters.saturating_sub(1),
             _ => {}
         }
-        if filters > 0 || !item.is_drawing() || matches!(item, Item::Video { .. }) || b.is_empty() {
+        if filters > 0 || !item.is_drawing() || item.is_video() || b.is_empty() {
             continue;
         }
         if videos
@@ -138,9 +149,12 @@ pub fn under_videos(list: &DisplayList, scale: f32) -> Option<DisplayList> {
 
 /// Where a video's patch keeps its tiles from one raster to the next ([`TileRasterizer::raster_piece`]):
 /// by the video and the piece of the frame it is in (`piece`: 0 for the full frame).
-fn patch_slot(video: VideoId, piece: u64) -> u64 {
-    (0x5649_4445_4F00_0000 ^ u64::from(video.0)).rotate_left(23)
-        ^ piece.wrapping_mul(0x9E37_79B9_7F4A_7C15)
+fn patch_slot(picture: Picture, piece: u64) -> u64 {
+    let id = match picture {
+        Picture::Frames(video) => 0x5649_4445_4F00_0000 ^ u64::from(video.0),
+        Picture::Protected(player) => 0x5052_4F54_0000_0000 ^ player.rotate_left(17),
+    };
+    id.rotate_left(23) ^ piece.wrapping_mul(0x9E37_79B9_7F4A_7C15)
 }
 
 /// The video quads of a list rasterized into `view` (with pixel (0, 0) at `origin` of the list's
@@ -168,7 +182,7 @@ pub fn quads(
     }
     let mut item_bounds = Vec::new();
     list.item_bounds(&Matrix::scale(view.scale, view.scale), &mut item_bounds);
-    for (index, video, dest, visible) in items {
+    for (index, picture, dest, visible) in items {
         let visible = visible.intersect(&bounds);
         if visible.is_empty() {
             continue;
@@ -184,10 +198,7 @@ pub fn quads(
             .zip(&item_bounds)
             .enumerate()
             .any(|(i, (item, b))| {
-                i > index
-                    && item.is_drawing()
-                    && !matches!(item, Item::Video { .. })
-                    && b.intersects(&visible)
+                i > index && item.is_drawing() && !item.is_video() && b.intersects(&visible)
             });
         let patch = if over {
             let patch_list = patch_list(list, index);
@@ -203,7 +214,7 @@ pub fn quads(
                     sources,
                     &patch_view,
                     (x0 as i32, y0 as i32),
-                    patch_slot(video, piece),
+                    patch_slot(picture, piece),
                 )
                 .ok()
                 .map(|f| (f, (x0 as i32, y0 as i32)))
@@ -211,7 +222,7 @@ pub fn quads(
             None
         };
         out.push(VideoQuad {
-            video,
+            picture,
             dest,
             clip: visible,
             patch,
@@ -244,7 +255,7 @@ mod tests {
         let v = video_items(&list, 2.0);
         assert_eq!(v.len(), 1);
         let (index, id, dest, visible) = v[0];
-        assert_eq!(id, VideoId(7));
+        assert_eq!(id, Picture::Frames(VideoId(7)));
         assert_eq!(dest, Rect::new(20.0, 40.0, 640.0, 360.0));
         // (cut by the clip at 300×300 CSS px: 600 device px)
         assert_eq!(visible, Rect::new(20.0, 40.0, 580.0, 360.0));
@@ -303,5 +314,28 @@ mod tests {
         );
         b.pop_transform();
         assert!(video_items(&b.build(), 1.0).is_empty());
+    }
+
+    /// A protected player's picture is a quad as a video's frames are, with what paints over it
+    /// in its patch and left out of the tiles under it.
+    #[test]
+    fn a_protected_video_is_a_quad_with_its_patch() {
+        let mut b = DisplayListBuilder::new();
+        let r = Rect::new(10.0, 20.0, 320.0, 180.0);
+        b.protected_video(0x1_0000_0005, r, r);
+        b.fill_rect(Rect::new(20.0, 150.0, 100.0, 30.0), Color::WHITE);
+        let list = b.build();
+        let v = video_items(&list, 2.0);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].1, Picture::Protected(0x1_0000_0005));
+        assert_eq!(v[0].2, Rect::new(20.0, 40.0, 640.0, 360.0));
+        let patch = patch_list(&list, v[0].0);
+        assert!(matches!(patch.items[..], [Item::FillRect { .. }]));
+        let under = under_videos(&list, 2.0).expect("the fill is the patch's");
+        assert!(matches!(under.items[..], [Item::ProtectedVideo { .. }]));
+        assert_ne!(
+            patch_slot(Picture::Protected(5), 0),
+            patch_slot(Picture::Frames(VideoId(5)), 0)
+        );
     }
 }

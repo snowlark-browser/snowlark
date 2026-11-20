@@ -49,6 +49,15 @@ pub struct Protected {
     _keeper: Option<Player>,
 }
 
+impl Protected {
+    /// The module's player (the page's id of it), once made and while it plays: what the element
+    /// shows ([`snowlark_paint::Item::ProtectedVideo`]).
+    pub fn player(&self) -> Option<u64> {
+        let st = self.feeder.state();
+        st.player.filter(|_| !st.closed)
+    }
+}
+
 struct Buffer {
     sb: Handle,
     reader: fmp4::SampleReader,

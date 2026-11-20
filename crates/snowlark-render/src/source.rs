@@ -37,6 +37,9 @@ pub struct MediaState {
     pub show_poster: bool,
     /// The slot of the video's GPU frames.
     pub video: Option<snowlark_paint::VideoId>,
+    /// The page's id of the protected player whose picture the element shows instead (its frames
+    /// never reach the page: the compositor shows the player's own surface).
+    pub protected: Option<u64>,
     pub controls: Option<snowlark_layout::media::MediaControls>,
 }
 
@@ -389,6 +392,7 @@ impl<'a> DocumentStyles<'a> {
                 natural_height: Some(54.0),
                 media: Some(Arc::new(snowlark_layout::media::MediaContent {
                     video: None,
+                    protected: None,
                     frame_image: None,
                     controls,
                 })),
@@ -399,7 +403,8 @@ impl<'a> DocumentStyles<'a> {
             Some(ImageState::Loaded(i)) => Some(self.shown(i, el)),
             _ => None,
         };
-        let show_frame = state.is_some_and(|s| !s.show_poster && s.video.is_some());
+        let show_frame =
+            state.is_some_and(|s| !s.show_poster && (s.video.is_some() || s.protected.is_some()));
         let (w, h, ratio) = match (state.and_then(|s| s.natural), poster) {
             (Some((w, h)), _) if w > 0 && h > 0 => (Some(w as f32), Some(h as f32), None),
             // (the poster frame's natural dimensions, an SVG poster's ratio among them)
@@ -421,6 +426,11 @@ impl<'a> DocumentStyles<'a> {
             media: Some(Arc::new(snowlark_layout::media::MediaContent {
                 video: if show_frame {
                     state.and_then(|s| s.video)
+                } else {
+                    None
+                },
+                protected: if show_frame {
+                    state.and_then(|s| s.protected)
                 } else {
                     None
                 },

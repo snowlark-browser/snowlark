@@ -58,7 +58,8 @@ use crate::begin_frames::{BeginFrameSource, VSyncThread};
 use crate::driver::{ColorScheme, ScrollbarColors};
 use crate::scroll::{Scrollbar, SmoothScroll};
 use crate::tab::{TabCommand, TabId};
-use crate::video::VideoQuad;
+use crate::video::{Picture, VideoQuad};
+use snowlark_paint::compositor::Underlay;
 use snowlark_paint::video::VideoStore;
 pub use snowlark_tab::comp::{
     AutoTarget, CompEvent, CompInput, CompMsg, DevtoolsFrame, FrameData, FrameRef, Handle,
@@ -599,6 +600,8 @@ struct State {
     /// The [`CompMsg::Ack`]s waiting for their frame, and when each arrived.
     acks: Vec<(u64, Instant)>,
     videos: Option<Arc<VideoStore>>,
+    /// The browser's protected players' pictures ([`CompInput::Protected`]).
+    protected: Option<Arc<dyn snowlark_tab::comp::ProtectedPictures>>,
     /// The begin frames for tabs ([`CompMsg::NeedsBeginFrames`]), and the thread that waits for
     /// the vsyncs that start them.
     begin_frames: BeginFrameSource,
@@ -652,6 +655,7 @@ impl State {
             uncommitted: false,
             acks: Vec::new(),
             videos: None,
+            protected: None,
             begin_frames: BeginFrameSource::default(),
             vsync: None,
             devtools: None,
@@ -887,6 +891,7 @@ impl State {
                 }
             }
             CompInput::Resource(r) => self.resource(r),
+            CompInput::Protected(p) => self.protected = Some(p),
             CompInput::VSync(time, interval) => {
                 let args = self.begin_frames.on_vsync(time, interval);
                 for layer in self.layers.values().filter(|l| l.needs_begin_frames) {
@@ -1190,10 +1195,11 @@ impl State {
                     .and_then(|t| self.layers.get(&t))
                     .and_then(|l| l.frame.as_ref())
                     .is_some_and(|f| {
-                        f.videos.iter().any(|q| q.video == id)
+                        let id = Picture::Frames(id);
+                        f.videos.iter().any(|q| q.picture == id)
                             || f.layers
                                 .iter()
-                                .any(|l| l.videos.iter().any(|q| q.video == id))
+                                .any(|l| l.videos.iter().any(|q| q.picture == id))
                     });
                 if shown {
                     self.dirty = true;
@@ -1524,6 +1530,17 @@ impl State {
         let images = &self.images;
         let overlay = &self.overlay;
         let videos = self.videos.clone();
+        // (protected players' pictures show under the content, through holes in it)
+        let protected = self
+            .protected
+            .clone()
+            .filter(|_| layer.is_some_and(shows_protected))
+            .filter(|_| comp.allow_underlays());
+        let mut under = Under {
+            pictures: protected.as_deref(),
+            shown: Vec::new(),
+            placed: Vec::new(),
+        };
         let r = comp.draw_content(|pass| {
             let bg = layer
                 .and_then(|l| l.frame.as_ref())
@@ -1537,7 +1554,14 @@ impl State {
                     let dy = (f.origin.y * f.scale).round() as i32 - (s.y * f.scale).round() as i32;
                     let clip = Rect::new(ox as f32, 0.0, cw as f32, chh as f32);
                     pass.tiles(&f.frame, dx + f.base_at.0, dy + f.base_at.1, clip);
-                    draw_videos(pass, videos.as_deref(), &f.videos, (dx, dy), clip);
+                    draw_videos(
+                        pass,
+                        videos.as_deref(),
+                        &mut under,
+                        &f.videos,
+                        (dx, dy),
+                        clip,
+                    );
                     let now = snowlark_paint::Ticks::now();
                     for layer in &f.layers {
                         if !layer.state.0.is_empty() {
@@ -1567,7 +1591,14 @@ impl State {
                         // (the quads are in the layer list's device pixels; its pixel (0, 0) is
                         // at `at` of them)
                         let off = (x - layer.at.0, y - layer.at.1);
-                        draw_videos(pass, videos.as_deref(), &layer.videos, off, clip);
+                        draw_videos(
+                            pass,
+                            videos.as_deref(),
+                            &mut under,
+                            &layer.videos,
+                            off,
+                            clip,
+                        );
                     }
                 }
             }
@@ -1590,6 +1621,24 @@ impl State {
         let Some(comp) = &mut self.comp else {
             return;
         };
+        let shown = std::mem::take(&mut under.shown);
+        let placed = std::mem::take(&mut under.placed);
+        if let Err(e) = comp.set_underlays(&shown) {
+            eprintln!("[gpu] protected video: {e}");
+        }
+        if let Some(p) = &protected {
+            let (_, client) = comp.window().screen_placement();
+            let top = self.size.2 as i32;
+            for (player, dest) in &placed {
+                p.place(
+                    *player,
+                    client.0 + dest.x.round() as i32,
+                    client.1 + top + dest.y.round() as i32,
+                    dest.width.round() as i32,
+                    dest.height.round() as i32,
+                );
+            }
+        }
         let present = match comp.present() {
             Ok(d) => d,
             Err(e) => {
@@ -1619,7 +1668,7 @@ impl State {
                 }
             }
             eprintln!(
-                "[gpu] frame {} interval {} wait {:.2} compose {:.2} present {:.2} ms{}{}{}",
+                "[gpu] frame {} interval {} wait {:.2} compose {:.2} present {:.2} ms{}{}{}{}",
                 self.stats.frames,
                 interval.map_or("-".into(), |i| format!("{i:.2}")),
                 ms(waited),
@@ -1634,6 +1683,10 @@ impl State {
                     format!(" UNCOVERED {rows} rows at scroll {at:.0}")
                 } else {
                     String::new()
+                },
+                match self.comp.as_ref().map_or(0, |c| c.underlays()) {
+                    0 => String::new(),
+                    n => format!(" protected {n}"),
                 }
             );
         } else {
@@ -1642,26 +1695,62 @@ impl State {
     }
 }
 
-/// Draws video quads (device pixels moved by `off`) within `clip`: each video's latest frame, then
-/// what the page paints over it.
+/// The protected players' pictures of a frame: where they come from (none: the compositor cannot
+/// show them, and their videos stay black), and the ones it shows under the content.
+struct Under<'a> {
+    pictures: Option<&'a dyn snowlark_tab::comp::ProtectedPictures>,
+    shown: Vec<Underlay>,
+    /// Where each protected video is (device pixels of the content area), with a picture or
+    /// not yet: its engine protects its output there and draws at that size.
+    placed: Vec<(u64, Rect)>,
+}
+
+/// Whether a tab's frame has a protected player's picture.
+fn shows_protected(layer: &Layer) -> bool {
+    let protected = |q: &VideoQuad| matches!(q.picture, Picture::Protected(_));
+    layer.frame.as_ref().is_some_and(|f| {
+        f.videos.iter().any(protected) || f.layers.iter().any(|l| l.videos.iter().any(protected))
+    })
+}
+
+/// Draws video quads (device pixels moved by `off`) within `clip`: each video's latest frame (a
+/// protected player's picture: a hole in the content over it, `under`), then what the page paints
+/// over it.
 fn draw_videos(
     pass: &mut snowlark_paint::ContentPass<'_>,
     store: Option<&VideoStore>,
+    under: &mut Under<'_>,
     quads: &[VideoQuad],
     off: (i32, i32),
     clip: Rect,
 ) {
-    let Some(store) = store else {
-        return;
-    };
     for q in quads {
         let (dx, dy) = (off.0 as f32, off.1 as f32);
         let visible = q.clip.translate(dx, dy).intersect(&clip);
         if visible.is_empty() {
             continue;
         }
-        if let Some(front) = store.front_of(q.video) {
-            pass.video_frame(&front, q.dest.translate(dx, dy), visible);
+        let dest = q.dest.translate(dx, dy);
+        match q.picture {
+            Picture::Frames(video) => {
+                if let Some(front) = store.and_then(|s| s.front_of(video)) {
+                    pass.video_frame(&front, dest, visible);
+                }
+            }
+            Picture::Protected(player) => {
+                under.placed.push((player, dest));
+                let surface = under.pictures.and_then(|p| p.surface(player));
+                if let Some(surface) = surface {
+                    let shown = dest.intersect(&visible);
+                    pass.hole(shown);
+                    under.shown.push(Underlay {
+                        key: player,
+                        surface,
+                        dest,
+                        clip: shown,
+                    });
+                }
+            }
         }
         if let Some((patch, at)) = &q.patch {
             pass.tiles(patch, at.0 + off.0, at.1 + off.1, visible);

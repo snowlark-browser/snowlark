@@ -18,6 +18,9 @@ use snowlark_paint::{
 pub struct MediaContent {
     /// The video's frames (the compositor draws them), when it shows a frame.
     pub video: Option<VideoId>,
+    /// The page's id of a protected player whose picture shows instead (a compositor shows it;
+    /// see [`snowlark_paint::Item::ProtectedVideo`]).
+    pub protected: Option<u64>,
     /// The frame copied to memory, for rasterizers without the compositor (headless renders).
     pub frame_image: Option<snowlark_paint::ImageId>,
     /// The user agent's controls (the `controls` attribute).
@@ -202,7 +205,9 @@ pub fn paint(
     rect: Rect,
     clip: Rect,
 ) {
-    if let Some(video) = media.video {
+    if let Some(player) = media.protected {
+        out.protected_video(player, rect, clip);
+    } else if let Some(video) = media.video {
         out.video(video, media.frame_image, rect, clip);
     }
     let Some(c) = &media.controls else {
@@ -379,6 +384,7 @@ mod tests {
         let mut b = DisplayListBuilder::new();
         let content = MediaContent {
             video: Some(VideoId(3)),
+            protected: None,
             frame_image: None,
             controls: Some(MediaControls {
                 paused: true,

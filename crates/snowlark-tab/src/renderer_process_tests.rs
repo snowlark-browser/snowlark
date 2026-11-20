@@ -1104,7 +1104,10 @@ fn a_video_in_a_renderer_draws_in_the_browser() {
         }
         while let Ok(input) = tab.compositor.try_recv() {
             if let CompInput::Frame(_, frame) = input {
-                quads.extend(frame.videos.iter().map(|q| q.video));
+                quads.extend(frame.videos.iter().filter_map(|q| match q.picture {
+                    crate::video::Picture::Frames(v) => Some(v),
+                    crate::video::Picture::Protected(_) => None,
+                }));
             }
         }
         while let Some(event) = next_event(&tab.events, Instant::now()) {

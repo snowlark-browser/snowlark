@@ -142,14 +142,19 @@ fn cdm_configuration(
         return None;
     }
     // 14-15.
+    // (the key system's name says its robustness: a PlayReady name ends in its security level,
+    // which a robustness string may repeat)
+    let level = key_system
+        .rsplit_once('.')
+        .map(|(_, l)| l)
+        .filter(|l| !l.is_empty() && l.bytes().all(|b| b.is_ascii_digit()));
     let capabilities = |requested: &[MediaKeySystemMediaCapability]| {
         let mut out: Vec<MediaKeySystemMediaCapability> = Vec::new();
         for c in requested {
             if c.content_type.is_empty() {
                 return None;
             }
-            // (the key system's name says its robustness)
-            if !c.robustness.is_empty()
+            if !(c.robustness.is_empty() || Some(c.robustness.as_str()) == level)
                 || c.encryption_scheme
                     .as_deref()
                     .is_some_and(|s| !matches!(s, "cenc" | "cbcs" | "cbcs-1-9"))

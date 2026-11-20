@@ -33,6 +33,7 @@ use crate::raster_link::{cross, Taken, ToRaster};
 use crate::renderer_process::{RasterUp, TabDown, TabUp};
 use crate::services::{BrowserPort, Down, RendererPort, Up, CALL_WAIT};
 use crate::tab::TabId;
+use crate::video::Picture;
 use crate::watchdog::PassMark;
 
 /// A frame the page painted: its lists, how to rasterize them, and what the compositor gets with it.
@@ -336,6 +337,7 @@ impl RasterThread {
             inbox.clone(),
             taken,
             None,
+            None,
             PassMark::default(),
         )?;
         RasterThread::encoder(id, Link::Local(inbox))
@@ -467,7 +469,9 @@ fn quit(inbox: &(Mutex<Inbox>, Condvar)) {
 
 /// Starts the raster thread of tab `id`: it takes jobs from `inbox`, sends its frames to
 /// `compositor` and gives each job's buffer to `taken` once it has decoded it.
-/// `video_ids`: for a renderer process's tab, the window's id of each of its videos.
+/// `video_ids`: for a renderer process's tab, the window's id of each of its videos, and
+/// `players` the browser's id of each of its protected players (none: its lists name none).
+#[allow(clippy::too_many_arguments)]
 fn start_raster(
     id: TabId,
     gpu: Arc<Gpu>,
@@ -475,6 +479,7 @@ fn start_raster(
     inbox: Arc<(Mutex<Inbox>, Condvar)>,
     taken: TakenSink,
     video_ids: Option<crate::services::video::VideoIds>,
+    players: Option<crate::services::cdm::RendererPlayers>,
     mark: PassMark,
 ) -> std::io::Result<()> {
     let recycler = Recycler(inbox.clone());
@@ -551,6 +556,7 @@ fn start_raster(
                             &recycler,
                             cost,
                             video_ids.as_deref(),
+                            players.as_deref(),
                         );
                     }
                     Err(e) => eprintln!("[tab {id}] raster: {e}"),
@@ -880,6 +886,8 @@ pub(crate) struct RasterEnds {
 pub(crate) struct SeamVideos {
     pub renderer: TabId,
     pub ids: crate::services::video::VideoIds,
+    /// The browser's id of each of the renderer's protected players.
+    pub players: crate::services::cdm::RendererPlayers,
 }
 
 enum HostRaster {
@@ -935,6 +943,7 @@ impl RasterHost {
                 ends.compositor.clone(),
                 Arc::new(taken),
                 Some(videos.ids),
+                Some(videos.players),
                 PassMark::default(),
             )),
         };
@@ -1182,7 +1191,7 @@ impl SeamRaster {
         compositor: std::sync::mpsc::Sender<CompInput>,
         taken: Arc<dyn Fn() + Send + Sync>,
     ) -> Option<SeamRaster> {
-        SeamRaster::start_with(id, gpu, compositor, taken, None, PassMark::default())
+        SeamRaster::start_with(id, gpu, compositor, taken, None, None, PassMark::default())
     }
 
     /// [`SeamRaster::start`] with the thread's passes marked in `mark` (the GPU process's
@@ -1195,7 +1204,8 @@ impl SeamRaster {
         video_ids: Option<crate::services::video::VideoIds>,
         mark: PassMark,
     ) -> Option<SeamRaster> {
-        SeamRaster::start_with(id, gpu, compositor, taken, video_ids, mark)
+        // (a GPU process shows no protected player: their pictures are the browser's)
+        SeamRaster::start_with(id, gpu, compositor, taken, video_ids, None, mark)
     }
 
     fn start_with(
@@ -1204,12 +1214,22 @@ impl SeamRaster {
         compositor: std::sync::mpsc::Sender<CompInput>,
         taken: Arc<dyn Fn() + Send + Sync>,
         video_ids: Option<crate::services::video::VideoIds>,
+        players: Option<crate::services::cdm::RendererPlayers>,
         mark: PassMark,
     ) -> Option<SeamRaster> {
         let inbox: Arc<(Mutex<Inbox>, Condvar)> = Arc::default();
         let sink = taken.clone();
         let sink: TakenSink = Box::new(move |_| sink());
-        match start_raster(id, gpu, compositor, inbox.clone(), sink, video_ids, mark) {
+        match start_raster(
+            id,
+            gpu,
+            compositor,
+            inbox.clone(),
+            sink,
+            video_ids,
+            players,
+            mark,
+        ) {
             Ok(()) => Some(SeamRaster { inbox, taken }),
             Err(e) => {
                 eprintln!("[tab {id}] no raster thread: {e}");
@@ -1548,6 +1568,7 @@ fn draw(
     recycler: &Recycler,
     cost: Option<(usize, f64)>,
     video_ids: Option<&(dyn Fn(VideoId) -> VideoId + Send + Sync)>,
+    players: Option<&(dyn Fn(u64) -> Option<u64> + Send + Sync)>,
 ) {
     let t = Instant::now();
     let job = job.head;
@@ -1659,12 +1680,24 @@ fn draw(
     }
     let mut videos = videos;
     if let Some(map) = video_ids {
-        // (a renderer's display list names its own videos: the compositor knows the window's)
-        for q in videos
-            .iter_mut()
-            .chain(layers.iter_mut().flat_map(|l| l.videos.iter_mut()))
-        {
-            q.video = map(q.video);
+        // (a renderer's display list names its own videos and players: the compositor knows the
+        // window's videos and the browser's players; a player not the renderer's shows nothing)
+        let mut mapped = |q: &mut crate::video::VideoQuad| match q.picture {
+            Picture::Frames(v) => {
+                q.picture = Picture::Frames(map(v));
+                true
+            }
+            Picture::Protected(p) => match players.and_then(|players| players(p)) {
+                Some(b) => {
+                    q.picture = Picture::Protected(b);
+                    true
+                }
+                None => false,
+            },
+        };
+        videos.retain_mut(&mut mapped);
+        for l in &mut layers {
+            l.videos.retain_mut(&mut mapped);
         }
     }
     let m = job.meta;
