@@ -263,6 +263,12 @@ impl selectors::parser::PseudoElement for PseudoElement {
     fn parses_as_element_backed(&self) -> bool {
         self.0 == "details-content"
     }
+
+    /// User action pseudo-classes may follow a `::-webkit-` pseudo-element (Selectors 4 §compat
+    /// makes them valid; `::-webkit-scrollbar-thumb:hover`).
+    fn accepts_state_pseudo_classes(&self) -> bool {
+        self.0.starts_with("-webkit-")
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

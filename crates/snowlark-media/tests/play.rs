@@ -348,6 +348,127 @@ fn seeks_while_paused_show_the_frame() {
     assert!(b > 150 && r < 80, "{color:?} {:?}", player.take_events());
 }
 
+/// Which second of the pattern clip a pixel is from (its background colour), if any.
+fn pattern_second(p: snowlark_paint::geom::Color) -> Option<u32> {
+    (0..4).find(|&s| {
+        let (b, g, r) = snowlark_media::win::encode::pattern_color(s);
+        let near = |a: u8, e: u8| (a as i32 - e as i32).abs() < 48;
+        near(p.b, b) && near(p.g, g) && near(p.r, r)
+    })
+}
+
+/// A script that sets `currentTime` on every animation frame (a scroll-scrubbed video) seeks
+/// again before the last seek finished. HTML §4.8.11.9: a new seek aborts the one running, so
+/// only the last one ends in `seeked`, and the element shows the frame at the last target, never
+/// one at a position given up. The player runs one seek at a time, keeps only the newest asked
+/// for while one runs, and reports the seek done once the frame there is copied.
+#[test]
+fn a_burst_of_seeks_ends_once_at_the_last_frame() {
+    let Ok(gpu) = snowlark_paint::Gpu::new() else {
+        return;
+    };
+    let body = std::fs::read(fixture()).expect("the fixture clip");
+    let (port, _) = serve(body, "video/mp4", false);
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let wake = Wake::new();
+    let videos = VideoStore::new(Some(gpu.clone()));
+    let w2 = wake.clone();
+    let player = Player::open(
+        PlayerOptions {
+            videos: Some(videos.clone()),
+            wake: Arc::new(move || {
+                *w2.0.lock().unwrap() = true;
+                w2.1.notify_all();
+            }),
+            volume: 1.0,
+            muted: true,
+            rate: 1.0,
+            audio: None,
+        },
+        Source::Resource {
+            resource: resource(
+                &net,
+                &format!("http://127.0.0.1:{port}/clip.mp4"),
+                wake.clone(),
+            ),
+            hint: None,
+        },
+    );
+    let mut events = Vec::new();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline && !events.contains(&PlayerEvent::Frame) {
+        events.extend(player.take_events());
+        wake.wait(50);
+    }
+    assert!(events.contains(&PlayerEvent::Frame), "{events:?}");
+    let slot = videos.get(player.video().unwrap()).unwrap();
+    // The first frame (second 0) shows.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline
+        && slot
+            .read_front(&gpu)
+            .ok()
+            .flatten()
+            .map(|f| pattern_second(f.pixel(10, 10)))
+            != Some(Some(0))
+    {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    // Seeks one after the other, each before the last finished: seconds 1, 2, then 3.
+    for t in [1.5, 2.5, 3.5] {
+        player.seek(t);
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    let mut seeked = 0;
+    let mut seen = Vec::new();
+    let mut last_seeked = None;
+    // The second shown a little after the seek was reported done: the frame copied by then shows
+    // once it is a copy's time old.
+    let mut shown_after = None;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline {
+        for e in player.take_events() {
+            if e == PlayerEvent::Seeked {
+                seeked += 1;
+                last_seeked = Some(Instant::now());
+            }
+        }
+        if let Ok(Some(f)) = slot.read_front(&gpu) {
+            let s = pattern_second(f.pixel(10, 10));
+            if seen.last() != Some(&s) {
+                seen.push(s);
+            }
+            if shown_after.is_none()
+                && last_seeked.is_some_and(|t| t.elapsed() > Duration::from_millis(100))
+            {
+                shown_after = Some(s);
+            }
+        }
+        if last_seeked.is_some_and(|t| t.elapsed() > Duration::from_millis(800)) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(
+        seeked, 1,
+        "one seeked for the burst; seconds shown {seen:?}"
+    );
+    assert_eq!(
+        shown_after,
+        Some(Some(3)),
+        "the frame at the target was copied before the seek was reported done: {seen:?}"
+    );
+    assert_eq!(
+        seen.last(),
+        Some(&Some(3)),
+        "the last target's frame shows: {seen:?}"
+    );
+    assert!(
+        !seen.contains(&Some(1)) && !seen.contains(&Some(2)),
+        "no frame of a seek given up shows: {seen:?}"
+    );
+}
+
 /// Plays `body` (served over HTTP) in a tab's audio group that is muted (the tests make no sound;
 /// the tab's mute is below what counts as audible).
 fn play_in_tab(

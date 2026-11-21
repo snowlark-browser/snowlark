@@ -82,6 +82,46 @@ pub enum PseudoElement {
     WebkitMeterSuboptimumValue,
     WebkitMeterEvenLessGoodValue,
 
+    // Snowlark patch: Selectors 4 §compat, `::-webkit-` pseudo-elements are valid. The parts of
+    // form controls and scrollbars that pages style under these names, which this engine does
+    // not have (they match nothing; the stylist drops their rules), then any other name. Keep
+    // them together, `WebkitInnerSpinButton` first and `UnknownWebkit` last.
+    WebkitInnerSpinButton,
+    WebkitOuterSpinButton,
+    WebkitSearchCancelButton,
+    WebkitSearchDecoration,
+    WebkitSearchResultsButton,
+    WebkitSearchResultsDecoration,
+    WebkitSliderThumb,
+    WebkitSliderRunnableTrack,
+    WebkitSliderContainer,
+    WebkitCalendarPickerIndicator,
+    WebkitClearButton,
+    WebkitColorSwatch,
+    WebkitColorSwatchWrapper,
+    WebkitDatetimeEdit,
+    WebkitDatetimeEditFieldsWrapper,
+    WebkitDatetimeEditText,
+    WebkitDatetimeEditYearField,
+    WebkitDatetimeEditMonthField,
+    WebkitDatetimeEditDayField,
+    WebkitDatetimeEditHourField,
+    WebkitDatetimeEditMinuteField,
+    WebkitDatetimeEditSecondField,
+    WebkitDatetimeEditMillisecondField,
+    WebkitDatetimeEditAmpmField,
+    WebkitDatetimeEditWeekField,
+    WebkitDetailsMarker,
+    WebkitTextfieldDecorationContainer,
+    WebkitScrollbar,
+    WebkitScrollbarThumb,
+    WebkitScrollbarTrack,
+    WebkitScrollbarTrackPiece,
+    WebkitScrollbarButton,
+    WebkitScrollbarCorner,
+    WebkitResizer,
+    UnknownWebkit,
+
     // Private, Servo-specific implemented pseudos. Only matchable in UA sheet.
     ServoTextControlInnerContainer,
     ServoTextControlInnerEditor,
@@ -97,6 +137,47 @@ pub enum PseudoElement {
 
 /// The count of all pseudo-elements.
 pub const PSEUDO_COUNT: usize = PseudoElement::ServoTableWrapper as usize + 1;
+
+/// Snowlark patch: the `::-webkit-` parts this engine parses but does not have, by name.
+const WEBKIT_PARTS: &[(&str, PseudoElement)] = {
+    use self::PseudoElement::*;
+    &[
+        ("-webkit-inner-spin-button", WebkitInnerSpinButton),
+        ("-webkit-outer-spin-button", WebkitOuterSpinButton),
+        ("-webkit-search-cancel-button", WebkitSearchCancelButton),
+        ("-webkit-search-decoration", WebkitSearchDecoration),
+        ("-webkit-search-results-button", WebkitSearchResultsButton),
+        ("-webkit-search-results-decoration", WebkitSearchResultsDecoration),
+        ("-webkit-slider-thumb", WebkitSliderThumb),
+        ("-webkit-slider-runnable-track", WebkitSliderRunnableTrack),
+        ("-webkit-slider-container", WebkitSliderContainer),
+        ("-webkit-calendar-picker-indicator", WebkitCalendarPickerIndicator),
+        ("-webkit-clear-button", WebkitClearButton),
+        ("-webkit-color-swatch", WebkitColorSwatch),
+        ("-webkit-color-swatch-wrapper", WebkitColorSwatchWrapper),
+        ("-webkit-datetime-edit", WebkitDatetimeEdit),
+        ("-webkit-datetime-edit-fields-wrapper", WebkitDatetimeEditFieldsWrapper),
+        ("-webkit-datetime-edit-text", WebkitDatetimeEditText),
+        ("-webkit-datetime-edit-year-field", WebkitDatetimeEditYearField),
+        ("-webkit-datetime-edit-month-field", WebkitDatetimeEditMonthField),
+        ("-webkit-datetime-edit-day-field", WebkitDatetimeEditDayField),
+        ("-webkit-datetime-edit-hour-field", WebkitDatetimeEditHourField),
+        ("-webkit-datetime-edit-minute-field", WebkitDatetimeEditMinuteField),
+        ("-webkit-datetime-edit-second-field", WebkitDatetimeEditSecondField),
+        ("-webkit-datetime-edit-millisecond-field", WebkitDatetimeEditMillisecondField),
+        ("-webkit-datetime-edit-ampm-field", WebkitDatetimeEditAmpmField),
+        ("-webkit-datetime-edit-week-field", WebkitDatetimeEditWeekField),
+        ("-webkit-details-marker", WebkitDetailsMarker),
+        ("-webkit-textfield-decoration-container", WebkitTextfieldDecorationContainer),
+        ("-webkit-scrollbar", WebkitScrollbar),
+        ("-webkit-scrollbar-thumb", WebkitScrollbarThumb),
+        ("-webkit-scrollbar-track", WebkitScrollbarTrack),
+        ("-webkit-scrollbar-track-piece", WebkitScrollbarTrackPiece),
+        ("-webkit-scrollbar-button", WebkitScrollbarButton),
+        ("-webkit-scrollbar-corner", WebkitScrollbarCorner),
+        ("-webkit-resizer", WebkitResizer),
+    ]
+};
 
 impl ToCss for PseudoElement {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
@@ -138,6 +219,17 @@ impl ToCss for PseudoElement {
             ServoAnonymousTableRow => "::-servo-anonymous-table-row",
             ServoTableGrid => "::-servo-table-grid",
             ServoTableWrapper => "::-servo-table-wrapper",
+            // (the name of any other `-webkit-` pseudo-element is not kept)
+            UnknownWebkit => "::-webkit-unknown",
+            ref p => {
+                dest.write_str("::")?;
+                return dest.write_str(
+                    WEBKIT_PARTS
+                        .iter()
+                        .find(|(_, q)| q == p)
+                        .map_or("-webkit-unknown", |(name, _)| name),
+                );
+            },
         })
     }
 }
@@ -168,6 +260,12 @@ impl ::selectors::parser::PseudoElement for PseudoElement {
 
     fn is_before_or_after(&self) -> bool {
         matches!(self, Self::Before | Self::After)
+    }
+
+    /// Snowlark patch: user action pseudo-classes may follow a `::-webkit-` pseudo-element
+    /// (`::-webkit-scrollbar-thumb:hover`), as in Gecko.
+    fn accepts_state_pseudo_classes(&self) -> bool {
+        self.is_unknown_webkit_pseudo_element()
     }
 }
 
@@ -213,7 +311,9 @@ impl PseudoElement {
     /// Whether this is an unknown ::-webkit- pseudo-element.
     #[inline]
     pub fn is_unknown_webkit_pseudo_element(&self) -> bool {
-        false
+        // Snowlark patch: the `::-webkit-` parts this engine does not have.
+        (PseudoElement::WebkitInnerSpinButton as u8..=PseudoElement::UnknownWebkit as u8)
+            .contains(&(*self as u8))
     }
 
     /// Whether this pseudo-element is the ::marker pseudo.
@@ -332,6 +432,8 @@ impl PseudoElement {
             | PseudoElement::ServoAnonymousTableRow
             | PseudoElement::ServoTableGrid
             | PseudoElement::ServoTableWrapper => PseudoElementCascadeType::Precomputed,
+            // (the `::-webkit-` parts this engine does not have)
+            _ => PseudoElementCascadeType::Lazy,
         }
     }
 
@@ -749,6 +851,11 @@ impl<'a, 'i> ::selectors::Parser<'i> for SelectorParser<'a> {
             "user-valid" => NonTSPseudoClass::UserValid,
             "valid" => NonTSPseudoClass::Valid,
             "visited" => NonTSPseudoClass::Visited,
+            // Snowlark patch: legacy names. `:-webkit-autofill` is HTML's own alias of `:autofill`
+            // (§4.16.3); the other two are the compat names of `:fullscreen` and `:any-link`.
+            "-webkit-autofill" => NonTSPseudoClass::Autofill,
+            "-webkit-full-screen" => NonTSPseudoClass::Fullscreen,
+            "-webkit-any-link" => NonTSPseudoClass::AnyLink,
             "-moz-meter-optimum" => NonTSPseudoClass::MozMeterOptimum,
             "-moz-meter-sub-optimum" => NonTSPseudoClass::MozMeterSubOptimum,
             "-moz-meter-sub-sub-optimum" => NonTSPseudoClass::MozMeterSubSubOptimum,
@@ -877,7 +984,25 @@ impl<'a, 'i> ::selectors::Parser<'i> for SelectorParser<'a> {
                 }
                 ServoTableWrapper
             },
-            _ => return Err(ParseError::custom(SelectorParseErrorKind::UnexpectedIdent))
+            // Snowlark patch: the legacy names of `::placeholder` and `::file-selector-button`
+            // (CSS Pseudo 4 §5.2, §5.3), then the other `::-webkit-` pseudo-elements, valid by
+            // Selectors 4 §compat (an unknown one is not supported in `@supports`, as CSS
+            // Conditional 4 §8.1's `selector()` asks).
+            "-webkit-input-placeholder" => Placeholder,
+            "-webkit-file-upload-button" => FileSelectorButton,
+            _ => {
+                if let Some((_, part)) = WEBKIT_PARTS
+                    .iter()
+                    .find(|(n, _)| n.eq_ignore_ascii_case(&name))
+                {
+                    return Ok(*part);
+                }
+                let webkit = name.len() > 8 && name.as_bytes()[..8].eq_ignore_ascii_case(b"-webkit-");
+                if webkit && !self.for_supports_rule {
+                    return Ok(UnknownWebkit);
+                }
+                return Err(ParseError::custom(SelectorParseErrorKind::UnexpectedIdent))
+            }
 
         };
 

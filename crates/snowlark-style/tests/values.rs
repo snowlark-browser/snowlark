@@ -583,6 +583,36 @@ fn pseudo_element_styles() {
     );
 }
 
+/// Selectors 4 §compat: a `::-webkit-` pseudo-element is valid, so the rule it is in (and every
+/// other selector of its list) stays; one this engine does not have matches nothing. The legacy
+/// names of `::placeholder`, `::file-selector-button`, `:autofill` (HTML §4.16.3) and
+/// `:fullscreen` select what the standard ones do.
+#[test]
+fn webkit_prefixed_pseudo_elements_and_classes() {
+    let p = Page::new(
+        "<!DOCTYPE html><style>
+           #a { color: red; }
+           span::-webkit-something-invalid, #a, ::-webkit-inner-spin-button { color: rgb(0, 1, 0); }
+           #b, ::-webkit-scrollbar-thumb:hover { color: rgb(0, 2, 0); }
+           ::-webkitfoo, #a { color: red; }
+           #c, input:-webkit-autofill { color: rgb(0, 3, 0); }
+           #d, :-webkit-full-screen { color: rgb(0, 4, 0); }
+           input::-webkit-input-placeholder { color: rgb(0, 5, 0); }
+           #a::-webkit-inner-spin-button { color: red; }
+         </style><p id=a>a</p><p id=b>b</p><p id=c>c</p><p id=d>d</p><input placeholder=x>",
+    );
+    assert_eq!(p.get("#a", "color"), "rgb(0, 1, 0)");
+    assert_eq!(p.get("#b", "color"), "rgb(0, 2, 0)");
+    assert_eq!(p.get("#c", "color"), "rgb(0, 3, 0)");
+    assert_eq!(p.get("#d", "color"), "rgb(0, 4, 0)");
+    let input = p.q("input");
+    let placeholder = p
+        .engine
+        .pseudo_style(&p.dom, &p.data, input, &PseudoElement::Placeholder)
+        .map(|v| computed::computed_property_by_name(&v, "color").unwrap());
+    assert_eq!(placeholder.as_deref(), Some("rgb(0, 5, 0)"));
+}
+
 #[test]
 fn display_none_subtrees_resolve_on_demand() {
     let p = Page::new(

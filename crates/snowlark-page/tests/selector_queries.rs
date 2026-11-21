@@ -27,6 +27,22 @@ fn eval(page: &mut Page, js: &str) -> String {
     }
 }
 
+/// Selectors 4 §compat: a `::-webkit-` pseudo-element is valid, and user action pseudo-classes may
+/// follow it; another pseudo-element may not.
+#[test]
+fn webkit_pseudo_elements_take_user_action_pseudo_classes() {
+    let mut p = page("<!doctype html><span>a</span>");
+    assert_eq!(
+        eval(
+            &mut p,
+            "const ok = s => { try { document.querySelectorAll(s); return 1 } catch (e) { return 0 } }; \
+             [ok('span::-webkit-x'), ok('span::-webkit-x:hover'), ok('span::-webkit-x:active'), \
+              ok('span::-webkit-x::before'), ok('span::-webkitx')].join()"
+        ),
+        "1,1,1,0,0"
+    );
+}
+
 #[test]
 fn a_selector_list_is_parsed_once_per_page() {
     let mut p =

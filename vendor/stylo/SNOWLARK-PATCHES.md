@@ -441,5 +441,14 @@ the source; `git log -p vendor/stylo` shows the diff.
    compatibility: `word-break: normal` with `overflow-wrap: anywhere`, which snowlark-layout's line
    breaking applies.
 
+77. **`::-webkit-` pseudo-elements and legacy pseudo-class names** (`servo/selector_parser.rs`, Selectors 4
+   §compat): any `::-webkit-` pseudo-element is valid. The form control and scrollbar parts pages style under
+   these names (`::-webkit-inner-spin-button`, `::-webkit-scrollbar-thumb` and others, by name) and any other
+   `-webkit-` name (`UnknownWebkit`, serialized as `::-webkit-unknown`; not supported in `@supports`, as in
+   Gecko) parse as pseudo-elements the stylist drops (`is_unknown_webkit_pseudo_element`), after which user
+   action pseudo-classes may follow. `::-webkit-input-placeholder` and `::-webkit-file-upload-button` are
+   `::placeholder` and `::file-selector-button`; `:-webkit-autofill`, `:-webkit-full-screen` and
+   `:-webkit-any-link` are `:autofill`, `:fullscreen` and `:any-link`.
+
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

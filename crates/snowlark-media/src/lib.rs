@@ -323,7 +323,14 @@ impl Player {
 
     /// The events since the last call.
     pub fn take_events(&self) -> Vec<PlayerEvent> {
-        std::mem::take(&mut *self.shared.events.lock().unwrap())
+        #[allow(unused_mut)]
+        let mut events = std::mem::take(&mut *self.shared.events.lock().unwrap());
+        match &self.inner {
+            #[cfg(windows)]
+            Backend::Win(p) => p.filter_events(&mut events),
+            Backend::Remote(_) => {}
+        }
+        events
     }
 
     /// The download's progress (a fetched resource; none for MSE).
