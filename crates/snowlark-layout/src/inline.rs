@@ -1002,16 +1002,43 @@ fn inline_edges<S: Style>(style: &S, cb_width: f32) -> (f32, f32) {
     )
 }
 
+/// The inline-start and -end edges (margin + border + padding) of an inline box, in logical
+/// order: the start edge is the line-left one in a left-to-right box and the line-right one in a
+/// right-to-left box (CSS Writing Modes 4 §6.4, the box's own `direction`).
+fn start_end_edges<S: Style>(style: &S, cb_width: f32) -> (f32, f32) {
+    let (left, right) = inline_edges(style, cb_width);
+    if style.direction() == Direction::Rtl {
+        (right, left)
+    } else {
+        (left, right)
+    }
+}
+
+/// Whether a piece of an inline box has its line-left and line-right edges, from whether it has
+/// its start and end edges: the start edge is the right one in a right-to-left box (CSS Writing
+/// Modes 4 §6.4), so a box broken across lines right to left has its right padding, border and
+/// margin on its first piece (CSS 2 §8.6).
+fn line_sides<S: Style>(style: &S, start: bool, end: bool) -> (bool, bool) {
+    if style.direction() == Direction::Rtl {
+        (end, start)
+    } else {
+        (start, end)
+    }
+}
+
 /// Whether an inline box start or end item has a non-zero margin, border or padding on its side.
 fn has_inline_edge<S: Style>(it: &Item<S>, cb_width: f32) -> bool {
     let e = Edges::of(&it.style, cb_width);
+    let left = e.ml() != 0.0 || e.border.left + e.padding.left != 0.0;
+    let right = e.mr() != 0.0 || e.border.right + e.padding.right != 0.0;
+    let (start, end) = if it.style.direction() == Direction::Rtl {
+        (right, left)
+    } else {
+        (left, right)
+    };
     match it.kind {
-        ItemKind::Open => {
-            it.has_start_edge && (e.ml() != 0.0 || e.border.left + e.padding.left != 0.0)
-        }
-        ItemKind::Close => {
-            it.has_end_edge && (e.mr() != 0.0 || e.border.right + e.padding.right != 0.0)
-        }
+        ItemKind::Open => it.has_start_edge && start,
+        ItemKind::Close => it.has_end_edge && end,
         _ => false,
     }
 }
@@ -1118,14 +1145,14 @@ impl<S: Style> Measure<'_, S> {
             }
             ItemKind::Open => {
                 if it.has_start_edge {
-                    inline_edges(&it.style, self.cb_width).0
+                    start_end_edges(&it.style, self.cb_width).0
                 } else {
                     0.0
                 }
             }
             ItemKind::Close => {
                 if it.has_end_edge {
-                    inline_edges(&it.style, self.cb_width).1
+                    start_end_edges(&it.style, self.cb_width).1
                 } else {
                     0.0
                 }
@@ -3208,7 +3235,7 @@ fn build_line<S: Style>(
                 level,
             } = n
             {
-                let (s, e) = inline_edges(&m.items[*item].style, m.cb_width);
+                let (s, e) = start_end_edges(&m.items[*item].style, m.cb_width);
                 let it = &m.items[*item];
                 let inner = measure_widths(children, m);
                 *width = inner
@@ -4029,19 +4056,20 @@ fn place_nodes<S: Style>(
                 };
                 let has_start = *st && it.has_start_edge;
                 let has_end = *ends && it.has_end_edge;
-                let ml = if has_start { e.ml() } else { 0.0 };
-                let mr = if has_end { e.mr() } else { 0.0 };
+                let (has_left, has_right) = line_sides(&it.style, has_start, has_end);
+                let ml = if has_left { e.ml() } else { 0.0 };
+                let mr = if has_right { e.mr() } else { 0.0 };
                 let border = Sides::new(
                     e.border.top,
-                    if has_end { e.border.right } else { 0.0 },
+                    if has_right { e.border.right } else { 0.0 },
                     e.border.bottom,
-                    if has_start { e.border.left } else { 0.0 },
+                    if has_left { e.border.left } else { 0.0 },
                 );
                 let padding = Sides::new(
                     e.padding.top,
-                    if has_end { e.padding.right } else { 0.0 },
+                    if has_right { e.padding.right } else { 0.0 },
                     e.padding.bottom,
-                    if has_start { e.padding.left } else { 0.0 },
+                    if has_left { e.padding.left } else { 0.0 },
                 );
                 let x0 = *cursor + ml;
                 let content_top = bl - a;

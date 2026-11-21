@@ -31,7 +31,7 @@
 //! it), then regenerated once each; the tree is renumbered once. Clean boxes keep their cached layout
 //! results, so the next layout reuses every untouched subtree's fragments.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -107,6 +107,43 @@ impl ElementChange {
             decorations: false,
             attributes: true,
         }
+    }
+}
+
+/// The changes of a batch with one entry per element. An element can be listed more than once
+/// (changes collected over several style updates before one layout update, or a style and an
+/// attribute change): its boxes take its current style once, with what all of its changes need
+/// (the strongest damage, every flag). Applied one after the other, a paint-only change listed
+/// first would give the boxes the new style, and a later layout change would then compare that
+/// style with itself and keep content prepared for the old one.
+fn merged_changes(list: &[ElementChange]) -> std::borrow::Cow<'_, [ElementChange]> {
+    if list.len() < 2 {
+        return std::borrow::Cow::Borrowed(list);
+    }
+    let mut seen: HashMap<NodeId, usize> = HashMap::with_capacity(list.len());
+    let mut merged: Option<Vec<ElementChange>> = None;
+    for (i, c) in list.iter().enumerate() {
+        match seen.get(&c.node) {
+            None => {
+                let at = merged.as_ref().map_or(i, |m| m.len());
+                seen.insert(c.node, at);
+                if let Some(m) = &mut merged {
+                    m.push(*c);
+                }
+            }
+            Some(&at) => {
+                let m = merged.get_or_insert_with(|| list[..i].to_vec());
+                let e = &mut m[at];
+                e.damage = e.damage.max(c.damage);
+                e.contents |= c.contents;
+                e.decorations |= c.decorations;
+                e.attributes |= c.attributes;
+            }
+        }
+    }
+    match merged {
+        Some(m) => std::borrow::Cow::Owned(m),
+        None => std::borrow::Cow::Borrowed(list),
     }
 }
 
@@ -460,8 +497,8 @@ impl<S: Style> LayoutTree<S> {
             }
         }
 
-        // Restyled elements.
-        for change in &changes.restyled {
+        // Restyled elements, each once.
+        for change in merged_changes(&changes.restyled).iter() {
             let el = change.node;
             if !mine(el) || !dom.is_element(el) {
                 continue;

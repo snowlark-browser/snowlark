@@ -1707,9 +1707,11 @@ impl Engine {
     }
 
     /// The content clips on `el`'s containing block chain within its document, from `el` outward,
-    /// stopping before `stop`; and whether `stop` is on that chain. A fixed-position box leaves its
-    /// document's boxes (its containing block is the viewport); an absolutely positioned box skips
-    /// the boxes up to its positioned containing block. The root element and the body propagate
+    /// stopping before `stop`; and whether `stop` is on that chain. An absolutely positioned box
+    /// skips the boxes up to its containing block (positioned, or transformed, filtered or
+    /// contained), a fixed-position box those up to one that is transformed, filtered or contained,
+    /// and without one leaves its document's boxes (its containing block is the viewport), as
+    /// [`scroll_shift`] finds them. The root element and the body propagate
     /// their overflow to the viewport, so they do not clip here. `None` when `el` has no layout.
     pub(crate) fn view_containing_clips(
         &self,
@@ -1724,19 +1726,25 @@ impl Engine {
             let mut position = r.element_style(el).map(|s| s.position());
             let mut n = r.flat_parent(&dom, el);
             while let Some(id) = n {
-                if Some(id) == stop {
-                    return (out, true);
-                }
-                if position == Some(Position::Fixed) {
-                    return (out, false);
-                }
                 let style = r.element_style(id);
                 let pos = style
                     .as_ref()
                     .map(|s| s.position())
                     .unwrap_or(Position::Static);
-                let in_chain = position != Some(Position::Absolute) || pos != Position::Static;
+                // (a transformed box, or one with a filter or containment, is the containing
+                // block of its positioned descendants, static or not: CSS Transforms 1 §2)
+                let establishes = style.as_ref().is_some_and(|s| s.establishes_fixed_cb());
+                let in_chain = match position {
+                    Some(Position::Absolute) => pos != Position::Static || establishes,
+                    Some(Position::Fixed) => establishes,
+                    _ => true,
+                };
                 if in_chain {
+                    // (an element root is an ancestor on the chain, or the target is not
+                    // intersecting: Intersection Observer §3.2.8)
+                    if Some(id) == stop {
+                        return (out, true);
+                    }
                     position = Some(pos);
                     let clips = style
                         .as_ref()

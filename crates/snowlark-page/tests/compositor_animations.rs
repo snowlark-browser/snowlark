@@ -278,12 +278,13 @@ fn events_of_a_seek_in_an_event_handler_still_fire() {
          })();",
     );
     let deadline = Instant::now() + Duration::from_millis(2000);
-    assert!(
-        page.run_until(deadline, |p| p.global_string("done").as_deref()
-            == Some("yes"))
-    );
+    let done = page.run_until(deadline, |p| {
+        p.global_string("done").as_deref() == Some("yes")
+    });
+    let log = eval(&mut page, "log.join(',')");
+    assert!(done, "all the events arrive: {log}");
     assert_eq!(
-        eval(&mut page, "log.join(',')"),
+        log,
         [
             "animationstart 0,w animationstart,animationstart 0,w animationstart",
             "animationiteration 100,w animationiteration,animationiteration 100,w animationiteration",

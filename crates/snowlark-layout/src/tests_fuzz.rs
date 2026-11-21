@@ -595,8 +595,9 @@ fn random_changes_update_the_box_tree_like_a_fresh_build() {
         .and_then(|v| v.parse().ok())
         .unwrap_or(200);
     let verbose = std::env::var("FUZZ_VERBOSE").is_ok();
-    // (seeds past the default count that found bugs: text turning into white space, kept in place)
-    let found = [1501, 2080, 5405].into_iter().filter(|&s| s > count);
+    // (seeds past the default count that found bugs: text turning into white space, kept in place;
+    // one element listed twice, a paint-only change first)
+    let found = [1501, 1526, 2080, 5405].into_iter().filter(|&s| s > count);
     for seed in (1..=count).chain(found) {
         if only.is_some_and(|o| o != seed) {
             continue;

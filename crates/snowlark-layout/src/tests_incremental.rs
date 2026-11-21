@@ -123,6 +123,49 @@ fn a_paint_change_takes_the_new_style_without_layout() {
     let _ = a;
 }
 
+/// One element listed twice in a batch (changes collected over two style updates before one layout
+/// update), a paint-only change first: its boxes take the strongest damage, so a font size change
+/// after a colour change shapes its text again.
+#[test]
+fn an_element_listed_twice_takes_the_strongest_change() {
+    let (mut t, [_, b, span, _]) = page();
+    t.run(400.0, 400.0);
+    let width = |f: &F, dom: &snowlark_dom::Dom| -> f32 {
+        let mut w = 0.0;
+        f.walk(&mut |fr, _| {
+            if let FragmentKind::Text(text) = &fr.kind {
+                if text.node.is_some_and(|n| dom.parent(n) == Some(span)) {
+                    w += fr.size.width;
+                }
+            }
+        });
+        w
+    };
+    let f = t.relayout();
+    assert_eq!(width(&f, &t.doc.dom), 40.0);
+    let red = Color::rgb(200, 0, 0);
+    t.doc.restyle(span, |s| {
+        s.color = red;
+        s.font_size = 20.0;
+    });
+    let changes = TreeChanges {
+        restyled: vec![
+            ElementChange::restyled(span, BoxDamage::Paint, false),
+            ElementChange::restyled(span, BoxDamage::Relayout, false),
+        ],
+        ..Default::default()
+    };
+    update(&mut t, changes);
+    let f = t.relayout();
+    assert_eq!(width(&f, &t.doc.dom), 80.0);
+    assert_eq!(colours(&f, &t.doc.dom, span), (vec![red], vec![red]));
+    let mut fresh = LayoutTree::new();
+    fresh.build(&t.doc.dom, t.doc.document, &t.doc.styles);
+    let full = fresh.layout(&t.text, t.viewport);
+    assert_eq!(f.dump(), full.dump());
+    let _ = b;
+}
+
 /// Line breaking measures text with the `letter-spacing` and `word-spacing` its items read when
 /// they were prepared: a change of either (layout damage) prepares them again, so the text is
 /// measured and wrapped with the new spacing.

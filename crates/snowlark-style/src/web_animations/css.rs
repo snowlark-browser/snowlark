@@ -182,13 +182,41 @@ pub(crate) fn transition_timing(t: &Transition) -> (Timing, f64) {
     (timing, t.start_time - t.delay)
 }
 
+/// Times this close (ms) are the same time where an event's phase is decided: a running
+/// animation's local time is `now - start`, and that difference rounds, so a seek to an iteration
+/// boundary or `finish()` could read back a hair before it and its event wait for the next
+/// frame that moves the time, or never come for a paused or finished animation. One microsecond,
+/// as precise as the clocks are.
+const TIME_TOLERANCE: f64 = 0.001;
+
+/// `local` (ms), or the iteration boundary or end of `timing` within [`TIME_TOLERANCE`] of it.
+fn snapped_to_boundary(timing: &Timing, local: f64) -> f64 {
+    let Some(d) = timing.duration.filter(|d| *d > 0.0) else {
+        return local;
+    };
+    let end = timing.delay + timing.iterations * d;
+    if end.is_finite() && (local - end).abs() <= TIME_TOLERANCE {
+        return end;
+    }
+    let k = ((local - timing.delay) / d).round();
+    if k < 0.0 || k > timing.iterations {
+        return local;
+    }
+    let boundary = timing.delay + k * d;
+    if (local - boundary).abs() <= TIME_TOLERANCE {
+        boundary
+    } else {
+        local
+    }
+}
+
 /// The phase and current iteration of `timing` at `local` (ms).
 fn phase_at(timing: &Timing, local: f64) -> (Phase, f64) {
     let both = Timing {
         fill: FillMode::Both,
         ..timing.clone()
     };
-    let c = both.compute(Some(local), false);
+    let c = both.compute(Some(snapped_to_boundary(timing, local)), false);
     (c.phase, c.current_iteration.unwrap_or(0.0))
 }
 
@@ -274,13 +302,13 @@ pub(crate) fn timings(
     }
 }
 
-/// Puts a CSS animation at local time `local` (ms), paused or playing, at timeline time `now` (s):
-/// script controls it through its `CSSAnimation` object.
-pub(crate) fn control_animation(a: &mut Animation, now: f64, local: f64, paused: bool) {
-    let t = local / 1000.0;
-    let d = a.duration;
-    let (_, max) = iteration_of(a);
-    let active = t - a.delay;
+/// Where a CSS animation put at local time `t` (s) is, from `t` alone: its current iteration
+/// (within its iteration count `max`) and how far into that iteration it is (s; negative in its
+/// delay). Not by way of the timeline time: `(now - t) + delay + cur * d` rounds, so a seek to the
+/// start of an iteration could read back as the end of the one before (its paused progress a
+/// little under 0), and its `animationiteration` never come.
+fn seek_position(t: f64, delay: f64, d: f64, max: f64) -> (f64, f64) {
+    let active = t - delay;
     let mut cur = if active <= 0.0 || d <= 0.0 {
         0.0
     } else {
@@ -289,8 +317,17 @@ pub(crate) fn control_animation(a: &mut Animation, now: f64, local: f64, paused:
     if max.is_finite() && max > 0.0 {
         cur = cur.min(max - 1.0).max(0.0);
     }
-    let start = now - t;
-    a.started_at = start + a.delay + cur * d;
+    (cur, active - cur * d)
+}
+
+/// Puts a CSS animation at local time `local` (ms), paused or playing, at timeline time `now` (s):
+/// script controls it through its `CSSAnimation` object.
+pub(crate) fn control_animation(a: &mut Animation, now: f64, local: f64, paused: bool) {
+    let t = local / 1000.0;
+    let d = a.duration;
+    let (_, max) = iteration_of(a);
+    let (cur, into) = seek_position(t, a.delay, d, max);
+    a.started_at = now - into;
     a.iteration_state = match a.iteration_state {
         KeyframesIterationState::Finite(_, m) => KeyframesIterationState::Finite(cur, m),
         KeyframesIterationState::Infinite(_) => KeyframesIterationState::Infinite(cur),
@@ -311,11 +348,7 @@ pub(crate) fn control_animation(a: &mut Animation, now: f64, local: f64, paused:
         (b, _) => b,
     };
     a.state = if paused {
-        AnimationState::Paused(if d > 0.0 {
-            (now - a.started_at) / d
-        } else {
-            0.0
-        })
+        AnimationState::Paused(if d > 0.0 { into / d } else { 0.0 })
     } else if a.started_at > now {
         AnimationState::Pending
     } else {
@@ -532,6 +565,54 @@ mod tests {
             .collect();
         let expected: Vec<&str> = names[..31].iter().map(String::as_str).collect();
         assert_eq!(canceled, expected);
+    }
+
+    /// A seek to the start of an iteration is at that iteration, exactly: a paused animation's
+    /// local time, `delay + (cur + progress) * duration`, reads it back whatever the timeline time
+    /// (by way of the timeline time, 0.0263 s read 99999.99999999999 ms for a seek to 100 s).
+    #[test]
+    fn a_seek_to_an_iteration_start_reads_back_exactly() {
+        for (t, delay, d, max, cur) in [
+            (100.0, 0.0, 100.0, 2.0, 1.0),
+            (3.0, 1.0, 0.5, f64::INFINITY, 4.0),
+            (250.0, 50.0, 100.0, 3.0, 2.0),
+        ] {
+            let (c, into) = seek_position(t, delay, d, max);
+            assert_eq!((c, into), (cur, 0.0), "{t} {delay} {d}");
+            assert_eq!(delay + (c + into / d) * d, t);
+        }
+        // In its delay: the first iteration, before its start.
+        assert_eq!(seek_position(0.5, 1.0, 2.0, 1.0), (0.0, -0.5));
+        // Past its last iteration: in the last one.
+        assert_eq!(seek_position(9.0, 0.0, 2.0, 2.0), (1.0, 7.0));
+    }
+
+    /// A local time a rounding error short of an iteration boundary or the end is at it (a running
+    /// animation's is `now - start`): its iteration and end events come.
+    #[test]
+    fn events_come_at_a_local_time_a_rounding_error_short() {
+        let mut t = CssEventTracker::default();
+        let mut out = Vec::new();
+        let tm = timing(0.0, 100_000.0, 2.0);
+        t.see(key(false), &tm, 0.0, 50_000.0, false, &mut out);
+        t.finish(0.05, &mut out);
+        out.clear();
+        t.see(key(false), &tm, 0.0, 99_999.999_999_999_99, false, &mut out);
+        t.finish(0.1, &mut out);
+        assert_eq!(kinds(&out), vec![CssEventKind::AnimationIteration]);
+        out.clear();
+        t.see(
+            key(false),
+            &tm,
+            0.0,
+            199_999.999_999_999_97,
+            false,
+            &mut out,
+        );
+        t.finish(0.2, &mut out);
+        assert_eq!(kinds(&out), vec![CssEventKind::AnimationEnd]);
+        // A time clearly before the boundary is not at it.
+        assert_eq!(snapped_to_boundary(&tm, 99_999.9), 99_999.9);
     }
 
     #[test]

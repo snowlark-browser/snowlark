@@ -273,3 +273,36 @@ fn clips_and_roots_under_transforms_clip_where_they_are_drawn() {
         "inroot:true:1:300:50 moved:true:1:200:13 scaled:true:0.5:0:50"
     );
 }
+
+/// A transformed box is the containing block of its absolutely positioned and fixed descendants
+/// (CSS Transforms 1 §2), so its clip is on their containing block chain (Intersection Observer
+/// "compute the intersection" step 3), static or not; and an element root a target's chain skips is
+/// not an ancestor on it (§3.2.8: the target is not intersecting).
+#[test]
+fn a_transformed_ancestor_clips_its_positioned_descendants() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><body style='margin:0'>         <div style='width:100px;height:50px;overflow:hidden;transform:translateX(0)'>           <div><div id=abs style='position:absolute;top:100px;width:50px;height:50px'></div></div></div>         <div style='margin-left:300px;width:100px;height:50px;overflow:hidden;transform:translateX(0)'>           <div id=fixed style='position:fixed;top:100px;width:50px;height:50px'></div></div>         <div style='position:relative'>           <div id=root style='width:100px;height:300px;overflow:hidden'>             <div id=skipping style='position:absolute;top:0;width:50px;height:50px'></div></div></div>",
+    );
+    eval(
+        &mut page,
+        r#"
+        var log = [];
+        const cb = es => { for (const e of es) log.push(e.target.id + ':' + e.isIntersecting); };
+        const io = new IntersectionObserver(cb);
+        io.observe(document.getElementById('abs'));
+        io.observe(document.getElementById('fixed'));
+        new IntersectionObserver(cb, { root: document.getElementById('root') })
+          .observe(document.getElementById('skipping'));
+        'ok'
+        "#,
+    );
+    page.run_until_settled(Duration::from_secs(5));
+    let mut log: Vec<String> = eval(&mut page, "log.join(' ')")
+        .split(' ')
+        .map(str::to_owned)
+        .collect();
+    log.sort();
+    assert_eq!(log.join(" "), "abs:false fixed:false skipping:false");
+}

@@ -39,13 +39,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   element, and `align-self: normal` still stretches a button that is a flex or grid item. (ref 216)
 - **Smaller layout differences.** A flex container holding a `display: none` image counts that image's size, and a
   visually hidden absolutely positioned span in an inline-flex label reports an empty rect. (ref 31)
-- **Incremental layout differs from a fresh build in rare cases.** Found with the layout fuzz tests past their default
-  seeds: an in-place restyle can leave the layout different from a fresh build. (ref 585)
-- **Inline boxes across lines, right to left.** In right-to-left text, an inline box that wraps across lines has its
-  right padding and border on its last line's piece rather than its first. (ref 586)
-- **Geometry under transforms.** A frame's container is placed by its untransformed content box, and an absolutely
-  positioned element's containing block chain skips a static transformed ancestor, so that ancestor's clip is missed.
-  (ref 99)
+- **Geometry under transforms.** For Intersection Observer, a frame's container is placed by its untransformed content
+  box. (ref 99)
 - **Geometry reads near split inlines.** An inline box split around a block still walks the tree on geometry reads,
   which costs time on large pages. (ref 97)
 - **Block details.** `align-content` on block containers that are not independent formatting contexts is not applied,
@@ -211,8 +206,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   too slow to crash. The Media Source test `an_append_ends_once_however_the_media_side_reports_it` fails in a debug
   build (its `update` and `updateend` events arrive after the check) and passes in optimised builds. (ref 56, 91, 560)
 - **Other test-suite problems.** Debug-profile tests overflow their stack in `snowlark-ipc` and `snowlark-js` (ref 562);
-  `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572), and its test
-  `compositor_animations::events_of_a_seek_in_an_event_handler_still_fire` fails now and then (ref 594); the WPT files
+  `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572); the WPT files
   `navigation-timing/test-document-open.html`, `fetch/api/abort/general.any.html` and
   `css/css-pseudo/text-selection.html` vary from run to run (ref 60, 563, 595); a headless
   Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py` can read one arm slower than the other for the same binary when the arms share a core (ref 509).

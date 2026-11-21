@@ -14,6 +14,13 @@
   "/css/cssom/cssimportrule-sheet-identity.html": [
    "CSSImportRule has different sheets even if referencing the same URL"
   ],
+  "/fetch/api/abort/general.any.html": [
+   "response.arrayBuffer() rejects if already aborted",
+   "response.blob() rejects if already aborted"
+  ],
+  "/fetch/api/abort/general.any.worker.html": [
+   "response.json() rejects if already aborted"
+  ],
   "/navigation-timing/test-document-open.html": [
    "domContentLoadedEventEnd is the same after document open.",
    "domContentLoadedEventStart is the same after document open.",
@@ -29,7 +36,7 @@
   ]
  },
  "reftests": [],
- "built": "2026-11-17",
+ "built": "2026-11-21",
  "from": [
   "l3-base-1.jsonl",
   "l3-base-2.jsonl",
@@ -97,7 +104,10 @@
   "q-e9-font-r3.jsonl",
   "q-e9-calc-r1.jsonl",
   "q-e9-calc-r2.jsonl",
-  "q-e9-calc-r3.jsonl"
+  "q-e9-calc-r3.jsonl",
+  "bf6-flake-r1.jsonl",
+  "bf6-flake-r2.jsonl",
+  "bf6-flake-r3.jsonl"
  ],
  "note": "Subtests and reftests whose result differed across runs of one binary; the gate reports their losses apart."
 }

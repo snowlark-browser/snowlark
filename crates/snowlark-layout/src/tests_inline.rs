@@ -666,3 +666,64 @@ fn balancing_does_not_break_inside_words() {
     assert_eq!(lines.len(), 2, "{lines:?}");
     assert_eq!(lines[1], r(0.0, 10.0, 70.0, 10.0));
 }
+
+/// The pieces of `node`'s inline box from top to bottom: (border box, padding).
+fn inline_pieces(f: &F, node: NodeId) -> Vec<(Rect, snowlark_paint::Sides)> {
+    let mut out = Vec::new();
+    f.walk(&mut |fr, at| {
+        if let crate::fragment::FragmentKind::Box(b) = &fr.kind {
+            if b.node == Some(node) {
+                out.push((
+                    Rect::new(at.x, at.y, fr.size.width, fr.size.height),
+                    b.padding,
+                ));
+            }
+        }
+    });
+    out.sort_by(|a, b| a.0.y.total_cmp(&b.0.y));
+    out
+}
+
+#[test]
+fn a_broken_inline_box_has_its_start_edge_on_its_first_piece_right_to_left() {
+    // CSS 2 §8.6, CSS Writing Modes 4 §6.4: the start edge of a right-to-left box is its right
+    // one, so a box broken across lines right to left has its right padding on its first piece
+    // and none on its last (Chrome: the same).
+    for rtl in [false, true] {
+        let mut t = T::new();
+        let r0 = t.root();
+        let p = t.doc.block(r0, |s| {
+            if rtl {
+                s.direction = Direction::Rtl;
+            }
+        });
+        t.doc.text(p, "aa ");
+        let a = t.doc.span(p, |s| {
+            s.padding[1] = LengthPercentage::px(16.0);
+            s.padding[3] = LengthPercentage::px(4.0);
+        });
+        t.doc.text(a, "bbbb bbbb bbbb");
+        t.doc.text(p, " cc");
+        let f = t.run(100.0, 400.0);
+        let pieces = inline_pieces(&f, a);
+        assert!(pieces.len() >= 2, "{pieces:?}");
+        let (first, last) = (pieces[0].1, pieces[pieces.len() - 1].1);
+        let (start, end) = if rtl {
+            (first.right, last.left)
+        } else {
+            (first.left, last.right)
+        };
+        assert_eq!(
+            (start, end),
+            (if rtl { 16.0 } else { 4.0 }, if rtl { 4.0 } else { 16.0 }),
+            "rtl {rtl}: {pieces:?}"
+        );
+        // (no edges where the box is broken)
+        let (first_end, last_start) = if rtl {
+            (first.left, last.right)
+        } else {
+            (first.right, last.left)
+        };
+        assert_eq!((first_end, last_start), (0.0, 0.0), "rtl {rtl}: {pieces:?}");
+    }
+}
