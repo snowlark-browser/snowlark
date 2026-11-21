@@ -2258,6 +2258,9 @@ impl ls::Style for RenderStyle {
             W::Normal => ls::WordBreak::Normal,
             W::BreakAll => ls::WordBreak::BreakAll,
             W::KeepAll => ls::WordBreak::KeepAll,
+            // (CSS Text 3 §5.2: `normal` with `overflow-wrap: anywhere`, which line breaking
+            // applies)
+            W::BreakWord => ls::WordBreak::BreakWord,
         }
     }
 

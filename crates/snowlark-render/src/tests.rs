@@ -504,6 +504,20 @@ fn font_variant_longhands_enable_their_opentype_features() {
     assert!(d.s("n").font_features().is_empty());
 }
 
+/// CSS Text 3 §5.2: `word-break: break-word` is kept for compatibility; it computes as itself and
+/// breaks as `word-break: normal` with `overflow-wrap: anywhere`.
+#[test]
+fn word_break_break_word() {
+    let d = doc(
+        "<!DOCTYPE html><style>#a { word-break: break-word } #b { word-break: break-word;
+        word-break: nonsense }</style><div id=a></div><div id=b></div>",
+    );
+    assert_eq!(d.s("a").word_break(), WordBreak::BreakWord);
+    assert_eq!(d.s("a").overflow_wrap(), OverflowWrap::Normal);
+    // (a later invalid declaration is dropped: break-word stays)
+    assert_eq!(d.s("b").word_break(), WordBreak::BreakWord);
+}
+
 #[test]
 fn text_properties() {
     let d = doc("<!DOCTYPE html><style>

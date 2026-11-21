@@ -579,10 +579,17 @@ fn word_break_and_overflow_wrap() {
     t.doc.text(ow, "bbbbb");
     let normal = t.doc.block(r0, |s| s.width = SizeValue::px(30.0));
     t.doc.text(normal, "ccccc");
+    // (CSS Text 3 §5.2: `word-break: break-word` breaks as `overflow-wrap: anywhere`)
+    let bw = t.doc.block(r0, |s| {
+        s.width = SizeValue::px(30.0);
+        s.word_break = WordBreak::BreakWord;
+    });
+    t.doc.text(bw, "ddddd");
     let f = t.run(200.0, 200.0);
     assert_eq!(rect(&f, ba).height, 30.0);
     assert_eq!(rect(&f, ow).height, 20.0);
     assert_eq!(rect(&f, normal).height, 10.0);
+    assert_eq!(rect(&f, bw).height, 20.0);
 }
 
 /// CSS Text 3 §4.1.3: `pre-wrap`'s spaces at a line end hang, so they do not count in the

@@ -436,5 +436,10 @@ the source; `git log -p vendor/stylo` shows the diff.
    rgb(0, 65, 198) and black), the colors the engine paints a selection in where no `::selection` colors are
    declared. The dark scheme keeps upstream's values.
 
+76. **`word-break: break-word` in the servo build** (`values/specified/text.rs`, CSS Text 3 §5.2): upstream
+   parses the value only with the `gecko` feature. It is the deprecated value the spec keeps for
+   compatibility: `word-break: normal` with `overflow-wrap: anywhere`, which snowlark-layout's line
+   breaking applies.
+
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.
