@@ -1492,6 +1492,8 @@ impl TabDriver for PageDriver {
             DevtoolsCommand::Attach(on) => {
                 self.devtools.attached = on;
                 self.devtools.netlog.set_recording(on);
+                // (uncaught errors print with their call frames while the tools are open)
+                self.page.capture_error_stacks(on);
                 if on {
                     self.send_tree();
                 } else {

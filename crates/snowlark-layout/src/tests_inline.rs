@@ -478,6 +478,29 @@ fn inline_split_around_a_block_reports_the_block_too() {
 }
 
 #[test]
+fn inline_split_around_a_transformed_block_reports_its_untransformed_box() {
+    // <picture><img style="display:block; transform:scale(2)"></picture>: the block's transform
+    // is not one of the inline's (CSSOM View §6.1), so the inline reports the block's layout box;
+    // the block's own rect is transformed.
+    let mut t = T::new();
+    let r0 = t.root();
+    let p = t.doc.block(r0, |_| {});
+    let a = t.doc.span(p, |_| {});
+    let d = t.doc.block(a, |s| {
+        s.width = SizeValue::px(20.0);
+        s.height = SizeValue::px(10.0);
+        s.margin[3] = LengthPercentageAuto::px(30.0);
+        s.transform = Some(snowlark_paint::Matrix::scale(2.0, 2.0));
+    });
+    t.run(400.0, 400.0);
+    let rects = t.layout.client_rects(a);
+    assert!(rects.contains(&r(0.0, 0.0, 50.0, 10.0)), "{rects:?}");
+    assert!(rects.iter().all(|r| r.y >= 0.0), "{rects:?}");
+    // scaled about its center (40, 5)
+    assert_eq!(t.layout.client_rects(d), vec![r(20.0, -5.0, 40.0, 20.0)]);
+}
+
+#[test]
 fn fallback_fonts_count_for_normal_line_height() {
     // CSS Inline 3 §5.1: with `line-height: normal`, the metrics of the fonts the text falls back
     // to count. Ahem has no CJK glyphs: a system font takes 中, and its ascent and descent are

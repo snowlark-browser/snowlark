@@ -382,6 +382,59 @@ fn positioned_content_of_a_sticky_scroller_moves_with_it() {
 }
 
 #[test]
+fn an_inline_box_on_two_lines_positions_its_background_once_for_all_its_pieces() {
+    // CSS Backgrounds 3 §3.9, CSS Fragmentation 3 §5.4 (`box-decoration-break: slice`): the
+    // pieces are positioned as one box side by side. A link's icon at `right`, after its
+    // `padding-right`, is drawn once at the end of the last piece, not at the end of each piece.
+    use snowlark_paint::{ImageId, Rect};
+    let mut t = T::new();
+    let r0 = t.root();
+    let p = t.doc.block(r0, |s| s.width = SizeValue::px(70.0));
+    let a = t.doc.span(p, |s| {
+        s.padding[1] = LengthPercentage::px(10.0);
+        s.background_layers = vec![BackgroundLayer {
+            image: Image::raster(ImageId(4), 8.0, 8.0),
+            position: (
+                LengthPercentage::percent(100.0),
+                LengthPercentage::percent(0.0),
+            ),
+            repeat: (BackgroundRepeat::NoRepeat, BackgroundRepeat::NoRepeat),
+            origin: BoxArea::BorderBox,
+            ..BackgroundLayer::default()
+        }];
+    });
+    t.doc.text(a, "aaaa bbbb");
+    let f = t.run(200.0, 200.0);
+    let pieces = t.layout.client_rects(a);
+    assert_eq!(pieces.len(), 2, "{pieces:?}");
+    let mut b = DisplayListBuilder::new();
+    paint(&f, &t.text, Size::new(200.0, 200.0), &mut b);
+    let list = b.build();
+    let images: Vec<Rect> = list
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            Item::Image { image, dest, .. } if *image == ImageId(4) => Some(*dest),
+            _ => None,
+        })
+        .collect();
+    let right = |r: &Rect| r.x + r.width;
+    // (the second piece's end, where the icon is; never over the first piece's last letters)
+    assert!(
+        images
+            .iter()
+            .any(|d| right(d) == right(&pieces[1]) && d.y == pieces[1].y),
+        "{images:?} {pieces:?}"
+    );
+    assert!(
+        !images
+            .iter()
+            .any(|d| right(d) == right(&pieces[0]) && d.y == pieces[0].y),
+        "{images:?} {pieces:?}"
+    );
+}
+
+#[test]
 fn a_mask_group_holds_the_mask_layers_then_the_masked_content() {
     use snowlark_paint::{Color, ImageId};
     let mut t = T::new();

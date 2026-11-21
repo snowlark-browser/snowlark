@@ -1481,6 +1481,77 @@ fn foreign_content_namespaces() {
     assert_eq!(dom.namespace(math), &ns!(mathml));
 }
 
+/// The parser marks the elements on its stack of open elements, including those the adoption agency
+/// takes off it (`<i>` inside a `<b>` closed by `</b>`), and HTML "select the indicated part" finds an
+/// id, a percent-decoded id, an `a` element's name, the top of the document, or nothing.
+#[test]
+fn the_parser_marks_open_elements_and_fragments_select_the_indicated_part() {
+    let cell = RefCell::new(Dom::new());
+    let doc = cell.borrow_mut().create_document(DocumentKind::Html);
+    let mut parser = HtmlParser::new(&cell, doc, ParseOptions::default());
+    parser.push_str(
+        "<div id=done>a</div><b><i id=inner>x</b><a name=anchor>y</a><p id=s%C3%A9>z</p>\
+         <div id=open>",
+    );
+    assert_eq!(parser.run(), ParseStep::NeedInput);
+    let open = |dom: &Dom, id: &str| {
+        let Some(Some(el)) = dom.indexed_element_by_id(doc, id) else {
+            panic!("no #{id}")
+        };
+        dom.element_flags(el) & element_flags::OPEN_IN_PARSER != 0
+    };
+    {
+        let dom = cell.borrow();
+        assert!(!open(&dom, "done"));
+        assert!(
+            !open(&dom, "inner"),
+            "the adoption agency's removal is a pop"
+        );
+        assert!(open(&dom, "open"));
+        let root = dom.document_element(doc).unwrap();
+        assert_ne!(dom.element_flags(root) & element_flags::OPEN_IN_PARSER, 0);
+        let id = |id: &str| dom.indexed_element_by_id(doc, id).unwrap().unwrap();
+        assert_eq!(
+            dom.indicated_part(doc, "done"),
+            IndicatedPart::Element(id("done"))
+        );
+        // (the raw fragment first: the `p`'s id is literally "s%C3%A9")
+        assert_eq!(
+            dom.indicated_part(doc, "s%C3%A9"),
+            IndicatedPart::Element(id("s%C3%A9"))
+        );
+        assert!(matches!(
+            dom.indicated_part(doc, "anchor"),
+            IndicatedPart::Element(a) if dom.get_attribute(a, "name") == Some("anchor")
+        ));
+        assert_eq!(dom.indicated_part(doc, ""), IndicatedPart::TopOfDocument);
+        assert_eq!(
+            dom.indicated_part(doc, "%54op"),
+            IndicatedPart::TopOfDocument
+        );
+        assert_eq!(dom.indicated_part(doc, "missing"), IndicatedPart::None);
+    }
+    parser.push_str("<p id=caf%C3%A9>");
+    assert_eq!(parser.run(), ParseStep::NeedInput);
+    {
+        // (no element has the raw fragment "caf%25C3%25A9" decoded once: "caf%C3%A9" does)
+        let dom = cell.borrow();
+        let p = dom
+            .indexed_element_by_id(doc, "caf%C3%A9")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            dom.indicated_part(doc, "caf%25C3%25A9"),
+            IndicatedPart::Element(p)
+        );
+    }
+    let _ = parser.finish();
+    let dom = cell.borrow();
+    let root = dom.document_element(doc).unwrap();
+    assert_eq!(dom.element_flags(root) & element_flags::OPEN_IN_PARSER, 0);
+    assert!(!open(&dom, "open"));
+}
+
 #[test]
 fn incremental_parser_stops_at_scripts() {
     let cell = RefCell::new(Dom::new());

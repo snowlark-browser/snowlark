@@ -826,6 +826,55 @@ impl DisplayList {
         )
     }
 
+    /// The rectangle a path is, when it is one closed rectangle along the axes (corners in order;
+    /// its last line back to the start may be left to the close): a clip by it can be a rectangle
+    /// clip, antialiased and not snapped to pixels.
+    pub fn path_rect(&self, r: PathRange) -> Option<Rect> {
+        let (verbs, points) = self.path(r);
+        let mut corners: [Point; 5] = [Point::ZERO; 5];
+        let mut n = 0;
+        for (i, &v) in verbs.iter().enumerate() {
+            match PathVerb::from_u8(v)? {
+                PathVerb::Move if i == 0 => {}
+                PathVerb::Line if i > 0 && n < 5 => {}
+                PathVerb::Close if i == verbs.len() - 1 => break,
+                _ => return None,
+            }
+            corners[n] = *points.get(n)?;
+            n += 1;
+        }
+        if n == 5 && corners[4] == corners[0] {
+            n = 4;
+        }
+        if n != 4
+            || points.len()
+                != verbs
+                    .iter()
+                    .filter(|&&v| v != PathVerb::Close as u8)
+                    .count()
+        {
+            return None;
+        }
+        // (each side along an axis, alternating: a rectangle, not a bow tie)
+        for i in 0..4 {
+            let (a, b, c) = (corners[i], corners[(i + 1) % 4], corners[(i + 2) % 4]);
+            let first_horizontal = a.y == b.y && a.x != b.x;
+            let first_vertical = a.x == b.x && a.y != b.y;
+            let then_vertical = b.x == c.x && b.y != c.y;
+            let then_horizontal = b.y == c.y && b.x != c.x;
+            if !((first_horizontal && then_vertical) || (first_vertical && then_horizontal)) {
+                return None;
+            }
+        }
+        let (a, c) = (corners[0], corners[2]);
+        Some(Rect::new(
+            a.x.min(c.x),
+            a.y.min(c.y),
+            (a.x - c.x).abs(),
+            (a.y - c.y).abs(),
+        ))
+    }
+
     /// A stroke's dash lengths.
     pub fn dashes(&self, r: DashRange) -> &[f32] {
         &self.paths.dashes[r.start as usize..(r.start + r.len) as usize]
@@ -4130,6 +4179,89 @@ impl<'a> Dec<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A closed rectangle along the axes is a rectangle (corners either way round, the line back
+    /// to the start given or left to the close); a bow tie, a slanted or curved side, an open
+    /// polyline of three points or a second subpath is not.
+    #[test]
+    fn a_path_along_the_axes_with_four_corners_is_a_rectangle() {
+        let p = Point::new;
+        let rect = |els: &[PathEl]| {
+            let mut b = DisplayListBuilder::new();
+            let range = b.add_path(els).unwrap();
+            b.build().path_rect(range)
+        };
+        let (m, l, c) = (PathEl::MoveTo, PathEl::LineTo, PathEl::Close);
+        let want = Some(Rect::new(1.5, 2.0, 8.5, 3.25));
+        assert_eq!(
+            rect(&[
+                m(p(1.5, 2.0)),
+                l(p(10.0, 2.0)),
+                l(p(10.0, 5.25)),
+                l(p(1.5, 5.25)),
+                c
+            ]),
+            want
+        );
+        assert_eq!(
+            rect(&[
+                m(p(10.0, 5.25)),
+                l(p(10.0, 2.0)),
+                l(p(1.5, 2.0)),
+                l(p(1.5, 5.25)),
+                l(p(10.0, 5.25)),
+                c
+            ]),
+            want
+        );
+        assert_eq!(
+            rect(&[
+                m(p(0.0, 0.0)),
+                l(p(10.0, 10.0)),
+                l(p(10.0, 0.0)),
+                l(p(0.0, 10.0)),
+                c
+            ]),
+            None
+        );
+        assert_eq!(
+            rect(&[
+                m(p(0.0, 0.0)),
+                l(p(10.0, 1.0)),
+                l(p(10.0, 10.0)),
+                l(p(0.0, 10.0)),
+                c
+            ]),
+            None
+        );
+        assert_eq!(
+            rect(&[
+                m(p(0.0, 0.0)),
+                PathEl::QuadTo(p(5.0, 0.0), p(10.0, 0.0)),
+                l(p(10.0, 10.0)),
+                l(p(0.0, 10.0)),
+                c
+            ]),
+            None
+        );
+        assert_eq!(
+            rect(&[m(p(0.0, 0.0)), l(p(10.0, 0.0)), l(p(10.0, 10.0)), c]),
+            None
+        );
+        assert_eq!(
+            rect(&[
+                m(p(0.0, 0.0)),
+                l(p(10.0, 0.0)),
+                l(p(10.0, 10.0)),
+                l(p(0.0, 10.0)),
+                c,
+                m(p(20.0, 0.0)),
+                l(p(30.0, 0.0)),
+                c
+            ]),
+            None
+        );
+    }
 
     /// A composited layer whose content reads its backdrop is painted with what is under it: it
     /// is not split off (it scrolls with the document, so nothing is pinned). A fixed one is a

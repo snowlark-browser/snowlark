@@ -101,6 +101,12 @@ pub(crate) fn value_to_key<'s>(
         return Ok(Conv::Key(Key::Binary(out)));
     }
     if input.is_array() {
+        // (an array nested deeper than keys may cross between processes is an invalid value, a
+        // "DataError", rather than a key that overflows a thread's stack: the specification sets
+        // no depth, and engines refuse very deep keys)
+        if seen.len() >= snowlark_idb::wire::WIRE_KEY_DEPTH as usize {
+            return Ok(Conv::InvalidValue);
+        }
         let arr: v8::Local<v8::Object> = input.try_into().map_err(|_| ())?;
         let len_key = rt::name(scope, "length");
         let len = arr.get(scope, len_key.into()).ok_or(())?;

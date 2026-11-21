@@ -277,6 +277,7 @@ impl<S: Style> Refresh<'_, S> {
                     content: b.content.clone(),
                     containing: b.containing.copied(),
                     clip_reference: b.clip_reference.copied(),
+                    strip: b.strip.copied(),
                     stitched: b.stitched.clone(),
                 }),
                 FragmentKind::Text(t) => {
@@ -851,7 +852,9 @@ impl<S: Style> LayoutTree<S> {
             let parent = cb.parent.expect("a child box has a parent");
             match (cb.kind, cb.node, cb.pseudo) {
                 (BoxKind::Text, Some(t), None) => {
-                    if dom.parent(t) == Some(el) {
+                    // (a text node removed and freed since the last update keeps its box until the
+                    // removal regenerates the container: nothing to restyle)
+                    if dom.is_alive(t) && dom.parent(t) == Some(el) {
                         self.swap_style(c, style.clone(), stats, paint);
                     }
                 }

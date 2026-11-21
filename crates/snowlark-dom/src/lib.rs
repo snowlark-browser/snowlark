@@ -43,6 +43,7 @@ mod xml_serialize;
 
 pub use dom::Dom;
 pub use error::{DomError, DomResult};
+pub use ids::IndicatedPart;
 pub use mutation::NodeOrString;
 pub use node::{
     element_flags, qualified_name, Attr, AttrList, CustomElementState, DocumentData, DocumentKind,

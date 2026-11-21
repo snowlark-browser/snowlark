@@ -180,7 +180,8 @@ impl<S: Style> LayoutTree<S> {
     }
 
     /// A text node's data changed. Returns `false` when the node has no box (its text was white space
-    /// dropped between blocks): call [`LayoutTree::children_changed`] on its parent instead.
+    /// dropped between blocks), or when it becomes or ceases to be such white space: call
+    /// [`LayoutTree::children_changed`] on its parent instead.
     pub fn text_changed(&mut self, dom: &Dom, node: NodeId) -> bool {
         let Some(id) = self.tree.box_of(node) else {
             return false;
@@ -192,18 +193,15 @@ impl<S: Style> LayoutTree<S> {
         if b.kind != BoxKind::Text {
             return false;
         }
-        // Text becoming (or ceasing to be) collapsible white space can change which anonymous
-        // block boxes exist among blocks: that is a structural change.
+        // Text becoming (or ceasing to be) white space can change whether it has a box and which
+        // anonymous boxes exist: collapsible white space generates nothing among blocks (CSS 2
+        // §9.2.1.1, CSS Text 3 §4.1.1), and a run of any white space generates no flex or grid
+        // item (css-flexbox-1 §4, css-grid-2 §6). That is a structural change, whatever box holds it.
         let collapsible = |s: &str| build::is_collapsible_whitespace(&b.style, s);
-        let was_ws = b.text().is_some_and(collapsible);
-        if was_ws != collapsible(text) {
-            let owner_anonymous = b.parent.is_some_and(|p| {
-                let pb = self.tree.b(p);
-                pb.is_anonymous() || pb.kind == BoxKind::Inline
-            });
-            if owner_anonymous {
-                return false;
-            }
+        let white_space = |s: &str| s.bytes().all(|c| matches!(c, b' ' | b'\t' | b'\n' | b'\r'));
+        let old = b.text().unwrap_or("");
+        if collapsible(old) != collapsible(text) || white_space(old) != white_space(text) {
+            return false;
         }
         let b = self.tree.b_mut(id);
         b.data = boxes_text(text);
@@ -329,6 +327,7 @@ impl<S: Style> LayoutTree<S> {
             stats: LayoutStats::default(),
             clamp: None,
             clipped_inlines: false,
+            striped_inlines: false,
             pct_height_basis: None,
             frame,
             icb: viewport,
@@ -413,6 +412,7 @@ impl<S: Style> LayoutTree<S> {
                 content: BoxContent::None,
                 containing: Default::default(),
                 clip_reference: Default::default(),
+                strip: Default::default(),
                 stitched: None,
             }),
             children,
@@ -668,21 +668,26 @@ impl<S: Style> LayoutTree<S> {
                     .and_then(|b| tree.split_owners.get(&b))
                     .is_some_and(|owners| owners.contains(&node))
         };
+        // (`visit` gets the fragment's map with its own transform, and the map of its place in its
+        // parent, without it)
         fn walk<S: Style>(
             f: &Fragment<S>,
             m: snowlark_paint::Matrix,
             transformed: bool,
+            placed: (snowlark_paint::Matrix, bool),
             transforms: bool,
-            visit: &mut impl FnMut(&Fragment<S>, &dyn Fn(Rect) -> Rect),
+            visit: &mut impl FnMut(&Fragment<S>, &dyn Fn(Rect) -> Rect, &dyn Fn(Rect) -> Rect),
         ) {
-            let map = |r: Rect| {
-                if transformed {
-                    m.apply_rect(&r)
-                } else {
-                    r.translate(m.dx, m.dy)
+            let mapper = |m: snowlark_paint::Matrix, transformed: bool| {
+                move |r: Rect| {
+                    if transformed {
+                        m.apply_rect(&r)
+                    } else {
+                        r.translate(m.dx, m.dy)
+                    }
                 }
             };
-            visit(f, &map);
+            visit(f, &mapper(m, transformed), &mapper(placed.0, placed.1));
             for c in &f.children {
                 let offset = snowlark_paint::Matrix::translation(c.offset.x, c.offset.y);
                 let local = c
@@ -690,15 +695,24 @@ impl<S: Style> LayoutTree<S> {
                     .as_box()
                     .filter(|_| transforms)
                     .and_then(|b| b.used_transform(c.fragment.size));
+                let placed = (offset.then(&m), transformed);
                 match local {
                     Some(t) => walk(
                         &c.fragment,
                         t.then(&offset).then(&m),
                         true,
+                        placed,
                         transforms,
                         visit,
                     ),
-                    None => walk(&c.fragment, offset.then(&m), transformed, transforms, visit),
+                    None => walk(
+                        &c.fragment,
+                        placed.0,
+                        transformed,
+                        placed,
+                        transforms,
+                        visit,
+                    ),
                 }
             }
         }
@@ -708,8 +722,9 @@ impl<S: Style> LayoutTree<S> {
                 root,
                 snowlark_paint::Matrix::IDENTITY,
                 false,
+                (snowlark_paint::Matrix::IDENTITY, false),
                 transforms,
-                &mut |f, map| {
+                &mut |f, map, placed| {
                     walked += 1;
                     let backdrop = lookup::is_backdrop(f);
                     let own = f.node() == Some(node);
@@ -721,11 +736,13 @@ impl<S: Style> LayoutTree<S> {
                         out.push(map(Rect::new(0.0, 0.0, f.size.width, f.size.height)));
                     } else if block_piece {
                         // (the block's inline-axis margins count too, as in Chrome, whose inline box
-                        // holds the block's margin box on its line)
+                        // holds the block's margin box on its line; the block's own transform is
+                        // left out, as for the inline's own pieces: it transforms the block, not
+                        // the inline, CSSOM View §6.1)
                         let s = &f.as_box().expect("box fragment").style;
                         let ml = s.margin(style::Side::Left).resolve_or_zero(0.0);
                         let mr = s.margin(style::Side::Right).resolve_or_zero(0.0);
-                        out.push(map(Rect::new(
+                        out.push(placed(Rect::new(
                             -ml,
                             0.0,
                             f.size.width + ml + mr,

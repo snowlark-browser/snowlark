@@ -795,7 +795,15 @@ where
 
             let Some((furthest_block_index, furthest_block)) = maybe_furthest_block else {
                 // 10.
-                self.open_elems.borrow_mut().truncate(fmt_elem_stack_index);
+                // (Snowlark patch: the elements removed from the stack are reported to the sink)
+                let removed: Vec<Handle> = self
+                    .open_elems
+                    .borrow_mut()
+                    .drain(fmt_elem_stack_index..)
+                    .collect();
+                for elem in removed.iter().rev() {
+                    self.sink.pop(elem);
+                }
                 self.active_formatting.borrow_mut().remove(fmt_elem_index);
                 return;
             };
@@ -830,13 +838,17 @@ where
                 if inner_counter > 3 {
                     self.position_in_active_formatting(&node)
                         .map(|position| self.active_formatting.borrow_mut().remove(position));
-                    self.open_elems.borrow_mut().remove(node_index);
+                    // (Snowlark patch: reported to the sink)
+                    let removed = self.open_elems.borrow_mut().remove(node_index);
+                    self.sink.pop(&removed);
                     continue;
                 }
 
                 let Some(node_formatting_index) = self.position_in_active_formatting(&node) else {
                     // 13.6.
-                    self.open_elems.borrow_mut().remove(node_index);
+                    // (Snowlark patch: reported to the sink)
+                    let removed = self.open_elems.borrow_mut().remove(node_index);
+                    self.sink.pop(&removed);
                     continue;
                 };
 
@@ -1468,7 +1480,9 @@ where
 
         match push {
             PushFlag::Push => self.push(&elem),
-            PushFlag::NoPush => (),
+            // (Snowlark patch: an element inserted and immediately popped, as a void element, is
+            // reported to the sink as popped)
+            PushFlag::NoPush => self.sink.pop(&elem),
         }
         // FIXME: Remove from the stack if we can't append?
         elem

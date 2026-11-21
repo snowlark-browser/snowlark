@@ -173,6 +173,11 @@ pub struct BoxFragment<S: Style> {
     /// (CSS Masking 1 does not say; what browsers do). Set by the inline layout that placed the
     /// pieces, after it placed them.
     pub clip_reference: ClipReferenceCell,
+    /// On a piece of an inline box on several lines that has background images: the border,
+    /// padding and content boxes of all its pieces side by side as one box, relative to this
+    /// fragment, where the images are positioned (CSS Backgrounds 3 §3.9, CSS Fragmentation 3
+    /// §5.4: `box-decoration-break: slice`). Set by the inline layout that placed the pieces.
+    pub strip: StripCell,
     /// On the first piece of a box that block fragmentation split (a multi-column container's
     /// columns): the box's scrollable overflow in its own coordinates as if it were not split, which
     /// is what its scroll size measures (the pieces stitched together).
@@ -240,6 +245,25 @@ impl ClipReferenceCell {
     /// A cell of its own with the same boxes.
     pub fn copied(&self) -> ClipReferenceCell {
         ClipReferenceCell(std::sync::RwLock::new(self.get()))
+    }
+}
+
+/// See [`BoxFragment::strip`]: the border, padding and content boxes.
+#[derive(Debug, Default)]
+pub struct StripCell(std::sync::RwLock<Option<[Rect; 3]>>);
+
+impl StripCell {
+    pub fn get(&self) -> Option<[Rect; 3]> {
+        *self.0.read().unwrap_or_else(|e| e.into_inner())
+    }
+
+    pub fn set(&self, boxes: Option<[Rect; 3]>) {
+        *self.0.write().unwrap_or_else(|e| e.into_inner()) = boxes;
+    }
+
+    /// A cell of its own with the same boxes.
+    pub fn copied(&self) -> StripCell {
+        StripCell(std::sync::RwLock::new(self.get()))
     }
 }
 

@@ -802,6 +802,59 @@ fn a_style_sheets_load_event_waits_for_its_imports() {
     );
 }
 
+/// HTML "the link element": a `link` removed while its style sheet is fetched processes nothing
+/// (no sheet, no `load`), and one whose `href` changed processes only the new sheet (one `load`).
+#[test]
+fn a_superseded_style_sheet_fetch_fires_nothing() {
+    let mut slow = resource("text/css", "p { color: rgb(255, 0, 0) }");
+    slow.delay = Duration::from_millis(500);
+    let mut first = resource("text/css", "p { color: rgb(255, 0, 0) }");
+    first.delay = Duration::from_millis(400);
+    let server = Server::start(vec![
+        ("/", resource("text/html", "<!doctype html><p>x")),
+        ("/removed.css", slow),
+        ("/first.css", first),
+        (
+            "/second.css",
+            resource("text/css", "p { color: rgb(0, 128, 0) }"),
+        ),
+    ]);
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered_page(&net);
+    load(&mut page, server.url("/"));
+    settle(&mut page);
+    eval(
+        &mut page,
+        "window.ev = []; const on = e => ev.push(e.target.id + ':' + e.type); \
+         for (const [id, href] of [['removed', '/removed.css'], ['changed', '/first.css']]) { \
+           const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet'; \
+           l.href = href; l.onload = l.onerror = on; document.head.append(l); }",
+    );
+    // (both fetches are at the server, their responses delayed, before they are superseded)
+    let start = std::time::Instant::now();
+    while (server.hits("/removed.css") == 0 || server.hits("/first.css") == 0)
+        && start.elapsed() < Duration::from_secs(10)
+    {
+        run_ms(&mut page, 5);
+    }
+    assert_eq!(eval(&mut page, "ev.join(' ')"), "");
+    eval(
+        &mut page,
+        "document.getElementById('removed').remove(); \
+         document.getElementById('changed').href = '/second.css';",
+    );
+    run_ms(&mut page, 1000);
+    assert_eq!(server.hits("/removed.css"), 1);
+    assert_eq!(server.hits("/first.css"), 1);
+    assert_eq!(
+        eval(
+            &mut page,
+            "ev.join(' ') + ' ' + getComputedStyle(document.querySelector('p')).color"
+        ),
+        "changed:load rgb(0, 128, 0)"
+    );
+}
+
 /// Runs the page for `ms` milliseconds.
 fn run_ms(page: &mut Page, ms: u64) {
     let start = std::time::Instant::now();

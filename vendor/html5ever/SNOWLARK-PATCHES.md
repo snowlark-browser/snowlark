@@ -21,9 +21,12 @@ shows the diff.
    (and not remembered as the form element pointer).
 5. **`input` in a `select` fragment** is ignored, not inserted (`tree_builder/rules.rs`).
 6. **Pops reach the sink** (`tree_builder/mod.rs`, `rules.rs`): every element popped off the stack of open
-   elements is reported with `TreeSink::pop` (upstream skipped `pop_until`, `pop_until_current` and
-   truncations), so the sink runs "maybe clone an option into selectedcontent" for every option pop,
-   including those at the end of input.
+   elements is reported with `TreeSink::pop` (upstream skipped `pop_until`, `pop_until_current`,
+   truncations and the adoption agency's removals in its steps 10, 13.5 and 13.6; an element inserted
+   without being pushed, as a void element, which HTML pushes and pops at once, is reported as
+   popped), so the sink runs
+   "maybe clone an option into selectedcontent" for every option pop, including those at the end of
+   input, and knows which elements are still open (`link rel=expect`).
 
 7. **Tags in one scan** (`tokenizer/mod.rs`, a speed change with no behaviour change): in the tag open
    state, a whole tag that sits in the front input chunk and that the tag, attribute name and attribute

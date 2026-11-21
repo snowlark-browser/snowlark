@@ -493,6 +493,9 @@ struct Doc {
     /// HTML "render-blocking element set": the `<link rel=stylesheet>` elements whose sheets
     /// the first rendering waits for.
     render_blocking: HashSet<NodeId>,
+    /// The `<link rel=expect>` elements of the render-blocking element set (HTML link type
+    /// "expect"): each blocks until the element its URL indicates is parsed ([`expect_link_blocks`]).
+    expect_blocking: HashSet<NodeId>,
     /// A sheet of the parsed `<head>` (a `<style>` or a render-blocking `<link>`) exists, so `@import`s
     /// in flight (their critical subresources) block rendering too.
     import_blockers: Vec<NodeId>,
@@ -737,6 +740,66 @@ fn has_token(value: &str, token: &str) -> bool {
     value
         .split_ascii_whitespace()
         .any(|t| t.eq_ignore_ascii_case(token))
+}
+
+/// HTML link type "expect", "process internal resource link" step 5: whether `link` is to block
+/// rendering now (otherwise rendering is unblocked on it). Its `href` must give the document's URL
+/// with a fragment, and the part that fragment indicates must not be an element the document's
+/// parser has finished (not an element at all, as the top of the document or a missing id, blocks
+/// until parsing ends). A URL without a fragment indicates nothing to wait for: it does not block.
+fn expect_link_blocks(doc: &Doc, dom: &Dom, link: NodeId) -> bool {
+    use snowlark_dom::element_flags::OPEN_IN_PARSER;
+    if !dom.is_alive(link)
+        || !dom.is_connected(link)
+        || dom.node_document(link) != doc.document
+        || !dom.is_html_element_named(link, &local_name!("link"))
+    {
+        return false;
+    }
+    // (the document's current readiness is "loading": its parser has not popped the root yet)
+    let loading = dom
+        .document_element(doc.document)
+        .is_some_and(|root| dom.element_flags(root) & OPEN_IN_PARSER != 0);
+    if !loading {
+        return false;
+    }
+    let attr = |name| dom.get_attribute(link, name);
+    // (an internal resource link of type "expect", and potentially render-blocking: its `blocking`
+    // attribute has `render`; an expect link is not implicitly potentially render-blocking)
+    if !attr("rel").is_some_and(|r| has_token(r, "expect"))
+        || !attr("blocking").is_some_and(|b| has_token(b, "render"))
+    {
+        return false;
+    }
+    let Some(href) = attr("href") else {
+        return false;
+    };
+    let base = Renderer::base_url(doc);
+    let Ok(url) = base.join(href.trim()) else {
+        return false;
+    };
+    let Some(fragment) = url.fragment() else {
+        return false;
+    };
+    let mut without = url.clone();
+    without.set_fragment(None);
+    let mut doc_url = doc.url.clone();
+    doc_url.set_fragment(None);
+    if without != doc_url {
+        return false;
+    }
+    if !srcset::media_matches(
+        doc.engine.stylist().device(),
+        doc.engine.stylist().quirks_mode(),
+        &style::stylesheets::UrlExtraData::from(base.clone()),
+        attr("media").unwrap_or(""),
+    ) {
+        return false;
+    }
+    match dom.indicated_part(doc.document, fragment) {
+        snowlark_dom::IndicatedPart::Element(el) => dom.element_flags(el) & OPEN_IN_PARSER != 0,
+        _ => true,
+    }
 }
 
 /// Whether box generation or layout may read an attribute of `el` directly, rather than through
@@ -1319,6 +1382,7 @@ impl Renderer {
             origin: Instant::now(),
             timeline_origin: Instant::now(),
             render_blocking: HashSet::new(),
+            expect_blocking: HashSet::new(),
             import_blockers: Vec::new(),
             rendered: false,
             canvases: HashMap::new(),
@@ -2932,6 +2996,7 @@ impl Renderer {
                 _ => {}
             }
         }
+        Self::process_expect_links(d, &dom, reactions);
         // Changes inside a disconnected subtree (an element built before it is inserted, as most
         // script-built content is) are neither discovered nor kept for the box tree: nothing of it
         // is rendered, and its insertion (`discover_roots`, the new parent's children) looks at the
@@ -3160,6 +3225,68 @@ impl Renderer {
         stats
     }
 
+    /// HTML link type "expect": "process internal resource link" for each `link` that a batch of DOM
+    /// changes connected or changed an attribute of (block or unblock rendering on it), then "process
+    /// internal resource links" for those in the render-blocking element set (the parser's pops
+    /// since the last batch, "finish parsing the children", can satisfy them).
+    ///
+    /// "Block rendering" adds a link only while the document allows adding render-blocking
+    /// elements (no body yet). The batch can come after the parser made the body: a link the parser
+    /// inserted outside the body (in the head, before the body existed) was inserted while it
+    /// allowed adding.
+    fn process_expect_links(d: &mut Doc, dom: &Dom, reactions: &[&Reaction]) {
+        if d.rendered {
+            d.expect_blocking.clear();
+            return;
+        }
+        let body = dom.body(d.document);
+        let allows_adding = dom.is_html_document(d.document) && body.is_none();
+        let mut changes: smallvec::SmallVec<[(NodeId, bool, bool); 4]> = smallvec::SmallVec::new();
+        for r in reactions {
+            let (link, inserted) = match r {
+                Reaction::Inserted {
+                    node,
+                    connected: true,
+                    ..
+                } => (*node, true),
+                Reaction::AttributeChanged {
+                    element,
+                    namespace: None,
+                    ..
+                } => (*element, false),
+                _ => continue,
+            };
+            if !dom.is_html_element_named(link, &local_name!("link")) {
+                continue;
+            }
+            let may_add = allows_adding
+                || (inserted
+                    && dom.is_html_document(d.document)
+                    && dom.element_flags(link) & snowlark_dom::element_flags::PARSER_INSERTED != 0
+                    && body.is_some_and(|b| !dom.ancestors(link).any(|a| a == b)));
+            let blocks = expect_link_blocks(d, dom, link);
+            changes.push((link, blocks, may_add));
+        }
+        for (link, blocks, may_add) in changes {
+            if !blocks {
+                d.expect_blocking.remove(&link);
+            } else if may_add {
+                d.expect_blocking.insert(link);
+            }
+        }
+        if !d.expect_blocking.is_empty() {
+            let done: smallvec::SmallVec<[NodeId; 4]> = d
+                .expect_blocking
+                .iter()
+                .copied()
+                .filter(|&n| !expect_link_blocks(d, dom, n))
+                .collect();
+            for n in done {
+                d.expect_blocking.remove(&n);
+            }
+        }
+    }
+
     /// HTML "render-blocked": the document's render-blocking element set is non-empty (here: a
     /// render-blocking `<link>`'s sheet, or an `@import` of a `<head>` sheet, is in flight) or the
     /// document allows adding render-blocking elements (a text/html document without a body), and the
@@ -3194,7 +3321,13 @@ impl Renderer {
                 .values()
                 .any(|e| matches!(e, ImportEntry::Pending));
         let allows_adding = dom.is_html_document(doc.document) && dom.body(doc.document).is_none();
-        links || imports || allows_adding
+        // (an expect link whose target was parsed since the last DOM change, or whose document
+        // finished parsing, is unblocked: `dom_changed` then removes it)
+        let expect = doc
+            .expect_blocking
+            .iter()
+            .any(|&n| expect_link_blocks(doc, &dom, n));
+        links || imports || allows_adding || expect
     }
 
     /// The document timeline's current time.
@@ -5016,7 +5149,8 @@ impl Renderer {
 
     /// CSSOM `getComputedStyle(node, pseudo).getPropertyValue(name)` for a pseudo-element
     /// (`::before`, `::after`, `::marker`...): the computed value (pseudo-elements have no used
-    /// values here). `None` when the element or the pseudo-element has no style.
+    /// values here), whether or not the pseudo-element generates a box. `None` when the element
+    /// has no style.
     pub fn resolved_pseudo_property(
         &self,
         node: NodeId,
@@ -5026,7 +5160,9 @@ impl Renderer {
         let doc = self.doc.as_deref()?;
         let dom = doc.dom.borrow();
         let id = snowlark_style::computed::property_id(name)?;
-        let values = doc.engine.pseudo_style(&dom, &doc.data, node, pseudo)?;
+        let values = doc
+            .engine
+            .cssom_pseudo_style(&dom, &doc.data, node, pseudo)?;
         Some(snowlark_style::computed::computed_property(&values, &id))
     }
 
@@ -5450,6 +5586,7 @@ impl Renderer {
         doc.img_state.retain(|n, _| !freed.contains(n));
         doc.scroll.retain(|n, _| !freed.contains(n));
         doc.render_blocking.retain(|n| !freed.contains(n));
+        doc.expect_blocking.retain(|n| !freed.contains(n));
         doc.canvases.retain(|n, _| !freed.contains(n));
         doc.media.retain(|n, _| !freed.contains(n));
         doc.video_frames.retain(|n, _| !freed.contains(n));

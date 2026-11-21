@@ -414,6 +414,16 @@ impl Page {
         }
     }
 
+    /// Whether V8 records each error's call frames when the error is made, for the developer
+    /// tools' line of an uncaught exception or rejection: on while the tools are open (it costs
+    /// every error made, so it is off otherwise). Pages observe nothing of it (`stack` is
+    /// unchanged).
+    pub fn capture_error_stacks(&mut self, on: bool) {
+        // (as many frames as a developer tools front end asks for by default)
+        self.isolate
+            .set_capture_stack_trace_for_uncaught_exceptions(on, 200);
+    }
+
     pub fn engine(&self) -> &Rc<Engine> {
         &self.engine
     }

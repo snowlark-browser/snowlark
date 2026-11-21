@@ -862,6 +862,10 @@ impl Engine {
         if particular && self.is_frame_container(el) {
             self.frame_removed(el);
         }
+        // (a removed `link` does not process the style sheet it was fetching: no sheet, no `load`)
+        if self.dom().is_html_element_named(el, &local_name!("link")) {
+            self.loader.borrow_mut().sheet_fetches.remove(&el);
+        }
         self.slot_removing_steps(el, old_parent);
     }
 

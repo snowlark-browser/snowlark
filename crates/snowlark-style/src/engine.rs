@@ -4296,6 +4296,68 @@ impl StyleEngine {
         Some(style)
     }
 
+    /// The style `getComputedStyle(element, pseudo)` reads (CSSOM §6.7.1: a pseudo-element's
+    /// computed values whether or not it generates a box): [`StyleEngine::pseudo_style`]'s, and
+    /// for a pseudo-element no rule creates (a `::before` with no rule, or whose `content` is
+    /// `none`), the style it has with no rules: inherited from the element, initial otherwise.
+    /// `None` for an element without a style, or an anonymous-box pseudo-element.
+    pub fn cssom_pseudo_style(
+        &self,
+        dom: &Dom,
+        data: &StyleData,
+        element: NodeId,
+        pseudo: &PseudoElement,
+    ) -> Option<Arc<ComputedValues>> {
+        let primary = self.computed_style(dom, data, element)?;
+        let style = if pseudo.is_eager() {
+            if data.styles(element).is_some() {
+                data.slot(element)?
+                    .data
+                    .borrow()
+                    .styles
+                    .pseudos
+                    .get(pseudo)
+                    .cloned()
+            } else {
+                self.resolve_on_demand(dom, data, element)
+                    .pseudos
+                    .get(pseudo)
+                    .cloned()
+            }
+        } else if pseudo.is_lazy() {
+            let entered = !thread_state::get().is_layout();
+            if entered {
+                thread_state::enter(ThreadState::LAYOUT);
+            }
+            let style = self.guards_and_view(dom, data, |shared, view| {
+                self.stylist.lazily_compute_pseudo_element_style(
+                    &shared.guards,
+                    view.element(element),
+                    pseudo,
+                    RuleInclusion::All,
+                    &primary,
+                    false,
+                    None,
+                )
+            });
+            if entered {
+                thread_state::exit(ThreadState::LAYOUT);
+            }
+            style
+        } else {
+            return None;
+        };
+        Some(style.unwrap_or_else(|| {
+            style::properties::StyleBuilder::for_inheritance(
+                self.stylist.device(),
+                Some(&self.stylist),
+                Some(&primary),
+                Some(pseudo),
+            )
+            .build()
+        }))
+    }
+
     /// The style of a part of `element`'s internal tree (`::-webkit-progress-bar`, the meter's value
     /// part...): the rules for `pseudo` matched against `element`, inheriting from `parent` (the part
     /// it is in, or the element itself), with `inline`, the declarations the element sets on the part,

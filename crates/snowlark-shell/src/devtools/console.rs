@@ -14,6 +14,8 @@ use snowlark_paint::{Color, DisplayListBuilder, Point, Rect};
 use super::{chip, field_style, Action, Colors, FieldId, Scroll, ROW, TEXT, TOOLBAR};
 use crate::address::TextField;
 use crate::chrome::{glyph, Face, Fonts};
+use crate::driver::Clipboard;
+use crate::text_area;
 use crate::widgets;
 
 use super::protocol::DevtoolsCommand;
@@ -23,6 +25,8 @@ const MAX_ITEMS: usize = 5000;
 /// The most lines a message shows.
 const MAX_LINES: usize = 40;
 const INPUT_H: f32 = 26.0;
+/// The most lines of the input shown at once; a longer input shows the ones around its caret.
+const MAX_INPUT_LINES: usize = 8;
 /// The distance between the lines of a message: a line of `TEXT` monospaced text at its `normal`
 /// line height (12 px Consolas is 14.05 px), so that box-drawing characters on consecutive lines
 /// join. A message is at least a [`ROW`] tall, its lines centred in it.
@@ -176,9 +180,11 @@ struct Parts {
     input: Rect,
 }
 
-fn parts(body: Rect) -> Parts {
+/// The body's parts, the input as tall as `input_rows` lines.
+fn parts(body: Rect, input_rows: usize) -> Parts {
     let bar = Rect::new(body.x, body.y, body.width, TOOLBAR);
-    let input = Rect::new(body.x, body.bottom() - INPUT_H, body.width, INPUT_H);
+    let input_h = (INPUT_H + input_rows.saturating_sub(1) as f32 * LINE).min(body.height);
+    let input = Rect::new(body.x, body.bottom() - input_h, body.width, input_h);
     Parts {
         bar,
         clear: Rect::new(bar.x + 4.0, bar.y, 28.0, bar.height),
@@ -192,6 +198,16 @@ fn parts(body: Rect) -> Parts {
         ),
         input,
     }
+}
+
+/// The text of the input in a part's input rectangle (after the prompt sign).
+fn input_field(p: &Parts) -> Rect {
+    Rect::new(
+        p.input.x + 24.0,
+        p.input.y,
+        p.input.width - 32.0,
+        p.input.height,
+    )
 }
 
 const CHIPS: [&str; 5] = ["Verbose", "Info", "Warnings", "Errors", "Preserve log"];
@@ -403,6 +419,107 @@ impl ConsoleView {
         tops.partition_point(|&t| t <= y).saturating_sub(1)
     }
 
+    /// The body's parts for the input as it is.
+    fn layout(&self, body: Rect) -> Parts {
+        parts(body, self.input_rows())
+    }
+
+    /// How many of the input's lines show (the input grows with its lines, up to
+    /// [`MAX_INPUT_LINES`]).
+    fn input_rows(&self) -> usize {
+        self.input
+            .text()
+            .split('\n')
+            .count()
+            .clamp(1, MAX_INPUT_LINES)
+    }
+
+    /// The line of the input holding its caret.
+    fn input_caret_row(&self) -> usize {
+        self.input.text()[..self.input.caret()]
+            .matches('\n')
+            .count()
+    }
+
+    /// The first of the input's lines shown: the caret's line stays in view.
+    fn input_top(&self) -> usize {
+        (self.input_caret_row() + 1).saturating_sub(self.input_rows())
+    }
+
+    /// The caret index in the input at `p`, the input's text drawn in `field`.
+    fn input_index_at(&self, fonts: &Fonts, field: Rect, p: Point) -> usize {
+        let text = self.input.text();
+        if !text.contains('\n') {
+            let style = field_style(true, true, "", Face::Mono);
+            return widgets::field_index_at(fonts, &self.input, field, p.x, &style);
+        }
+        let row = ((p.y - field.y - (INPUT_H - LINE) / 2.0) / LINE)
+            .floor()
+            .max(0.0) as usize;
+        let row = self.input_top() + row.min(self.input_rows() - 1);
+        let mut start = 0;
+        for (i, line) in text.split('\n').enumerate() {
+            if i == row {
+                let x = p.x - field.x;
+                return start + fonts.index_at_in(Face::Mono, line, x, TEXT).min(line.len());
+            }
+            start += line.len() + 1;
+        }
+        text.len()
+    }
+
+    /// Paints an input of several lines in `field`, its first line where a one-line input's is:
+    /// the lines shown ([`Self::input_top`]), the selection and the caret.
+    fn paint_input_lines(
+        &self,
+        b: &mut DisplayListBuilder,
+        fonts: &Fonts,
+        t: &crate::chrome::Theme,
+        field: Rect,
+        focused: bool,
+        caret_on: bool,
+    ) {
+        let f = &self.input;
+        let (top, rows) = (self.input_top(), self.input_rows());
+        // (the caret as tall as a one-line field's)
+        let caret_h = TEXT * 1.35;
+        let sel = f.selection();
+        b.push_clip_rect(Rect::new(
+            field.x - 1.0,
+            field.y,
+            field.width + 2.0,
+            field.height,
+        ));
+        let mut start = 0;
+        for (i, line) in f.text().split('\n').enumerate() {
+            let end = start + line.len();
+            if (top..top + rows).contains(&i) {
+                let cy = field.y + INPUT_H / 2.0 + (i - top) as f32 * LINE;
+                if focused && f.has_selection() && sel.start <= end && sel.end >= start {
+                    let a = sel.start.max(start) - start;
+                    let z = sel.end.min(end) - start;
+                    let x0 = fonts.caret_x_in(Face::Mono, line, a, TEXT);
+                    // (a selected line break shows as a little extra width)
+                    let extra = if sel.end > end { 4.0 } else { 0.0 };
+                    let x1 = fonts.caret_x_in(Face::Mono, line, z, TEXT) + extra;
+                    b.fill_rect(
+                        Rect::new(field.x + x0, cy - LINE / 2.0, (x1 - x0).max(0.0), LINE),
+                        t.selection,
+                    );
+                }
+                let x = field.x;
+                fonts.label_in(b, Face::Mono, line, x, cy, TEXT, t.text, f32::INFINITY);
+                if focused && caret_on && !f.has_selection() && (start..=end).contains(&f.caret()) {
+                    let cx = fonts.caret_x_in(Face::Mono, line, f.caret() - start, TEXT);
+                    let cx = (field.x + cx).round();
+                    b.fill_rect(Rect::new(cx, cy - caret_h / 2.0, 1.0, caret_h), t.text);
+                }
+            }
+            start = end + 1;
+        }
+        b.pop_clip();
+    }
+
     /// The scroll offset as painted (the stored one may be past the end while following).
     fn scroll_y(&self, list: Rect, content: f32) -> f32 {
         let mut scroll = self.scroll;
@@ -412,7 +529,7 @@ impl ConsoleView {
 
     /// The line under `p` (an index into [`Self::lines`]), when it is on one.
     fn line_at(&self, body: Rect, p: Point, lines: &[(usize, usize, &str)]) -> Option<usize> {
-        let list = parts(body).list;
+        let list = self.layout(body).list;
         if !list.contains(p) {
             return None;
         }
@@ -423,7 +540,7 @@ impl ConsoleView {
 
     /// The place in the messages nearest `p`: above them their start, below them their end.
     fn pos_at(&self, body: Rect, p: Point, fonts: &Fonts) -> Option<Pos> {
-        let list = parts(body).list;
+        let list = self.layout(body).list;
         let lines = self.lines();
         let &(k, l, t) = lines.last()?;
         let (tops, content) = Self::tops(&lines);
@@ -590,7 +707,7 @@ impl ConsoleView {
         focus: Option<FieldId>,
         caret_on: bool,
     ) {
-        let p = parts(body);
+        let p = self.layout(body);
         b.fill_rect(
             Rect::new(p.bar.x, p.bar.bottom() - 1.0, p.bar.width, 1.0),
             c.border,
@@ -739,7 +856,7 @@ impl ConsoleView {
             Rect::new(p.input.x, p.input.y, p.input.width, 1.0),
             c.border,
         );
-        let cy = p.input.y + p.input.height / 2.0;
+        let cy = p.input.y + INPUT_H / 2.0;
         fonts.label_in(
             b,
             Face::Mono,
@@ -757,19 +874,25 @@ impl ConsoleView {
             p.input.height - 4.0,
         );
         let theme = crate::chrome::theme(c.dark);
-        widgets::draw_field(
-            b,
-            fonts,
-            &theme,
-            field,
-            &self.input,
-            &field_style(
-                focus == Some(FieldId::ConsoleInput),
-                caret_on,
-                "Type JavaScript to run in the page",
-                Face::Mono,
-            ),
-        );
+        let focused = focus == Some(FieldId::ConsoleInput);
+        if self.input.text().contains('\n') {
+            let field = input_field(&p);
+            self.paint_input_lines(b, fonts, &theme, field, focused, caret_on);
+        } else {
+            widgets::draw_field(
+                b,
+                fonts,
+                &theme,
+                field,
+                &self.input,
+                &field_style(
+                    focused,
+                    caret_on,
+                    "Type JavaScript to run in the page",
+                    Face::Mono,
+                ),
+            );
+        }
     }
 
     pub fn mouse_down(
@@ -780,17 +903,9 @@ impl ConsoleView {
         clicks: u32,
         fonts: &Fonts,
     ) -> (Option<FieldId>, Vec<Action>) {
-        let parts = parts(body);
-        let input_field = Rect::new(
-            parts.input.x + 24.0,
-            parts.input.y,
-            parts.input.width - 32.0,
-            parts.input.height,
-        );
-        let input_at = |s: &Self| {
-            let style = field_style(true, true, "", Face::Mono);
-            widgets::field_index_at(fonts, &s.input, input_field, p.x, &style)
-        };
+        let parts = self.layout(body);
+        let field = input_field(&parts);
+        let input_at = |s: &Self| s.input_index_at(fonts, field, p);
         if button == MouseButton::Right {
             if parts.input.contains(p) {
                 // (the input line's own editing menu)
@@ -877,7 +992,7 @@ impl ConsoleView {
     /// The pointer moved to `p` while pressed: a selection in the messages or the input line
     /// follows it, the messages scrolling when it is past their edge. Whether to redraw.
     pub fn mouse_move(&mut self, body: Rect, p: Point, fonts: &Fonts) -> bool {
-        let parts = parts(body);
+        let parts = self.layout(body);
         if self.selecting {
             let list = parts.list;
             let content = self.content_height();
@@ -900,14 +1015,7 @@ impl ConsoleView {
             return true;
         }
         if self.input_drag {
-            let field = Rect::new(
-                parts.input.x + 24.0,
-                parts.input.y,
-                parts.input.width - 32.0,
-                parts.input.height,
-            );
-            let style = field_style(true, true, "", Face::Mono);
-            let at = widgets::field_index_at(fonts, &self.input, field, p.x, &style);
+            let at = self.input_index_at(fonts, input_field(&parts), p);
             self.input.set_caret(at, true);
             return true;
         }
@@ -956,7 +1064,7 @@ impl ConsoleView {
     }
 
     pub fn wheel(&mut self, body: Rect, dy: f32, _fonts: &Fonts) -> bool {
-        let p = parts(body);
+        let p = self.layout(body);
         let content = self.content_height();
         self.scroll.clamp(content, p.list.height);
         let moved = self.scroll.by(dy, content, p.list.height);
@@ -969,10 +1077,47 @@ impl ConsoleView {
         self.history_pos = None;
     }
 
-    /// The input line's own keys: Enter runs it, Up/Down walk the history.
-    pub fn input_key(&mut self, key: u16, mods: Modifiers) -> Option<Vec<Action>> {
+    /// The input's own keys: Enter runs it, Shift+Enter starts a new line, a paste keeps its line
+    /// breaks, Up/Down move between its lines and past the first or last walk the history.
+    pub fn input_key(
+        &mut self,
+        key: u16,
+        mods: Modifiers,
+        clip: &dyn Clipboard,
+    ) -> Option<Vec<Action>> {
+        let ctrl = mods.ctrl && !mods.alt;
+        let multiline = self.input.text().contains('\n');
         match key {
-            keys::ENTER if !mods.shift => {
+            keys::ENTER if mods.shift => {
+                self.input.insert_multiline("\n");
+                self.history_pos = None;
+                Some(Vec::new())
+            }
+            k if ctrl && k == b'V' as u16 => {
+                if let Some(text) = clip.text() {
+                    self.input.insert_multiline(&text);
+                    self.history_pos = None;
+                }
+                Some(Vec::new())
+            }
+            keys::UP | keys::DOWN
+                if multiline
+                    && if key == keys::UP {
+                        self.input_caret_row() > 0
+                    } else {
+                        self.input_caret_row() + 1 < self.input.text().split('\n').count()
+                    } =>
+            {
+                text_area::vertical(&mut self.input, key == keys::DOWN, mods.shift);
+                Some(Vec::new())
+            }
+            keys::HOME | keys::END if multiline && !ctrl => {
+                let (start, end) = text_area::line_at(self.input.text(), self.input.caret());
+                let at = if key == keys::HOME { start } else { end };
+                self.input.set_caret(at, mods.shift);
+                Some(Vec::new())
+            }
+            keys::ENTER => {
                 let source = self.input.text().to_owned();
                 if source.trim().is_empty() {
                     return Some(Vec::new());
@@ -1013,7 +1158,7 @@ impl ConsoleView {
                 };
                 self.history_pos = pos;
                 let text = pos.map_or("", |i| self.history[i].as_str()).to_owned();
-                self.input.set_text(&text);
+                self.input.set_multiline_text(&text);
                 Some(Vec::new())
             }
             keys::ESCAPE => {
@@ -1145,15 +1290,18 @@ mod tests {
         v.add_entries(vec![entry("clear", "Console was cleared")]);
         assert_eq!(v.items.len(), 1);
         // The input line: Enter sends it, Up brings it back.
+        let clip = crate::driver::MemoryClipboard::default();
         v.input.set_text("1 + 1");
-        let a = v.input_key(keys::ENTER, Modifiers::default()).unwrap();
+        let a = v
+            .input_key(keys::ENTER, Modifiers::default(), &clip)
+            .unwrap();
         assert_eq!(a, [Action::Send(DevtoolsCommand::Eval(1, "1 + 1".into()))]);
         assert_eq!(v.input.text(), "");
         v.eval_result(1, Ok(("2".into(), ValueKind::Primitive)));
         assert_eq!(v.items.back().unwrap().kind, ItemKind::Result);
-        v.input_key(keys::UP, Modifiers::default());
+        v.input_key(keys::UP, Modifiers::default(), &clip);
         assert_eq!(v.input.text(), "1 + 1");
-        v.input_key(keys::DOWN, Modifiers::default());
+        v.input_key(keys::DOWN, Modifiers::default(), &clip);
         assert_eq!(v.input.text(), "");
         // A navigation clears it unless the log is preserved.
         v.navigated();
@@ -1172,7 +1320,11 @@ mod tests {
             entry("warn", "second\nline two"),
         ]);
         v.input.set_text("({a: 1})");
-        v.input_key(keys::ENTER, Modifiers::default());
+        v.input_key(
+            keys::ENTER,
+            Modifiers::default(),
+            &crate::driver::MemoryClipboard::default(),
+        );
         v.eval_result(1, Ok(("{a: 1}".into(), ValueKind::Object)));
         // The list starts under the toolbar; a line's text 24 DIPs in.
         let body = Rect::new(0.0, 0.0, 900.0, 400.0);
@@ -1343,5 +1495,67 @@ mod tests {
             let p = px.pixel(x, y);
             assert!(blue(p), "row {y}: {p:?}, not the style's blue");
         }
+    }
+
+    /// A paste keeps its line breaks and Shift+Enter starts a new line, so a script whose first
+    /// line is a `//` comment runs whole; Up and Down move between the lines and walk the history
+    /// only from the first or the last; the input grows upwards with its lines, and a press picks
+    /// a line.
+    #[test]
+    fn the_input_takes_several_lines() {
+        let fonts = Fonts::new(std::sync::Arc::new(
+            snowlark_paint::TextEngine::new().unwrap(),
+        ));
+        let clip = crate::driver::MemoryClipboard::default();
+        let mut v = ConsoleView::default();
+        let none = Modifiers::default();
+        let shift = Modifiers {
+            shift: true,
+            ..Modifiers::default()
+        };
+        let ctrl = Modifiers {
+            ctrl: true,
+            ..Modifiers::default()
+        };
+        let body = Rect::new(0.0, 0.0, 600.0, 400.0);
+        let one = v.layout(body).input;
+        clip.set_text("// note\r\nlet a = 1;\r\na + 1");
+        v.input_key(b'V' as u16, ctrl, &clip);
+        assert_eq!(v.input.text(), "// note\nlet a = 1;\na + 1");
+        let three = v.layout(body).input;
+        assert_eq!(three.height, one.height + 2.0 * LINE);
+        assert_eq!(three.bottom(), one.bottom());
+        // Up goes to the line above at the same column; Home to its start.
+        v.input_key(keys::UP, none, &clip);
+        assert_eq!(v.input.caret(), "// note\nlet a".len());
+        v.input_key(keys::HOME, none, &clip);
+        assert_eq!(v.input.caret(), "// note\n".len());
+        // A press on a line puts the caret on it.
+        let field = input_field(&v.layout(body));
+        let first = Point::new(field.x + 1.0, field.y + INPUT_H / 2.0);
+        assert_eq!(v.input_index_at(&fonts, field, first), 0);
+        let third = Point::new(field.x + 1.0, first.y + 2.0 * LINE);
+        assert_eq!(
+            v.input_index_at(&fonts, field, third),
+            "// note\nlet a = 1;\n".len()
+        );
+        let c = super::super::colors(true);
+        let mut b = DisplayListBuilder::new();
+        v.paint(&mut b, body, &fonts, &c, Some(FieldId::ConsoleInput), true);
+        // Shift+Enter adds a line; Enter runs the whole text and the input is one line again.
+        v.input.set_caret(v.input.text().len(), false);
+        v.input_key(keys::ENTER, shift, &clip);
+        widgets::type_char(&mut v.input, 'a');
+        assert_eq!(v.input.text(), "// note\nlet a = 1;\na + 1\na");
+        let source = v.input.text().to_owned();
+        let a = v.input_key(keys::ENTER, none, &clip).unwrap();
+        assert_eq!(a, [Action::Send(DevtoolsCommand::Eval(1, source.clone()))]);
+        assert_eq!(v.layout(body).input, one);
+        // Up brings it back whole; Up again, from its last line, moves up a line.
+        v.input_key(keys::UP, none, &clip);
+        assert_eq!(v.input.text(), source);
+        v.input_key(keys::UP, none, &clip);
+        assert_eq!(v.input.text(), source);
+        assert_eq!(v.input_caret_row(), 2);
     }
 }

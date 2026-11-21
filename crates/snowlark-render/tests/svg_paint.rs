@@ -65,6 +65,7 @@ const RED: Color = Color::rgb(255, 0, 0);
 const GREEN: Color = Color::rgb(0, 128, 0);
 const BLUE: Color = Color::rgb(0, 0, 255);
 const WHITE: Color = Color::rgb(255, 255, 255);
+const BLACK: Color = Color::rgb(0, 0, 0);
 
 #[test]
 fn shapes_paint_as_path_items() {
@@ -196,6 +197,33 @@ fn clip_paths_of_any_shapes_clip() {
     assert_pixel(&px, 75, 80, WHITE);
     assert_pixel(&px, 85, 80, BLUE);
     assert_pixel(&px, 95, 80, WHITE);
+}
+
+/// CSS Masking 1 §6: a clip path of one rectangle clips antialiased, not snapped to device pixels:
+/// under a `viewBox` that scales it by 3, its left edge at x = 33.3 covers a tenth of device pixel
+/// 99 and its top edge at y = 10.5 half of row 31, as the same rectangle filled does.
+#[test]
+fn a_rectangle_clip_path_is_antialiased_at_fractional_edges() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut r = render(
+        &net,
+        "<svg width=120 height=100 viewBox='0 0 40 100' preserveAspectRatio=none>
+           <defs><clipPath id=c><rect x=3.3 y=10.5 width=10 height=20 /></clipPath></defs>
+           <rect width=40 height=100 fill=black clip-path='url(#c)' />
+           <rect x=23.3 y=10.5 width=10 height=20 fill=black />
+         </svg>",
+    );
+    let px = pixels(&mut r);
+    assert_eq!(r.inline_svg_unsupported(svg_of(&r)), None);
+    // (the left edges at device x 9.9 and 69.9, the top ones at y 10.5)
+    let partial = |c: Color| c.r > 200 && c.r < 250;
+    let half = |c: Color| c.r > 100 && c.r < 160;
+    assert_like(&px, 9, 20, "a tenth covered", partial);
+    assert_like(&px, 69, 20, "a tenth covered", partial);
+    assert_like(&px, 20, 10, "half covered", half);
+    assert_like(&px, 80, 10, "half covered", half);
+    assert_pixel(&px, 10, 20, BLACK);
+    assert_pixel(&px, 8, 20, WHITE);
 }
 
 #[track_caller]

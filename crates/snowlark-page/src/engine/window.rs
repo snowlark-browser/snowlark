@@ -865,7 +865,7 @@ fn shallow(scope: &mut v8::PinScope, v: v8::Local<v8::Value>) -> String {
 
 /// The stack V8 captured when an error was made (`\n    at f (url:line:column)` per frame), read
 /// from the error's internal record: its `stack` property is not touched.
-fn captured_stack(scope: &mut v8::PinScope, v: v8::Local<v8::Value>) -> String {
+pub(crate) fn captured_stack(scope: &mut v8::PinScope, v: v8::Local<v8::Value>) -> String {
     let Some(trace) = v8::Exception::get_stack_trace(scope, v) else {
         return String::new();
     };

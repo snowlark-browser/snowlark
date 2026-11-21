@@ -1110,6 +1110,18 @@ impl<'a> Painter<'a> {
                     self.push_mask(&geometry, None);
                 }
                 Item::PushClipPath { path, evenodd, .. } => {
+                    // (a path that is a rectangle along the device's axes clips as a rectangle,
+                    // antialiased where its edges fall inside pixels, without a layer: an SVG
+                    // `clipPath` of one `rect` under a scaling `viewBox`, CSS Masking 1 §6)
+                    if let Some(rect) = list
+                        .path_rect(path)
+                        .filter(|_| self.transform.is_axis_aligned())
+                    {
+                        self.ctx
+                            .PushAxisAlignedClip(&rect_f(&rect), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+                        self.stack.push(Open::AxisClip);
+                        return Ok(());
+                    }
                     // (a path Direct2D refuses clips everything: its pop must close a group)
                     match self
                         .path_geometry(list, path, evenodd)

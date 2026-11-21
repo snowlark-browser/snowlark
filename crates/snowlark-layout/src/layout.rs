@@ -387,6 +387,9 @@ pub(crate) struct Cx<'a, S: Style> {
     /// (the inline layout then relates its pieces' reference boxes, see
     /// [`crate::fragment::BoxFragment::clip_reference`]).
     pub clipped_inlines: bool,
+    /// The same for an inline box with background images (the inline layout then places its
+    /// pieces in their strip, see [`crate::fragment::BoxFragment::strip`]).
+    pub striped_inlines: bool,
     /// While the intrinsic inline sizes of a box are computed: its content-box height when that is
     /// definite, which percentage heights of its children resolve against (CSS 2 §10.5), so that a
     /// replaced child's percentage height transfers through its ratio (css-sizing-3 §5.2: a grid
@@ -827,6 +830,7 @@ pub(crate) fn box_fragment<S: Style>(
             content,
             containing: Default::default(),
             clip_reference: Default::default(),
+            strip: Default::default(),
             stitched: None,
         }),
         children,

@@ -999,7 +999,7 @@ impl Engine {
             for j in &l.jobs {
                 match j.purpose {
                     crate::loader::Purpose::Script(n)
-                    | crate::loader::Purpose::Stylesheet(n)
+                    | crate::loader::Purpose::Stylesheet(n, _)
                     | crate::loader::Purpose::SvgImage(n) => r.nodes.push(n),
                     _ => {}
                 }
@@ -2106,7 +2106,7 @@ impl Engine {
             self.loader.borrow_mut().jobs.retain(|j| {
                 let node = match j.purpose {
                     Purpose::Script(n)
-                    | Purpose::Stylesheet(n)
+                    | Purpose::Stylesheet(n, _)
                     | Purpose::Preload(n)
                     | Purpose::SvgImage(n)
                     | Purpose::ModulePreload(n, _) => Some(n),

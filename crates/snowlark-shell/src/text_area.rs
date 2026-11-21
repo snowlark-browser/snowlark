@@ -69,38 +69,12 @@ impl TextArea {
 
     /// The byte range of the line holding byte `at` (without its line break).
     fn line_at(&self, at: usize) -> (usize, usize) {
-        let t = self.text();
-        let start = t[..at].rfind('\n').map_or(0, |i| i + 1);
-        let end = t[at..].find('\n').map_or(t.len(), |i| at + i);
-        (start, end)
+        line_at(self.text(), at)
     }
 
     /// Moves the caret to the same column of the line above or below.
     fn vertical(&mut self, down: bool, extend: bool) {
-        let caret = self.field.caret();
-        let (start, end) = self.line_at(caret);
-        let column = self.text()[start..caret].chars().count();
-        let target = if down {
-            if end >= self.text().len() {
-                // (on the last line Down goes to its end)
-                self.field.set_caret(self.text().len(), extend);
-                return;
-            }
-            end + 1
-        } else {
-            if start == 0 {
-                self.field.set_caret(0, extend);
-                return;
-            }
-            self.line_at(start - 1).0
-        };
-        let (ls, le) = self.line_at(target);
-        let line = &self.text()[ls..le];
-        let at = line
-            .char_indices()
-            .nth(column)
-            .map_or(line.len(), |(i, _)| i);
-        self.field.set_caret(ls + at, extend);
+        vertical(&mut self.field, down, extend);
     }
 
     /// A key while the editor has the keyboard.
@@ -268,6 +242,41 @@ impl TextArea {
         }
         b.pop_clip();
     }
+}
+
+/// The byte range of the line of `text` holding byte `at` (without its line break).
+pub fn line_at(text: &str, at: usize) -> (usize, usize) {
+    let start = text[..at].rfind('\n').map_or(0, |i| i + 1);
+    let end = text[at..].find('\n').map_or(text.len(), |i| at + i);
+    (start, end)
+}
+
+/// Moves a multi-line field's caret to the same column of the line above or below (from the
+/// first line Up goes to the start, from the last Down to the end); `extend` keeps the anchor.
+pub fn vertical(field: &mut TextField, down: bool, extend: bool) {
+    let caret = field.caret();
+    let (start, end) = line_at(field.text(), caret);
+    let column = field.text()[start..caret].chars().count();
+    let target = if down {
+        if end >= field.text().len() {
+            field.set_caret(field.text().len(), extend);
+            return;
+        }
+        end + 1
+    } else {
+        if start == 0 {
+            field.set_caret(0, extend);
+            return;
+        }
+        line_at(field.text(), start - 1).0
+    };
+    let (ls, le) = line_at(field.text(), target);
+    let line = &field.text()[ls..le];
+    let at = line
+        .char_indices()
+        .nth(column)
+        .map_or(line.len(), |(i, _)| i);
+    field.set_caret(ls + at, extend);
 }
 
 #[cfg(test)]

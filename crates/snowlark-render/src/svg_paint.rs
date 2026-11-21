@@ -410,7 +410,6 @@ impl Recorder<'_, '_> {
             self.b.push_transform(paint_matrix(&m));
         }
         match &clip {
-            Clip::Rect(rect) => self.b.push_clip_rect(*rect),
             Clip::Range(range, evenodd) => self.b.push_clip_path(*range, *evenodd),
             Clip::Union(shapes, bounds) => {
                 // (the union of the shapes: their opaque fills as the mask's alpha)
@@ -435,7 +434,7 @@ impl Recorder<'_, '_> {
             self.group(n, k, opacity)
         };
         match clip {
-            Clip::Rect(_) | Clip::Range(..) => self.b.pop_clip(),
+            Clip::Range(..) => self.b.pop_clip(),
             Clip::Union(..) => self.b.pop_mask(),
             _ => {}
         }
@@ -478,9 +477,10 @@ impl Recorder<'_, '_> {
 
     /// `clip-path` referring to a `clipPath` element (CSS Masking 1 §6): its content's shapes, each
     /// under its own transform and `clip-rule`, in the element's user space through the
-    /// `clipPath`'s transform and units. One shape clips as its path (a rectangle along the axes as
-    /// a clip rectangle); several clip as their union, an alpha mask of their fills. (The reference
-    /// engine clips by a path when the content makes one, else by a mask.)
+    /// `clipPath`'s transform and units. One shape clips as its path, antialiased (a rectangle too:
+    /// the rasterizer clips by a rectangle path along the device's axes as a rectangle, not snapped
+    /// to pixels); several clip as their union, an alpha mask of their fills. (The reference engine
+    /// clips by a path when the content makes one, else by a mask.)
     fn clip(&self, n: NodeId, v: &ComputedValues) -> Result<Clip, Unsupported> {
         use style::values::generics::basic_shape::GenericClipPath as ClipPath;
         // (a reference is to the fragment, whatever document the URL names, as for the image
@@ -568,18 +568,7 @@ impl Recorder<'_, '_> {
             0 => Clip::All,
             1 => {
                 let (path, evenodd) = shapes.pop().expect("one");
-                match axis_aligned_rect(&path) {
-                    Some(r) if r.width() > 0.0 && r.height() > 0.0 => {
-                        Clip::Rect(snowlark_paint::Rect::new(
-                            r.x0 as f32,
-                            r.y0 as f32,
-                            r.width() as f32,
-                            r.height() as f32,
-                        ))
-                    }
-                    Some(_) => Clip::All,
-                    None => Clip::Path(path, evenodd),
-                }
+                Clip::Path(path, evenodd)
             }
             _ => {
                 let b = shapes
@@ -1456,47 +1445,12 @@ enum Clip {
     None,
     /// Clips everything away (no content, or none of it visible).
     All,
-    /// A rectangle along the axes, in the element's user space.
-    Rect(snowlark_paint::Rect),
     /// One shape's path and whether it fills by `evenodd`.
     Path(BezPath, bool),
     /// [`Clip::Path`] once added to the display list.
     Range(snowlark_paint::PathRange, bool),
     /// Several shapes, clipping as their union, and the union's bounds.
     Union(Vec<(BezPath, bool)>, snowlark_paint::Rect),
-}
-
-/// The rectangle a path is, when it is one closed rectangle along the axes (corners in order),
-/// for the cheaper rectangle clip.
-fn axis_aligned_rect(path: &BezPath) -> Option<kurbo::Rect> {
-    let els = path.elements();
-    let mut points: smallvec::SmallVec<[kurbo::Point; 6]> = smallvec::SmallVec::new();
-    for (i, el) in els.iter().enumerate() {
-        match *el {
-            kurbo::PathEl::MoveTo(p) if i == 0 => points.push(p),
-            kurbo::PathEl::LineTo(p) if i > 0 => points.push(p),
-            kurbo::PathEl::ClosePath if i == els.len() - 1 => {}
-            _ => return None,
-        }
-    }
-    if points.len() == 5 && points[4] == points[0] {
-        points.pop();
-    }
-    if points.len() != 4 {
-        return None;
-    }
-    // (each side along an axis, alternating: a rectangle, not a bow tie)
-    for i in 0..4 {
-        let (a, b, c) = (points[i], points[(i + 1) % 4], points[(i + 2) % 4]);
-        let first_horizontal = a.y == b.y && a.x != b.x;
-        let first_vertical = a.x == b.x && a.y != b.y;
-        let then_vertical = b.x == c.x && b.y != c.y;
-        let then_horizontal = b.y == c.y && b.x != c.x;
-        if !((first_horizontal && then_vertical) || (first_vertical && then_horizontal)) {
-            return None;
-        }
-    }
-    Some(kurbo::Rect::from_points(points[0], points[2]))
 }
 
 fn convert(path: &BezPath, out: &mut Vec<PathEl>) {

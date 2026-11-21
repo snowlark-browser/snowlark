@@ -1677,6 +1677,7 @@ pub(crate) fn layout_inline_content<S: Style>(
     let floats_mark = bfc.len();
     let clamp_before = cx.clamp.clone();
     let clipped_inlines_before = std::mem::take(&mut cx.clipped_inlines);
+    let striped_inlines_before = std::mem::take(&mut cx.striped_inlines);
     let mut out = layout_lines(
         cx,
         id,
@@ -1725,8 +1726,85 @@ pub(crate) fn layout_inline_content<S: Style>(
     if std::mem::replace(&mut cx.clipped_inlines, clipped_inlines_before) {
         relate_clipped_pieces(&out.children);
     }
+    if std::mem::replace(&mut cx.striped_inlines, striped_inlines_before) {
+        strip_pieces(&out.children);
+    }
     put_content(cx, id, content);
     out
+}
+
+/// Places the pieces of each inline box that is on several lines in their strip (see
+/// [`BoxFragment::strip`]): the pieces side by side in line order as one box, with the box's
+/// edges at the strip's ends. A box laid out in one piece here has none.
+fn strip_pieces<S: Style>(lines: &[FragmentChild<S>]) {
+    fn walk<'a, S: Style>(
+        children: &'a [FragmentChild<S>],
+        pieces: &mut HashMap<u32, SmallVec<[&'a Fragment<S>; 2]>>,
+    ) {
+        for c in children {
+            let f = &*c.fragment;
+            match &f.kind {
+                FragmentKind::Line { .. } => walk(&f.children, pieces),
+                FragmentKind::Box(b) if b.flags & fragment_flags::INLINE_BOX != 0 => {
+                    pieces.entry(b.order).or_default().push(f);
+                    walk(&f.children, pieces);
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut pieces = HashMap::new();
+    walk(lines, &mut pieces);
+    for list in pieces.values() {
+        let boxes = || list.iter().filter_map(|f| f.as_box());
+        let Some(first) = boxes().next() else {
+            continue;
+        };
+        // (in vertical writing modes the strip runs down the lines: not done, each piece is its
+        // own area as before)
+        if list.len() < 2 || !first.style.view().is_identity() {
+            for b in boxes() {
+                b.strip.set(None);
+            }
+            continue;
+        }
+        let total: f32 = list.iter().map(|f| f.size.width).sum();
+        // (the box's left and right edges are on one piece each)
+        let left = (
+            boxes().map(|b| b.border.left).sum::<f32>(),
+            boxes().map(|b| b.padding.left).sum::<f32>(),
+        );
+        let right = (
+            boxes().map(|b| b.border.right).sum::<f32>(),
+            boxes().map(|b| b.padding.right).sum::<f32>(),
+        );
+        let rtl = first.style.direction() == Direction::Rtl;
+        let mut before = 0.0;
+        for f in list {
+            let Some(b) = f.as_box() else { continue };
+            // (right to left, the first piece is at the strip's right end)
+            let x = if rtl {
+                -(total - before - f.size.width)
+            } else {
+                -before
+            };
+            let border = Rect::new(x, 0.0, total, f.size.height);
+            let padding = Rect::new(
+                border.x + left.0,
+                b.border.top,
+                (total - left.0 - right.0).max(0.0),
+                (f.size.height - b.border.top - b.border.bottom).max(0.0),
+            );
+            let content = Rect::new(
+                padding.x + left.1,
+                padding.y + b.padding.top,
+                (padding.width - left.1 - right.1).max(0.0),
+                (padding.height - b.padding.top - b.padding.bottom).max(0.0),
+            );
+            b.strip.set(Some([border, padding, content]));
+            before += f.size.width;
+        }
+    }
 }
 
 /// Relates the pieces of each inline box with a `clip-path` that is on several lines: every
@@ -4012,6 +4090,9 @@ fn place_nodes<S: Style>(
                 if it.style.has_clip_path() {
                     cx.clipped_inlines = true;
                 }
+                if !has_start || !has_end {
+                    cx.striped_inlines = true;
+                }
                 let frag = Arc::new(Fragment {
                     size: Size::new(frag_w, frag_h),
                     kind: FragmentKind::Box(BoxFragment {
@@ -4027,6 +4108,7 @@ fn place_nodes<S: Style>(
                         content: BoxContent::None,
                         containing: Default::default(),
                         clip_reference: Default::default(),
+                        strip: Default::default(),
                         stitched: None,
                     }),
                     children: inner,
@@ -4172,6 +4254,7 @@ fn place_nodes<S: Style>(
                                 content: BoxContent::None,
                                 containing: Default::default(),
                                 clip_reference: Default::default(),
+                                strip: Default::default(),
                                 stitched: None,
                             }),
                             children: Vec::new(),

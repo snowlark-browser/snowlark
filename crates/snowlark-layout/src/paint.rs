@@ -1906,6 +1906,7 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                 viewport,
                 local: None,
                 clip_override: Some(area),
+                strip: None,
             };
             paint_background_layers(self.out, s, &geo);
             return;
@@ -1939,6 +1940,10 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                 viewport,
                 local: scroll.map(|sc| scrolled_area(f, b, at, sc)),
                 clip_override: None,
+                strip: (b.flags & fragment_flags::INLINE_BOX != 0)
+                    .then(|| b.strip.get())
+                    .flatten()
+                    .map(|s| s.map(|r| r.translate(at.x, at.y))),
             };
             // The color is painted under the bottom layer, clipped as it is (§3.10).
             let bottom = match s.background_layer_count() {
@@ -2565,6 +2570,7 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
             viewport: (self.transforms == 0).then_some(self.viewport),
             local: None,
             clip_override: None,
+            strip: None,
         };
         paint_image_layers(
             self.out,
@@ -2764,6 +2770,10 @@ struct LayerArea {
     local: Option<[Rect; 3]>,
     /// The canvas: every layer is painted over it, whatever its `background-clip`.
     clip_override: Option<Rect>,
+    /// For a piece of an inline box on several lines, the border, padding and content boxes of
+    /// its strip ([`crate::fragment::BoxFragment::strip`]), where layers are positioned; they are
+    /// painted in the piece's own `boxes`.
+    strip: Option<[Rect; 3]>,
 }
 
 impl LayerArea {
@@ -2791,7 +2801,11 @@ impl LayerArea {
                     (local[o], self.boxes[1], self.radii[1])
                 }
             }
-            _ => (self.boxes[o], self.boxes[c], self.radii[c]),
+            _ => (
+                self.strip.map_or(self.boxes[o], |s| s[o]),
+                self.boxes[c],
+                self.radii[c],
+            ),
         };
         match self.clip_override {
             Some(all) => (area, all, Radii::ZERO),

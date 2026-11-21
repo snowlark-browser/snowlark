@@ -387,6 +387,17 @@ fn computed_and_inline_style_declarations() {
          [cs.width, threw].join('|')",
     );
     assert_eq!(r, "100px|NoModificationAllowedError");
+    // A pseudo-element that generates no box still has computed values (CSSOM §6.7.1): inherited
+    // from its element, initial otherwise; `content: none` stops `::after` from generating one.
+    let r = eval(
+        &mut page,
+        "const b = getComputedStyle(a, '::after');
+         const n = document.createElement('style'); n.textContent = '#a::before { content: none }';
+         document.head.append(n);
+         const c = getComputedStyle(a, '::before');
+         [b.content, b.display, b.color, b.width, c.content, c.color].join('|')",
+    );
+    assert_eq!(r, "none|inline|rgb(1, 2, 3)|auto|none|rgb(1, 2, 3)");
     // element.style mirrors the style attribute in both directions.
     let r = eval(
         &mut page,
@@ -1377,6 +1388,101 @@ fn nothing_is_painted_while_render_blocked() {
     )));
 }
 
+/// HTML link type "expect": a `<link rel=expect blocking=render>` in the head keeps the document
+/// render-blocked (no animation frame callbacks run) until the element its fragment names is parsed,
+/// while the parser waits on a slow script in between. A link naming an element parsed before that
+/// script blocks no longer than that element.
+#[test]
+fn an_expect_link_blocks_rendering_until_its_target_is_parsed() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::sync::{Arc, Condvar, Mutex};
+    fn serve(target: &'static str) -> (std::net::SocketAddr, Arc<(Mutex<bool>, Condvar)>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let released = Arc::new((Mutex::new(false), Condvar::new()));
+        let gate = released.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                let gate = gate.clone();
+                std::thread::spawn(move || {
+                    let mut reader = BufReader::new(stream.try_clone().unwrap());
+                    let mut first = String::new();
+                    let _ = reader.read_line(&mut first);
+                    loop {
+                        let mut h = String::new();
+                        if reader.read_line(&mut h).is_err() || h == "\r\n" || h.is_empty() {
+                            break;
+                        }
+                    }
+                    let page = format!(
+                        "<!doctype html><head><link rel=expect href=#{target} blocking=render>
+                         <script>window.seen = [];
+                           requestAnimationFrame(() => seen.push(!!document.getElementById('last')));
+                         </script></head><body><div id=first>a</div>
+                         <script src=/slow.js></script><div id=last>b</div>"
+                    );
+                    let (mime, body) = if first.contains("/slow.js") {
+                        // The script comes when the test says so: the parser waits for it.
+                        let (lock, cv) = &*gate;
+                        let mut open = lock.lock().unwrap();
+                        while !*open {
+                            open = cv.wait(open).unwrap();
+                        }
+                        ("text/javascript", String::from("window.slow = 1;"))
+                    } else {
+                        ("text/html", page)
+                    };
+                    let _ = write!(
+                        stream,
+                        "HTTP/1.1 200 OK\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                });
+            }
+        });
+        (addr, released)
+    }
+    let run = |page: &mut Page, ms: u64| {
+        let start = std::time::Instant::now();
+        while start.elapsed() < Duration::from_millis(ms) {
+            page.run_for(Duration::from_millis(10));
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    };
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    for (target, while_parsing) in [("last", "0"), ("first", "1")] {
+        let (addr, released) = serve(target);
+        let mut page = Page::new(PageOptions {
+            net: Some(net.client()),
+            viewport: (800, 600),
+            render: Some(RenderSetup::new().unwrap()),
+            ..Default::default()
+        });
+        page.navigate(url::Url::parse(&format!("http://{addr}/index.html")).unwrap());
+        run(&mut page, 500);
+        assert_eq!(
+            eval(&mut page, "document.readyState"),
+            "loading",
+            "#{target}"
+        );
+        assert_eq!(
+            eval(&mut page, "seen.length"),
+            while_parsing,
+            "frames while #last is unparsed, expecting #{target}"
+        );
+        {
+            let (lock, cv) = &*released;
+            *lock.lock().unwrap() = true;
+            cv.notify_all();
+        }
+        page.run_until_settled(Duration::from_secs(5));
+        run(&mut page, 100);
+        let expected = if target == "last" { "true" } else { "false" };
+        assert_eq!(eval(&mut page, "String(seen[0])"), expected, "#{target}");
+    }
+}
+
 /// The "checkbox hack" of Wikipedia's Vector 2022 menus: a transparent checkbox laid over a label
 /// toggles a sibling dropdown through `:checked ~ .content`. A click on the checkbox's area checks it
 /// and the dropdown shows.
@@ -1887,6 +1993,25 @@ fn default_styled_textarea_is_an_inline_block() {
          [s.display, sizes, t.offsetHeight > 0].join('|')",
     );
     assert_eq!(r, "inline-block|true|true");
+}
+
+/// CSSOM View §6 forced layout: a geometry read after script set a control's value measures the
+/// new value (an auto-growing textarea reads `scrollHeight` right after setting `value`).
+#[test]
+fn textarea_scroll_height_follows_a_value_set_by_script() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0 } textarea { display: block; width: 300px; \
+         border: 0; padding: 0; font: 14px/20px monospace; overflow: hidden }</style>\
+         <textarea id=t rows=1>1\n2\n3\n4\n5</textarea>",
+    );
+    let r = eval(
+        &mut page,
+        "const a = [t.scrollHeight]; t.value = '1\\n2'; a.push(t.scrollHeight);
+         t.value = '1\\n2\\n3\\n4\\n5\\n6\\n7'; a.push(t.scrollHeight); a.join(' ')",
+    );
+    assert_eq!(r, "100 40 140");
 }
 
 /// CSSOM View §6.1 `getBoundingClientRect()`: the union leaves out only rects whose width and

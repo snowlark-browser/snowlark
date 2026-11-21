@@ -844,10 +844,12 @@ impl Engine {
             rt::note_replaced_window(scope, old_window, context);
             context.global(scope)
         });
+        // (the security token of its origin-domain: an `about:` document's domain is its creator's)
+        let token = realm_token(window, &origin);
         let realm = create_realm_for(
             scope,
             window,
-            &origin.identity,
+            &token,
             snowlark_bindings::generated::GlobalKind::Window,
             proxy,
         );

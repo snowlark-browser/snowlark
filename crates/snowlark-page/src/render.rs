@@ -1038,6 +1038,11 @@ impl Engine {
         // (script animations' current values: the model takes effect immediately)
         self.sync_animation_styles();
         self.sync_form_states(None, crate::engine::forms::FormSync::Connected);
+        // (a control's state set by script, such as a textarea's value, decides its box: the read
+        // measures it, not what the last rendering update showed)
+        if !self.controls_dirty.borrow().is_empty() {
+            self.sync_controls();
+        }
         let now = self.document_time(doc);
         self.with_doc_renderer(doc, |r, st| {
             let probe = self.profile.as_ref().map(|_| (Instant::now(), r.stats()));

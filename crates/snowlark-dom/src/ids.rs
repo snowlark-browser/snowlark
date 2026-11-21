@@ -171,4 +171,70 @@ impl Dom {
         let index = &self.doc(doc).names;
         index.ids.contains_key(value) || index.names.contains_key(value)
     }
+
+    /// HTML "select the indicated part" for a URL equal to `doc`'s URL apart from its fragment
+    /// `fragment` (steps 3-9): the first element in tree order whose ID is the fragment, else the first
+    /// `a` element whose `name` is, tried with the fragment as it is and then percent-decoded; the
+    /// top of the document for an empty fragment or (decoded) "top" in any case.
+    pub fn indicated_part(&self, doc: NodeId, fragment: &str) -> IndicatedPart {
+        if fragment.is_empty() {
+            return IndicatedPart::TopOfDocument;
+        }
+        if let Some(el) = self.potential_indicated_element(doc, fragment) {
+            return IndicatedPart::Element(el);
+        }
+        let decoded = percent_decode(fragment);
+        if let Some(el) = self.potential_indicated_element(doc, &decoded) {
+            return IndicatedPart::Element(el);
+        }
+        if decoded.eq_ignore_ascii_case("top") {
+            return IndicatedPart::TopOfDocument;
+        }
+        IndicatedPart::None
+    }
+
+    /// HTML "find a potential indicated element": an element of `doc`'s tree with ID `fragment`, else
+    /// the first `a` element in tree order with a `name` attribute of `fragment`.
+    fn potential_indicated_element(&self, doc: NodeId, fragment: &str) -> Option<NodeId> {
+        if let Some(Some(el)) = self.indexed_element_by_id(doc, fragment) {
+            return Some(el);
+        }
+        if !self.doc(doc).names.names.contains_key(fragment) {
+            return None;
+        }
+        let root = self.document_element(doc)?;
+        self.descendants(root).find(|&n| {
+            self.is_html_element_named(n, &local_name!("a"))
+                && self.get_attribute(n, "name") == Some(fragment)
+        })
+    }
+}
+
+/// What a fragment indicates in a document ([`Dom::indicated_part`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IndicatedPart {
+    Element(NodeId),
+    TopOfDocument,
+    None,
+}
+
+/// URL "percent-decode" of a string, then "UTF-8 decode without BOM" (a BOM stays; invalid sequences
+/// become U+FFFD).
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = |b: u8| (b as char).to_digit(16);
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(h), Some(l)) = (hex(bytes[i + 1]), hex(bytes[i + 2])) {
+                out.push((h * 16 + l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }

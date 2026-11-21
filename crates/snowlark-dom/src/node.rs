@@ -440,6 +440,9 @@ pub mod element_flags {
     /// The page's mark: the element's form pseudo-class state (HTML §4.16.3) is to be computed
     /// again, and the element is on the page's list of those.
     pub const FORM_STATE_MARKED: u8 = 32;
+    /// The element is on the stack of open elements of its document's HTML parser: set when the
+    /// parser creates it, cleared when the parser pops it (HTML "finish parsing the children").
+    pub const OPEN_IN_PARSER: u8 = 64;
 }
 
 /// Data of an Element node (DOM §4.9).

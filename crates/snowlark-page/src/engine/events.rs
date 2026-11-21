@@ -1600,9 +1600,16 @@ impl Engine {
         message: Option<v8::Global<v8::Message>>,
         may_mute: bool,
     ) {
-        let (text, filename, lineno, colno, muted) = {
+        let (text, filename, lineno, colno, muted, stack) = {
             let scope = cx.scope();
             let ex = v8::Local::new(scope, &exception);
+            // (the console shows an error's call frames after its message, as V8 captured them
+            // when it was made: its `stack` property, which the page may redefine, is not read)
+            let stack = if ex.is_native_error() {
+                super::window::captured_stack(scope, ex)
+            } else {
+                String::new()
+            };
             let msg = match &message {
                 Some(m) => Some(v8::Local::new(scope, m)),
                 None => Some(v8::Exception::create_message(scope, ex)),
@@ -1640,11 +1647,19 @@ impl Engine {
                     // "shared cross-origin" (every other script's is, and so is the script V8
                     // gives an exception thrown with no script running).
                     let muted = may_mute && !m.is_shared_cross_origin();
-                    (text, filename, line, col, muted)
+                    (text, filename, line, col, muted, stack)
                 }
-                None => (ex.to_rust_string_lossy(scope), String::new(), 0, 0, false),
+                None => (
+                    ex.to_rust_string_lossy(scope),
+                    String::new(),
+                    0,
+                    0,
+                    false,
+                    stack,
+                ),
             }
         };
+        let console_text = uncaught(&text) + &stack;
         // HTML "report an exception" step 5: a muted script's error is "Script error.", with no
         // URL, position or value (the console, which is not the page's, keeps all of it).
         let (event_text, event_filename, event_lineno, event_colno, error) = if muted {
@@ -1667,13 +1682,13 @@ impl Engine {
             .current_window(cx)
             .filter(|&w| self.context_of_window(w).is_some())
         else {
-            self.console_error(&uncaught(&text));
+            self.console_error(&console_text);
             return;
         };
         // A nested report while the window's error event is dispatching prints instead (the "in error
         // reporting mode" flag).
         if self.in_error_reporting.get() {
-            self.console_error(&uncaught(&text));
+            self.console_error(&console_text);
             return;
         }
         // A script without a name (code `eval` or `Function` made, an exception thrown with no
@@ -1716,7 +1731,7 @@ impl Engine {
             if let Some(doc) = self.associated_document(window) {
                 self.devtools_note_realm(doc);
             }
-            self.console_print_at("error", &uncaught(&text), source);
+            self.console_print_at("error", &console_text, source);
         }
     }
 

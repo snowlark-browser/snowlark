@@ -144,6 +144,7 @@ fn map_fragment_inner<S: Style>(f: &Fragment<S>, m: Flip, view: Flip, line: bool
                 content,
                 containing: b.containing.copied(),
                 clip_reference: b.clip_reference.copied(),
+                strip: b.strip.copied(),
                 stitched: b.stitched.as_ref().map(|r| Box::new(m.rect(**r, size))),
             })
         }

@@ -39,13 +39,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   element, and `align-self: normal` still stretches a button that is a flex or grid item. (ref 216)
 - **Smaller layout differences.** A flex container holding a `display: none` image counts that image's size, and a
   visually hidden absolutely positioned span in an inline-flex label reports an empty rect. (ref 31)
-- **Incremental layout differs from a fresh build in rare cases.** When a text node is edited so that it holds only
-  collapsible white space, the incremental update can keep a text box that a fresh build would not generate. Found with
-  the layout fuzz tests, in `snowlark-layout`. (ref 351)
-- **Inline box background across lines.** A background image on an inline box that wraps across lines is positioned per
-  line piece instead of once for the whole box (for example an external-link icon on a wrapped link). (ref 311)
-- **`getBoundingClientRect()` of an inline.** The rect includes the transformed box of a descendant, where CSSOM View
-  says only the inline's own fragments count. (ref 95)
+- **Incremental layout differs from a fresh build in rare cases.** Found with the layout fuzz tests past their default
+  seeds: an in-place restyle can leave the layout different from a fresh build. (ref 585)
+- **Inline boxes across lines, right to left.** In right-to-left text, an inline box that wraps across lines has its
+  right padding and border on its last line's piece rather than its first. (ref 586)
 - **Geometry under transforms.** A frame's container is placed by its untransformed content box, and an absolutely
   positioned element's containing block chain skips a static transformed ancestor, so that ancestor's clip is missed.
   (ref 99)
@@ -70,8 +67,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   lazy loading of faces nothing uses. Request modifiers on a `src` URL are not parsed. (ref 68)
 - **Animations.** Replacing the effect of a CSS animation (`animation.effect = ...`) does nothing: the element keeps
   the CSS animation's values. Script animations on pseudo-elements do not reach the cascade. (ref 115, 33)
-- **`getComputedStyle()` on pseudo-elements.** `getComputedStyle(el, '::before')` returns empty strings when the
-  pseudo-element generates no box, where the specification asks for its computed values. (ref 96)
+- **`getComputedStyle()` on pseudo-elements.** For a `::before` or `::after` that generates a box, `width` and
+  `height` read their computed value (such as `auto`) rather than the used size. (ref 96)
 - **Highlight pseudo-elements.** The `::selection` highlight covers the font's ascent and descent rather than the line
   box. With no author style, selected text keeps its own color on a translucent blue. `text-shadow` and
   `text-decoration` on `::selection` are not applied, `getComputedStyle(el, '::selection')` returns empty strings, a
@@ -88,8 +85,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## Painting and compositing
 
-- **Rectangular SVG clip paths are not antialiased.** An SVG `clipPath` made of one axis-aligned rectangle is snapped to
-  device pixels, so under a scaling `viewBox` an edge at a fractional position shows a full pixel. (ref 331)
 - **System-font text is not byte-stable between runs.** The same frames can differ by a few bytes from one run to the
   next. The cause is not established. (ref 87)
 - **Canvas 2D.** `ctx.filter` keeps its value but is not applied. Edges of images drawn at fractional coordinates are
@@ -112,9 +107,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## DOM and HTML
 
-- **`<link rel=expect>` does not block rendering.** `blocking=render` on `rel=expect` is not implemented. (ref 58)
-- **A removed stylesheet link can still fire `load`.** A `<link rel=stylesheet>` removed before its sheet arrives still
-  fires `load`. (ref 122)
 - **Text controls.** A textarea does not scroll its own long text, by script or by the user (ref 65).
 - **Selection across shadow trees.** A selection cannot keep its two ends in different trees, so dragging across a
   shadow boundary and `getComposedRanges()` crossing ranges do not work as in other browsers. (ref 62)
@@ -130,8 +122,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `CrossOriginGet`/`Set`. Same-origin `Location` is an ordinary object (it lacks the specified default properties),
   `javascript:` URLs do not run, `<iframe csp>` is not implemented, and the `Origin` interface is missing. On
   non-Windows-x64 targets V8's token check refuses all cross-origin access. (ref 77)
-- **Cross-origin review findings.** Three findings from an independent review of the cross-origin boundary remain
-  open. (ref 78)
+- **Cross-origin review findings.** Two documents at the same `file:` URL compare as same origin, an `about:` document
+  with no browsing context takes the top-level document's origin, and callbacks other than event listeners (timers,
+  observers, animation frames) do not check that their document is still fully active. (ref 78)
 - **Credential Management and Battery details.** Early rejections in Credential Management run in the queued task,
   `getBattery()` creates a fresh rejected promise per call in a cross-origin frame, `parse*OptionsFromJSON` rejects with
   the wrong error, and a truncated body over TLS has no test. (ref 83)
@@ -160,8 +153,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   focus inside hidden SVG containers, `getScreenCTM()` through CSS transforms of HTML ancestors,
   `attributeStyleMap` on SVG elements, and listeners added to an original that should reach its `<use>` instances are
   open. (ref 67)
-- **SMIL crash in headless render.** `--render` of some SMIL animation pages panics with a stale node id roughly one
-  run in three. Timing dependent. (ref 93)
 - **Motion path.** `corner-shape` on the `<coord-box>` path and `rect()` radii in `offset-path` are not supported, and
   a containing block is known only for boxes laid out by a block, flex or grid parent. (ref 43)
 
@@ -213,8 +204,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   (ref 542)
 - **Incognito windows are not finished.** They keep nothing on disk, but open the settings, history and bookmark
   pages in themselves rather than in a regular window, and lose bookmarks added in them when they close. (ref 540)
-- **Devtools Console.** A multi-line paste arrives as one line, so a pasted script that starts with a `//` comment does
-  nothing (ref 576), and uncaught errors are printed without their stack (ref 579).
 
 ## Tooling
 

@@ -747,7 +747,7 @@ impl DevTools {
         }
         match (self.focus, self.panel) {
             (Some(FieldId::ConsoleInput), Panel::Console) => {
-                if let Some(a) = self.console.input_key(key, mods) {
+                if let Some(a) = self.console.input_key(key, mods, clip) {
                     return Some(a);
                 }
             }

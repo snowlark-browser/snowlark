@@ -818,6 +818,60 @@ fn document_domain_decides_same_origin_domain() {
     assert_eq!(eval(page, "isSecurityError(() => same.mark)"), "ok");
 }
 
+/// An `about:blank` document shares its creator's origin with its domain (HTML §7.5.2, §7.1.6): made
+/// by a frame that set `document.domain`, it is same origin-domain with that frame and not with a
+/// same-origin document whose domain is unset, whose script gets a `SecurityError` from it too.
+#[test]
+fn an_about_blank_document_keeps_its_creators_domain() {
+    let config = NetConfig {
+        host_rules: HostRule::parse_list("MAP *.example.test 127.0.0.1"),
+        ..Default::default()
+    };
+    let net = NetThread::start(config).unwrap();
+    let frame = format!(
+        "<!doctype html>{HELPERS}<body><iframe id=g src='/plain.html'></iframe><script>
+         document.domain = 'www.example.test';
+         onload = () => {{
+           const g = document.getElementById('g');
+           g.onload = () => parent.postMessage(attempt(() => g.contentWindow.document.URL), '*');
+           g.src = 'about:blank';
+         }};
+         </script>"
+    );
+    let top_page = format!(
+        "<!doctype html><title>the top</title>{HELPERS}{TOP_SCRIPT}<body>\
+         <iframe id=f src='/f.html'></iframe>"
+    );
+    let port = serve(vec![
+        ("/top.html", top_page),
+        ("/f.html", frame),
+        ("/plain.html", "<!doctype html><title>plain</title>".into()),
+    ]);
+    let mut page = Page::new(PageOptions {
+        net: Some(net.client()),
+        viewport: (800, 600),
+        ..Default::default()
+    });
+    page.navigate(url::Url::parse(&format!("http://www.example.test:{port}/top.html")).unwrap());
+    let page = &mut page;
+    wait_loaded(page);
+    // (the frame that set its domain reaches its about:blank child)
+    wait(page, "got.join()", "about:blank");
+    assert_eq!(
+        eval(page, "isSecurityError(() => frames[0].document)"),
+        "ok"
+    );
+    assert_eq!(eval(page, "frames[0].length"), "1");
+    assert_eq!(
+        eval(page, "isSecurityError(() => frames[0][0].document)"),
+        "ok"
+    );
+    assert_eq!(
+        eval(page, "isSecurityError(() => frames[0][0].location.href)"),
+        "ok"
+    );
+}
+
 /// A `Location` setter is an origin's way to navigate a frame it cannot read.
 #[test]
 fn a_cross_origin_location_can_be_set() {

@@ -153,3 +153,56 @@ fn percent_c_styles_reach_the_developer_tools() {
     assert_eq!(entries[2].styles, vec![(18, red)]);
     assert!(entries[3].styles.is_empty());
 }
+
+/// While the developer tools are open, their line for an uncaught exception or an unhandled
+/// rejection of an error carries the error's call frames after its message, as V8 captured them
+/// when the error was made (the page's own `stack` getter is not run); a thrown value that is not
+/// an error has none.
+#[test]
+fn uncaught_errors_reach_the_developer_tools_with_their_stack() {
+    let mut p = page();
+    p.engine().devtools_console(true);
+    p.capture_error_stacks(true);
+    eval(
+        &mut p,
+        r#"
+        var hits = [];
+        function boom() { throw new Error("6"); }
+        function reject() { return Promise.reject(new TypeError("7")); }
+        setTimeout(() => boom(), 0);
+        setTimeout(() => {
+          const e = new RangeError("8");
+          Object.defineProperty(e, "stack", { get() { hits.push("stack"); return ""; } });
+          throw e;
+        }, 0);
+        setTimeout(() => { throw "plain"; }, 0);
+        setTimeout(() => { reject(); }, 0);
+        "#,
+    );
+    p.run_until_settled(std::time::Duration::from_secs(5));
+    let entries = p.engine().take_console_entries();
+    let errors: Vec<&str> = entries
+        .iter()
+        .filter(|e| e.level == "error")
+        .map(|e| e.text.as_str())
+        .collect();
+    assert_eq!(errors.len(), 4, "{errors:?}");
+    assert!(
+        errors[0].starts_with("Uncaught Error: 6\n    at boom (console-test.js:"),
+        "{:?}",
+        errors[0]
+    );
+    assert!(
+        errors[1].starts_with("Uncaught RangeError: 8\n    at console-test.js:"),
+        "{:?}",
+        errors[1]
+    );
+    assert_eq!(errors[2], "Uncaught plain");
+    assert!(
+        errors[3]
+            .starts_with("Uncaught (in promise) TypeError: 7\n    at reject (console-test.js:"),
+        "{:?}",
+        errors[3]
+    );
+    assert_eq!(eval(&mut p, "hits.join()"), "");
+}

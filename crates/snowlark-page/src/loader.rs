@@ -36,7 +36,10 @@ pub enum Purpose {
     Document(ContextId),
     Script(NodeId),
     Module(String),
-    Stylesheet(NodeId),
+    /// A `link` element's style sheet, and the fetch's number: only the fetch the element still
+    /// waits for is processed (HTML "the link element": a removed element, or one whose `href`
+    /// changed, does not process the resource it was fetching).
+    Stylesheet(NodeId, u32),
     /// A `<link rel=preload>`'s preload (fetched by the network layer's list of preloaded
     /// resources; this job only follows it, for the element's `load` or `error`).
     Preload(NodeId),
@@ -413,6 +416,10 @@ impl DocLoad {
 #[derive(Default)]
 pub struct Loader {
     pub jobs: Vec<FetchJob>,
+    /// The style sheet fetch each `link` element is waiting for (its number: see
+    /// [`Purpose::Stylesheet`]); an element that stopped wanting one has none.
+    pub(crate) sheet_fetches: rustc_hash::FxHashMap<NodeId, u32>,
+    pub(crate) next_sheet_fetch: u32,
     pub scripts: rustc_hash::FxHashMap<NodeId, ScriptState>,
     pub docs: rustc_hash::FxHashMap<NodeId, DocLoad>,
     /// What loading cost, for `--render --trace` and the tests.
@@ -610,7 +617,7 @@ impl Engine {
                 Purpose::Document(_) => "document",
                 Purpose::Script(_) => "script",
                 Purpose::Module(_) => "module",
-                Purpose::Stylesheet(_) => "stylesheet",
+                Purpose::Stylesheet(..) => "stylesheet",
                 Purpose::Preload(_) => "preload",
                 Purpose::ModulePreload(..) => "modulepreload",
                 Purpose::SvgImage(_) => "svg image",
@@ -827,7 +834,7 @@ impl Engine {
             p => {
                 let client_doc = match p {
                     Purpose::Script(el)
-                    | Purpose::Stylesheet(el)
+                    | Purpose::Stylesheet(el, _)
                     | Purpose::SvgImage(el)
                     | Purpose::Preload(el)
                     | Purpose::ModulePreload(el, _) => Some(self.dom().node_document(*el)),
@@ -841,7 +848,7 @@ impl Engine {
                     Purpose::Document(_) => None,
                 };
                 let dest = match p {
-                    Purpose::Stylesheet(_) => snowlark_net::Destination::Style,
+                    Purpose::Stylesheet(..) => snowlark_net::Destination::Style,
                     Purpose::SvgImage(_) => snowlark_net::Destination::Image,
                     // A module script's destination follows its module type.
                     Purpose::Module(key) => match crate::script::split_module_key(key).1 {
@@ -930,7 +937,7 @@ impl Engine {
                         };
                         r.render_blocking = self.render_blocking_element(*el, implicit);
                     }
-                    Purpose::Stylesheet(el) => {
+                    Purpose::Stylesheet(el, _) => {
                         r.nonce = self.nonce_of(*el);
                         r.initiator_type = "link".into();
                         // HTML "create a link request": the link's integrity metadata, and a
@@ -1610,9 +1617,20 @@ impl Engine {
                 }
                 self.module_fetched(cx, &key, body, streamer, cache);
             }
-            Purpose::Stylesheet(el) => {
+            Purpose::Stylesheet(el, fetch) => {
                 let doc = self.dom().node_document(el);
                 self.doc_load(doc, |d| d.load_delayers = d.load_delayers.saturating_sub(1));
+                // (a fetch the element no longer waits for, because it was removed, stopped being
+                // a style sheet link or fetched another `href` since, is not processed: no sheet,
+                // no `load` or `error`)
+                let current = {
+                    let mut l = self.loader.borrow_mut();
+                    let current = l.sheet_fetches.get(&el) == Some(&fetch);
+                    if current {
+                        l.sheet_fetches.remove(&el);
+                    }
+                    current
+                };
                 // HTML "process this type of linked resource" (stylesheet): the response's
                 // Content-Type must be text/css (none, and the unknown type, are let through, as
                 // the engines do), except under the "quirks mode stylesheet" rule: in quirks mode
@@ -1626,8 +1644,9 @@ impl Engine {
                             == self.net_origin_of_document(doc);
                     (css || lax).then_some((body, mime, url)).ok_or(())
                 });
-                match r {
-                    Ok((body, _mime, url)) => {
+                match (current, r) {
+                    (false, _) => {}
+                    (true, Ok((body, _mime, url))) => {
                         // CSS Syntax §3.2 "decode": BOM, the Content-Type charset, `@charset`,
                         // then the document's encoding.
                         let charset = head.and_then(|h| {
@@ -1642,7 +1661,7 @@ impl Engine {
                             self.queue_sheet_event(el, Some(true));
                         }
                     }
-                    Err(()) => {
+                    (true, Err(())) => {
                         self.render_link_sheet(el, None);
                         self.queue_sheet_event(el, Some(false));
                     }
@@ -3406,6 +3425,9 @@ impl Engine {
     /// A `link` element was inserted, or its `rel` or `href` changed: fetch its stylesheet if it is one
     /// (the renderer takes `<style>` sheets from the DOM's reactions itself).
     pub(crate) fn link_element_changed(&self, el: NodeId) {
+        // (whatever changed, the sheet being fetched is not the element's any more: a new fetch
+        // below, if any, is the one it waits for)
+        self.loader.borrow_mut().sheet_fetches.remove(&el);
         if self.dom().is_connected(el) {
             self.link_fetches_ahead(el);
         }
@@ -3463,7 +3485,14 @@ impl Engine {
         if parser_made && media.is_none_or(|m| self.media_query_matches(el, &m)) {
             self.doc_load(doc, |d| d.script_blocking_sheets.insert(el));
         }
-        self.fetch_resource(url, Purpose::Stylesheet(el));
+        let fetch = {
+            let mut l = self.loader.borrow_mut();
+            l.next_sheet_fetch = l.next_sheet_fetch.wrapping_add(1);
+            let fetch = l.next_sheet_fetch;
+            l.sheet_fetches.insert(el, fetch);
+            fetch
+        };
+        self.fetch_resource(url, Purpose::Stylesheet(el, fetch));
     }
 
     /// HTML "process the linked resource" (style sheet) and "update a `style` block" step 9: in an

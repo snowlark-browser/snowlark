@@ -443,20 +443,22 @@ impl Engine {
         }
     }
 
-    /// "Uncaught (in promise) …" for an unhandled rejection, with the reason's position when it is
-    /// an error object.
+    /// "Uncaught (in promise) …" for an unhandled rejection, with the reason's position and call
+    /// frames when it is an error object.
     pub(crate) fn console_rejection(
         &self,
         cx: &mut Cx,
         reason: Option<&v8::Global<v8::Value>>,
         text: &str,
     ) {
+        let mut stack = String::new();
         let source = reason.and_then(|g| {
             let scope = cx.scope();
             let v = v8::Local::new(scope, g);
             if !v.is_native_error() {
                 return None;
             }
+            stack = crate::engine::window::captured_stack(scope, v);
             let m = v8::Exception::create_message(scope, v);
             let url = m
                 .get_script_resource_name(scope)
@@ -468,7 +470,7 @@ impl Engine {
                 column: u32::try_from(m.get_start_column()).map_or(0, |c| c + 1),
             })
         });
-        let text = format!("Uncaught (in promise) {text}");
+        let text = format!("Uncaught (in promise) {text}{stack}");
         match source {
             Some(s) => self.console_print_at("error", &text, Some(s)),
             None => self.console_error(&text),

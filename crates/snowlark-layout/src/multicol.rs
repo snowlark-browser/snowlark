@@ -2260,6 +2260,7 @@ fn piece<S: Style>(
             content,
             containing: b.containing.copied(),
             clip_reference: Default::default(),
+            strip: Default::default(),
             stitched,
         }),
         children,

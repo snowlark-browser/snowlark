@@ -392,6 +392,32 @@ fn inserted_and_removed_children_update_their_container() {
     assert!(rect(&f, a).y < rect(&f, p).y);
 }
 
+/// An element restyled in the same batch that removed and freed one of its text children: the
+/// restyle in place passes over the freed node's box (its container is regenerated for the
+/// removal) rather than asking the DOM about it.
+#[test]
+fn a_restyle_in_place_skips_the_box_of_a_freed_text_child() {
+    let (mut t, [_, b, _, _]) = page();
+    t.run(200.0, 400.0);
+    let before = t.doc.dom.first_child(b).unwrap();
+    t.doc.dom.remove_node(before);
+    t.doc.dom.free_subtree(before);
+    t.doc.restyle(b, |s| s.color = Color::rgb(200, 0, 0));
+    let mut changes = restyled(b, BoxDamage::Repaint);
+    changes.children.push(b);
+    update(&mut t, changes);
+    let f = t.relayout();
+    let mut texts = Vec::new();
+    f.walk(&mut |fr, _| {
+        if let FragmentKind::Text(text) = &fr.kind {
+            if let Some(n) = text.node {
+                texts.push(n);
+            }
+        }
+    });
+    assert!(!texts.contains(&before));
+}
+
 #[test]
 fn text_changes_update_text_boxes_in_place() {
     let (mut t, [_, b, ..]) = page();

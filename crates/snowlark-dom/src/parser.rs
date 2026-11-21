@@ -193,7 +193,9 @@ impl<D: Borrow<RefCell<Dom>>> TreeSink for DomSink<D> {
             bits |= element_flags::HAD_DUPLICATE_ATTRIBUTES;
         }
         if !self.fragment {
-            bits |= element_flags::PARSER_INSERTED;
+            // (html5ever pushes every element it creates onto the stack of open elements, and
+            // reports each removal from it to `pop`)
+            bits |= element_flags::PARSER_INSERTED | element_flags::OPEN_IN_PARSER;
         }
         if ((self.fragment && !self.run_scripts) || !self.scripting) && dom.is_script_element(el) {
             // (HTML does this for its own at the start tag: these scripts never run, nor do their
@@ -395,10 +397,13 @@ impl<D: Borrow<RefCell<Dom>>> TreeSink for DomSink<D> {
     /// An element was popped off the stack of open elements: for an `option`, HTML's "maybe clone an option
     /// into selectedcontent" (the vendored html5ever reports every pop, also those at the end of input).
     fn pop(&self, node: &NodeId) {
-        let is_option = self
-            .cell()
-            .borrow()
-            .is_html_element_named(*node, &local_name!("option"));
+        let is_option = {
+            let mut dom = self.dom();
+            if !self.fragment && dom.is_alive(*node) && dom.is_element(*node) {
+                dom.set_element_flag(*node, element_flags::OPEN_IN_PARSER, false);
+            }
+            dom.is_html_element_named(*node, &local_name!("option"))
+        };
         if is_option {
             self.clone_option_into_selectedcontent(*node);
         }

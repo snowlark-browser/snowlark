@@ -1503,6 +1503,7 @@ fn adjust_cell<S: Style>(
             content: b.content.clone(),
             containing: Default::default(),
             clip_reference: Default::default(),
+            strip: Default::default(),
             stitched: None,
         }),
         children,
