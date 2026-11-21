@@ -4308,6 +4308,9 @@ impl StyleEngine {
         element: NodeId,
         pseudo: &PseudoElement,
     ) -> Option<Arc<ComputedValues>> {
+        if pseudo.is_highlight_pseudo() {
+            return self.highlight_style(dom, data, element, pseudo);
+        }
         let primary = self.computed_style(dom, data, element)?;
         let style = if pseudo.is_eager() {
             if data.styles(element).is_some() {
@@ -4356,6 +4359,145 @@ impl StyleEngine {
             )
             .build()
         }))
+    }
+
+    /// The style of a highlight pseudo-element of `element` (`::selection`, `::target-text`,
+    /// `::spelling-error`, `::grammar-error`), as `getComputedStyle()` reads it. CSS
+    /// Pseudo-Elements 4 §3.5 (highlight inheritance): a property that applies to highlights (§3.2)
+    /// and has no value from the cascade takes the value of the same highlight of the originating
+    /// element's parent, inherited or not; custom properties inherit from the originating element,
+    /// and every other property is the originating element's (they do not apply, so font-relative
+    /// units resolve against its font). `color: currentcolor` is the originating element's color.
+    /// `None` for an element without a style.
+    pub fn highlight_style(
+        &self,
+        dom: &Dom,
+        data: &StyleData,
+        element: NodeId,
+        pseudo: &PseudoElement,
+    ) -> Option<Arc<ComputedValues>> {
+        let primary = self.computed_style(dom, data, element)?;
+        let parent = crate::handle::flat_parent(dom, data, element)
+            .filter(|&p| dom.is_element(p))
+            .and_then(|p| self.highlight_style(dom, data, p, pseudo));
+        let device = self.stylist.device();
+        // What the cascade inherits from: the originating element, with the parent highlight's
+        // inherited highlight properties.
+        let base = match &parent {
+            Some(parent) => {
+                let mut b = style::properties::StyleBuilder::for_derived_style(
+                    device,
+                    Some(&self.stylist),
+                    &primary,
+                    None,
+                );
+                b.rules = primary.rules.clone();
+                let text = parent.get_inherited_text();
+                let t = b.mutate_inherited_text();
+                t.copy_color_from(text);
+                t.copy_text_shadow_from(text);
+                t.copy_text_underline_offset_from(text);
+                t.copy_text_underline_position_from(text);
+                let svg = parent.get_inherited_svg();
+                let s = b.mutate_inherited_svg();
+                s.copy_fill_from(svg);
+                s.copy_stroke_from(svg);
+                s.copy_stroke_width_from(svg);
+                b.build()
+            }
+            None => primary.clone(),
+        };
+        let entered = !thread_state::get().is_layout();
+        if entered {
+            thread_state::enter(ThreadState::LAYOUT);
+        }
+        let own = self.guards_and_view(dom, data, |shared, view| {
+            if pseudo.is_eager() {
+                // (cascaded with the element: its rules are those of the stored style)
+                let inputs = match self.pseudo_style(dom, data, element, pseudo) {
+                    Some(s) => style::context::CascadeInputs::new_from_style(&s),
+                    None => {
+                        let mut i = style::context::CascadeInputs::new_from_style(&primary);
+                        i.rules = None;
+                        i.visited_rules = None;
+                        i
+                    }
+                };
+                Some(self.stylist.compute_pseudo_element_style_with_inputs(
+                    inputs,
+                    pseudo,
+                    &shared.guards,
+                    Some(&base),
+                    Some(view.element(element)),
+                ))
+            } else {
+                self.stylist.lazily_compute_pseudo_element_style(
+                    &shared.guards,
+                    view.element(element),
+                    pseudo,
+                    RuleInclusion::All,
+                    &base,
+                    false,
+                    None,
+                )
+            }
+        });
+        if entered {
+            thread_state::exit(ThreadState::LAYOUT);
+        }
+        let own = own.unwrap_or_else(|| {
+            style::properties::StyleBuilder::for_inheritance(
+                device,
+                Some(&self.stylist),
+                Some(&base),
+                Some(pseudo),
+            )
+            .build()
+        });
+        let color = declared_kind(data, &own, LonghandId::Color);
+        let reset = [
+            LonghandId::BackgroundColor,
+            LonghandId::TextDecorationLine,
+            LonghandId::TextDecorationStyle,
+            LonghandId::TextDecorationColor,
+            LonghandId::TextDecorationThickness,
+        ]
+        .map(|id| parent.is_some() && declared_kind(data, &own, id) == DeclaredColor::No);
+        if color != DeclaredColor::CurrentColor && !reset.contains(&true) {
+            return Some(own);
+        }
+        let mut b = style::properties::StyleBuilder::for_derived_style(
+            device,
+            Some(&self.stylist),
+            &own,
+            None,
+        );
+        b.rules = own.rules.clone();
+        if color == DeclaredColor::CurrentColor {
+            b.mutate_inherited_text()
+                .copy_color_from(primary.get_inherited_text());
+        }
+        if let Some(parent) = &parent {
+            if reset[0] {
+                b.mutate_background()
+                    .copy_background_color_from(parent.get_background());
+            }
+            let text = parent.get_text();
+            let t = b.mutate_text();
+            if reset[1] {
+                t.copy_text_decoration_line_from(text);
+            }
+            if reset[2] {
+                t.copy_text_decoration_style_from(text);
+            }
+            if reset[3] {
+                t.copy_text_decoration_color_from(text);
+            }
+            if reset[4] {
+                t.copy_text_decoration_thickness_from(text);
+            }
+        }
+        Some(b.build())
     }
 
     /// The style of a part of `element`'s internal tree (`::-webkit-progress-bar`, the meter's value
@@ -4715,11 +4857,19 @@ pub fn highlight_colors_declared(
     data: &StyleData,
     values: &ComputedValues,
 ) -> (DeclaredColor, DeclaredColor) {
+    (
+        declared_kind(data, values, LonghandId::Color),
+        declared_kind(data, values, LonghandId::BackgroundColor),
+    )
+}
+
+/// What the author and user declarations behind `values` give the longhand `id` (the first one
+/// found from the rule node up is the one the cascade uses): see [`DeclaredColor`].
+fn declared_kind(data: &StyleData, values: &ComputedValues, id: LonghandId) -> DeclaredColor {
     use style::properties::{CSSWideKeyword, PropertyDeclarationId};
     use style::values::specified::Color;
-    let none = (DeclaredColor::No, DeclaredColor::No);
     let Some(rules) = values.rules.as_ref() else {
-        return none;
+        return DeclaredColor::No;
     };
     let ua_lock = SharedRwLock::read_only();
     let ua_guard = ua_lock.read();
@@ -4728,38 +4878,32 @@ pub fn highlight_colors_declared(
         author: &author_guard,
         ua_or_user: &ua_guard,
     };
-    let declared = |id: LonghandId| {
-        rules
-            .self_and_ancestors()
-            .find_map(|node| {
-                let level = node.cascade_level();
-                if matches!(level.origin(), style::rule_tree::CascadeOrigin::UA) {
-                    return None;
+    rules
+        .self_and_ancestors()
+        .find_map(|node| {
+            let level = node.cascade_level();
+            if matches!(level.origin(), style::rule_tree::CascadeOrigin::UA) {
+                return None;
+            }
+            let source = node.style_source()?;
+            let block = source.read(level.guard(&guards));
+            let (declaration, _) = block.get(PropertyDeclarationId::Longhand(id))?;
+            Some(match declaration {
+                PropertyDeclaration::CSSWideKeyword(w)
+                    if matches!(w.keyword, CSSWideKeyword::Inherit | CSSWideKeyword::Unset) =>
+                {
+                    DeclaredColor::No
                 }
-                let source = node.style_source()?;
-                let block = source.read(level.guard(&guards));
-                let (declaration, _) = block.get(PropertyDeclarationId::Longhand(id))?;
-                Some(match declaration {
-                    PropertyDeclaration::CSSWideKeyword(w)
-                        if matches!(w.keyword, CSSWideKeyword::Inherit | CSSWideKeyword::Unset) =>
-                    {
-                        DeclaredColor::No
-                    }
-                    PropertyDeclaration::Color(c) if c.0 == Color::CurrentColor => {
-                        DeclaredColor::CurrentColor
-                    }
-                    PropertyDeclaration::BackgroundColor(c) if *c == Color::CurrentColor => {
-                        DeclaredColor::CurrentColor
-                    }
-                    _ => DeclaredColor::Value,
-                })
+                PropertyDeclaration::Color(c) if c.0 == Color::CurrentColor => {
+                    DeclaredColor::CurrentColor
+                }
+                PropertyDeclaration::BackgroundColor(c) if *c == Color::CurrentColor => {
+                    DeclaredColor::CurrentColor
+                }
+                _ => DeclaredColor::Value,
             })
-            .unwrap_or(DeclaredColor::No)
-    };
-    (
-        declared(LonghandId::Color),
-        declared(LonghandId::BackgroundColor),
-    )
+        })
+        .unwrap_or(DeclaredColor::No)
 }
 
 fn important_declaration(data: &StyleData, values: &ComputedValues, id: LonghandId) -> bool {

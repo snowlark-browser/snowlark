@@ -57,6 +57,10 @@ pub enum PseudoElement {
     Backdrop,
     DetailsContent,
     Marker,
+    // Snowlark patch: the highlight pseudo-elements besides `::selection` (CSS Pseudo 4 §3.1).
+    TargetText,
+    SpellingError,
+    GrammarError,
 
     // Implemented pseudos. These pseudo elements are representing the
     // elements within an UA shadow DOM, and matching the elements with
@@ -108,6 +112,9 @@ impl ToCss for PseudoElement {
             Backdrop => "::backdrop",
             DetailsContent => "::details-content",
             Marker => "::marker",
+            TargetText => "::target-text",
+            SpellingError => "::spelling-error",
+            GrammarError => "::grammar-error",
             ColorSwatch => "::color-swatch",
             FileSelectorButton => "::file-selector-button",
             Placeholder => "::placeholder",
@@ -183,7 +190,8 @@ impl PseudoElement {
 
     /// An array of `None`, one per pseudo-element.
     pub fn pseudo_none_array<T>() -> [Option<T>; PSEUDO_COUNT] {
-        Default::default()
+        // Snowlark patch: more than 32 pseudo-elements (arrays that long have no `Default`).
+        std::array::from_fn(|_| None)
     }
 
     /// Creates a pseudo-element from an eager index.
@@ -299,6 +307,9 @@ impl PseudoElement {
             | PseudoElement::ColorSwatch
             | PseudoElement::FileSelectorButton
             | PseudoElement::Marker
+            | PseudoElement::TargetText
+            | PseudoElement::SpellingError
+            | PseudoElement::GrammarError
             | PseudoElement::Placeholder
             | PseudoElement::DetailsContent
             | PseudoElement::SliderFill
@@ -344,6 +355,11 @@ impl PseudoElement {
                 PropertyFlags::APPLIES_TO_MARKER
             },
             PseudoElement::Placeholder => PropertyFlags::APPLIES_TO_PLACEHOLDER,
+            // Snowlark patch: CSS Pseudo 4 §3.2, the properties that apply to highlights.
+            PseudoElement::Selection
+            | PseudoElement::TargetText
+            | PseudoElement::SpellingError
+            | PseudoElement::GrammarError => PropertyFlags::APPLIES_TO_HIGHLIGHT,
             _ => return None,
         })
     }
@@ -376,7 +392,16 @@ impl PseudoElement {
     /// Whether this pseudo-element is the ::target-text pseudo.
     #[inline]
     pub fn is_target_text(&self) -> bool {
-        false
+        *self == PseudoElement::TargetText
+    }
+
+    /// Snowlark patch: whether this is one of the highlight pseudo-elements (CSS Pseudo 4 §3.1).
+    #[inline]
+    pub fn is_highlight_pseudo(&self) -> bool {
+        matches!(
+            self,
+            Self::Selection | Self::TargetText | Self::SpellingError | Self::GrammarError
+        )
     }
 
     /// Whether this is a highlight pseudo-element that is styled lazily during
@@ -786,6 +811,9 @@ impl<'a, 'i> ::selectors::Parser<'i> for SelectorParser<'a> {
             "file-selector-button" => FileSelectorButton,
             "first-letter" => FirstLetter,
             "marker" => Marker,
+            "target-text" => TargetText,
+            "spelling-error" => SpellingError,
+            "grammar-error" => GrammarError,
             "details-content" => DetailsContent,
             "color-swatch" => ColorSwatch,
             "placeholder" => Placeholder,

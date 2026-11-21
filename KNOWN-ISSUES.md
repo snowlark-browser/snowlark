@@ -71,9 +71,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `height` read their computed value (such as `auto`) rather than the used size. (ref 96)
 - **Highlight pseudo-elements.** The `::selection` highlight covers the font's ascent and descent rather than the line
   box. With no author style, selected text keeps its own color on a translucent blue. `text-shadow` and
-  `text-decoration` on `::selection` are not applied, `getComputedStyle(el, '::selection')` returns empty strings, a
-  selected replaced element gets no highlight, and the painted selection's colors are not resolved again when only
-  styles change. (ref 502)
+  `text-decoration` on `::selection` are not applied, a selected replaced element gets no highlight, and the painted
+  selection's colors are not resolved again when only styles change. `::highlight()` and `::search-text` are not
+  parsed. (ref 502)
 - **`clip-path`.** `margin-box` resolves percentage and `auto` margins against the box's own width. `url()` on a
   pseudo-element does not clip, a `clip-path` on a shape inside a `<clipPath>` is ignored, and `url()` to a
   `<clipPath>` in another document names nothing. (ref 63)
@@ -211,9 +211,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   too slow to crash. The Media Source test `an_append_ends_once_however_the_media_side_reports_it` fails in a debug
   build (its `update` and `updateend` events arrive after the check) and passes in optimised builds. (ref 56, 91, 560)
 - **Other test-suite problems.** Debug-profile tests overflow their stack in `snowlark-ipc` and `snowlark-js` (ref 562);
-  `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572); the WPT files
-  `navigation-timing/test-document-open.html` and `fetch/api/abort/general.any.html` vary from run to run (ref 60,
-  563); a headless Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py`
-  can read one arm slower than the other for the same binary when the arms share a core (ref 509).
+  `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572), and its test
+  `compositor_animations::events_of_a_seek_in_an_event_handler_still_fire` fails now and then (ref 594); the WPT files
+  `navigation-timing/test-document-open.html`, `fetch/api/abort/general.any.html` and
+  `css/css-pseudo/text-selection.html` vary from run to run (ref 60, 563, 595); a headless
+  Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py` can read one arm slower than the other for the same binary when the arms share a core (ref 509).
 - **Reftest hangs.** Two reftests, `background-size-near-zero-png` and the flexbox `flex-1-N-N-shrink` pages, hang in
   the runner in ways its watchdog cannot stop. (ref 39)

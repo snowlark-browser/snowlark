@@ -29,6 +29,11 @@ pub enum Pseudo {
     Before,
     After,
     Marker,
+    /// The highlight pseudo-elements (CSS Pseudo-Elements 4 §3.1).
+    Selection,
+    TargetText,
+    SpellingError,
+    GrammarError,
     /// Not a pseudo-element this engine knows: every value is empty.
     Unknown,
 }
@@ -149,6 +154,10 @@ fn parse_pseudo(p: Option<&str>) -> Pseudo {
         "::before" | ":before" => Pseudo::Before,
         "::after" | ":after" => Pseudo::After,
         "::marker" => Pseudo::Marker,
+        "::selection" => Pseudo::Selection,
+        "::target-text" => Pseudo::TargetText,
+        "::spelling-error" => Pseudo::SpellingError,
+        "::grammar-error" => Pseudo::GrammarError,
         _ => Pseudo::Unknown,
     }
 }
@@ -264,6 +273,10 @@ impl Engine {
             Pseudo::Before => Some(snowlark_style::PseudoElement::Before),
             Pseudo::After => Some(snowlark_style::PseudoElement::After),
             Pseudo::Marker => Some(snowlark_style::PseudoElement::Marker),
+            Pseudo::Selection => Some(snowlark_style::PseudoElement::Selection),
+            Pseudo::TargetText => Some(snowlark_style::PseudoElement::TargetText),
+            Pseudo::SpellingError => Some(snowlark_style::PseudoElement::SpellingError),
+            Pseudo::GrammarError => Some(snowlark_style::PseudoElement::GrammarError),
             Pseudo::Unknown => return String::new(),
         };
         match pseudo_el {
@@ -924,5 +937,8 @@ mod tests {
         assert_eq!(parse_pseudo(Some("::BEFORE")), Pseudo::Before);
         assert_eq!(parse_pseudo(Some("before")), Pseudo::None);
         assert_eq!(parse_pseudo(Some("::bogus")), Pseudo::Unknown);
+        assert_eq!(parse_pseudo(Some("::Selection")), Pseudo::Selection);
+        assert_eq!(parse_pseudo(Some("::selection:")), Pseudo::Unknown);
+        assert_eq!(parse_pseudo(Some(":selection")), Pseudo::Unknown);
     }
 }

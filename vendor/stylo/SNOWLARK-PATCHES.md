@@ -421,5 +421,15 @@ the source; `git log -p vendor/stylo` shows the diff.
    `a`, `g`, `use`, `tspan` and `textPath`; MathML elements) only in the gecko build. The servo build now
    does the same, comparing local names as strings; pseudo-elements keep `contents`.
 
+74. **The highlight pseudo-elements** (`servo/selector_parser.rs`, `properties/data.py`, `properties/mod.rs`,
+   `properties/properties.mako.rs`; CSS Pseudo-Elements 4 §3): the servo build parses `::target-text`,
+   `::spelling-error` and `::grammar-error` (lazy, like the other pseudo-elements the traversal does not
+   style) and has `is_highlight_pseudo()`. A new property flag, `APPLIES_TO_HIGHLIGHT` (`color`,
+   `background-color`, `text-decoration` and its longhands, `text-underline-offset`, `text-underline-position`,
+   `text-shadow`, `fill`, `stroke`, `stroke-width`; §3.2), is the property restriction of those three and of
+   `::selection`, so their cascade ignores every other property (custom properties pass, as for the other
+   restrictions). `pseudo_none_array` is built with `std::array::from_fn`: with more than 32 pseudo-elements
+   the array has no `Default`.
+
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

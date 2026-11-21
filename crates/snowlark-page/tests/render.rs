@@ -56,6 +56,45 @@ fn painted_glyphs_and_carets(page: &mut Page) -> (usize, usize) {
     (glyphs, carets)
 }
 
+/// CSS Pseudo-Elements 4 §3.5: a highlight pseudo-element's computed style inherits its highlight
+/// properties from the parent's highlight, reset ones too; custom properties and the properties
+/// that do not apply to highlights are the originating element's; `color: currentcolor` is the
+/// originating element's color.
+#[test]
+fn highlight_pseudo_elements_inherit_from_the_parent_highlight() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>
+           body { --v: body }
+           #p { color: rgb(0, 0, 9); font-size: 10px }
+           #p::selection { color: rgb(1, 2, 3); background-color: rgb(4, 5, 6); --v: own }
+           #p::target-text { background-color: rgb(7, 8, 9) }
+           *::selection { font-size: 40px }
+           #c::selection { text-shadow: rgb(0, 0, 0) 1em 0 }
+           #d::spelling-error { color: currentcolor; background-color: currentcolor }
+         </style>
+         <div id=p><span id=c style='font-size: 20px'></span><span id=d></span></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const p = getComputedStyle(document.getElementById('p'), '::selection');
+         const c = getComputedStyle(document.getElementById('c'), '::selection');
+         const t = getComputedStyle(document.getElementById('c'), '::target-text');
+         const d = getComputedStyle(document.getElementById('d'), '::spelling-error');
+         const bad = getComputedStyle(document.getElementById('c'), '::selection:');
+         [p.color, p.backgroundColor, p.getPropertyValue('--v'), p.fontSize,
+          c.color, c.backgroundColor, c.getPropertyValue('--v'), c.fontSize, c.textShadow,
+          t.backgroundColor, d.color, d.backgroundColor, bad.color === ''].join('|')",
+    );
+    assert_eq!(
+        r,
+        "rgb(1, 2, 3)|rgb(4, 5, 6)|own|10px\
+         |rgb(1, 2, 3)|rgb(4, 5, 6)|body|20px|rgb(0, 0, 0) 20px 0px 0px\
+         |rgb(7, 8, 9)|rgb(0, 0, 9)|rgb(0, 0, 9)|true"
+    );
+}
+
 #[test]
 fn script_changes_to_controls_show_at_the_next_rendering_update() {
     let net = NetThread::start(NetConfig::default()).unwrap();
