@@ -655,6 +655,28 @@ impl Engine {
         self.pointer.borrow_mut().doc_drag = Some(drag);
     }
 
+    /// The element of `doc` under `top` (a top-level viewport point), or its nearest ancestor,
+    /// that contains text: where a drag's focus is looked for. `None` where the point is over
+    /// nothing of `doc` (outside it, or over another document's frame).
+    fn text_scope_under(&self, doc: NodeId, top: Point) -> Option<NodeId> {
+        let hit = self.hit_element(top)?;
+        let dom = self.dom();
+        if dom.node_document(hit.element) != doc {
+            return None;
+        }
+        let mut cur = Some(hit.element);
+        while let Some(el) = cur {
+            if dom
+                .descendants(el)
+                .any(|n| dom.is_text(n) && dom.length(n) > 0)
+            {
+                return Some(el);
+            }
+            cur = dom.parent_element(el);
+        }
+        None
+    }
+
     /// The pointer moved to `top` (top-level viewport) with the button held after a press in a
     /// document: the selection follows by its unit.
     pub(crate) fn doc_pointer_dragged(&self, top: Point) {
@@ -676,7 +698,12 @@ impl Engine {
         }
         let origin = self.doc_origin_in_top(drag.doc);
         let p = Point::new(top.x - origin.x, top.y - origin.y);
-        let within = self.editing_host(drag.anchor.0 .0);
+        // The focus is the position for the point in what is under the pointer, as for the press
+        // (CSSOM View's caret position for a point hit tests first): text elsewhere on the same
+        // line, such as a side column's beside a gap between paragraphs, is not a candidate.
+        let within = self
+            .editing_host(drag.anchor.0 .0)
+            .or_else(|| self.text_scope_under(drag.doc, top));
         let Some(at) = self.caret_at_point(drag.doc, p, within) else {
             return;
         };
@@ -826,6 +853,7 @@ impl Engine {
                             end: byte_of(s, b) as u32,
                             highlight: None,
                             continues: true,
+                            shadows: 0,
                         },
                     );
                     last = Some(n);
@@ -856,9 +884,24 @@ impl Engine {
             let colors = self
                 .with_style(el, |rr| rr.selection_colors(&origins))
                 .unwrap_or_default();
+            // and so are its highlight's `text-shadow`s (§3.2), each element's list kept once.
+            let shadows = self
+                .with_style(el, |rr| rr.selection_shadows(&origins))
+                .unwrap_or_default();
+            let mut kept: Vec<u32> = vec![0; origins.len()];
             for (n, i) in styled {
-                if let (Some(range), Some(&Some(c))) = (sel.ranges.get_mut(&n), colors.get(i)) {
+                let Some(range) = sel.ranges.get_mut(&n) else {
+                    continue;
+                };
+                if let Some(&Some(c)) = colors.get(i) {
                     range.highlight = Some(c);
+                }
+                if let Some(list) = shadows.get(i).filter(|l| !l.is_empty()) {
+                    if kept[i] == 0 {
+                        sel.shadows.push(list.clone());
+                        kept[i] = sel.shadows.len() as u32;
+                    }
+                    range.shadows = kept[i];
                 }
             }
             // A replaced element is covered by its highlight's background, drawn translucent if

@@ -2114,36 +2114,90 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
             Some(self.text.metrics(run.font, run.size))
         };
         let width = size.width;
-        let decorate = |out: &mut DisplayListBuilder, over_text: bool| {
+        // (`lines`: underlines and overlines, line-throughs or both; `shift` and `paint` move and
+        // recolor them for a shadow)
+        let decorate = |out: &mut DisplayListBuilder,
+                        lines: Lines,
+                        shift: Point,
+                        paint: Option<Color>| {
             let Some(m) = metrics else {
                 return;
             };
             let thickness = m.underline_thickness.max(1.0);
+            let (x, base) = (at.x + shift.x, origin.y + shift.y);
             for d in &t.decorations {
+                let color = paint.unwrap_or(d.color);
                 let mut line = |y: f32, th: f32| {
-                    out.fill_rect(Rect::new(at.x, y, width, th), d.color);
+                    out.fill_rect(Rect::new(x, y, width, th), color);
                     if d.style == TextDecorationStyle::Double {
-                        out.fill_rect(Rect::new(at.x, y + th * 2.0, width, th), d.color);
+                        out.fill_rect(Rect::new(x, y + th * 2.0, width, th), color);
                     }
                 };
-                if over_text {
-                    if d.line.contains(TextDecorationLine::LINE_THROUGH) {
-                        line(
-                            origin.y + m.strikeout_offset,
-                            m.strikeout_thickness.max(1.0),
-                        );
+                if lines != Lines::Through {
+                    if d.line.contains(TextDecorationLine::UNDERLINE) {
+                        line(base + m.underline_offset, thickness);
                     }
-                    continue;
+                    if d.line.contains(TextDecorationLine::OVERLINE) {
+                        line(base - m.ascent, thickness);
+                    }
                 }
-                if d.line.contains(TextDecorationLine::UNDERLINE) {
-                    line(origin.y + m.underline_offset, thickness);
-                }
-                if d.line.contains(TextDecorationLine::OVERLINE) {
-                    line(origin.y - m.ascent, thickness);
+                if lines != Lines::UnderOver && d.line.contains(TextDecorationLine::LINE_THROUGH) {
+                    line(base + m.strikeout_offset, m.strikeout_thickness.max(1.0));
                 }
             }
         };
-        decorate(self.out, false);
+        let glyphs = (&self.glyphs, &self.advances, &self.offsets);
+        let draw = |out: &mut DisplayListBuilder, origin: Point, color: Color| {
+            out.text(
+                glyphs.0,
+                glyphs.1,
+                glyphs.2,
+                origin,
+                run.font,
+                run.size,
+                color,
+                run.bidi_level,
+            );
+            if run.upright && c0 < c1 {
+                out.last_text_sideways();
+            }
+        };
+        // Text shadows (CSS Text Decoration 3 §4): below the text and its decorations, each the
+        // text and decorations in the shadow's color, moved by its offset and blurred with a
+        // standard deviation of half its blur radius; the first shadow on top.
+        let shadow = |out: &mut DisplayListBuilder, sh: &Shadow| {
+            if sh.color.is_transparent() {
+                return;
+            }
+            let shift = Point::new(sh.offset_x, sh.offset_y);
+            let sigma = sh.blur.max(0.0) / 2.0;
+            if sigma > 0.0 {
+                // (the glyphs' reach as the partly selected clips below take it, then the blur's)
+                let content = Rect::new(
+                    at.x + shift.x - 2.0 * run.size,
+                    origin.y + shift.y - 4.0 * run.size,
+                    width.abs() + 4.0 * run.size,
+                    8.0 * run.size,
+                );
+                let blur = [FilterOp::Blur(sigma)];
+                out.push_filter(&blur, snowlark_paint::filter::map_rect(&blur, content));
+            }
+            decorate(out, Lines::UnderOver, shift, Some(sh.color));
+            if c0 < c1 {
+                draw(
+                    out,
+                    Point::new(origin.x + shift.x, origin.y + shift.y),
+                    sh.color,
+                );
+            }
+            decorate(out, Lines::Through, shift, Some(sh.color));
+            if sigma > 0.0 {
+                out.pop_filter();
+            }
+        };
+        for i in (0..s.text_shadow_count()).rev() {
+            shadow(self.out, &s.text_shadow(i));
+        }
         // Find in page: the matches behind the text (the selection, below, over them).
         if let Some((find, n)) = self.find.zip(t.node) {
             if let Some(ranges) = find.ranges.get(&n) {
@@ -2175,9 +2229,9 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
             }
         }
         // The selection (CSS Pseudo-Elements 4 §3.6): the highlight's background behind the selected
-        // part, and that part of the text in the highlight's `color`.
-        // (the selected part's left and right edges, `None` at an end of the fragment, and its color)
-        let mut recolored: Option<(Option<f32>, Option<f32>, Color)> = None;
+        // part, its `text-shadow`s over that, and the part's text and the originating element's
+        // decorations in the highlight's `color` (§3.6.3; the text's own color where it has none).
+        let mut part: Option<SelectedPart> = None;
         let selected = self
             .selection
             .zip(t.node)
@@ -2213,59 +2267,70 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                             background,
                         );
                     }
-                    if let Some(c) = highlight_color.filter(|c| *c != color) {
-                        recolored = Some((
-                            (lo > t.text_range.start).then_some(x0),
-                            (hi < t.text_range.end).then_some(x1),
-                            c,
-                        ));
+                    let shadows = (r.shadows as usize)
+                        .checked_sub(1)
+                        .and_then(|i| sel.shadows.get(i))
+                        .map_or(&[][..], |v| &v[..]);
+                    part = Some((
+                        (lo > t.text_range.start).then_some(x0),
+                        (hi < t.text_range.end).then_some(x1),
+                        highlight_color.unwrap_or(color),
+                        shadows,
+                    ));
+                }
+            }
+        }
+        // Partly selected, each pass is painted once per part, clipped to it, so that a glyph the
+        // boundary crosses (a ligature, an overhang) and a decoration change color at the boundary.
+        // (the clips are open where the fragment ends, and taller than any glyph; `Some` is the
+        // selected part's color)
+        let reach = size.width.abs() + 4.0 * run.size;
+        let (clip_top, clip_height) = (origin.y - 4.0 * run.size, 8.0 * run.size);
+        let (start, end) = (at.x - reach, at.x + reach);
+        let pieces = part.map(|(left, right, c, _)| {
+            let (x0, x1) = (
+                left.map_or(start, |x| at.x + x),
+                right.map_or(end, |x| at.x + x),
+            );
+            [
+                left.map(|_| (start, x0, None)),
+                Some((x0, x1, Some(c))),
+                right.map(|_| (x1, end, None)),
+            ]
+        });
+        let in_pieces =
+            |out: &mut DisplayListBuilder, f: &dyn Fn(&mut DisplayListBuilder, Option<Color>)| {
+                match &pieces {
+                    None => f(out, None),
+                    Some([None, Some((_, _, c)), None]) => f(out, *c),
+                    Some(list) => {
+                        for &(a, b, c) in list.iter().flatten() {
+                            out.push_clip_rect(Rect::new(a, clip_top, b - a, clip_height));
+                            f(out, c);
+                            out.pop_clip();
+                        }
                     }
                 }
+            };
+        if let Some((left, right, _, shadows)) = part.filter(|p| !p.3.is_empty()) {
+            let x0 = left.map_or(start, |x| at.x + x);
+            let x1 = right.map_or(end, |x| at.x + x);
+            self.out
+                .push_clip_rect(Rect::new(x0, clip_top, x1 - x0, clip_height));
+            for sh in shadows.iter().rev() {
+                shadow(self.out, sh);
             }
+            self.out.pop_clip();
         }
-        let glyphs = (&self.glyphs, &self.advances, &self.offsets);
-        let draw = |out: &mut DisplayListBuilder, color: Color| {
-            out.text(
-                glyphs.0,
-                glyphs.1,
-                glyphs.2,
-                origin,
-                run.font,
-                run.size,
-                color,
-                run.bidi_level,
-            );
-            if run.upright && c0 < c1 {
-                out.last_text_sideways();
+        let zero = Point::new(0.0, 0.0);
+        in_pieces(self.out, &|out, c| decorate(out, Lines::UnderOver, zero, c));
+        match part {
+            Some((_, _, c, _)) if c != color => {
+                in_pieces(self.out, &|out, c| draw(out, origin, c.unwrap_or(color)))
             }
-        };
-        match recolored {
-            None => draw(self.out, color),
-            Some((None, None, c)) => draw(self.out, c),
-            Some((left, right, c)) => {
-                // Partly selected: the run is drawn once per part, clipped to it, so that a glyph
-                // the boundary crosses (a ligature, an overhang) changes color at the boundary.
-                // (the clips are open where the fragment ends, and taller than any glyph)
-                let reach = size.width.abs() + 4.0 * run.size;
-                let (top, height) = (origin.y - 4.0 * run.size, 8.0 * run.size);
-                let (start, end) = (at.x - reach, at.x + reach);
-                let (x0, x1) = (
-                    left.map_or(start, |x| at.x + x),
-                    right.map_or(end, |x| at.x + x),
-                );
-                let parts = [
-                    left.map(|_| (start, x0, color)),
-                    Some((x0, x1, c)),
-                    right.map(|_| (x1, end, color)),
-                ];
-                for (a, b, color) in parts.into_iter().flatten() {
-                    self.out.push_clip_rect(Rect::new(a, top, b - a, height));
-                    draw(self.out, color);
-                    self.out.pop_clip();
-                }
-            }
+            _ => draw(self.out, origin, color),
         }
-        decorate(self.out, true);
+        in_pieces(self.out, &|out, c| decorate(out, Lines::Through, zero, c));
         // The caret of an editing host.
         if let (Some(sel), Some(n)) = (self.selection, t.node) {
             if let Some((cn, at_byte)) = sel.caret {
@@ -3861,6 +3926,18 @@ fn transparent_fixup(stops: Vec<GradientStop>) -> Vec<GradientStop> {
 #[allow(dead_code)]
 fn unused(_: Color) {}
 
+/// Which text decoration lines a pass paints: underlines and overlines go below the text,
+/// line-throughs over it (CSS Text Decoration 3 §2.3).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Lines {
+    UnderOver,
+    Through,
+}
+
+/// The selected part of a text fragment as the painter takes it: its left and right edges (`None`
+/// at an end of the fragment), its text's color and its highlight's shadows.
+type SelectedPart<'s> = (Option<f32>, Option<f32>, Color, &'s [Shadow]);
+
 // ----- selection -----
 
 /// A document selection to paint: the selected part of each text node with its `::selection`
@@ -3872,6 +3949,9 @@ pub struct TextSelection {
     /// The replaced elements the selection contains, with the translucent color painted over each
     /// (CSS Pseudo-Elements 4 §3.6.4).
     pub replaced: std::collections::HashMap<NodeId, Color>,
+    /// The `text-shadow` lists of the selection's highlights, which [`SelectedText::shadows`]
+    /// index.
+    pub shadows: Vec<Vec<Shadow>>,
     pub caret: Option<(NodeId, u32)>,
     /// The user agent's highlight background (CSS Pseudo-Elements 4 §3.3), where a text node has
     /// no [`SelectedText::highlight`].
@@ -3895,6 +3975,9 @@ pub struct SelectedText {
     pub highlight: Option<(Color, Option<Color>)>,
     /// The selection goes on past this node's text (it is not the last selected text node).
     pub continues: bool,
+    /// Its highlight's `text-shadow`s: one more than their index in [`TextSelection::shadows`],
+    /// 0 for none.
+    pub shadows: u32,
 }
 
 /// The shaped text offset of the cluster boundary nearest to `x` (from the fragment's start).

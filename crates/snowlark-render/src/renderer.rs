@@ -4851,6 +4851,35 @@ impl Renderer {
             .collect()
     }
 
+    /// The `text-shadow`s of each element's `::selection` (CSS Pseudo-Elements 4 §3.2: it applies
+    /// to highlights; §3.5: inherited from the parent's highlight, not the element), empty where
+    /// it has none.
+    pub fn selection_shadows(
+        &self,
+        elements: &[NodeId],
+    ) -> Vec<Vec<snowlark_layout::style::Shadow>> {
+        let Some(d) = self.doc.as_deref() else {
+            return vec![Vec::new(); elements.len()];
+        };
+        let dom = d.dom.borrow();
+        let pseudo = style::selector_parser::PseudoElement::Selection;
+        elements
+            .iter()
+            .map(|&el| {
+                let Some(values) = d.engine.highlight_style(&dom, &d.data, el, &pseudo) else {
+                    return Vec::new();
+                };
+                if values.get_inherited_text().text_shadow.0.is_empty() {
+                    return Vec::new();
+                }
+                let s = RenderStyle::new(values, d.env.clone());
+                (0..snowlark_layout::Style::text_shadow_count(&s))
+                    .map(|i| snowlark_layout::Style::text_shadow(&s, i))
+                    .collect()
+            })
+            .collect()
+    }
+
     /// The border box and friends of `node`'s first box fragment (`getBoundingClientRect`,
     /// `offset*`, `client*`, `scroll*` start from it), unscrolled.
     pub fn geometry(&self, node: NodeId) -> Option<BoxGeometry> {

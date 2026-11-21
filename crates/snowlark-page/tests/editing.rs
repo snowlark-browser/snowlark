@@ -850,3 +850,77 @@ fn a_selection_ending_in_an_element_highlights_the_text_before_its_end() {
     );
     assert_eq!(highlights(&mut page).len(), 3);
 }
+
+#[test]
+fn a_selection_paints_its_text_shadows_and_recolors_the_decorations() {
+    // CSS Pseudo-Elements 4 §3.6.3: over the highlight's background, the selected part gets its
+    // `::selection` `text-shadow`s, and the originating element's decorations take the
+    // highlight's `color` there (they kept theirs, under the background); the unselected parts
+    // keep the text's own decoration color and shadow.
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>\
+         body { margin: 0; font: 20px monospace; background: rgb(255, 255, 255) }\
+         p { margin: 0; color: rgb(0, 0, 0); text-decoration: underline rgb(255, 0, 0);\
+         text-shadow: 0 40px rgb(128, 128, 128) }\
+         #p::selection { color: rgb(0, 128, 0); background: rgb(255, 255, 0);\
+         text-shadow: 0 60px rgb(0, 0, 255) }\
+         </style><p id=p>abcdef</p>\
+         <script>var t = document.getElementById('p').firstChild, r = document.createRange();\
+         r.setStart(t, 2); r.setEnd(t, 4); getSelection().addRange(r);</script>",
+    );
+    page.update_the_rendering();
+    let list = page.engine().paint(Point::ZERO, 1.0).unwrap();
+    let rgb = |c: &snowlark_paint::Color| (c.r, c.g, c.b);
+    let painted: Vec<(&str, (u8, u8, u8))> = list
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            Item::FillRect { color, .. } => Some(("fill", rgb(color))),
+            Item::Text(t) => Some(("text", rgb(&t.color))),
+            _ => None,
+        })
+        .filter(|(_, c)| *c != (255, 255, 255))
+        .collect();
+    let first = |what: (&str, (u8, u8, u8))| painted.iter().position(|p| *p == what);
+    let background = first(("fill", (255, 255, 0))).expect("the highlight background");
+    // the text's own shadow (and its underline's), below the highlight
+    assert!(
+        first(("text", (128, 128, 128))).is_some_and(|i| i < background),
+        "{painted:?}"
+    );
+    // the selection's shadow over the highlight, the underline green there and red elsewhere
+    assert!(
+        first(("text", (0, 0, 255))).is_some_and(|i| i > background),
+        "{painted:?}"
+    );
+    assert!(
+        first(("fill", (0, 128, 0))).is_some_and(|i| i > background),
+        "{painted:?}"
+    );
+    assert!(painted.contains(&("fill", (255, 0, 0))), "{painted:?}");
+    assert!(painted.contains(&("text", (0, 128, 0))), "{painted:?}");
+}
+
+#[test]
+fn a_drag_over_a_gap_takes_its_focus_from_what_is_under_the_pointer() {
+    // The focus of a drag is the position for the point in the element under the pointer: over
+    // the gap between two paragraphs of an article, text in a side column at the same height is
+    // not a candidate (it was, being the only text on the pointer's line).
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><body style='margin:0;font:20px/20px monospace'>\
+         <div id=art style='position:absolute;left:0;top:0;width:300px'>\
+         <p id=a style='margin:0 0 60px'>alpha beta</p><p id=b style='margin:0'>second</p></div>\
+         <div id=side style='position:absolute;left:400px;top:40px'>teaser text</div>",
+    );
+    let none = Modifiers::default();
+    page.pointer_pressed(Point::new(70.0, 10.0), 0, none, 1);
+    page.pointer_moved(Point::new(40.0, 50.0), none);
+    page.pointer_released(Point::new(40.0, 50.0), 0, none, 1);
+    let focus = eval(&mut page, "getSelection().focusNode.parentNode.id");
+    assert!(focus == "a" || focus == "b", "focus in #{focus}");
+    assert!(!eval(&mut page, "getSelection().toString()").contains("teaser"));
+}

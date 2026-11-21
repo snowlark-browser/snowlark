@@ -347,3 +347,49 @@ fn filter_lengths_take_math_and_units() {
     assert!(close(px[3], green, 2), "{:?}", px[3]);
     assert!(close(px[4], white, 0), "{:?}", px[4]);
 }
+
+#[test]
+fn text_shadows_paint_below_the_text_and_its_decorations() {
+    // CSS Text Decoration 3 §4: each `text-shadow` paints the text and its decorations in the
+    // shadow's color at its offset, blurred by half its blur radius as a standard deviation. The
+    // shadows here are 100 px below the text, where nothing else paints: #a sharp and red, its
+    // underline under no-break spaces (no glyph ink, so a red row there is the underline's shadow);
+    // #b blurred and blue.
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0; background: white }\
+         div { position: absolute; top: 0; font: 40px monospace; line-height: 40px; color: black }\
+         #a { left: 0; text-shadow: 0 100px rgb(255, 0, 0) }\
+         #u { left: 100px; text-decoration: underline; text-shadow: 0 100px rgb(255, 0, 0) }\
+         #b { left: 250px; text-shadow: 0 100px 10px rgb(0, 0, 255) }</style>\
+         <div id=a>MM</div><div id=u>&nbsp;&nbsp;&nbsp;</div><div id=b>MM</div>",
+    );
+    let region = |x0: u32, x1: u32| -> Vec<(u32, u32)> {
+        (100..160)
+            .flat_map(|y| (x0..x1).map(move |x| (x, y)))
+            .collect()
+    };
+    let red = |c: &Color| c.r > 200 && c.g < 60 && c.b < 60;
+    let a = pixels(&mut page, &region(0, 90));
+    assert!(a.iter().filter(|c| red(c)).count() > 100, "no shadow of #a");
+    // the underline's shadow: a red line across most of the 72 px of three spaces
+    let u = pixels(&mut page, &region(100, 200));
+    let widest = u
+        .chunks(100)
+        .map(|row| row.iter().filter(|c| red(c)).count())
+        .max()
+        .unwrap();
+    assert!(widest >= 60, "underline shadow rows reach {widest} px");
+    // the blurred shadow: light blue around the glyphs, and no fully blue pixel at its center
+    let b = pixels(&mut page, &region(240, 340));
+    let light = b
+        .iter()
+        .filter(|c| c.b > 200 && c.r > 40 && c.r < 215 && c.r == c.g)
+        .count();
+    assert!(light > 200, "{light} light blue pixels");
+    assert!(
+        b.iter().all(|c| c.r > 20),
+        "a blurred shadow is never fully blue"
+    );
+}

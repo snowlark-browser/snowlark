@@ -134,6 +134,7 @@ pub struct TestStyle {
     /// `backdrop-filter`'s functions.
     pub backdrop_filters: Vec<FilterOp>,
     pub box_shadows: Vec<Shadow>,
+    pub text_shadows: Vec<Shadow>,
     pub outline_width: f32,
     pub outline_style: BorderStyle,
     pub outline_color: Option<Color>,
@@ -280,6 +281,7 @@ impl Default for TestStyle {
             filters: Vec::new(),
             backdrop_filters: Vec::new(),
             box_shadows: Vec::new(),
+            text_shadows: Vec::new(),
             outline_width: 0.0,
             outline_style: BorderStyle::None,
             outline_color: None,
@@ -829,6 +831,12 @@ impl Style for Arc<TestStyle> {
     }
     fn box_shadow(&self, index: usize) -> Shadow {
         self.box_shadows[index]
+    }
+    fn text_shadow_count(&self) -> usize {
+        self.text_shadows.len()
+    }
+    fn text_shadow(&self, index: usize) -> Shadow {
+        self.text_shadows[index]
     }
     fn outline_width(&self) -> f32 {
         if self.outline_style.is_invisible() {

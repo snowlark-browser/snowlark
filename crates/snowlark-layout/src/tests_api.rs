@@ -1228,6 +1228,7 @@ fn selected_text_is_drawn_in_its_highlight_colors() {
                     end,
                     highlight,
                     continues: false,
+                    shadows: 0,
                 },
             )]),
             background: Color::rgb(0, 0, 255),

@@ -21,6 +21,10 @@
   "/fetch/api/abort/general.any.worker.html": [
    "response.json() rejects if already aborted"
   ],
+  "/html/rendering/replaced-elements/attributes-for-embedded-content-and-images/video-aspect-ratio.html": [
+   "Aspect ratio for regular video",
+   "Aspect ratio for regular video with width:auto"
+  ],
   "/navigation-timing/test-document-open.html": [
    "domContentLoadedEventEnd is the same after document open.",
    "domContentLoadedEventStart is the same after document open.",
@@ -107,7 +111,12 @@
   "q-e9-calc-r3.jsonl",
   "bf6-flake-r1.jsonl",
   "bf6-flake-r2.jsonl",
-  "bf6-flake-r3.jsonl"
+  "bf6-flake-r3.jsonl",
+  "bf10-flake-r1.jsonl",
+  "bf10-flake-r2.jsonl",
+  "bf10-flake-r3.jsonl",
+  "bf10-flake-r4.jsonl",
+  "bf10-flake-r5.jsonl"
  ],
  "note": "Subtests and reftests whose result differed across runs of one binary; the gate reports their losses apart."
 }

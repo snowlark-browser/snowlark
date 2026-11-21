@@ -2899,6 +2899,22 @@ impl ls::Style for RenderStyle {
         shadow(&list[index], |c| self.color_of(c))
     }
 
+    fn text_shadow_count(&self) -> usize {
+        self.values.get_inherited_text().text_shadow.0.len()
+    }
+
+    fn text_shadow(&self, index: usize) -> ls::Shadow {
+        let s = &self.values.get_inherited_text().text_shadow.0[index];
+        ls::Shadow {
+            offset_x: s.horizontal.px(),
+            offset_y: s.vertical.px(),
+            blur: s.blur.0.px(),
+            spread: 0.0,
+            color: self.color_of(&s.color),
+            inset: false,
+        }
+    }
+
     fn outline_width(&self) -> f32 {
         use style::values::computed::OutlineStyle as O;
         let o = self.values.get_outline();

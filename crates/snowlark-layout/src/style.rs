@@ -2434,6 +2434,21 @@ pub trait Style: Clone {
             inset: false,
         }
     }
+    /// How many `text-shadow`s the text has (CSS Text Decoration 3 §4).
+    fn text_shadow_count(&self) -> usize {
+        0
+    }
+    /// One `text-shadow` (no spread, never inset); the first is painted on top.
+    fn text_shadow(&self, _index: usize) -> Shadow {
+        Shadow {
+            offset_x: 0.0,
+            offset_y: 0.0,
+            blur: 0.0,
+            spread: 0.0,
+            color: Color::TRANSPARENT,
+            inset: false,
+        }
+    }
     /// The computed outline width (0 when `outline-style` is `none`).
     fn outline_width(&self) -> f32 {
         0.0
