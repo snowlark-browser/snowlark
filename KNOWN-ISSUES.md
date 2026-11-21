@@ -53,10 +53,11 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## CSS and style
 
-- **`-webkit-` pseudo-elements.** `::-webkit-scrollbar` and its parts, the spin, search, slider and date parts of
-  form controls, and other `::-webkit-` names parse but style nothing, so pages that hide or restyle their
-  scrollbars this way show default ones; Chrome's scrollbar pseudo-classes (`:horizontal`, `:decrement` and
-  others) do not parse. (ref 621)
+- **Custom scroll bars.** `::-webkit-scrollbar` and its thumb and track style a box's scroll bars (hidden, thinner,
+  colored), but a box's custom bars are drawn over its content rather than taking layout space, their `:hover` and
+  `:active` rules do not apply, the buttons and corner are not drawn, and the scrollbar pseudo-classes
+  (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
+  parse but style nothing. (ref 627)
 - **Properties not built.** `resize`, `scroll-snap-type`, `scroll-snap-align`,
   `scroll-snap-stop`, `-webkit-text-fill-color`, `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink`
   and `accent-color` do not parse, so their declarations are dropped. (ref 622)
@@ -88,9 +89,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   shadow trees, `::part()` followed by pseudo-classes, `@import` through `insertRule()`, `<style>` load and error
   events, and the `CSSScopeRule` interface are not implemented. (ref 45)
 
-- **Scroll-animated sections.** On apple.com's iPhone pages at a display scale above 100%, the scroll-driven camera
-  section's video may not show (its start picture shows instead), and its still frame was reported misplaced. Not
-  located yet. (ref 618)
+
+- **Scroll-animated video at high display scale.** On apple.com's iPhone pages at a display scale above 100%, the
+  scroll-driven camera section's video may not show. (ref 618)
 
 ## Painting and compositing
 
@@ -207,6 +208,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   (for example a long Reddit thread) lags behind the pointer. Not measured. (ref 92)
 
 ## Browser UI
+
+- **One regular window.** Ctrl+N opens a new tab rather than a new window; only Incognito windows open alongside
+  the main one. (ref 631)
 
 - **Scroll bar details.** A classic scroll bar is drawn for the page, but frames keep overlay bars (none drawn) and
   `scrollbar-gutter` is not implemented. (ref 8)

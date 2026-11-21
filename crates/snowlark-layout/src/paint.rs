@@ -2796,49 +2796,58 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
         let pb = f.padding_rect().translate(at.x, at.y);
         let (range, start) = user_scroll_range(f, s, device_scale);
         let scroll = Point::new(scroll.x - start.x, scroll.y - start.y);
-        let (w, inset) = (look.thickness, 2.0);
-        let gutter = w + 2.0 * inset;
+        let inset = look.inset;
         // (a bar does not show in a scrollport too narrow for it)
-        if range.y > 0.0 && pb.width >= gutter {
+        let w = look.vertical;
+        let gutter = w + 2.0 * inset;
+        if w > 0.0 && range.y > 0.0 && pb.width >= gutter {
             if let Some(track) = look.track {
                 self.out.fill_rect(
                     Rect::new(pb.right() - gutter, pb.y, gutter, pb.height),
                     track,
                 );
             }
-            if let Some((start, len)) = scroll_thumb(
-                pb.height,
-                pb.height + range.y,
-                scroll.y,
-                pb.y + inset,
-                pb.height - 2.0 * inset,
-            ) {
-                self.out.fill_rounded_rect(
-                    Rect::new(pb.right() - inset - w, start, w, len),
-                    Radii::uniform(w / 2.0),
-                    look.thumb,
-                );
+            let t = w - 2.0 * look.thumb_inset;
+            if let (Some(thumb), true) = (look.thumb, t > 0.0) {
+                if let Some((start, len)) = scroll_thumb(
+                    pb.height,
+                    pb.height + range.y,
+                    scroll.y,
+                    pb.y + inset,
+                    pb.height - 2.0 * inset,
+                ) {
+                    self.out.fill_rounded_rect(
+                        Rect::new(pb.right() - inset - w + look.thumb_inset, start, t, len),
+                        Radii::uniform(look.thumb_radius(t)),
+                        thumb,
+                    );
+                }
             }
         }
-        if range.x > 0.0 && pb.height >= gutter {
+        let h = look.horizontal;
+        let gutter = h + 2.0 * inset;
+        if h > 0.0 && range.x > 0.0 && pb.height >= gutter {
             if let Some(track) = look.track {
                 self.out.fill_rect(
                     Rect::new(pb.x, pb.bottom() - gutter, pb.width, gutter),
                     track,
                 );
             }
-            if let Some((start, len)) = scroll_thumb(
-                pb.width,
-                pb.width + range.x,
-                scroll.x,
-                pb.x + inset,
-                pb.width - 2.0 * inset,
-            ) {
-                self.out.fill_rounded_rect(
-                    Rect::new(start, pb.bottom() - inset - w, len, w),
-                    Radii::uniform(w / 2.0),
-                    look.thumb,
-                );
+            let t = h - 2.0 * look.thumb_inset;
+            if let (Some(thumb), true) = (look.thumb, t > 0.0) {
+                if let Some((start, len)) = scroll_thumb(
+                    pb.width,
+                    pb.width + range.x,
+                    scroll.x,
+                    pb.x + inset,
+                    pb.width - 2.0 * inset,
+                ) {
+                    self.out.fill_rounded_rect(
+                        Rect::new(start, pb.bottom() - inset - h + look.thumb_inset, len, t),
+                        Radii::uniform(look.thumb_radius(t)),
+                        thumb,
+                    );
+                }
             }
         }
     }
@@ -2847,40 +2856,73 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
 /// How a scroll container's own scroll bars are drawn: overlay thumbs over the content (layout
 /// reserves no gutter for them), colored for the box's used color scheme (CSS Color Adjust 1 §2.4:
 /// scroll bars follow it), or with `scrollbar-color`'s thumb and track (CSS Scrollbars 1 §2), as
-/// thick as `scrollbar-width` says (§3).
+/// thick as `scrollbar-width` says (§3); or, when neither is set, as the box's custom scroll bar
+/// parts say ([`CustomScrollbar`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ScrollbarLook {
-    pub thumb: Color,
-    /// The track, painted under the thumb along the edge (`scrollbar-color` only: the automatic
-    /// overlay bar has none).
+    /// The thumb's color (`None`: no thumb).
+    pub thumb: Option<Color>,
+    /// The track, painted under the thumb along the edge (`scrollbar-color` and custom bars only:
+    /// the automatic overlay bar has none).
     pub track: Option<Color>,
-    /// The thumb's thickness (CSS px).
-    pub thickness: f32,
+    /// The vertical bar's width and the horizontal bar's height (CSS px; 0: no bar).
+    pub vertical: f32,
+    pub horizontal: f32,
+    /// The space around a bar inside the scrollport's edges (CSS px).
+    pub inset: f32,
+    /// How far the thumb stands in from the bar's sides across it (CSS px).
+    pub thumb_inset: f32,
+    /// The thumb's corner radius: a length plus a fraction of its thickness.
+    pub thumb_radius: (f32, f32),
 }
 
 impl ScrollbarLook {
     /// `None` for `scrollbar-width: none` (no bar; the box still scrolls).
     pub(crate) fn of<S: Style>(s: &S) -> Option<ScrollbarLook> {
+        const AUTO: f32 = 6.0;
+        let standard = s.scrollbar_width() != ScrollbarWidth::Auto || s.scrollbar_color().is_some();
+        if let Some(c) = s.custom_scrollbar().filter(|_| !standard) {
+            return Some(ScrollbarLook {
+                thumb: c.thumb.map(|t| t.color),
+                track: c.track,
+                vertical: c.vertical.unwrap_or(AUTO),
+                horizontal: c.horizontal.unwrap_or(AUTO),
+                inset: 0.0,
+                thumb_inset: c.thumb.map_or(0.0, |t| t.inset),
+                thumb_radius: c.thumb.map_or((0.0, 0.0), |t| t.radius),
+            });
+        }
         let thickness = match s.scrollbar_width() {
-            ScrollbarWidth::Auto => 6.0,
+            ScrollbarWidth::Auto => AUTO,
             ScrollbarWidth::Thin => 4.0,
             ScrollbarWidth::None => return None,
         };
-        Some(match s.scrollbar_color() {
-            Some(c) => ScrollbarLook {
-                thumb: c.thumb,
-                track: Some(c.track),
-                thickness,
-            },
-            None => ScrollbarLook {
-                thumb: match s.color_scheme() {
+        let (thumb, track) = match s.scrollbar_color() {
+            Some(c) => (c.thumb, Some(c.track)),
+            None => (
+                match s.color_scheme() {
                     ColorScheme::Light => Color::rgba(0, 0, 0, 110),
                     ColorScheme::Dark => Color::rgba(255, 255, 255, 120),
                 },
-                track: None,
-                thickness,
-            },
+                None,
+            ),
+        };
+        Some(ScrollbarLook {
+            thumb: Some(thumb),
+            track,
+            vertical: thickness,
+            horizontal: thickness,
+            inset: 2.0,
+            thumb_inset: 0.0,
+            thumb_radius: (0.0, 0.5),
         })
+    }
+
+    /// The thumb's corner radius for a thumb `thickness` thick.
+    fn thumb_radius(&self, thickness: f32) -> f32 {
+        (self.thumb_radius.0 + self.thumb_radius.1 * thickness)
+            .min(thickness / 2.0)
+            .max(0.0)
     }
 }
 

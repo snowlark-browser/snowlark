@@ -691,6 +691,98 @@ fn a_classic_scroll_bar_narrows_the_layout_viewport_when_shown() {
     assert!(!r.vertical_scrollbar());
 }
 
+/// A scroll container's `::-webkit-scrollbar` parts style its scroll bars when it sets neither
+/// `scrollbar-width` nor `scrollbar-color`: `display: none` hides them, the part's `width` is the
+/// bar's, the thumb and track are drawn in their backgrounds, and a state pseudo-class after a part
+/// does not apply. The viewport's bar takes the body's (else the root's) parts.
+#[test]
+fn webkit_scrollbar_parts_style_scroll_bars() {
+    use snowlark_paint::display_list::Item;
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let url = Url::parse("http://example.test/").unwrap();
+    let mut r = renderer(&net, 400.0, 600.0);
+    r.load_html(
+        b"<!doctype html><style>\
+          .a, .b, .c { overflow: auto; width: 200px; height: 100px }\
+          .a::-webkit-scrollbar { display: none }\
+          .b::-webkit-scrollbar { width: 10px }\
+          .b::-webkit-scrollbar-thumb { background: rgb(255, 0, 0); border-radius: 5px }\
+          .b::-webkit-scrollbar-thumb:hover { background: rgb(0, 255, 0) }\
+          .b::-webkit-scrollbar-track { background: rgb(0, 0, 255) }\
+          .c { scrollbar-color: rgb(0, 128, 0) rgb(0, 0, 128) }\
+          .c::-webkit-scrollbar { display: none }\
+          </style><body style='margin:0'>\
+          <div class=a><div style='height:300px'></div></div>\
+          <div class=b><div style='height:300px'></div></div>\
+          <div class=c><div style='height:300px'></div></div>",
+        &url,
+        None,
+    );
+    let viewport = Size::new(400.0, 600.0);
+    r.layout(viewport).unwrap();
+    let list = r.paint(viewport, Point::ZERO);
+    let rounded: Vec<_> = list
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            Item::FillRoundedRect { rect, color, .. } => Some((*rect, *color)),
+            _ => None,
+        })
+        .collect();
+    let filled = |c: Color| {
+        list.items
+            .iter()
+            .any(|i| matches!(i, Item::FillRect { rect, color } if *color == c && rect.x == 190.0 && rect.width == 10.0 && rect.y == 100.0))
+    };
+    // `.a`: no bar (the automatic thumb is not drawn).
+    assert!(!rounded.iter().any(|(r, _)| r.y < 100.0), "{rounded:?}");
+    // `.b`: a 10 px red thumb at the edge over a blue track; `:hover`'s green never applies.
+    let red: Vec<_> = rounded
+        .iter()
+        .filter(|(_, c)| *c == Color::rgb(255, 0, 0))
+        .collect();
+    assert_eq!(red.len(), 1, "{rounded:?}");
+    assert_eq!((red[0].0.x, red[0].0.width), (190.0, 10.0));
+    assert!(filled(Color::rgb(0, 0, 255)));
+    assert!(!rounded.iter().any(|(_, c)| *c == Color::rgb(0, 255, 0)));
+    // `.c`: `scrollbar-color` wins over the parts.
+    assert!(rounded.iter().any(|(_, c)| *c == Color::rgb(0, 128, 0)));
+
+    // The viewport's bar: the body's parts, else the root's.
+    let case = |css: &str| {
+        let mut r = renderer(&net, 400.0, 300.0);
+        r.set_scrollbar_width(17.0);
+        let html = format!(
+            "<!doctype html><style>{css}</style><body style='margin:0'><div style='height:2000px'></div>"
+        );
+        r.load_html(html.as_bytes(), &url, None);
+        r.layout(Size::new(400.0, 300.0)).unwrap();
+        let bar = r.viewport_scrollbar();
+        (
+            r.layout_viewport(Size::new(400.0, 300.0)).width,
+            bar.colors.map(|c| (c.thumb, c.track)),
+        )
+    };
+    // (a hidden bar: no thumb, no track)
+    let clear = Some((Color::TRANSPARENT, Color::TRANSPARENT));
+    assert_eq!(
+        case("body::-webkit-scrollbar { display: none }"),
+        (400.0, clear)
+    );
+    assert_eq!(case("::-webkit-scrollbar { width: 0 }"), (400.0, clear));
+    assert_eq!(
+        case("::-webkit-scrollbar { width: 8px } ::-webkit-scrollbar-thumb { background: red }"),
+        (392.0, Some((Color::rgb(255, 0, 0), Color::TRANSPARENT)))
+    );
+    // A root `scrollbar-width` or `scrollbar-color` wins over them.
+    assert_eq!(
+        case("html { scrollbar-width: thin } ::-webkit-scrollbar { display: none }"),
+        (389.0, None)
+    );
+    // No rule for the parts: the automatic bar.
+    assert_eq!(case(""), (383.0, None));
+}
+
 /// CSS Color Adjust 1 §2.4 and CSS Scrollbars 1: the root's used color scheme colors the canvas
 /// surface and the viewport's scroll bar, the root's `scrollbar-color` and `scrollbar-width` (not
 /// the body's) style that bar, and the canvas surface shows in the headless raster as in the window.

@@ -695,6 +695,72 @@ pub struct ScrollbarColors {
     pub track: Color,
 }
 
+/// A scroll container's custom scroll bars, from the styles of its `::-webkit-scrollbar` parts (a
+/// compat feature of the web platform; `scrollbar-width` and `scrollbar-color`, CSS Scrollbars 1,
+/// take precedence when either is not `auto`). The parts are drawn as boxes filling the bar: the
+/// track's background along the edge and the thumb over it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CustomScrollbar {
+    /// The vertical bar's width (CSS px, `::-webkit-scrollbar`'s `width`): `None` for `auto` (the
+    /// automatic bar's), 0 for no bar (`display: none`, or a zero width).
+    pub vertical: Option<f32>,
+    /// The horizontal bar's height, as `vertical`.
+    pub horizontal: Option<f32>,
+    /// The thumb (`::-webkit-scrollbar-thumb`), `None` when it is not drawn: no rule styles it,
+    /// or `display: none`.
+    pub thumb: Option<CustomScrollbarThumb>,
+    /// The track's color (`::-webkit-scrollbar-track`'s background, else
+    /// `::-webkit-scrollbar`'s), `None` when transparent.
+    pub track: Option<Color>,
+}
+
+/// The thumb of a [`CustomScrollbar`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CustomScrollbarThumb {
+    pub color: Color,
+    /// The corner radius: a length (CSS px) plus a fraction of the thumb's thickness.
+    pub radius: (f32, f32),
+    /// How far the painted thumb stands in from each side of the bar across it: its border, when
+    /// `background-clip` leaves the border out (CSS px).
+    pub inset: f32,
+}
+
+impl CustomScrollbar {
+    /// The bars the styles of the parts say: `bar` is `::-webkit-scrollbar`'s, `thumb` and `track`
+    /// those of `-thumb` and `-track` when a rule styles them. A part is drawn as its background
+    /// color; a bar's thickness is its `width` (vertical) or `height` (horizontal), percentages
+    /// against nothing (zero), `auto` the automatic bar's, and none for `display: none`.
+    pub fn from_parts<S: Style>(bar: &S, thumb: Option<&S>, track: Option<&S>) -> CustomScrollbar {
+        let hidden = bar.display() == Display::None;
+        let thickness = |v: SizeValue| match v {
+            _ if hidden => Some(0.0),
+            SizeValue::LengthPercentage(l) => Some(l.resolve(0.0).max(0.0)),
+            _ => None,
+        };
+        let fill = |s: &S| Some(s.background_color()).filter(|c| !c.is_transparent());
+        let thumb = thumb
+            .filter(|t| t.display() != Display::None)
+            .and_then(|t| {
+                let (r, _) = t.phys_border_radius(Corner::TopLeft);
+                Some(CustomScrollbarThumb {
+                    color: fill(t)?,
+                    radius: (r.length, r.percent.unwrap_or(0.0)),
+                    inset: if t.background_color_area().0 == BoxArea::BorderBox {
+                        0.0
+                    } else {
+                        t.phys_border_width(Side::Left)
+                    },
+                })
+            });
+        CustomScrollbar {
+            vertical: thickness(bar.phys_width()),
+            horizontal: thickness(bar.phys_height()),
+            thumb,
+            track: track.and_then(fill).or_else(|| fill(bar)),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Visibility {
     #[default]
@@ -2563,6 +2629,11 @@ pub trait Style: Clone {
     }
     fn scrollbar_width(&self) -> ScrollbarWidth {
         ScrollbarWidth::Auto
+    }
+    /// The element's custom scroll bars, when a rule styles its `::-webkit-scrollbar` (only
+    /// asked of scroll containers).
+    fn custom_scrollbar(&self) -> Option<CustomScrollbar> {
+        None
     }
 }
 

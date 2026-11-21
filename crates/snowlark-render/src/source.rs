@@ -747,6 +747,15 @@ impl StyleSource for DocumentStyles<'_> {
             self.auto_intrinsic.set(true);
             style.remembered = self.remembered.and_then(|m| m.get(&element).copied());
         }
+        if crate::adapter::shows_scrollbars(&style.values) {
+            style.custom_scrollbar = crate::adapter::custom_scrollbar(
+                self.engine,
+                self.dom,
+                self.data,
+                &self.env,
+                element,
+            );
+        }
         Some(style)
     }
 
@@ -768,6 +777,7 @@ impl StyleSource for DocumentStyles<'_> {
             remembered: None,
             view: snowlark_layout::style::Flip::IDENTITY,
             animations: 0,
+            custom_scrollbar: None,
         })
     }
 

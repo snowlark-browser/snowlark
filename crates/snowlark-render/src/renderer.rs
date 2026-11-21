@@ -482,6 +482,9 @@ struct Doc {
     vertical_scrollbar: bool,
     /// The width of the gutter the last layout left for it (`scrollbar-width` on the root decides it).
     vertical_scrollbar_width: f32,
+    /// The viewport's custom scroll bar in the last layout (`::-webkit-scrollbar` on the body or
+    /// the root), when it has one.
+    viewport_custom_scrollbar: Option<snowlark_layout::style::CustomScrollbar>,
     scroll: HashMap<NodeId, Point>,
     requests: usize,
     counts: ResourceCounts,
@@ -1376,6 +1379,7 @@ impl Renderer {
             last_viewport: None,
             vertical_scrollbar: false,
             vertical_scrollbar_width: 0.0,
+            viewport_custom_scrollbar: None,
             scroll: HashMap::new(),
             requests: 0,
             counts: ResourceCounts::default(),
@@ -3790,10 +3794,19 @@ impl Renderer {
                 ..ViewportScrollbar::default()
             };
         };
+        // (a custom bar's parts: its thumb and track, transparent where no rule colors them)
+        let custom = self
+            .doc
+            .as_deref()
+            .and_then(|d| d.viewport_custom_scrollbar)
+            .map(|c| snowlark_layout::style::ScrollbarColors {
+                thumb: c.thumb.map_or(Color::TRANSPARENT, |t| t.color),
+                track: c.track.unwrap_or(Color::TRANSPARENT),
+            });
         ViewportScrollbar {
             width,
             color_scheme: crate::adapter::used_color_scheme(&values),
-            colors: crate::adapter::scrollbar_colors(&values),
+            colors: custom.or_else(|| crate::adapter::scrollbar_colors(&values)),
         }
     }
 
@@ -4200,15 +4213,23 @@ impl Renderer {
         // one, and a second contradiction (content that only overflows without the bar) keeps the
         // bar.
         // (CSS Scrollbars 1 §3: the root's `scrollbar-width` applies to the viewport: `none` hides
-        // its bar, the viewport still scrolling; `thin` makes it thinner)
-        let sb = viewport_scrollbar_width(
-            self.scrollbar_width,
-            dom.document_element(doc.document)
-                .and_then(|root| doc.data.styles(root))
-                .map_or(snowlark_layout::style::ScrollbarWidth::Auto, |v| {
-                    crate::adapter::scrollbar_width(v)
-                }),
-        );
+        // its bar, the viewport still scrolling; `thin` makes it thinner. When the root sets
+        // neither it nor `scrollbar-color`, a custom scroll bar of the body, else of the root, is
+        // the viewport's: its `::-webkit-scrollbar` width is the gutter's, none for `display:
+        // none`.)
+        let custom = viewport_custom_scrollbar(&dom, doc, self.scrollbar_width);
+        let sb = match custom {
+            Some(c) => c.vertical.unwrap_or(self.scrollbar_width),
+            None => viewport_scrollbar_width(
+                self.scrollbar_width,
+                dom.document_element(doc.document)
+                    .and_then(|root| doc.data.styles(root))
+                    .map_or(snowlark_layout::style::ScrollbarWidth::Auto, |v| {
+                        crate::adapter::scrollbar_width(v)
+                    }),
+            ),
+        };
+        doc.viewport_custom_scrollbar = custom;
         let icb = |bar: bool| {
             Size::new(
                 (viewport.width - if bar { sb } else { 0.0 }).max(0.0),
@@ -6112,6 +6133,30 @@ pub fn viewport_scrollbar_width(full: f32, width: snowlark_layout::style::Scroll
         W::Thin => (full * 11.0 / 17.0).round(),
         W::None => 0.0,
     }
+}
+
+/// The viewport's custom scroll bar: when the root's `scrollbar-width` and `scrollbar-color` are
+/// `auto` and a rule styles the `::-webkit-scrollbar` of the body (first) or the root, that
+/// element's. `None` without a classic scroll bar (`full` 0: overlay scroll bars).
+fn viewport_custom_scrollbar(
+    dom: &Dom,
+    doc: &Doc,
+    full: f32,
+) -> Option<snowlark_layout::style::CustomScrollbar> {
+    if full <= 0.0 {
+        return None;
+    }
+    let root = dom.document_element(doc.document)?;
+    let values = doc.data.styles(root)?;
+    if crate::adapter::scrollbar_width(values) != snowlark_layout::style::ScrollbarWidth::Auto
+        || crate::adapter::scrollbar_colors(values).is_some()
+    {
+        return None;
+    }
+    [dom.body(doc.document), Some(root)]
+        .into_iter()
+        .flatten()
+        .find_map(|e| crate::adapter::custom_scrollbar(&doc.engine, dom, &doc.data, &doc.env, e))
 }
 
 /// The canvas surface's color for the root's used color scheme (CSS Color Adjust 1 §2.4).

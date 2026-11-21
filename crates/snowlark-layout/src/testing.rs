@@ -149,6 +149,7 @@ pub struct TestStyle {
     pub color_scheme: ColorScheme,
     pub scrollbar_color: Option<ScrollbarColors>,
     pub scrollbar_width: ScrollbarWidth,
+    pub custom_scrollbar: Option<CustomScrollbar>,
     pub overflow_clip_margin: OverflowClipMargin,
     pub line_clamp: Option<LineClamp>,
     pub column_width: Option<f32>,
@@ -292,6 +293,7 @@ impl Default for TestStyle {
             color_scheme: ColorScheme::Light,
             scrollbar_color: None,
             scrollbar_width: ScrollbarWidth::Auto,
+            custom_scrollbar: None,
             overflow_clip_margin: OverflowClipMargin::default(),
             line_clamp: None,
             column_width: None,
@@ -883,6 +885,9 @@ impl Style for Arc<TestStyle> {
     }
     fn scrollbar_width(&self) -> ScrollbarWidth {
         self.scrollbar_width
+    }
+    fn custom_scrollbar(&self) -> Option<CustomScrollbar> {
+        self.custom_scrollbar
     }
 }
 

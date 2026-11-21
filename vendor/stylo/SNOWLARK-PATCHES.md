@@ -449,6 +449,11 @@ the source; `git log -p vendor/stylo` shows the diff.
    action pseudo-classes may follow. `::-webkit-input-placeholder` and `::-webkit-file-upload-button` are
    `::placeholder` and `::file-selector-button`; `:-webkit-autofill`, `:-webkit-full-screen` and
    `:-webkit-any-link` are `:autofill`, `:fullscreen` and `:any-link`.
+78. **Custom scroll bar parts** (`servo/selector_parser.rs`): `::-webkit-scrollbar`, `-thumb`, `-track`,
+   `-track-piece`, `-button` and `-corner` are lazily cascaded pseudo-elements (`is_webkit_scrollbar_part`),
+   no longer among the parts patch 77 drops: the engine reads them from a scroll container to draw its scroll
+   bars. A user action pseudo-class may follow them; their styles are cascaded without state, so the stylist
+   (`stylist.rs` `add_styles`) leaves such rules out.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

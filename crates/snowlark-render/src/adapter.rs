@@ -47,6 +47,9 @@ pub struct RenderStyle {
     /// What the element's current animations animate
     /// ([`snowlark_style::StyleEngine::animation_flags`]; set by the style source).
     pub(crate) animations: u8,
+    /// A scroll container's custom scroll bars (its `::-webkit-scrollbar` parts' styles; set by
+    /// the style source).
+    pub(crate) custom_scrollbar: Option<ls::CustomScrollbar>,
 }
 
 impl std::fmt::Debug for RenderStyle {
@@ -133,6 +136,7 @@ impl RenderStyle {
             remembered: None,
             view: ls::Flip::IDENTITY,
             animations: 0,
+            custom_scrollbar: None,
         }
     }
 
@@ -167,6 +171,7 @@ impl RenderStyle {
             remembered: self.remembered,
             view: self.view,
             animations: self.animations,
+            custom_scrollbar: self.custom_scrollbar,
         }
     }
 
@@ -2426,6 +2431,7 @@ impl ls::Style for RenderStyle {
             remembered: self.remembered,
             view,
             animations: self.animations,
+            custom_scrollbar: self.custom_scrollbar,
         }
     }
 
@@ -3100,6 +3106,10 @@ impl ls::Style for RenderStyle {
     fn scrollbar_width(&self) -> ls::ScrollbarWidth {
         scrollbar_width(&self.values)
     }
+
+    fn custom_scrollbar(&self) -> Option<ls::CustomScrollbar> {
+        self.custom_scrollbar
+    }
 }
 
 /// The used color scheme of the box with these computed values (CSS Color Adjust 1 §2.3).
@@ -3130,6 +3140,39 @@ pub fn scrollbar_width(values: &ComputedValues) -> ls::ScrollbarWidth {
         T::Thin => ls::ScrollbarWidth::Thin,
         T::None => ls::ScrollbarWidth::None,
     }
+}
+
+/// The custom scroll bars of `element`, when a rule styles its `::-webkit-scrollbar` (the parts'
+/// styles, cascaded from it: [`ls::CustomScrollbar::from_parts`]).
+pub(crate) fn custom_scrollbar(
+    engine: &snowlark_style::StyleEngine,
+    dom: &snowlark_dom::Dom,
+    data: &snowlark_style::StyleData,
+    env: &Arc<StyleEnv>,
+    element: snowlark_dom::NodeId,
+) -> Option<ls::CustomScrollbar> {
+    use style::selector_parser::PseudoElement as P;
+    let part = |p: P| {
+        engine
+            .pseudo_style(dom, data, element, &p)
+            .map(|v| RenderStyle::new(v, env.clone()))
+    };
+    let bar = part(P::WebkitScrollbar)?;
+    let thumb = part(P::WebkitScrollbarThumb);
+    let track = part(P::WebkitScrollbarTrack);
+    Some(ls::CustomScrollbar::from_parts(
+        &bar,
+        thumb.as_ref(),
+        track.as_ref(),
+    ))
+}
+
+/// Whether `values` make a scroll container that shows scroll bars: `overflow` `auto` or `scroll`
+/// on an axis (CSS Overflow 3 §3).
+pub(crate) fn shows_scrollbars(values: &ComputedValues) -> bool {
+    use style::values::computed::Overflow as O;
+    let b = values.get_box();
+    matches!(b.overflow_x, O::Auto | O::Scroll) || matches!(b.overflow_y, O::Auto | O::Scroll)
 }
 
 /// The paint crate's color from a stylo color in the context of `style` (its `currentcolor`).

@@ -82,10 +82,20 @@ pub enum PseudoElement {
     WebkitMeterSuboptimumValue,
     WebkitMeterEvenLessGoodValue,
 
+    // Snowlark patch: the parts of a scroll container's custom scroll bars (a compat feature:
+    // their styles, cascaded lazily from the scroll container, say how its bars are drawn). Keep
+    // them together, `WebkitScrollbar` first and `WebkitScrollbarCorner` last.
+    WebkitScrollbar,
+    WebkitScrollbarThumb,
+    WebkitScrollbarTrack,
+    WebkitScrollbarTrackPiece,
+    WebkitScrollbarButton,
+    WebkitScrollbarCorner,
+
     // Snowlark patch: Selectors 4 §compat, `::-webkit-` pseudo-elements are valid. The parts of
-    // form controls and scrollbars that pages style under these names, which this engine does
-    // not have (they match nothing; the stylist drops their rules), then any other name. Keep
-    // them together, `WebkitInnerSpinButton` first and `UnknownWebkit` last.
+    // form controls that pages style under these names, which this engine does not have (they
+    // match nothing; the stylist drops their rules), then any other name. Keep them together,
+    // `WebkitInnerSpinButton` first and `UnknownWebkit` last.
     WebkitInnerSpinButton,
     WebkitOuterSpinButton,
     WebkitSearchCancelButton,
@@ -113,12 +123,6 @@ pub enum PseudoElement {
     WebkitDatetimeEditWeekField,
     WebkitDetailsMarker,
     WebkitTextfieldDecorationContainer,
-    WebkitScrollbar,
-    WebkitScrollbarThumb,
-    WebkitScrollbarTrack,
-    WebkitScrollbarTrackPiece,
-    WebkitScrollbarButton,
-    WebkitScrollbarCorner,
     WebkitResizer,
     UnknownWebkit,
 
@@ -138,7 +142,8 @@ pub enum PseudoElement {
 /// The count of all pseudo-elements.
 pub const PSEUDO_COUNT: usize = PseudoElement::ServoTableWrapper as usize + 1;
 
-/// Snowlark patch: the `::-webkit-` parts this engine parses but does not have, by name.
+/// Snowlark patch: the `::-webkit-` parts this engine parses by name: the scroll bar parts, then
+/// the ones it does not have.
 const WEBKIT_PARTS: &[(&str, PseudoElement)] = {
     use self::PseudoElement::*;
     &[
@@ -263,9 +268,10 @@ impl ::selectors::parser::PseudoElement for PseudoElement {
     }
 
     /// Snowlark patch: user action pseudo-classes may follow a `::-webkit-` pseudo-element
-    /// (`::-webkit-scrollbar-thumb:hover`), as in Gecko.
+    /// (`::-webkit-scrollbar-thumb:hover`), as in Gecko. (A scroll bar part's style is cascaded
+    /// without state, so such a rule does not apply to it.)
     fn accepts_state_pseudo_classes(&self) -> bool {
-        self.is_unknown_webkit_pseudo_element()
+        self.is_unknown_webkit_pseudo_element() || self.is_webkit_scrollbar_part()
     }
 }
 
@@ -313,6 +319,14 @@ impl PseudoElement {
     pub fn is_unknown_webkit_pseudo_element(&self) -> bool {
         // Snowlark patch: the `::-webkit-` parts this engine does not have.
         (PseudoElement::WebkitInnerSpinButton as u8..=PseudoElement::UnknownWebkit as u8)
+            .contains(&(*self as u8))
+    }
+
+    /// Snowlark patch: whether this is a part of a custom scroll bar (`::-webkit-scrollbar` and
+    /// its `-thumb`, `-track`, `-track-piece`, `-button` and `-corner`).
+    #[inline]
+    pub fn is_webkit_scrollbar_part(&self) -> bool {
+        (PseudoElement::WebkitScrollbar as u8..=PseudoElement::WebkitScrollbarCorner as u8)
             .contains(&(*self as u8))
     }
 

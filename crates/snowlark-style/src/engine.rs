@@ -4239,7 +4239,8 @@ impl StyleEngine {
     /// The style of a pseudo-element of `element` (`::before`, `::after`, `::marker`, `::placeholder`,
     /// `::selection`, `::first-letter`, `::backdrop`, `::file-selector-button`...): the eagerly cascaded
     /// ones from the element's data, the others resolved on demand. `None` when no rule creates it (for
-    /// `::before`/`::after`, when `content` computes to `none`).
+    /// `::before`/`::after`, when `content` computes to `none`; for a `::-webkit-scrollbar` part, when
+    /// no rule matches it).
     pub fn pseudo_style(
         &self,
         dom: &Dom,
@@ -4282,7 +4283,8 @@ impl StyleEngine {
                 pseudo,
                 RuleInclusion::All,
                 &primary,
-                pseudo.is_before_or_after(),
+                // (a scroll bar part no rule styles is not drawn: no style for it)
+                pseudo.is_before_or_after() || pseudo.is_webkit_scrollbar_part(),
                 None,
             )
         });
