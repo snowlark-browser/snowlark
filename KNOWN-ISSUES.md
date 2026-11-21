@@ -160,7 +160,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   after an earlier visit with another string, run `localStorage.removeItem('clientInformation')` in the devtools
   Console on play.hbomax.com, or wait. A user agent chosen in Settings is sent as chosen. (ref 580)
 - **HBO Max shows no frames.** Its protected playback gets a licence and starts, but no video frame is shown: the page
-  stays black with a spinner. (ref 597)
+  stays black with a spinner. Protected playback whose audio is still streaming does not start: the media engine
+  takes every encrypted audio sample it is given and waits for more (it starts once the audio stream has ended, or
+  without an audio track). Fixed on the way: playback that starts after the first frame was shown, and a seek in
+  an ended `MediaSource`. (ref 597)
 - **xHE-AAC.** `canPlayType`, `MediaSource.isTypeSupported` and `decodingInfo` answer `mp4a.40.42` (xHE-AAC) as
   plain AAC, without asking whether the system can decode it. (ref 574)
 - **`changeType()` to a different decoder.** Media Source Extensions `changeType()` cannot switch a set-up

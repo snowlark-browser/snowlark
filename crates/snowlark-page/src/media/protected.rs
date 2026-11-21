@@ -105,6 +105,8 @@ struct FeedState {
     seek: Option<f64>,
     /// The playback position last reported (100 ns units).
     position: i64,
+    /// The `MediaSource` ended: its streams have no more samples (until more are appended).
+    ended: bool,
 }
 
 impl Feeder {
@@ -224,6 +226,12 @@ impl Remote for Link {
                 .map_or(i64::MIN, |(&k, _)| k);
         }
         self.0.refeed(&mut st);
+        // (the flush dropped the streams' ends too: an ended source ends them again)
+        if st.ended {
+            for i in 0..st.streams.len() {
+                self.0.control(&st, PlayerControl::End(i as u32 + 1));
+            }
+        }
         if st.playing {
             self.0.control(&st, PlayerControl::Play);
         }
@@ -282,6 +290,7 @@ impl Engine {
                 volume: (options.volume, options.muted),
                 seek: None,
                 position: 0,
+                ended: false,
             }),
         });
         let (player, reporter) = Player::remote(&options, Box::new(Link(feeder.clone())));
@@ -332,6 +341,8 @@ impl Engine {
         let offset = self.mse_timestamp_offset(sb);
         let Some(outputs) = self.media_el(el, |m| {
             let p = m.protected.as_mut()?;
+            // (an append reopens an ended source)
+            p.feeder.state().ended = false;
             let b = match p.buffers.iter_mut().position(|b| b.sb == sb) {
                 Some(i) => &mut p.buffers[i],
                 None => {
@@ -446,6 +457,11 @@ impl Engine {
                     .map_or(i64::MIN, |(&k, _)| k);
             }
             feeder.refeed(&mut st);
+            if st.ended {
+                for i in 0..st.streams.len() {
+                    feeder.control(&st, PlayerControl::End(i as u32 + 1));
+                }
+            }
             if st.playing {
                 feeder.control(&st, PlayerControl::Play);
             }
@@ -461,7 +477,8 @@ impl Engine {
     pub(crate) fn media_protected_end(&self, el: NodeId) {
         self.media_el(el, |m| {
             if let Some(p) = &m.protected {
-                let st = p.feeder.state();
+                let mut st = p.feeder.state();
+                st.ended = true;
                 for i in 0..st.streams.len() {
                     p.feeder.control(&st, PlayerControl::End(i as u32 + 1));
                 }

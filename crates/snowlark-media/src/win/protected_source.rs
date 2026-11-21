@@ -98,6 +98,15 @@ struct StreamState {
     /// Flushed and not started since: samples wait for the start or seek that follows (the
     /// engine's requests from before it must not take samples of the new position).
     holding: bool,
+    /// The source is paused: requests wait for the start that follows (Media Foundation's
+    /// session does not take samples between a stream's pause and its start).
+    paused: bool,
+    /// Samples handed to the engine, and the time of the last (for traces).
+    delivered: u64,
+    last_time: i64,
+    /// Of them, clean points and encrypted samples.
+    keys: u64,
+    encrypted: u64,
 }
 
 // SAFETY (the four impls below): Media Foundation calls a source and its streams from its own
@@ -177,9 +186,13 @@ impl Shared {
         let mut end = false;
         {
             let mut st = self.state.lock().unwrap();
-            while !st.holding && !st.tokens.is_empty() && !st.samples.is_empty() {
+            while !st.holding && !st.paused && !st.tokens.is_empty() && !st.samples.is_empty() {
                 let token = st.tokens.pop_front().unwrap();
                 let s = st.samples.pop_front().unwrap();
+                st.delivered += 1;
+                st.last_time = s.time;
+                st.keys += s.key as u64;
+                st.encrypted += s.encryption.is_some() as u64;
                 match mf_sample(&s) {
                     Ok(sample) => {
                         // SAFETY: attribute and queue calls on live objects.
@@ -199,6 +212,7 @@ impl Shared {
                 }
             }
             if !st.holding
+                && !st.paused
                 && st.ended
                 && st.samples.is_empty()
                 && !st.tokens.is_empty()
@@ -362,6 +376,17 @@ impl IMFMediaSource_Impl for Source_Impl {
         };
         let seeked = *running && !empty;
         *running = true;
+        if super::playready_service::tracing() {
+            // SAFETY: as above; an 8-byte integer is read only when the tag says so.
+            let at = (!empty)
+                .then(|| unsafe {
+                    let v = &(*position).Anonymous.Anonymous;
+                    (v.vt == windows::Win32::System::Variant::VT_I8)
+                        .then(|| v.Anonymous.hVal as f64 / 1e7)
+                })
+                .flatten();
+            eprintln!("[cdm] source start at {at:?} (seek: {seeked})");
+        }
         // SAFETY: descriptor queries and queue calls on live objects; `position` is the caller's
         // variant, passed through to the event.
         unsafe {
@@ -374,6 +399,7 @@ impl IMFMediaSource_Impl for Source_Impl {
                     let mut st = self.states[i].lock().unwrap();
                     st.selected = selected;
                     st.holding = false;
+                    st.paused = false;
                     let was = st.announced;
                     st.announced |= selected;
                     was
@@ -438,7 +464,12 @@ impl IMFMediaSource_Impl for Source_Impl {
         // SAFETY: queue calls on live objects.
         unsafe {
             for (i, stream) in self.streams.iter().enumerate() {
-                if self.states[i].lock().unwrap().selected {
+                let selected = {
+                    let mut st = self.states[i].lock().unwrap();
+                    st.paused = true;
+                    st.selected
+                };
+                if selected {
                     stream.QueueEvent(
                         MEStreamPaused.0 as u32,
                         &GUID::zeroed(),
@@ -605,6 +636,30 @@ impl Feed {
             st.holding = st.selected;
         }
     }
+
+    /// Each stream's state for a trace line: samples handed over and the last one's time, queued
+    /// samples, requests waiting for one, held or ended.
+    pub fn describe(&self) -> String {
+        let mut out = String::new();
+        for (i, s) in self.streams.iter().enumerate() {
+            let st = s.state.lock().unwrap();
+            out.push_str(&format!(
+                "{}s{i}: {} out ({} clean points, {} encrypted; last {:.2} s), {} queued, {} asked{}{}{}{}",
+                if i > 0 { "; " } else { "" },
+                st.delivered,
+                st.keys,
+                st.encrypted,
+                st.last_time as f64 / 1e7,
+                st.samples.len(),
+                st.tokens.len(),
+                if st.holding { ", held" } else { "" },
+                if st.paused { ", paused" } else { "" },
+                if st.ended { ", ended" } else { "" },
+                if st.selected { "" } else { ", not selected" },
+            ));
+        }
+        out
+    }
 }
 
 /// Creates a source with these streams.
@@ -644,6 +699,11 @@ pub fn create(specs: Vec<StreamSpec>, trust: Arc<Trust>) -> Result<(IMFMediaSour
                 selected: true,
                 announced: false,
                 holding: false,
+                paused: false,
+                delivered: 0,
+                last_time: 0,
+                keys: 0,
+                encrypted: 0,
             }));
             let shared = Arc::new(Shared {
                 queue: MFCreateEventQueue()?,
@@ -740,6 +800,62 @@ pub fn extension(source: IMFMediaSource) -> IMFMediaEngineExtension {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A stream of a paused source answers no request: the engine's requests wait, and the
+    /// samples queued meanwhile go once the source starts again (Media Foundation's session does
+    /// not take samples between a stream's pause and its start: one sent then is lost, and a
+    /// protected engine's clock then never starts).
+    #[test]
+    fn a_paused_stream_delivers_samples_only_after_its_start() {
+        crate::win::ensure_com();
+        let state = |paused| StreamState {
+            samples: VecDeque::new(),
+            tokens: VecDeque::new(),
+            ended: false,
+            eos_sent: false,
+            selected: true,
+            announced: true,
+            holding: false,
+            paused,
+            delivered: 0,
+            last_time: 0,
+            keys: 0,
+            encrypted: 0,
+        };
+        // SAFETY: event queue creation and reads on live queues.
+        unsafe {
+            let shared = Shared {
+                queue: MFCreateEventQueue().unwrap(),
+                state: Arc::new(Mutex::new(state(true))),
+                presentation: Arc::new(Presentation {
+                    queue: MFCreateEventQueue().unwrap(),
+                    states: Mutex::new(Vec::new()),
+                    ended: Mutex::new(false),
+                }),
+            };
+            let next = || {
+                shared
+                    .queue
+                    .GetEvent(MF_EVENT_FLAG_NO_WAIT.0)
+                    .ok()
+                    .map(|e| e.GetType().unwrap())
+            };
+            shared.state.lock().unwrap().tokens.push_back(None);
+            shared.state.lock().unwrap().samples.push_back(Sample {
+                data: vec![1, 2, 3],
+                time: 0,
+                duration: 10,
+                key: true,
+                encryption: None,
+            });
+            shared.pump();
+            assert_eq!(next(), None);
+            shared.state.lock().unwrap().paused = false;
+            shared.pump();
+            assert_eq!(next(), Some(MEMediaSample.0 as u32));
+            assert_eq!(next(), None);
+        }
+    }
 
     /// A key id as the media carries it becomes the GUID whose first three fields read the same
     /// bytes big-endian, so its in-memory bytes have those fields reversed.

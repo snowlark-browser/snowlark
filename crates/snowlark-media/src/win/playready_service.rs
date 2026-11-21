@@ -133,6 +133,13 @@ impl EngineState {
     }
 }
 
+/// Whether `SNOWLARK_CDM_TRACE=1`: the players' engines and streams are described on stderr
+/// every second (`[cdm]` lines).
+pub(crate) fn tracing() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("SNOWLARK_CDM_TRACE").is_ok_and(|v| v == "1"))
+}
+
 /// How often a player reports [`PlayerEvent::Progress`].
 pub const PROGRESS: std::time::Duration = std::time::Duration::from_millis(250);
 
@@ -455,6 +462,7 @@ struct Player {
     surface: bool,
     size: (i32, i32),
     progress: std::time::Instant,
+    described: std::time::Instant,
 }
 
 impl Player {
@@ -498,6 +506,7 @@ impl Player {
             surface: false,
             size: (0, 0),
             progress: std::time::Instant::now(),
+            described: std::time::Instant::now(),
         })
     }
 
@@ -547,11 +556,40 @@ impl Player {
     }
 
     /// Reports what the engine did since the last call.
-    fn poll(&mut self) {
+    fn poll(&mut self, id: u64) {
         // SAFETY: plain calls on the live engine.
         unsafe {
-            while let Ok((event, _, _)) = self.events.try_recv() {
+            if tracing() && self.described.elapsed() >= std::time::Duration::from_secs(1) {
+                self.described = std::time::Instant::now();
+                let buffered = self.engine.GetBuffered().ok().map(|r| {
+                    (0..r.GetLength())
+                        .map(|i| {
+                            let s = r.GetStart(i).unwrap_or(f64::NAN);
+                            let e = r.GetEnd(i).unwrap_or(f64::NAN);
+                            format!("{s:.2}-{e:.2}")
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                });
+                eprintln!(
+                    "[cdm] player {id}: engine ready {} network {} paused {} seeking {} at {:.2} \
+                     buffered [{}]; {}",
+                    self.engine.GetReadyState(),
+                    self.engine.GetNetworkState(),
+                    self.engine.IsPaused().as_bool(),
+                    self.engine.IsSeeking().as_bool(),
+                    self.engine.GetCurrentTime(),
+                    buffered.unwrap_or_default(),
+                    self.feed.describe()
+                );
+            }
+            while let Ok((event, p1, p2)) = self.events.try_recv() {
                 let time = self.engine.GetCurrentTime();
+                if tracing() && EngineState::of(event).is_none() {
+                    eprintln!(
+                        "[cdm] player {id}: engine event {event} ({p1:#x}, {p2:#x}) at {time:.2}"
+                    );
+                }
                 if let Some(state) = EngineState::of(event) {
                     (self.sink)(PlayerEvent::Engine { state, time });
                 }
@@ -660,8 +698,8 @@ fn run(rx: Receiver<Job>, tx: Sender<Job>) {
             }
         } else {
             pump();
-            for p in players.values_mut() {
-                p.poll();
+            for (id, p) in players.iter_mut() {
+                p.poll(*id);
             }
             match rx.recv_timeout(TICK) {
                 Ok(job) => job,

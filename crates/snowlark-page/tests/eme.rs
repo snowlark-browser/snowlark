@@ -551,6 +551,56 @@ fn a_modules_player_that_takes_over_a_playing_element_plays() {
     assert!(log.contains(&"Play".to_string()), "{log:?}");
 }
 
+/// A seek in an ended `MediaSource` (MSE `endOfStream()`): the player drops its samples and the
+/// ends of its streams, is handed the samples from the key frame again, and then the ends again,
+/// so that it can start (its engine otherwise waits for more audio) and reach the end.
+#[test]
+fn a_seek_in_an_ended_media_source_ends_the_players_streams_again() {
+    let clip = std::fs::read(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../snowlark-media/tests/fixtures/pattern-frag.mp4"),
+    )
+    .unwrap();
+    let bytes: Vec<String> = clip.iter().map(|b| b.to_string()).collect();
+    let fake = Arc::new(Fake::default());
+    let mut p = media_page(&fake);
+    run_async(
+        &mut p,
+        &format!(
+            r#"
+        const clip = new Uint8Array([{}]);
+        const v = window.v = document.createElement('video');
+        v.muted = true;
+        document.body.append(v);
+        const a = await navigator.requestMediaKeySystemAccess('org.test.module',
+            [{{initDataTypes: ['cenc'], videoCapabilities: [{{contentType: 'video/mp4; codecs="avc1.64001f"'}}]}}]);
+        await v.setMediaKeys(await a.createMediaKeys());
+        const ms = new MediaSource();
+        v.src = URL.createObjectURL(ms);
+        await new Promise(r => ms.addEventListener('sourceopen', r, {{once: true}}));
+        const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.42C00D"');
+        sb.appendBuffer(clip);
+        await new Promise(r => sb.addEventListener('updateend', r, {{once: true}}));
+        ms.endOfStream();
+        return '';
+    "#,
+            bytes.join(",")
+        ),
+    );
+    let log = || fake.player.lock().unwrap().clone();
+    assert!(log().contains(&"End(1)".to_string()), "{:?}", log());
+    fake.player.lock().unwrap().clear();
+    run_async(&mut p, "v.currentTime = 3.5; return '';");
+    let again = log();
+    assert_eq!(again[..2], ["Flush".to_string(), "Seek(3.5)".to_string()]);
+    let last_sample = again.iter().rposition(|l| l.starts_with("sample"));
+    let end = again.iter().position(|l| l == "End(1)");
+    assert!(
+        matches!((last_sample, end), (Some(s), Some(e)) if e > s),
+        "{again:?}"
+    );
+}
+
 /// A media element whose `MediaKeys` are the embedder's module's and whose source is a
 /// `MediaSource` plays through the module's protected player: it is made with the tracks of the
 /// initialization segment, handed every sample and the element's play, seek and end of stream; a

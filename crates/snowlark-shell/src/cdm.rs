@@ -132,6 +132,36 @@ fn tracing() -> bool {
     *ON.get_or_init(|| std::env::var("SNOWLARK_CDM_TRACE").is_ok_and(|v| v == "1"))
 }
 
+/// A track for a trace line: its codec and size or channels, its timescale and start, its
+/// protection.
+fn track_summary(t: &Track) -> String {
+    use snowlark_media::fmp4::Codec;
+    let codec = match &t.codec {
+        Codec::Avc {
+            parameter_sets,
+            length_size,
+        } => format!(
+            "H.264 ({} bytes of parameter sets, {length_size}-byte lengths) {}x{}",
+            parameter_sets.len(),
+            t.width,
+            t.height
+        ),
+        Codec::Aac { config } => format!(
+            "AAC {config:02x?} {} channels {} Hz",
+            t.channels, t.sample_rate
+        ),
+        Codec::Other(f) => format!("{}", String::from_utf8_lossy(f)),
+    };
+    let protection = match &t.encryption {
+        Some(e) => format!("{:?} key {:02x?}", e.scheme, e.key_id),
+        None => "clear".into(),
+    };
+    format!(
+        "track {}: {codec}, timescale {}, start {}, {protection}",
+        t.id, t.timescale, t.start
+    )
+}
+
 /// 128 random bits as hex (the standard library's random hash keys, from the system's generator).
 fn random_id() -> String {
     use std::hash::{BuildHasher, Hasher};
@@ -273,6 +303,14 @@ fn key_status(status: &str) -> KeyStatus {
 
 /// A service event as the page's.
 fn page_event(event: Event) -> CdmEvent {
+    if tracing() {
+        match &event {
+            Event::Message { session, data, .. } => {
+                eprintln!("[cdm] session {session}: message of {} bytes", data.len())
+            }
+            other => eprintln!("[cdm] {other:?}"),
+        }
+    }
     match event {
         Event::Created { request, result } => CdmEvent::Done {
             request,
@@ -437,10 +475,7 @@ impl Cdm for BrowserCdm {
             .get(&keys)
             .cloned();
         if tracing() {
-            let kinds: Vec<String> = tracks
-                .iter()
-                .map(|t| format!("{t:?}").chars().take(160).collect())
-                .collect();
+            let kinds: Vec<String> = tracks.iter().map(track_summary).collect();
             eprintln!(
                 "[cdm] player {player} of instance {keys}: {}",
                 kinds.join("; ")
