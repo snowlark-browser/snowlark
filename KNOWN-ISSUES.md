@@ -10,8 +10,11 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   minimum when the items overflow, and a single-line `flex-wrap: wrap-reverse` container puts its line at the wrong
   cross edge. `flex-wrap: balance` and `flex-line-count` are not implemented. Both layout bugs are in the vendored
   flex algorithm. (ref 42)
-- **Grid gaps.** `display: grid-lanes` (masonry) and subgrid are not implemented, and subgrids in another writing mode do
-  not take their parent's tracks. Column flex containers compute no baselines, so `last baseline` alignment falls back
+- **Percentage-sized SVG icons.** An `<svg>` with only a `viewBox` and a percentage width, inside a shrink-to-fit box
+  (an inline-block, a float, a flex item that is not stretched), takes no width, so the icon is not drawn. (ref 613)
+- **Grid gaps.** `display: grid-lanes` (masonry) is not implemented. Subgrids in another writing mode or direction than
+  their parent are laid out as ordinary grids, a subgrid's items share baselines only within it, and a subgrid's
+  `repeat(auto-fill, ...)` line names are taken once. Column flex containers compute no baselines, so `last baseline` alignment falls back
   to `end` there. (ref 42, 85)
 - **Writing modes.** Vertical modes work in block, inline, float, table, flex, grid and positioned layout, but several
   pieces are missing: ideographic baseline metrics (`text-box-edge`), `text-group-align`, `chws`/`halt` in vertical
@@ -162,8 +165,12 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **HBO Max shows no frames.** Its protected playback gets a licence and starts, but no video frame is shown: the page
   stays black with a spinner. Protected playback whose audio is still streaming does not start: the media engine
   takes every encrypted audio sample it is given and waits for more (it starts once the audio stream has ended, or
-  without an audio track). This happens at the hardware security level (SL3000) only: there the audio is not
-  decrypted for the media engine, while the same content plays with sound at SL2000. Fixed on the way: playback
+  without an audio track). This happens at the hardware security level (SL3000) only. There the protected pipeline
+  runs in the browser's process, and the system's audio decrypter passes on mostly zeroed buffers instead of clear
+  audio, so the decoder has nothing to decode. The same content plays with sound at SL2000. The audio key's licence
+  asks for SL2000 or lower in both the HBO Max and the reference streams. Microsoft Edge on the same system plays
+  the reference stream at SL3000 with no audio as well, so this is the platform's hardware audio decryption; the engine
+  keeps offering SL3000. Fixed on the way: playback
   that starts after the first frame was shown, and a seek in an ended `MediaSource`. (ref 597)
 - **`changeType()` to a different decoder.** Media Source Extensions `changeType()` cannot switch a set-up
   `SourceBuffer` to a stream that needs another decoder. Dolby AC-3 and E-AC-3 are not offered through MSE for that

@@ -37,6 +37,7 @@ mod alignment;
 mod explicit_grid;
 mod implicit_grid;
 mod placement;
+mod subgrid;
 mod track_sizing;
 mod types;
 mod util;
@@ -348,13 +349,13 @@ pub fn compute_grid_layout<Tree: LayoutGridContainer>(
                 .into_origin_zero(explicit_col_count),
             vertical: name_resolver.resolve_row_names(&child_style.grid_row()).into_origin_zero(explicit_row_count),
         });
-        items.push(GridItem::new_with_style_and_order(
-            child_node,
-            child_style,
-            align_items,
-            justify_items,
-            index as u16,
-        ));
+        let subgrid_axes = child_style.subgrid();
+        let mut item =
+            GridItem::new_with_style_and_order(child_node, child_style, align_items, justify_items, index as u16);
+        if subgrid_axes.width || subgrid_axes.height {
+            subgrid::mark_subgrid(&mut item, subgrid_axes);
+        }
+        items.push(item);
     }
 
     // 4. Implicit Grid: Estimate Track Counts
@@ -371,8 +372,19 @@ pub fn compute_grid_layout<Tree: LayoutGridContainer>(
     place_grid_items(&mut cell_occupancy_matrix, &mut items, &placements, style.grid_auto_flow());
 
     // Extract track counts from previous step (auto-placement can expand the number of tracks)
-    let final_col_counts = *cell_occupancy_matrix.track_counts(AbsoluteAxis::Horizontal);
-    let final_row_counts = *cell_occupancy_matrix.track_counts(AbsoluteAxis::Vertical);
+    #[allow(unused_mut)]
+    let mut final_col_counts = *cell_occupancy_matrix.track_counts(AbsoluteAxis::Horizontal);
+    #[allow(unused_mut)]
+    let mut final_row_counts = *cell_occupancy_matrix.track_counts(AbsoluteAxis::Vertical);
+    // Snowlark patch: a subgrid has no implicit tracks in its subgridded axes (css-grid-2 §9)
+    let subgridded = style.subgridded();
+    if subgridded.width {
+        subgrid::clamp_to_subgrid(&mut items, &mut final_col_counts, AbsoluteAxis::Horizontal);
+    }
+    if subgridded.height {
+        subgrid::clamp_to_subgrid(&mut items, &mut final_row_counts, AbsoluteAxis::Vertical);
+    }
+    let gap_style = style.gap();
 
     // 5. Initialize Tracks
     // Initialize (explicit and implicit) grid tracks (and gutters)
@@ -412,6 +424,38 @@ pub fn compute_grid_layout<Tree: LayoutGridContainer>(
     // Record this as a boolean (per-axis) on each item for later use in the track-sizing algorithm
     determine_if_item_crosses_flexible_or_intrinsic_tracks(&mut items, &columns, &rows);
 
+    // Snowlark patch: the items of subgrids take part in this grid's track sizing (css-grid-2 §9)
+    let own_item_count = items.len();
+    let parent_gap = Size {
+        width: gap_style.width.resolve_or_zero(inner_node_size.width, |val, basis| tree.calc(val, basis)),
+        height: gap_style.height.resolve_or_zero(inner_node_size.width, |val, basis| tree.calc(val, basis)),
+    };
+    let mut subgrids = if items.iter().any(|item| item.subgrid.width || item.subgrid.height) {
+        subgrid::collect_subgrids(
+            tree,
+            &mut items,
+            &detailed_column_line_names,
+            &detailed_row_line_names,
+            parent_gap,
+            inner_node_size.width,
+        )
+    } else {
+        Vec::new()
+    };
+    if !subgrids.is_empty() {
+        subgrid::add_subgrid_items(
+            tree,
+            &mut subgrids,
+            &mut items,
+            &columns,
+            &rows,
+            final_col_counts,
+            final_row_counts,
+            parent_gap,
+            false,
+        );
+    }
+
     // Determine if the grid has any baseline aligned items
     let has_baseline_aligned_item = items.iter().any(|item| item.participates_in_baseline_alignment());
 
@@ -447,6 +491,21 @@ pub fn compute_grid_layout<Tree: LayoutGridContainer>(
     }
 
     items.iter_mut().for_each(|item| item.grid_area_size_cache = None);
+
+    if !subgrids.is_empty() {
+        subgrid::set_subgrid_tracks(tree, &subgrids, &items, &columns, &rows, false, direction.is_rtl());
+        subgrid::add_subgrid_items(
+            tree,
+            &mut subgrids,
+            &mut items,
+            &columns,
+            &rows,
+            final_col_counts,
+            final_row_counts,
+            parent_gap,
+            true,
+        );
+    }
 
     // Run track sizing algorithm for Block axis
     track_sizing_algorithm(
@@ -519,8 +578,10 @@ pub fn compute_grid_layout<Tree: LayoutGridContainer>(
 
     if !rerun_column_sizing {
         // Note: every item must be visited (no short-circuiting) as the closure updates each item's caches
-        intrinsic_column_contribution_changed =
-            items.iter_mut().filter(|item| item.crosses_intrinsic_column).fold(false, |any_changed, item| {
+        intrinsic_column_contribution_changed = items
+            .iter_mut()
+            .filter(|item| item.sized_in(AbstractAxis::Inline) && item.crosses_intrinsic_column)
+            .fold(false, |any_changed, item| {
                 let grid_area_size = item.grid_area_size(
                     AbstractAxis::Inline,
                     &columns,
@@ -589,12 +650,31 @@ pub fn compute_grid_layout<Tree: LayoutGridContainer>(
             has_baseline_aligned_item,
         );
 
+        // Snowlark patch: the areas of the items of subgrids subgridded in rows only follow the new columns
+        if !subgrids.is_empty() {
+            subgrid::remove_row_subgrid_items(&mut items);
+            subgrid::set_subgrid_tracks(tree, &subgrids, &items, &columns, &rows, false, direction.is_rtl());
+            subgrid::add_subgrid_items(
+                tree,
+                &mut subgrids,
+                &mut items,
+                &columns,
+                &rows,
+                final_col_counts,
+                final_row_counts,
+                parent_gap,
+                true,
+            );
+        }
+
         // The column widths may have changed, so the items' intrinsic height contributions need to be recomputed
         // (unless row sizing is being re-run anyway, in which case the caches have already been cleared).
         if !rerun_row_sizing {
             // Note: every item must be visited (no short-circuiting) as the closure updates each item's caches
-            intrinsic_row_contribution_changed =
-                items.iter_mut().filter(|item| item.crosses_intrinsic_row).fold(false, |any_changed, item| {
+            intrinsic_row_contribution_changed = items
+                .iter_mut()
+                .filter(|item| item.sized_in(AbstractAxis::Block) && item.crosses_intrinsic_row)
+                .fold(false, |any_changed, item| {
                     let grid_area_size = item.grid_area_size(
                         AbstractAxis::Block,
                         &rows,
@@ -696,6 +776,12 @@ pub fn compute_grid_layout<Tree: LayoutGridContainer>(
         align_content,
         false,
     );
+
+    // Snowlark patch: each subgrid is laid out with this grid's used tracks, and its items are its own again
+    if !subgrids.is_empty() {
+        subgrid::set_subgrid_tracks(tree, &subgrids, &items, &columns, &rows, true, direction.is_rtl());
+        items.truncate(own_item_count);
+    }
 
     // 9. Size, Align, and Position Grid Items
 

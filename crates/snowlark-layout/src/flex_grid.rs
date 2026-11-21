@@ -62,6 +62,9 @@ pub(crate) struct TaffyNode<S: Style> {
     pub runs: u32,
     /// A nested container's fragment, built from its items' layouts after its last run.
     pub built: Option<Box<Built<S>>>,
+    /// A subgrid's tracks from its parent grid, and the style it is laid out with for them
+    /// (css-grid-2 §9).
+    pub subgrid: Option<Box<(taffy::SubgridTracks<Arc<str>>, TStyle)>>,
 }
 
 /// A container's fragment and out-of-flow candidates as built after an algorithm run, with what
@@ -531,6 +534,16 @@ fn taffy_style<S: Style>(b: &LayoutBox<S>, s: &S, calcs: &mut Vec<LengthPercenta
         t.grid_template_rows = rows;
         t.grid_template_column_names = col_names;
         t.grid_template_row_names = row_names;
+        // css-grid-2 §9: a subgrid takes its parent's gap where its own is `normal`.
+        let (subgrid_columns, subgrid_rows) = s.grid_template_subgrid();
+        t.subgrid = taffy::Size {
+            width: subgrid_columns,
+            height: subgrid_rows,
+        };
+        t.gap_is_normal = taffy::Size {
+            width: s.column_gap().is_none(),
+            height: s.row_gap().is_none(),
+        };
         t.grid_auto_columns = s
             .grid_auto_columns()
             .iter()
@@ -701,6 +714,7 @@ fn ensure_nodes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) {
                     node.own_style = Some(old);
                 }
                 node.view = frame;
+                node.subgrid = None;
                 node.cache.clear();
             }
             continue;
@@ -741,6 +755,7 @@ fn ensure_nodes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) {
                 grid: None,
                 runs: 0,
                 built: None,
+                subgrid: None,
             }));
         }
     }
@@ -885,6 +900,9 @@ impl<S: Style> Tree<'_, '_, S> {
     /// The style of `n` as the container being laid out (in its own frame).
     fn container_style(&self, n: taffy::NodeId) -> &TStyle {
         let node = self.node(n);
+        if let Some(subgrid) = &node.subgrid {
+            return &subgrid.1;
+        }
         match &node.own_style {
             Some(s) if node.view != self.cx.frame => s,
             _ => &node.style,
@@ -1477,6 +1495,34 @@ impl<S: Style> taffy::LayoutGridContainer for Tree<'_, '_, S> {
             rows: info.rows.clone(),
         }));
         n.grid_info = Some(Box::new(info));
+    }
+
+    fn set_subgrid_tracks(
+        &mut self,
+        node: taffy::NodeId,
+        tracks: &taffy::SubgridTracks<Self::CustomIdent>,
+    ) -> bool {
+        let id = bid(node);
+        let b = self.cx.tree.b(id);
+        // A subgrid in another writing mode or direction than its parent grid is laid out as an
+        // ordinary grid here.
+        let parent_direction = b.parent.map(|p| self.cx.tree.b(p).style.direction());
+        if b.style.view() != self.cx.frame || parent_direction != Some(b.style.direction()) {
+            return false;
+        }
+        ensure_nodes(self.cx, id);
+        order_children(self.cx, id);
+        let n = self.node_mut(node);
+        if n.own_style.is_some() {
+            return false;
+        }
+        if n.subgrid.as_ref().is_some_and(|s| s.0 == *tracks) {
+            return true;
+        }
+        let view = n.style.subgrid_view(tracks);
+        n.subgrid = Some(Box::new((tracks.clone(), view)));
+        n.cache.clear();
+        true
     }
 }
 

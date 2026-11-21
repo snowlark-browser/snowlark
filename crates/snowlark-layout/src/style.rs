@@ -2162,6 +2162,11 @@ pub trait Style: Clone {
     fn grid_template_rows(&self) -> Cow<'_, TrackList> {
         Cow::Owned(TrackList::default())
     }
+    /// Whether `grid-template-columns`/`-rows` is `subgrid` (columns, rows): that track list then holds
+    /// the subgrid's `<line-name-list>` only (css-grid-2 §9).
+    fn grid_template_subgrid(&self) -> (bool, bool) {
+        (false, false)
+    }
     fn grid_template_areas(&self) -> Option<Cow<'_, GridTemplateAreas>> {
         None
     }

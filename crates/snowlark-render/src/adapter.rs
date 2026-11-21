@@ -1096,10 +1096,34 @@ fn line_names(names: &[style::OwnedSlice<style::values::CustomIdent>]) -> Vec<Ve
 
 fn track_list(v: &c::GridTemplateComponent) -> ls::TrackList {
     use style::values::generics::grid::{
-        GenericGridTemplateComponent as G, GenericTrackListValue as V, RepeatCount,
+        GenericGridTemplateComponent as G, GenericLineNameListValue as N,
+        GenericTrackListValue as V, RepeatCount,
     };
+    if let G::Subgrid(list) = v {
+        // css-grid-2 §9: a subgrid's `<line-name-list>` names its lines from the first; its tracks
+        // are its parent's (`subgrid_axes`). A `repeat(auto-fill, ...)` is taken once.
+        let mut names = Vec::new();
+        for value in list.line_names.iter() {
+            match value {
+                N::LineNames(set) => names.push(set.iter().map(|n| Arc::from(&*n.0)).collect()),
+                N::Repeat(r) => {
+                    let count = match r.count {
+                        RepeatCount::Number(n) => n.clamp(1, 1000) as usize,
+                        _ => 1,
+                    };
+                    for _ in 0..count {
+                        names.extend(line_names(&r.line_names));
+                    }
+                }
+            }
+        }
+        return ls::TrackList {
+            items: Vec::new(),
+            line_names: names,
+        };
+    }
     let G::TrackList(list) = v else {
-        // `none`, `subgrid` and `masonry` (the last two are not implemented): no explicit tracks.
+        // `none` and `masonry` (not implemented): no explicit tracks.
         return ls::TrackList::default();
     };
     let items = list
@@ -1864,6 +1888,15 @@ impl ls::Style for RenderStyle {
 
     fn grid_template_rows(&self) -> Cow<'_, ls::TrackList> {
         Cow::Owned(track_list(&self.values.get_position().grid_template_rows))
+    }
+
+    fn grid_template_subgrid(&self) -> (bool, bool) {
+        use style::values::generics::grid::GenericGridTemplateComponent as G;
+        let p = self.values.get_position();
+        (
+            matches!(p.grid_template_columns, G::Subgrid(_)),
+            matches!(p.grid_template_rows, G::Subgrid(_)),
+        )
     }
 
     fn grid_template_areas(&self) -> Option<Cow<'_, ls::GridTemplateAreas>> {

@@ -259,6 +259,13 @@ pub trait GridContainerStyle: CoreStyle {
         }
     }
 
+    /// Snowlark patch: the axes in which this grid is laid out as a subgrid, with its parent grid's tracks
+    /// (css-grid-2 §9). Its template in such an axis lists those tracks at their fixed sizes.
+    #[inline(always)]
+    fn subgridded(&self) -> Size<bool> {
+        Size { width: false, height: false }
+    }
+
     /// Get a grid container's align-content or justify-content alignment depending on the axis passed
     /// (with `normal` resolved to `stretch`)
     #[inline(always)]
@@ -298,6 +305,19 @@ pub trait GridItemStyle: CoreStyle {
     #[inline(always)]
     fn justify_self(&self) -> Option<AlignSelf> {
         Style::<Self::CustomIdent>::DEFAULT.justify_self
+    }
+
+    /// Snowlark patch: the axes in which this item is a subgrid (`width` columns, `height` rows): it is a grid
+    /// container whose `grid-template-columns`/`-rows` is `subgrid` (css-grid-2 §9)
+    #[inline(always)]
+    fn subgrid(&self) -> Size<bool> {
+        Size { width: false, height: false }
+    }
+
+    /// Snowlark patch: this item's own `column-gap`/`row-gap` as a grid container, `None` for `normal`
+    #[inline(always)]
+    fn own_gap(&self) -> Size<Option<LengthPercentage>> {
+        Size { width: None, height: None }
     }
 
     /// Get a grid item's row or column placement depending on the axis passed

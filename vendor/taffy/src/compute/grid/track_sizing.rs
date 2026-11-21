@@ -459,7 +459,8 @@ fn resolve_item_baselines(
     // Sort items by track in the other axis (row) start position so that we can iterate items in groups which
     // are in the same track in the other axis (row)
     let other_axis = axis.other();
-    let mut items: Vec<&mut GridItem> = items.iter_mut().collect();
+    // Snowlark patch: a subgrid's items share no baselines with this grid's here (they are aligned in the subgrid).
+    let mut items: Vec<&mut GridItem> = items.iter_mut().filter(|item| !item.is_subgrid_item).collect();
     items.sort_by_key(|item| item.placement(other_axis).start);
 
     // Iterate over grid rows
@@ -599,9 +600,11 @@ fn resolve_intrinsic_track_sizes<Tree: LayoutPartialTree>(
     // Items that cross a flexible track are all processed together in a single batch (regardless of their span), so
     // they only need to be moved to the end of the list. And the order in which items within a batch are processed
     // does not affect the result, so the remaining items only need to be sorted if any of them span more than one track.
-    let mut partitioned_items: FrontBackVecBuilder<&mut GridItem> = FrontBackVecBuilder::with_capacity(items.len());
+    let sized_count = items.iter().filter(|item| item.sized_in(axis)).count();
+    let mut partitioned_items: FrontBackVecBuilder<&mut GridItem> = FrontBackVecBuilder::with_capacity(sized_count);
     let mut needs_sort = false;
-    for item in items.iter_mut() {
+    // Snowlark patch: only the items that take part in this axis's track sizing (css-grid-2 §9)
+    for item in items.iter_mut().filter(|item| item.sized_in(axis)) {
         if item.crosses_flexible_track(axis) {
             partitioned_items.push_back(item);
         } else {
@@ -1329,7 +1332,7 @@ fn expand_flexible_tracks<Tree: LayoutPartialTree>(
                 // that the item crosses and a space to fill of the item’s max-content contribution.
                 items
                     .iter_mut()
-                    .filter(|item| item.crosses_flexible_track(axis))
+                    .filter(|item| item.sized_in(axis) && item.crosses_flexible_track(axis))
                     .map(|item| {
                         let max_content_contribution = item_sizer.max_content_contribution(item, axis_tracks);
                         let tracks = &axis_tracks[item.track_range_excluding_lines(axis)];

@@ -110,6 +110,19 @@ pub(in super::super) struct GridItem {
     /// Out-of-flow candidates bubbled out of this item's subtree (anchors relative to the
     /// container's border box)
     pub oof_candidates: OofCandidates,
+
+    /// Snowlark patch: the axes in which this item is a subgrid (`width` columns, `height` rows; css-grid-2 §9)
+    pub subgrid: Size<bool>,
+    /// Snowlark patch: the axes whose track sizing this item takes part in. A subgrid does not in its
+    /// subgridded axes: its own items do instead, as items of this grid in those axes.
+    pub sizing: Size<bool>,
+    /// Snowlark patch: an item of a subgrid, taking part in this grid's track sizing only (it is laid out by
+    /// the subgrid)
+    pub is_subgrid_item: bool,
+    /// Snowlark patch: a subgrid item's extra margins in this grid: the subgrid's margin, border and padding
+    /// at its edges, half the difference of the gutters, and in an axis the subgrid has tracks of its own,
+    /// the space outside the item's area in them (css-grid-2 §9)
+    pub extra_margin: Rect<f32>,
 }
 
 impl GridItem {
@@ -157,6 +170,19 @@ impl GridItem {
             y_position: 0.0,
             height: 0.0,
             oof_candidates: OofCandidates::NONE,
+            subgrid: Size { width: false, height: false },
+            sizing: Size { width: true, height: true },
+            is_subgrid_item: false,
+            extra_margin: Rect::ZERO,
+        }
+    }
+
+    /// Snowlark patch: whether the item takes part in the track sizing of `axis`
+    #[inline(always)]
+    pub fn sized_in(&self, axis: AbstractAxis) -> bool {
+        match axis {
+            AbstractAxis::Inline => self.sizing.width,
+            AbstractAxis::Block => self.sizing.height,
         }
     }
 
@@ -545,6 +571,7 @@ impl GridItem {
                 + self.last_baseline_shim,
         }
         .sum_axes()
+            + self.extra_margin.sum_axes()
     }
 
     /// Compute the item's min content contribution from the provided parameters
@@ -649,7 +676,8 @@ impl GridItem {
         if available_space.width.is_none() && available_space.height.is_none() {
             return available_space;
         }
-        let margin = self.margin.resolve_or_zero(grid_area_size.width, |val, basis| tree.calc(val, basis));
+        let margin =
+            self.margin.resolve_or_zero(grid_area_size.width, |val, basis| tree.calc(val, basis)) + self.extra_margin;
         Size {
             width: available_space.width.map(|width| f32_max(width - margin.horizontal_axis_sum(), 0.0)),
             height: available_space

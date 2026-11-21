@@ -863,6 +863,18 @@ pub struct Style<S: CheapCloneStr = DefaultCheapStr> {
     /// The named lines between the rows
     #[cfg(feature = "grid")]
     pub grid_template_row_names: GridTrackVec<GridTrackVec<S>>,
+    /// Snowlark patch: `grid-template-columns`/`-rows: subgrid` (`width` is columns, `height` rows). The
+    /// subgrid's `<line-name-list>` is in `grid_template_column_names`/`grid_template_row_names`, and its
+    /// template track list is empty (css-grid-2 §9).
+    #[cfg(feature = "grid")]
+    pub subgrid: Size<bool>,
+    /// Snowlark patch: whether `column-gap`/`row-gap` is `normal` (a subgrid then takes its parent's gap)
+    #[cfg(feature = "grid")]
+    pub gap_is_normal: Size<bool>,
+    /// Snowlark patch: set on the style a subgrid is laid out with ([`Style::subgrid_view`]): the axes in
+    /// which its tracks are its parent grid's
+    #[cfg(feature = "grid")]
+    pub subgridded: Size<bool>,
 
     // Grid child properties
     /// Defines which row in the grid the item should start and end at
@@ -871,6 +883,82 @@ pub struct Style<S: CheapCloneStr = DefaultCheapStr> {
     /// Defines which column in the grid the item should start and end at
     #[cfg(feature = "grid")]
     pub grid_column: Line<GridPlacement<S>>,
+}
+
+/// Snowlark patch: the tracks a subgrid takes from its parent grid in one axis (css-grid-2 §9)
+#[cfg(feature = "grid")]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SubgridAxisTracks<S: CheapCloneStr> {
+    /// The size of each of the subgrid's tracks, or `None` while its parent has not sized them yet
+    pub sizes: Vec<Option<f32>>,
+    /// The parent grid's names of each line the subgrid spans (`sizes.len() + 1` sets)
+    pub line_names: Vec<Vec<S>>,
+    /// The subgrid's gutter size in this axis
+    pub gap: f32,
+}
+
+/// Snowlark patch: the tracks a subgrid takes from its parent grid, in each of its subgridded axes
+#[cfg(feature = "grid")]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SubgridTracks<S: CheapCloneStr> {
+    /// The columns, if the subgrid is subgridded in columns
+    pub columns: Option<SubgridAxisTracks<S>>,
+    /// The rows, if the subgrid is subgridded in rows
+    pub rows: Option<SubgridAxisTracks<S>>,
+}
+
+#[cfg(feature = "grid")]
+impl<S: CheapCloneStr> Style<S> {
+    /// Snowlark patch: the style a subgrid is laid out with: in each subgridded axis its explicit tracks are
+    /// its parent's (at their used sizes, `auto` until the parent has sized them), its lines carry the
+    /// parent's names and then its own `<line-name-list>`'s, and its gutters are `tracks.gap`
+    /// (css-grid-2 §9).
+    pub fn subgrid_view(&self, tracks: &SubgridTracks<S>) -> Self {
+        fn apply<S: CheapCloneStr>(
+            tracks: &SubgridAxisTracks<S>,
+            template: &mut GridTrackVec<GridTemplateComponent<S>>,
+            names: &mut GridTrackVec<GridTrackVec<S>>,
+            gap: &mut LengthPercentage,
+        ) {
+            use crate::style_helpers::FromLength as _;
+            let own = core::mem::take(names);
+            *template = tracks
+                .sizes
+                .iter()
+                .map(|size| {
+                    GridTemplateComponent::Single(match size {
+                        Some(size) => TrackSizingFunction::from_length(*size),
+                        None => TrackSizingFunction::AUTO,
+                    })
+                })
+                .collect();
+            *names = tracks
+                .line_names
+                .iter()
+                .enumerate()
+                .map(|(line, parent)| {
+                    let mut set: GridTrackVec<S> = parent.iter().cloned().collect();
+                    for name in own.get(line).into_iter().flatten() {
+                        if !set.iter().any(|n| n.as_ref() == name.as_ref()) {
+                            set.push(name.clone());
+                        }
+                    }
+                    set
+                })
+                .collect();
+            *gap = LengthPercentage::length(tracks.gap);
+        }
+        let mut view = self.clone();
+        if let Some(columns) = &tracks.columns {
+            apply(columns, &mut view.grid_template_columns, &mut view.grid_template_column_names, &mut view.gap.width);
+            view.subgridded.width = true;
+        }
+        if let Some(rows) = &tracks.rows {
+            apply(rows, &mut view.grid_template_rows, &mut view.grid_template_row_names, &mut view.gap.height);
+            view.subgridded.height = true;
+        }
+        view
+    }
 }
 
 impl<S: CheapCloneStr> Style<S> {
@@ -940,6 +1028,12 @@ impl<S: CheapCloneStr> Style<S> {
         grid_template_column_names: GridTrackVec::new(),
         #[cfg(feature = "grid")]
         grid_template_row_names: GridTrackVec::new(),
+        #[cfg(feature = "grid")]
+        subgrid: Size { width: false, height: false },
+        #[cfg(feature = "grid")]
+        gap_is_normal: Size { width: false, height: false },
+        #[cfg(feature = "grid")]
+        subgridded: Size { width: false, height: false },
         #[cfg(feature = "grid")]
         grid_auto_rows: GridTrackVec::new(),
         #[cfg(feature = "grid")]
@@ -1492,6 +1586,11 @@ impl<S: CheapCloneStr> GridContainerStyle for Style<S> {
     fn grid_template_row_names(&self) -> Option<Self::TemplateLineNames<'_>> {
         Some(self.grid_template_row_names.iter().map(|names| names.iter()))
     }
+
+    #[inline(always)]
+    fn subgridded(&self) -> Size<bool> {
+        self.subgridded
+    }
 }
 
 #[cfg(feature = "grid")]
@@ -1586,6 +1685,10 @@ impl<T: GridContainerStyle> GridContainerStyle for &'_ T {
     fn justify_items(&self) -> AlignItems {
         (*self).justify_items()
     }
+    #[inline(always)]
+    fn subgridded(&self) -> Size<bool> {
+        (*self).subgridded()
+    }
 }
 
 #[cfg(feature = "grid")]
@@ -1608,6 +1711,21 @@ impl<S: CheapCloneStr> GridItemStyle for Style<S> {
     fn justify_self(&self) -> Option<AlignSelf> {
         self.justify_self
     }
+    #[inline(always)]
+    fn subgrid(&self) -> Size<bool> {
+        // css-grid-2 §9: only a grid container is a subgrid (an absolutely positioned one is no grid item).
+        if self.display != Display::Grid {
+            return Size { width: false, height: false };
+        }
+        self.subgrid
+    }
+    #[inline(always)]
+    fn own_gap(&self) -> Size<Option<LengthPercentage>> {
+        Size {
+            width: (!self.gap_is_normal.width).then_some(self.gap.width),
+            height: (!self.gap_is_normal.height).then_some(self.gap.height),
+        }
+    }
 }
 
 #[cfg(feature = "grid")]
@@ -1627,6 +1745,14 @@ impl<T: GridItemStyle> GridItemStyle for &'_ T {
     #[inline(always)]
     fn justify_self(&self) -> Option<AlignSelf> {
         (*self).justify_self()
+    }
+    #[inline(always)]
+    fn subgrid(&self) -> Size<bool> {
+        (*self).subgrid()
+    }
+    #[inline(always)]
+    fn own_gap(&self) -> Size<Option<LengthPercentage>> {
+        (*self).own_gap()
     }
 }
 
@@ -1701,6 +1827,12 @@ mod tests {
             grid_template_row_names: Default::default(),
             #[cfg(feature = "grid")]
             grid_template_column_names: Default::default(),
+            #[cfg(feature = "grid")]
+            subgrid: Size { width: false, height: false },
+            #[cfg(feature = "grid")]
+            gap_is_normal: Size { width: false, height: false },
+            #[cfg(feature = "grid")]
+            subgridded: Size { width: false, height: false },
             #[cfg(feature = "grid")]
             grid_template_areas: Default::default(),
             #[cfg(feature = "grid")]

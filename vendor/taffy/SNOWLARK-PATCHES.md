@@ -47,6 +47,17 @@ the source; `git log -p vendor/taffy` shows the diff.
     of its flex items", as Blink's `ComputeMinMaxSizes`. Upstream ran the whole algorithm for it,
     laying out every item at its min-content or max-content width for a flex base size it then
     dropped. Items with an aspect ratio and collapsed items keep the full algorithm.
+11. **Subgrids** (`compute/grid/subgrid.rs`, `compute/grid/mod.rs`, `track_sizing.rs`, `types/grid_item.rs`,
+    `style/mod.rs`, `style/grid.rs`, `tree/traits.rs`): css-grid-2 §9. `Style::subgrid` marks
+    `grid-template-columns`/`-rows: subgrid` (the `<line-name-list>` in the line names). A subgrid's own
+    items, and those of subgrids nested in it in the same axis, take part in its parent's track sizing in
+    the subgridded axes as items of the parent (`GridItem::sizing`, `is_subgrid_item`), with the subgrid's
+    margin, border and padding and half the gutter difference as extra margin (`extra_margin`); in an axis
+    the subgrid has tracks of its own, their extra margin is the space outside the item's area in them. The
+    subgrid itself takes no part there and is stretched. The parent then hands the subgrid its used tracks
+    (`LayoutGridContainer::set_subgrid_tracks`), and the tree lays it out with `Style::subgrid_view`: those
+    tracks at fixed sizes, the parent's line names before its own, its gutter (its gap, or the parent's for
+    `normal`), and its items clamped to that explicit grid. Upstream had no subgrid.
 
 To move to a newer taffy: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `.\dev.ps1 test --release --package snowlark-layout`.

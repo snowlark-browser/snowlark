@@ -1849,6 +1849,84 @@ fn resolved_values_that_need_the_box() {
     );
 }
 
+/// CSS Grid 2 §9 subgrids: cards with `grid-template-rows: subgrid` take their rows (and the rows' names)
+/// from the grid they span, so their items line up across cards; each card's items size the shared rows,
+/// with the card's padding as extra margin at its edges, and the card's gutters are its parent's
+/// (`row-gap: normal`).
+#[test]
+fn subgrid_rows_are_the_parent_grids() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>* { margin: 0 } body { font: 16px/20px sans-serif }\
+         #set { display: grid; grid-auto-flow: column; column-gap: 20px; row-gap: 6px; justify-content: start;\
+           grid-template-rows: [image] auto [title-start] auto [title-end text] auto [price] auto }\
+         .tile { display: grid; grid-template-rows: subgrid; grid-row: 1 / -1; width: 200px; padding: 4px 10px }\
+         .img { grid-row: image; height: 50px } .title { grid-row: title } .text { grid-row: text }\
+         .price { grid-row: price }</style>\
+         <div id=set>\
+         <div class=tile id=a><div class=img></div><h3 class=title id=at>A</h3><p class=text id=ax>one</p>\
+         <div class=price id=ap>1</div></div>\
+         <div class=tile id=b><div class=img></div><h3 class=title>B</h3><p class=text id=bx>two<br>lines</p>\
+         <div class=price id=bp>2</div></div></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const r = id => document.getElementById(id).getBoundingClientRect();
+         [r('a').height, r('at').left, r('at').top, r('ax').top, r('ax').height, r('ap').top, r('bx').left,
+          r('bp').top].join(' ')",
+    );
+    assert_eq!(r, "156 10 60 86 40 132 250 132");
+}
+
+/// CSS Grid 2 §9: a `grid-template-columns: subgrid` item's own items size the parent's columns (an
+/// `auto` column takes an item's width plus the subgrid's padding at its edge and half the difference of
+/// the gutters between), and are placed in those columns by their names, in the gutters' middle.
+#[test]
+fn subgrid_columns_size_the_parent_grids() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>* { margin: 0 } body { font: 16px/20px sans-serif }\
+         #g { display: grid; grid-template-columns: [a] 100px [b] auto [c]; justify-content: start; column-gap: 10px }\
+         #s { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; padding: 0 5px; column-gap: 20px }\
+         </style><div id=g><div id=s><div id=x style='grid-column: b; width: 60px'>x</div><div id=y>y</div></div>\
+         <div id=z style='grid-column: b'>z</div></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const r = id => document.getElementById(id).getBoundingClientRect();
+         [r('x').left, r('y').left, r('z').left, r('z').width, r('s').width, r('y').top, r('z').top].join(' ')",
+    );
+    assert_eq!(r, "115 5 110 70 180 20 40");
+}
+
+/// CSS Grid 2 §9: a subgrid nested in a subgrid in the same axis passes its items on to the outermost
+/// grid's track sizing (with its padding as extra margin at its edge), and its lines are named by both.
+#[test]
+fn nested_subgrid_items_size_the_outer_grids_rows() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>* { margin: 0 } body { font: 16px/20px sans-serif }\
+         #set { display: grid; grid-auto-flow: column; justify-content: start; column-gap: 20px;\
+           grid-template-rows: [image] auto [id-start badge] auto [headline] auto [id-end text] auto }\
+         .tile { display: grid; grid-template-rows: subgrid; grid-row: 1 / -1; width: 150px }\
+         .id { display: grid; grid-template-rows: subgrid; grid-row: id; padding-top: 3px }\
+         .badge { grid-row: badge } .head { grid-row: headline } .text { grid-row: text }</style>\
+         <div id=set><div class=tile><div style='height: 30px'></div><h3 class=id id=aid>\
+         <span class=badge id=ab>New</span><span class=head id=ah>Name</span></h3><p class=text id=at>t</p></div>\
+         <div class=tile><div style='height: 30px'></div><h3 class=id><span class=head id=bh>Two<br>lines</span></h3>\
+         <p class=text id=bt>t</p></div></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const r = id => document.getElementById(id).getBoundingClientRect();
+         [r('ab').top, r('ah').top, r('at').top, r('bh').top, r('bt').top, r('aid').height, r('bh').height].join(' ')",
+    );
+    assert_eq!(r, "33 53 93 53 93 63 40");
+}
+
 /// CSS Overflow 4 §5.2 legacy line clamping: `display: -webkit-box;
 /// -webkit-box-orient: vertical; -webkit-line-clamp: N` computes to `flow-root` (as in Chrome and
 /// Gecko) and keeps N lines; `-webkit-box` without a clamp is a flex container in its orient's

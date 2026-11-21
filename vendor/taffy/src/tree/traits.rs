@@ -351,6 +351,15 @@ pub trait LayoutGridContainer: LayoutPartialTree {
     fn set_detailed_grid_info(&mut self, _node_id: NodeId, _detailed_grid_info: DetailedGridInfo<Self::CustomIdent>) {
         debug_log!("LayoutGridContainer::set_detailed_grid_info called");
     }
+
+    /// Snowlark patch: lay `node_id`, an item of the grid being laid out that is a subgrid, out with these
+    /// tracks from now on: `get_grid_container_style` then returns its style's
+    /// [`Style::subgrid_view`](crate::Style::subgrid_view) for them, and a change clears its layout cache.
+    /// Returns false when the tree does not lay the node out as a subgrid; the parent then takes it as an
+    /// ordinary grid item.
+    fn set_subgrid_tracks(&mut self, _node_id: NodeId, _tracks: &crate::style::SubgridTracks<Self::CustomIdent>) -> bool {
+        false
+    }
 }
 
 #[cfg(feature = "block_layout")]

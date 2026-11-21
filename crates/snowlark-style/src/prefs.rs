@@ -16,6 +16,8 @@ pub fn init() {
         // CSS Grid Layout 1 and Multi-column Layout 1 (layout lays them out through taffy and our own
         // block layout).
         stylo_static_prefs::set_pref!("layout.grid.enabled", true);
+        // CSS Grid Layout 2 §9 subgrids: `grid-template-columns`/`-rows: subgrid [<line-names>]*`.
+        stylo_static_prefs::set_pref!("layout.css.grid-template-subgrid-value.enabled", true);
         stylo_static_prefs::set_pref!("layout.columns.enabled", true);
         // CSS Writing Modes 4: `writing-mode`, `text-orientation`.
         stylo_static_prefs::set_pref!("layout.writing-mode.enabled", true);
