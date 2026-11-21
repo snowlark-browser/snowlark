@@ -58,6 +58,11 @@ the source; `git log -p vendor/taffy` shows the diff.
     (`LayoutGridContainer::set_subgrid_tracks`), and the tree lays it out with `Style::subgrid_view`: those
     tracks at fixed sizes, the parent's line names before its own, its gutter (its gap, or the parent's for
     `normal`), and its items clamped to that explicit grid. Upstream had no subgrid.
+12. **An item's percentage padding counts in its flex base size** (`compute/flexbox.rs`,
+    `determine_flex_base_size`): the item is measured without a main-axis parent size, so its own
+    percentage padding and border resolved to zero there in a row container. css-flexbox-1 §4.2 resolves
+    them against the container's inner width, as `FlexItem::padding` is; the difference is added to the
+    measured base size and min-content size (`pb_correction`). Upstream measured them as zero.
 
 To move to a newer taffy: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `.\dev.ps1 test --release --package snowlark-layout`.

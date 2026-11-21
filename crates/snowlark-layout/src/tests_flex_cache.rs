@@ -134,8 +134,9 @@ fn a_layout_under_another_containing_block_width_holds_without_percentages() {
 #[test]
 fn an_item_with_percentage_padding_takes_its_containers_width() {
     // Percentage padding resolves against the containing block's width (CSS 2 §8.4), so a layout
-    // under another containing block width is not reused for it. (It counts as zero in the item's
-    // intrinsic width, CSS Sizing 3 §5.2.1, so the item is 20px wide and its content overflows.)
+    // under another containing block width is not reused for it. (The container's width is definite,
+    // so the percentage is not cyclic and counts in the item's flex base size, css-flexbox-1 §4.2:
+    // the item is its 20px of content plus 20px of padding.)
     let mut t = T::new();
     let root = t.root();
     let flex = t.doc.block(root, |s| {
@@ -148,7 +149,7 @@ fn an_item_with_percentage_padding_takes_its_containers_width() {
     let inner = t.doc.block(item, |_| {});
     t.doc.text(inner, "ab");
     let f = t.run(400.0, 400.0);
-    assert_eq!(rect(&f, item), r(0.0, 0.0, 20.0, 10.0));
+    assert_eq!(rect(&f, item), r(0.0, 0.0, 40.0, 10.0));
     assert_eq!(rect(&f, inner).x, 20.0);
 }
 

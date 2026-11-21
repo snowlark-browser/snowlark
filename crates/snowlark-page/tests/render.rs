@@ -1849,6 +1849,127 @@ fn resolved_values_that_need_the_box() {
     );
 }
 
+/// CSS Sizing 3 §5.2.1 with CSS 2 §10.3.2: an `<svg>` with only a `viewBox` (a ratio, no natural size)
+/// and a percentage `width` contributes the default object width, 300px, to a shrink-to-fit box (an
+/// inline-block, a float, an unstretched flex item, where it then shrinks); with `width: auto` it
+/// contributes nothing. Values from headless Chrome.
+#[test]
+fn ratio_only_svg_with_a_percentage_width_contributes_the_default_width() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0 } svg { display: block }\
+         .f { display: flex; width: 56px; height: 56px } .s { display: block } .f svg { width: 100%; height: 100% }\
+         .i { display: inline-block; vertical-align: top }</style>\
+         <div class=f style='align-items: center'><span class=s id=a><svg viewBox='0 0 56 56'></svg></span></div>\
+         <div class=f style='align-items: flex-start'><span class=s id=b><svg viewBox='0 0 56 56'></svg></span></div>\
+         <div class=f style='align-items: center'><span class=s id=c><svg viewBox='0 0 56 56' style='height: auto'>\
+         </svg></span></div>\
+         <div class=f style='align-items: center'><span class=s id=d><svg viewBox='0 0 56 56' style='width: auto'>\
+         </svg></span></div>\
+         <div class=i id=e><svg viewBox='0 0 56 56' style='width: 100%; height: 100%'></svg></div>\
+         <div class=i id=f><svg viewBox='0 0 56 56' style='width: 100%'></svg></div>\
+         <div class=i id=g><svg viewBox='0 0 56 56' width=40 height=40 style='width: 100%'></svg></div>\
+         <div class=i id=h><svg viewBox='0 0 56 56'></svg></div>\
+         <div style='float: left' id=k><svg viewBox='0 0 56 56' style='width: 100%'></svg></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const r = id => { const b = document.getElementById(id).getBoundingClientRect();
+           return Math.round(b.width) + 'x' + Math.round(b.height); };
+         ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'k'].map(r).join(' ')",
+    );
+    assert_eq!(r, "56x56 56x56 56x56 0x0 300x300 300x300 40x40 0x0 300x300");
+}
+
+/// css-flexbox-1 §4.2 and §9.2: a flex item's percentage padding resolves against the container's
+/// inner width, also while its flex base size is measured, so a row item's base size is its content
+/// plus that padding (a flex or block item, in a container placed absolutely or not). Values from
+/// headless Chrome.
+#[test]
+fn a_flex_items_percentage_padding_counts_in_its_base_size() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0 } .f { display: flex; justify-content: end; width: 600px }\
+         .rel { position: relative; width: 600px; height: 50px } .u { display: flex; gap: 18px }\
+         .u > i { display: block; width: 36px; height: 20px }</style>\
+         <div class=f><div class=u id=a style='padding-right: 15%'><i></i><i></i></div></div>\
+         <div class=f><div class=u id=b style='padding-right: calc(50% - 0.5 * min(500px, 87.5%))'><i></i><i></i></div></div>\
+         <div class=rel><div class=f style='position: absolute; width: 100%'>\
+         <div class=u id=c style='padding-right: 15%'><i></i><i></i></div></div></div>\
+         <div class=f><div id=d style='padding-right: 15%'><i style='display: inline-block; width: 36px; height: 10px'></i></div></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const r = id => { const b = document.getElementById(id).getBoundingClientRect();
+           return b.left + ':' + b.width; };
+         ['a', 'b', 'c', 'd'].map(r).join(' ')",
+    );
+    assert_eq!(r, "420:180 460:140 420:180 474:126");
+}
+
+/// CSS Conditional 5 §6.1: `container-type` applies style and size containment but not layout
+/// containment, so a size container is not the containing block of its absolutely or fixed
+/// positioned descendants (csswg-drafts issue 10544; WPT `no-layout-containment-abspos.html`), while
+/// `contain: layout` still is one.
+#[test]
+fn a_size_container_is_not_a_containing_block_for_positioned_boxes() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0 }\
+         .rel { position: relative; width: 400px; height: 300px; padding-top: 50px; box-sizing: border-box }\
+         .q { margin-left: 100px; width: 100px; height: 40px }\
+         .abs { position: absolute; top: 0; right: 0; bottom: 0; left: 10px }</style>\
+         <div class=rel><div class=q style='container-type: inline-size'><div class=abs id=a></div></div></div>\
+         <div class=rel><div class=q style='container-type: size'>\
+         <div style='position: fixed; top: 5px; left: 7px; width: 10px; height: 10px' id=b></div></div></div>\
+         <div class=rel><div class=q style='contain: layout'><div class=abs id=c></div></div></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const r = id => { const b = document.getElementById(id).getBoundingClientRect();
+           return [b.left, b.top, b.width, b.height].join(','); };
+         [r('a'), r('b'), r('c')].join(' ')",
+    );
+    assert_eq!(r, "10,0,390,300 7,5,10,10 110,650,90,40");
+}
+
+/// CSS Sizing 3 §5.1 with CSS Text 3 §5.1: `white-space: nowrap` text has no soft wrap opportunity,
+/// so its min-content width is the whole line, spaces included, as its max-content width is (a
+/// `min-content` grid column, a `width: min-content` box); only a space where a line ends is removed.
+/// A space outside a `nowrap` box still wraps before it (§5.1). Chrome: 61.42 and 127.55 px for the
+/// first two at 17px Arial, equal to the max-content widths; every comparison below holds in Chrome.
+#[test]
+fn nowrap_text_keeps_its_spaces_in_the_min_content_width() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0; font: 17px Arial } .n { white-space: nowrap }\
+         .g { display: grid; grid-template-columns: min-content; justify-content: start }\
+         .min { width: min-content } .max { width: max-content }</style>\
+         <div class=g><a class=n id=a>Las mer</a></div>\
+         <div class='n min' id=b>Las mer och mer</div>\
+         <div class='n max' id=c>Las mer och mer</div>\
+         <div class=min id=d><span class=n>Las mer</span> <span class=n>och</span></div>\
+         <div class='n max' id=e>Las mer</div>\
+         <div class=min id=f>Las mer och mer</div>\
+         <div class=max id=g>mer</div>\
+         <div class=min id=h>Las <span class=n>mer och</span></div>\
+         <div class='n max' id=k>mer och</div>\
+         <div class=min id=m><span class=n>Las mer </span><span class=n>och</span></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const w = id => document.getElementById(id).getBoundingClientRect().width;
+         [w('a') == w('e'), w('b') == w('c'), w('d') == w('e'), w('f') == w('g'), w('h') == w('k'),
+          w('m') > w('e') + 25, w('a') > 60].join(' ')",
+    );
+    // (`m`: a space inside a `nowrap` box gives no wrap opportunity, also before another one)
+    assert_eq!(r, "true true true true true true true");
+}
+
 /// CSS Grid 2 §9 subgrids: cards with `grid-template-rows: subgrid` take their rows (and the rows' names)
 /// from the grid they span, so their items line up across cards; each card's items size the shared rows,
 /// with the card's padding as extra margin at its edges, and the card's gutters are its parent's

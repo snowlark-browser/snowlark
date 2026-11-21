@@ -1264,7 +1264,11 @@ impl<S: Style> Measure<'_, S> {
             return false;
         };
         let next = &self.items[j];
-        if !wrap || !next.wrap && next.kind == ItemKind::Text {
+        // The wrap opportunity after a space follows the space's own `white-space`, so a space
+        // before a `nowrap` box still breaks (CSS Text 3 §5.1: the nearest common ancestor's
+        // `white-space` controls it, and that is the wrapping one here); elsewhere both sides must
+        // allow wrapping.
+        if !wrap || !next.wrap && next.kind == ItemKind::Text && !is_space_like(last) {
             return false;
         }
         // A soft hyphen ending a text item (CSS Text 3 §6.1).
@@ -1497,7 +1501,7 @@ pub(crate) fn content_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> ContentS
         match it.kind {
             ItemKind::Break => {
                 max = max.max(line - line_trailing + floats_line);
-                min = min.max(word);
+                min = min.max(word - word_hanging);
                 line = 0.0;
                 line_trailing = 0.0;
                 word = 0.0;
@@ -1564,6 +1568,7 @@ pub(crate) fn content_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> ContentS
                     } else {
                         line_trailing = 0.0;
                     }
+                    let breaks = it.anywhere && it.wrap || m.break_after(p);
                     if !space || !it.collapsible {
                         word += w;
                         if !it.collapsible && m.hangs(i, c) {
@@ -1571,8 +1576,14 @@ pub(crate) fn content_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> ContentS
                         } else {
                             word_hanging = 0.0;
                         }
+                    } else if !breaks {
+                        // A collapsible space with no soft wrap opportunity after it (`nowrap`)
+                        // stays inside the unbreakable run; it is removed only where a line
+                        // ends right after it (CSS Text 3 §4.1.2), so it counts as hanging.
+                        word += w;
+                        word_hanging += w;
                     }
-                    if it.anywhere && it.wrap || m.break_after(p) {
+                    if breaks {
                         min = min.max(word - word_hanging);
                         word = 0.0;
                         word_hanging = 0.0;

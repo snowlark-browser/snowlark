@@ -89,6 +89,11 @@ fn natural<S: Style>(tree: &BoxTree<S>, text: &TextEngine, b: &LayoutBox<S>, s: 
     }
 }
 
+/// Whether a `width` is a percentage (or a calc() with one).
+fn percent_size(v: SizeValue) -> bool {
+    matches!(v, SizeValue::LengthPercentage(lp) if lp.has_percent())
+}
+
 /// The used content-box width and height (CSS 2 §10.3.2, §10.6.2, then the §10.4 constraint table).
 #[allow(clippy::too_many_arguments)]
 fn used_size<S: Style>(
@@ -153,7 +158,14 @@ fn used_size<S: Style>(
             (None, Some(h), None) => (default_w, h),
             (None, None, Some(r)) => {
                 // Only a ratio: fill the containing block's width (css-images-3 default sizing).
-                let w = (stretch - pbh).max(0.0);
+                // Without one (an intrinsic size contribution, where css-sizing-3 §5.2.1c makes a
+                // percentage `width` behave as `auto`), a percentage `width` takes the default
+                // object size's width (CSS 2 §10.3.2's fallback, as browsers do) and `auto` none.
+                let w = match cb_width {
+                    Some(_) => (stretch - pbh).max(0.0),
+                    None if own_sizes && percent_size(s.width()) => default_w,
+                    None => 0.0,
+                };
                 (w, w / r)
             }
             (None, None, None) => (default_w, default_h),
@@ -282,7 +294,7 @@ pub(crate) fn contribution_widths<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> (f
         true,
     );
     let w = w + e.pb_h();
-    let percent_width = matches!(b.style.width(), SizeValue::LengthPercentage(lp) if lp.has_percent())
+    let percent_width = percent_size(b.style.width())
         || matches!(b.style.max_width(), MaxSizeValue::LengthPercentage(lp) if lp.has_percent());
     let min = if percent_width { e.pb_h() } else { w };
     (min, w)

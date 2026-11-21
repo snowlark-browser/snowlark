@@ -197,11 +197,12 @@ fn uses_counters(s: &ComputedValues) -> bool {
 /// Whether an element with these values is the containing block of its absolutely and fixed
 /// positioned descendants whatever its `position` (css-position-3 §2.1): a transform or
 /// perspective, `transform-style: preserve-3d` (css-transforms-1 §2, -2 §6), a filter or backdrop
-/// filter (Filter Effects 1 §5, 2 §3), layout or paint containment (CSS Contain 2 §3.2, §3.3, also
-/// through `container-type`), or `will-change` naming any of them (CSS Will Change 1 §3). (The root
-/// element is one only through a transform; layout checks that.)
+/// filter (Filter Effects 1 §5, 2 §3), layout or paint containment (CSS Contain 2 §3.2, §3.3), or
+/// `will-change` naming any of them (CSS Will Change 1 §3). (The root element is one only through
+/// a transform; layout checks that.) `container-type` is not: it applies style and size
+/// containment, not layout containment (CSS Conditional 5 §6.1, csswg-drafts issue 10544).
 pub fn establishes_fixed_cb(v: &ComputedValues) -> bool {
-    use style::values::computed::{Contain, ContainerType};
+    use style::values::computed::Contain;
     use style::values::specified::box_::WillChangeBits;
     let b = v.get_box();
     let e = v.get_effects();
@@ -209,8 +210,6 @@ pub fn establishes_fixed_cb(v: &ComputedValues) -> bool {
         || !e.filter.0.is_empty()
         || !e.backdrop_filter.0.is_empty()
         || b.contain.intersects(Contain::LAYOUT | Contain::PAINT)
-        || b.container_type
-            .intersects(ContainerType::SIZE | ContainerType::INLINE_SIZE)
         || b.will_change.bits.intersects(
             WillChangeBits::TRANSFORM
                 | WillChangeBits::PERSPECTIVE

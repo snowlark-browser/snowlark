@@ -1158,6 +1158,22 @@ fn determine_flex_base_size(
             .maybe_resolve(percent_resolution_main_size, |val, basis| tree.calc(val, basis))
             .maybe_add(box_sizing_adjustment);
 
+        // Snowlark patch: the item is measured below without a main-axis parent size (so that its
+        // percentage sizes don't resolve there), but its padding and border always resolve against
+        // the container's inner width (css-flexbox-1 §4.2), as `child.padding` and `child.border`
+        // did. In a row container the measured border-box size then lacks their percentages; add
+        // the difference back.
+        let measured_pb_main = child_style
+            .padding()
+            .resolve_or_zero(child_parent_size.width, |val, basis| tree.calc(val, basis))
+            .main_axis_sum(dir)
+            + child_style
+                .border()
+                .resolve_or_zero(child_parent_size.width, |val, basis| tree.calc(val, basis))
+                .main_axis_sum(dir);
+        let pb_correction =
+            (child.padding.main_axis_sum(dir) + child.border.main_axis_sum(dir) - measured_pb_main).max(0.0);
+
         drop(child_style);
 
         child.flex_basis = 'flex_basis: {
@@ -1280,7 +1296,7 @@ fn determine_flex_base_size(
                 dir,
                 child_parent_size,
                 child_available_space,
-            );
+            ) + pb_correction;
         };
 
         // Floor flex-basis by the padding_border_sum (floors inner_flex_basis at zero)
@@ -1322,7 +1338,7 @@ fn determine_flex_base_size(
                     dir,
                     child_parent_size,
                     child_available_space,
-                )
+                ) + pb_correction
             };
 
             // 4.5. Automatic Minimum Size of Flex Items

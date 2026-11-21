@@ -10,8 +10,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   minimum when the items overflow, and a single-line `flex-wrap: wrap-reverse` container puts its line at the wrong
   cross edge. `flex-wrap: balance` and `flex-line-count` are not implemented. Both layout bugs are in the vendored
   flex algorithm. (ref 42)
-- **Percentage-sized SVG icons.** An `<svg>` with only a `viewBox` and a percentage width, inside a shrink-to-fit box
-  (an inline-block, a float, a flex item that is not stretched), takes no width, so the icon is not drawn. (ref 613)
 - **Grid gaps.** `display: grid-lanes` (masonry) is not implemented. Subgrids in another writing mode or direction than
   their parent are laid out as ordinary grids, a subgrid's items share baselines only within it, and a subgrid's
   `repeat(auto-fill, ...)` line names are taken once. Column flex containers compute no baselines, so `last baseline` alignment falls back
@@ -46,6 +44,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   box. (ref 99)
 - **Geometry reads near split inlines.** An inline box split around a block still walks the tree on geometry reads,
   which costs time on large pages. (ref 97)
+- **Geometry of an inline split around a block.** `getBoundingClientRect()` of an inline box split around a block
+  reports the block's own box, not the full-width anonymous block that holds it, and a relatively positioned block
+  inside such an inline resolves a percentage `left` against the inline (as 0) in `getComputedStyle()`. Layout and
+  painting are right. (ref 615)
 - **Block details.** `align-content` on block containers that are not independent formatting contexts is not applied,
   and hit testing treats rounded clips as rectangles. (ref 41)
 
