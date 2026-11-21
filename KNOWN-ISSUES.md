@@ -81,6 +81,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   shadow trees, `::part()` followed by pseudo-classes, `@import` through `insertRule()`, `<style>` load and error
   events, and the `CSSScopeRule` interface are not implemented. (ref 45)
 
+- **Scroll-animated sections.** On apple.com's iPhone pages at a display scale above 100%, the scroll-driven camera
+  section's video may not show (its start picture shows instead), and its still frame was reported misplaced. Not
+  located yet. (ref 618)
+
 ## Painting and compositing
 
 - **System-font text is not byte-stable between runs.** The same frames can differ by a few bytes from one run to the
@@ -90,8 +94,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   to the first. The raster is skipped, but the display list work is wasted. (ref 505)
 - **Pixel snapping inside transforms.** Box edges inside a scale or rotate transform are not snapped to device pixels.
   (ref 34)
-- **Unpainted areas while scrolling fast.** A sticky layer inside clips that move with the document is drawn through
-  them, and a page whose main thread is busy can show its background where the view outruns the painted band. (ref 52)
+- **Unpainted areas while scrolling fast.** A page whose main thread is busy can show its background where the view
+  outruns the painted band. (ref 52)
 - **Autoscroll cursor.** With middle-button autoscroll, circling the origin marker quickly makes the cursor icon draw
   wrongly. (ref 88)
 

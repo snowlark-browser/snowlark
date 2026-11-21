@@ -382,6 +382,30 @@ pub fn radii_of(r: &[f32; 8]) -> Radii {
 }
 
 /// The step a group's push item adds to a piece's state, if it can be one.
+/// Whether `items` show anything: a drawing item outside every opacity group at 0.
+fn shows_anything(items: &[Item]) -> bool {
+    // (per open opacity group: whether it is at 0)
+    let mut open: Vec<bool> = Vec::new();
+    let mut hidden = 0usize;
+    for item in items {
+        match *item {
+            Item::PushOpacity { opacity, .. } => {
+                let zero = opacity <= 0.0;
+                hidden += usize::from(zero);
+                open.push(zero);
+            }
+            Item::PopOpacity => {
+                if open.pop() == Some(true) {
+                    hidden -= 1;
+                }
+            }
+            _ if hidden == 0 && item.is_drawing() => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
 fn state_op(list: &DisplayList, item: &Item) -> Option<StateOp> {
     Some(match *item {
         Item::PushTransform { matrix: m } => {
@@ -1514,21 +1538,35 @@ impl DisplayList {
         }
         // (`inner`: the layer's items, between its push and its pop)
         let backdrops = |inner: &[Item]| -> Backdrops {
-            // (per open group: whether it is a backdrop root, an opacity or mask group; `None`
-            // for a mask, which no cut opens again)
-            let mut open: Vec<Option<bool>> = Vec::new();
+            /// An open group, as a backdrop filter in it sees it.
+            #[derive(Clone, Copy, PartialEq)]
+            enum Open {
+                /// An opacity group (at 0 or not): a backdrop root, which a cut opens again.
+                Opacity(bool),
+                /// A mask: a backdrop root, which no cut opens again.
+                Mask,
+                /// A rectangle clip or a transform that scales and translates: a cut's backdrop is drawn
+                /// through it ([`DisplayList::take_leading_backdrop`]).
+                Through,
+                Other,
+            }
+            let mut open: Vec<Open> = Vec::new();
             let mut found = Backdrops::Within;
             for item in inner {
                 match item {
-                    Item::PushOpacity { .. } => open.push(Some(true)),
-                    Item::PushMask { .. } => open.push(None),
-                    Item::PushClipRect { .. }
-                    | Item::PushClipRoundedRect { .. }
+                    Item::PushOpacity { opacity, .. } => open.push(Open::Opacity(*opacity <= 0.0)),
+                    Item::PushMask { .. } => open.push(Open::Mask),
+                    Item::PushClipRect { .. } => open.push(Open::Through),
+                    // (a scale and a translation: no rotation of the backdrop's corners)
+                    Item::PushTransform { matrix } if matrix.m12 == 0.0 && matrix.m21 == 0.0 => {
+                        open.push(Open::Through)
+                    }
+                    Item::PushClipRoundedRect { .. }
                     | Item::PushClipPath { .. }
                     | Item::PushTransform { .. }
                     | Item::PushFilter { .. }
                     | Item::PushLayer { .. }
-                    | Item::PushPlus => open.push(Some(false)),
+                    | Item::PushPlus => open.push(Open::Other),
                     Item::PopClip
                     | Item::PopTransform
                     | Item::PopOpacity
@@ -1539,11 +1577,19 @@ impl DisplayList {
                         open.pop();
                     }
                     Item::BackdropFilter { own, .. } => {
-                        let roots = open.iter().filter(|g| **g != Some(false)).count();
-                        if roots > *own as usize {
+                        let roots = open
+                            .iter()
+                            .filter(|g| matches!(g, Open::Opacity(_) | Open::Mask))
+                            .count();
+                        // (one inside the layer's own backdrop root reads nothing under it, and
+                        // one at opacity 0 shows nothing)
+                        if roots > *own as usize || open.contains(&Open::Opacity(true)) {
                             continue;
                         }
-                        if open.iter().all(|g| *g == Some(true)) {
+                        if open
+                            .iter()
+                            .all(|g| matches!(g, Open::Opacity(_) | Open::Through))
+                        {
                             found = Backdrops::Under;
                         } else {
                             return Backdrops::Held;
@@ -1645,7 +1691,25 @@ impl DisplayList {
                     // (a fixed layer under everything, the canvas background's: what scrolls over
                     // it with a backdrop filter is painted with it)
                     let under_readers = i == 0 && scrolling_backdrop;
-                    let split = match k {
+                    // (a sticky group under clips of content that scrolls with the document:
+                    // drawn through them, which stay with the document while the compositor
+                    // moves the piece; none of its backdrop filters reads what is under it, and
+                    // a video in it is under rectangle clips only, which its quad can take)
+                    let clipped_sticky = matches!(k, LayerKind::Sticky(_))
+                        && reads == Backdrops::Within
+                        && !under_readers
+                        && !inline_open
+                        && contexts.len() == 1
+                        && ctx.state.0.is_empty()
+                        && !ctx.groups.is_empty()
+                        && ctx.groups.len() < LayerState::MAX_OPS
+                        && ctx.groups.iter().all(|&g| match items[g] {
+                            Item::PushClipRect { .. } => true,
+                            Item::PushClipRoundedRect { .. } => layer_end(i)
+                                .is_some_and(|j| !items[i..j].iter().any(Item::is_video)),
+                            _ => false,
+                        });
+                    let split = (match k {
                         LayerKind::Pinned => false,
                         // (also in a composited box with no clip, transform or opacity around it,
                         // which `will-change` alone makes)
@@ -1699,18 +1763,28 @@ impl DisplayList {
                                 && layer_end(i)
                                     .is_some_and(|j| !items[i..j].iter().any(|it| it.is_video()))
                         }
-                    };
+                    }) || clipped_sticky;
                     if !split {
                         // (a sticky or fixed group within a fixed or sticky layer moves with it)
                         let moves = matches!(k, LayerKind::Fixed | LayerKind::Sticky(_));
-                        if matches!(k, LayerKind::Pinned) || (moves && !in_moving) {
+                        // (one that shows nothing, all of it at opacity 0, is right at any scroll
+                        // position)
+                        let shows = layer_end(i).is_none_or(|j| shows_anything(&items[i + 1..j]));
+                        if shows && (matches!(k, LayerKind::Pinned) || (moves && !in_moving)) {
                             out.pinned = true;
                         }
                         layers.push(Role::Inline);
                         continue;
                     }
                     flush(&mut current, ctx, true, &mut out);
-                    let state = if let LayerKind::Composited(key) = k {
+                    let state = if clipped_sticky {
+                        LayerState(
+                            ctx.groups
+                                .iter()
+                                .filter_map(|&g| state_op(self, &items[g]))
+                                .collect(),
+                        )
+                    } else if let LayerKind::Composited(key) = k {
                         let mut ops = ctx.state.0.clone();
                         ops.extend(ctx.groups.iter().filter_map(|&g| state_op(self, &items[g])));
                         // (a box with compositor animations: its own transform and opacity are
@@ -1824,25 +1898,54 @@ impl DisplayList {
 
     /// Takes out the backdrop filter a piece of a split list starts with
     /// ([`DisplayList::split_layers`] cuts a fixed or sticky layer there): the first item that is
-    /// not the push of an opacity group, when it is a backdrop filter whose own groups are those
-    /// pushes. A compositor applies it to what it has drawn under the piece; the piece's own
-    /// raster, which has nothing under it, is drawn without.
+    /// not the push of an opacity group, a rectangle clip or a transform that scales and
+    /// translates, when it is a backdrop filter whose own groups are those opacity groups. Its
+    /// rectangle is mapped through the transforms and cut by the clips (a cut one loses its
+    /// rounded corners). A compositor applies it to what it has drawn under the piece; the
+    /// piece's own raster, which has nothing under it, is drawn without.
     pub fn take_leading_backdrop(&mut self) -> Option<LayerBackdrop> {
         let mut opacity = 1.0f32;
+        let mut opacities = 0usize;
+        let mut m = Matrix::IDENTITY;
+        let mut clip = Rect::infinite();
         for (i, item) in self.items.iter().enumerate() {
             match *item {
-                Item::PushOpacity { opacity: o, .. } => opacity *= o,
+                Item::PushOpacity { opacity: o, .. } => {
+                    opacity *= o;
+                    opacities += 1;
+                }
+                Item::PushClipRect { rect } => clip = clip.intersect(&m.apply_rect(&rect)),
+                Item::PushTransform { matrix } if matrix.m12 == 0.0 && matrix.m21 == 0.0 => {
+                    m = matrix.then(&m)
+                }
                 Item::BackdropFilter {
                     filters,
                     rect,
                     radii,
                     own,
-                } if own as usize == i => {
+                } if own as usize == opacities => {
                     let filters = self.filter(filters).to_vec();
+                    let mapped = m.apply_rect(&rect);
+                    let shown = mapped.intersect(&clip);
+                    if shown.is_empty() {
+                        return None;
+                    }
+                    let radii = if shown == mapped {
+                        let (sx, sy) = (m.m11.abs(), m.m22.abs());
+                        let c = |s: Size| Size::new(s.width * sx, s.height * sy);
+                        Radii {
+                            top_left: c(radii.top_left),
+                            top_right: c(radii.top_right),
+                            bottom_right: c(radii.bottom_right),
+                            bottom_left: c(radii.bottom_left),
+                        }
+                    } else {
+                        Radii::ZERO
+                    };
                     self.items.remove(i);
                     return Some(LayerBackdrop {
                         filters,
-                        rect,
+                        rect: shown,
                         radii,
                         opacity: opacity.clamp(0.0, 1.0),
                     });
@@ -5544,11 +5647,49 @@ mod backdrop_split_tests {
         assert_eq!(split.layers[0].list.take_leading_backdrop(), None);
     }
 
-    /// Where the filter sits under another group of the layer, no cut opens that group again for
-    /// the compositor: the layer stays in the list, which is painted at each scroll position.
+    /// Under a rectangle clip and a translation of its layer, the filter is drawn through them: the
+    /// layer is cut there too, and the backdrop's rectangle is moved by the transform and cut by
+    /// the clip (a cut one loses its corners). Under a rounded clip, which no backdrop rectangle
+    /// can take, the layer stays in the list, which is painted at each scroll position.
     #[test]
-    fn a_backdrop_filter_under_a_clip_of_its_layer_keeps_the_layer_in_place() {
-        let split = bar(true, 1.0).split_layers();
+    fn a_backdrop_filter_under_a_clip_of_its_layer_is_drawn_through_it() {
+        let mut split = bar(true, 1.0).split_layers();
+        assert!(!split.pinned);
+        let taken = split.layers[2]
+            .list
+            .take_leading_backdrop()
+            .expect("the filter");
+        assert_eq!(taken.rect, BOX);
+        let bar = |rounded: bool| {
+            let mut b = DisplayListBuilder::new();
+            b.fill_rect(Rect::new(0.0, 0.0, 800.0, 3000.0), Color::rgb(0, 0, 255));
+            b.push_layer(LayerKind::Fixed);
+            if rounded {
+                b.push_clip_rounded_rect(Rect::new(0.0, 0.0, 200.0, 60.0), Radii::uniform(4.0));
+            } else {
+                b.push_clip_rect(Rect::new(0.0, 0.0, 200.0, 60.0));
+            }
+            b.push_transform(Matrix::translation(0.0, 5.0));
+            b.backdrop_filter(&[FilterOp::Blur(16.0)], BOX, Radii::uniform(8.0), 0);
+            b.fill_rect(BOX, Color::rgba(5, 11, 26, 190));
+            b.pop_transform();
+            b.pop_clip();
+            b.pop_layer();
+            b.build()
+        };
+        let mut split = bar(false).split_layers();
+        assert!(!split.pinned);
+        let piece = &mut split
+            .layers
+            .iter_mut()
+            .find(|l| has_backdrop(&l.list))
+            .expect("the cut piece")
+            .list;
+        let taken = piece.take_leading_backdrop().expect("the filter");
+        assert_eq!(taken.rect, Rect::new(10.0, 15.0, 190.0, 40.0));
+        assert_eq!(taken.radii, Radii::ZERO);
+        assert!(!has_backdrop(piece));
+        let split = bar(true).split_layers();
         assert!(split.pinned);
         assert!(split.layers.iter().all(|l| l.kind.is_none()));
     }
@@ -5576,6 +5717,114 @@ mod backdrop_split_tests {
         let kinds: Vec<_> = split.layers.iter().map(|l| l.kind).collect();
         assert_eq!(kinds, [Some(LayerKind::Fixed), None]);
         let split = list(true).split_layers();
+        assert!(split.pinned);
+        assert!(split.layers.iter().all(|l| l.kind.is_none()));
+    }
+
+    /// A layer that cannot be split off pins the list only when it shows something: a fixed
+    /// overlay at opacity 0 (a menu's backdrop, waiting to fade in) is right at any scroll position.
+    #[test]
+    fn a_layer_that_shows_nothing_pins_nothing() {
+        let list = |opacity: f32| {
+            let mut b = DisplayListBuilder::new();
+            b.fill_rect(Rect::new(0.0, 0.0, 9.0, 9.0), Color::BLACK);
+            b.push_layer(LayerKind::Pinned);
+            b.push_opacity(opacity, Rect::new(0.0, 0.0, 800.0, 600.0));
+            b.backdrop_filter(
+                &[FilterOp::Blur(20.0)],
+                Rect::new(0.0, 0.0, 800.0, 600.0),
+                Radii::ZERO,
+                1,
+            );
+            b.fill_rect(Rect::new(0.0, 0.0, 800.0, 600.0), Color::rgba(0, 0, 0, 100));
+            b.pop_opacity();
+            b.pop_layer();
+            b.build()
+        };
+        assert!(!list(0.0).split_layers().pinned);
+        assert!(list(0.5).split_layers().pinned);
+        // In a fixed bar, the overlay's backdrop filter at 0 reads nothing under the bar: the bar
+        // is still a piece of its own.
+        let mut b = DisplayListBuilder::new();
+        b.fill_rect(Rect::new(0.0, 0.0, 800.0, 3000.0), Color::BLACK);
+        b.push_layer(LayerKind::Fixed);
+        b.fill_rect(Rect::new(0.0, 0.0, 800.0, 40.0), Color::WHITE);
+        b.push_layer(LayerKind::Pinned);
+        b.push_opacity(0.0, Rect::new(0.0, 0.0, 800.0, 600.0));
+        b.backdrop_filter(
+            &[FilterOp::Blur(20.0)],
+            Rect::new(0.0, 0.0, 800.0, 600.0),
+            Radii::ZERO,
+            1,
+        );
+        b.pop_opacity();
+        b.pop_layer();
+        b.pop_layer();
+        let split = b.build().split_layers();
+        assert!(!split.pinned);
+        assert!(split
+            .layers
+            .iter()
+            .any(|l| l.kind == Some(LayerKind::Fixed)));
+    }
+
+    #[test]
+    fn a_sticky_layer_under_clips_splits_off_with_them_as_its_state() {
+        let sticky = LayerKind::Sticky(StickyConstraint {
+            rect: Rect::new(0.0, 100.0, 50.0, 50.0),
+            container: Rect::new(0.0, 100.0, 50.0, 400.0),
+            insets: [Some(0.0), None, None, None],
+        });
+        let list = |rounded: bool, video: bool| {
+            let mut b = DisplayListBuilder::new();
+            b.fill_rect(Rect::new(0.0, 0.0, 9.0, 9.0), Color::BLACK);
+            b.push_clip_rect(Rect::new(0.0, 50.0, 100.0, 500.0));
+            if rounded {
+                b.push_clip_rounded_rect(Rect::new(0.0, 60.0, 100.0, 400.0), Radii::uniform(4.0));
+            }
+            b.push_layer(sticky);
+            b.fill_rect(Rect::new(0.0, 100.0, 50.0, 50.0), Color::WHITE);
+            if video {
+                let r = Rect::new(0.0, 100.0, 50.0, 30.0);
+                b.video(VideoId(1), None, r, r);
+            }
+            b.pop_layer();
+            b.fill_rect(Rect::new(0.0, 450.0, 9.0, 9.0), Color::BLACK);
+            if rounded {
+                b.pop_clip();
+            }
+            b.pop_clip();
+            b.build()
+        };
+        // Under a rectangle clip, with a video: a piece, drawn through the clip.
+        let split = list(false, true).split_layers();
+        assert!(!split.pinned);
+        let kinds: Vec<_> = split.layers.iter().map(|l| l.kind).collect();
+        assert_eq!(kinds, [None, Some(sticky), None]);
+        assert_eq!(
+            split.layers[1].state.0,
+            [StateOp::Clip(Rect::new(0.0, 50.0, 100.0, 500.0))]
+        );
+        assert!(!split.layers[1]
+            .list
+            .items
+            .iter()
+            .any(|i| matches!(i, Item::PushClipRect { .. })));
+        // (what follows it is still clipped)
+        assert!(matches!(
+            split.layers[2].list.items[..],
+            [
+                Item::PushClipRect { .. },
+                Item::FillRect { .. },
+                Item::PopClip
+            ]
+        ));
+        // Under a rounded clip too: its state has both.
+        let split = list(true, false).split_layers();
+        assert!(!split.pinned);
+        assert_eq!(split.layers[1].state.0.len(), 2);
+        // A video under a rounded clip: its quad cannot take the corners, so it stays in place.
+        let split = list(true, true).split_layers();
         assert!(split.pinned);
         assert!(split.layers.iter().all(|l| l.kind.is_none()));
     }

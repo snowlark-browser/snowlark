@@ -49,7 +49,7 @@ use snowlark_paint::compositor::WindowSurface;
 use snowlark_paint::window::WindowHandle;
 use snowlark_paint::{
     Color, Compositor, DisplayList, DisplayListBuilder, FontTable, Gpu, ImageStore, ImageTable,
-    LayerKind, Point, Radii, Rect, Resource, Size, Sources, TextEngine, Ticks,
+    LayerKind, LayerState, Point, Radii, Rect, Resource, Size, Sources, StateOp, TextEngine, Ticks,
 };
 use snowlark_tab::raster_thread::Sent;
 use snowlark_tab::watchdog::PassMark;
@@ -106,6 +106,42 @@ pub fn layer_position(
             )
         }
     }
+}
+
+/// A sticky piece drawn through the clips around it (its state: the clips of content that scrolls
+/// with the document, in the list's CSS px), moved `shift` device pixels from where it was painted:
+/// the state to draw its tiles through (the clips, then the move, at `scale`), and the device rect
+/// its videos show within (the clips' bounds with the list's pixel (0, 0) at `base`).
+pub fn moved_through(
+    state: &LayerState,
+    shift: (i32, i32),
+    scale: f32,
+    base: (i32, i32),
+) -> (LayerState, Rect) {
+    let mut within = Rect::infinite();
+    for op in &state.0 {
+        if let StateOp::Clip(r) | StateOp::ClipRounded(r, _) = op {
+            let d = Rect::new(
+                r.x * scale + base.0 as f32,
+                r.y * scale + base.1 as f32,
+                r.width * scale,
+                r.height * scale,
+            );
+            within = within.intersect(&d);
+        }
+    }
+    let mut moved = state.clone();
+    if shift != (0, 0) && scale > 0.0 {
+        moved.0.push(StateOp::Transform([
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            shift.0 as f32 / scale,
+            shift.1 as f32 / scale,
+        ]));
+    }
+    (moved, within)
 }
 
 /// How many device rows of a page area `area_height` high show none of `frame`'s content when the
@@ -1570,6 +1606,33 @@ impl State {
                     );
                     let now = snowlark_paint::Ticks::now();
                     for layer in &f.layers {
+                        if !layer.state.0.is_empty()
+                            && matches!(layer.kind, Some(LayerKind::Sticky(_)))
+                        {
+                            // (a sticky piece through the clips around it, which stay with the
+                            // document: the piece moves within them)
+                            let (x, y) = layer_position(layer, f, (dx, dy), s);
+                            let shift = (x - dx - layer.at.0, y - dy - layer.at.1);
+                            let (moved, within) =
+                                moved_through(&layer.state, shift, f.scale, (dx, dy));
+                            pass.tiles_through(
+                                &layer.frame,
+                                layer.at,
+                                &moved,
+                                f.scale,
+                                (dx, dy),
+                                clip,
+                            );
+                            draw_videos(
+                                pass,
+                                videos.as_deref(),
+                                &mut under,
+                                &layer.videos,
+                                (x - layer.at.0, y - layer.at.1),
+                                clip.intersect(&within),
+                            );
+                            continue;
+                        }
                         if !layer.state.0.is_empty() {
                             // (a composited piece: through its clips, transforms and opacity, as
                             // its box's animations have them now; it holds no video)
@@ -2640,5 +2703,25 @@ mod tests {
         // Not reached yet: it scrolls with the document.
         let (_, y) = layer_position(&l, &data, (0, 0), Point::new(0.0, 100.0));
         assert_eq!(y, 40);
+    }
+
+    /// A sticky piece drawn through the clips around it: the clips stay with the document (at the
+    /// base offset), the piece's tiles move by its shift, and its videos show within the clips.
+    #[test]
+    fn a_sticky_piece_moves_within_its_clips() {
+        let state = LayerState(vec![
+            StateOp::Clip(Rect::new(0.0, 100.0, 400.0, 600.0)),
+            StateOp::ClipRounded(Rect::new(10.0, 0.0, 300.0, 2000.0), [4.0; 8]),
+        ]);
+        let (moved, within) = moved_through(&state, (0, 30), 1.5, (5, -100));
+        assert_eq!(moved.0[..2], state.0[..]);
+        assert_eq!(
+            moved.0[2],
+            StateOp::Transform([1.0, 0.0, 0.0, 1.0, 0.0, 20.0])
+        );
+        assert_eq!(within, Rect::new(20.0, 50.0, 450.0, 900.0));
+        // (not moved: drawn as painted)
+        let (same, _) = moved_through(&state, (0, 0), 1.5, (5, -100));
+        assert_eq!(same, state);
     }
 }

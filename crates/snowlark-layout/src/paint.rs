@@ -186,15 +186,42 @@ struct Clip {
 }
 
 /// The clips a collecting stacking context has open: per clipping ancestor, the intersection so
-/// far, how the clip moves when the viewport scrolls, and its rounded shape if it has one.
-type ClipStack = Vec<(Rect, Option<Anchor>, Option<(Rect, Radii)>)>;
+/// far, how the clip moves when the viewport scrolls, its rounded shape if it has one, and its own
+/// rectangle.
+type ClipStack = Vec<ClipEntry>;
+type ClipEntry = (Rect, Option<Anchor>, Option<(Rect, Radii)>, Rect);
 
 impl Clip {
-    fn of(clips: &ClipStack) -> Clip {
+    fn of(clips: &[ClipEntry]) -> Clip {
         Clip {
             rect: clips.last().map(|c| c.0),
             rounded: clips.iter().filter_map(|c| c.2).collect(),
         }
+    }
+
+    /// A sticky member's clips (`anchor` is a sticky box's) split where those of boxes that scroll
+    /// with the document, or the viewport's, end and those of boxes that move with the sticky box
+    /// begin: what is drawn outside its layer, and what inside. None for other members, or clips
+    /// in another order.
+    fn split_sticky(clips: &ClipStack, anchor: Anchor) -> Option<(Clip, Clip)> {
+        if !matches!(anchor, Anchor::Sticky(_)) {
+            return None;
+        }
+        let n = clips
+            .iter()
+            .take_while(|c| matches!(c.1, None | Some(Anchor::Scroll)))
+            .count();
+        let (outside, inside) = clips.split_at(n);
+        if !inside.iter().all(|c| c.1 == Some(anchor)) {
+            return None;
+        }
+        Some((
+            Clip::of(outside),
+            Clip {
+                rect: inside.iter().map(|c| c.3).reduce(|a, b| a.intersect(&b)),
+                rounded: inside.iter().filter_map(|c| c.2).collect(),
+            },
+        ))
     }
 
     fn is_none(&self) -> bool {
@@ -235,6 +262,10 @@ struct Deferred<'f, S: Style> {
     /// Clipped by a box that moves differently when the viewport scrolls (not the root or the body
     /// whose overflow is the viewport's, and anchored otherwise).
     doc_clip: bool,
+    /// A sticky member's clip as two: of the boxes that scroll with the document (or the
+    /// viewport's), which can be drawn outside its layer by a compositor moving the layer within
+    /// them, and of those that move with it ([`Clip::split_sticky`]).
+    sticky_clip: Option<(Clip, Clip)>,
     /// Only the scroll bars of `f`, a scroll container that is not a stacking context: they are
     /// painted after its descendants in tree order (its positioned descendants included), as a
     /// positioned box at its last descendant would be, so that later positioned boxes and higher
@@ -771,10 +802,10 @@ impl<K> Painter<'_, K> {
         let mut clips: ClipStack = Vec::new();
         if let Some(c) = base_clip {
             let mut rect = c.rect.unwrap_or_else(Rect::infinite);
-            clips.push((rect, Some(Anchor::Pinned), None));
+            clips.push((rect, Some(Anchor::Pinned), None, rect));
             for &(r, radii) in &c.rounded {
                 rect = rect.intersect(&r);
-                clips.push((rect, Some(Anchor::Pinned), Some((r, radii))));
+                clips.push((rect, Some(Anchor::Pinned), Some((r, radii)), r));
             }
         }
         self.collect(
@@ -856,6 +887,16 @@ impl<K> Painter<'_, K> {
     {
         // (a clip of the document's would have to move with the document)
         let free = !d.doc_clip && self.groups == 0 && !self.in_layer;
+        // A sticky box clipped only by boxes that move with the document: its clip is pushed
+        // outside its layer, and a compositor moves the layer within it (a stacking context with
+        // adopted members in it takes its clip inside, off them, so it stays pinned).
+        let detached = d.real && d.f.as_box().is_some_and(|b| adopts_within(adopted, b));
+        let clipped = d.doc_clip
+            && d.sticky_clip.is_some()
+            && !detached
+            && self.groups == 0
+            && !self.in_layer
+            && matches!(d.anchor, Anchor::Sticky(_));
         let layer = match d.anchor {
             _ if !self.layers => None,
             Anchor::Scroll => None,
@@ -863,9 +904,18 @@ impl<K> Painter<'_, K> {
             // stays in place with it)
             Anchor::Viewport if self.in_fixed && !d.doc_clip => None,
             Anchor::Viewport if free => Some(LayerKind::Fixed),
-            Anchor::Sticky(c) if free => Some(LayerKind::Sticky(c)),
+            Anchor::Sticky(c) if free || clipped => Some(LayerKind::Sticky(c)),
             _ => Some(LayerKind::Pinned),
         };
+        let split = d
+            .sticky_clip
+            .as_ref()
+            .filter(|_| clipped && layer.is_some());
+        let opened = match split {
+            Some((outside, _)) => outside.push::<S, K>(self.sink),
+            None => 0,
+        };
+        self.groups += opened;
         if let Some(kind) = layer {
             self.sink.push_layer(kind);
         }
@@ -876,17 +926,22 @@ impl<K> Painter<'_, K> {
             Some(_) => false,
             None => was.1,
         };
-        self.paint_deferred_content(d, adopted);
+        self.paint_deferred_content(d, adopted, split.map_or(&d.clip, |(_, inside)| inside));
         (self.in_layer, self.in_fixed) = was;
         if layer.is_some() {
             self.sink.pop_layer();
         }
+        for _ in 0..opened {
+            self.sink.pop_clip();
+        }
+        self.groups -= opened;
     }
 
     fn paint_deferred_content<'f, S: Style>(
         &mut self,
         d: &Deferred<'f, S>,
         adopted: &mut Adopted<'f, S>,
+        clip: &Clip,
     ) where
         K: Sink<S>,
     {
@@ -895,7 +950,7 @@ impl<K> Painter<'_, K> {
         let opened = if detached {
             0
         } else {
-            d.clip.push::<S, K>(self.sink)
+            clip.push::<S, K>(self.sink)
         };
         self.groups += opened;
         let port = std::mem::replace(&mut self.port, d.port);
@@ -1143,8 +1198,9 @@ impl<K> Painter<'_, K> {
                 .map(|b| clip_radii(f, b))
                 .filter(|r| !r.is_zero() && !viewport_box)
                 .map(|r| (c, r));
+            let own = c;
             let c = clips.last().map_or(c, |p| p.0.intersect(&c));
-            clips.push((c, (!viewport_box).then_some(anchor), rounded));
+            clips.push((c, (!viewport_box).then_some(anchor), rounded, own));
         }
         // A scroll container is the scrollport of the sticky boxes in it (css-position-3 §3.4).
         let port = sticky_port(f, at, port, self.viewport);
@@ -1154,7 +1210,6 @@ impl<K> Painter<'_, K> {
             .and_then(|b| b.node)
             .and_then(|n| self.scroll.and_then(|m| m.get(&n).copied()));
         self.sticky_cb.set(sticky_cb(f, at, outer_cb, scrolled));
-        let clipped = clips.iter().any(|c| c.1.is_some());
         let owned = f.visible_children().iter().any(|c| c.stacking_owner != 0);
         let passes = if owned { 2 } else { 1 };
         for pass in 0..passes {
@@ -1202,11 +1257,12 @@ impl<K> Painter<'_, K> {
                         // (sticky in a scroll container: it moves as that does)
                         anchor
                     } else if let Some(c) = constraint {
-                        // (only sticky boxes outside clips and groups, not nested in another
-                        // sticky box or a layer, scroll with the viewport alone)
+                        // (only sticky boxes outside groups, not nested in another sticky box
+                        // or a layer, and clipped by nothing or by boxes that scroll with the
+                        // document, scroll with the viewport alone)
                         if self.groups == 0
                             && !self.in_layer
-                            && !clipped
+                            && scroll_clip(clips)
                             && anchor == Anchor::Scroll
                         {
                             Anchor::Sticky(c)
@@ -1228,6 +1284,7 @@ impl<K> Painter<'_, K> {
                             anchor,
                             port,
                             doc_clip: moving_clip(clips, anchor),
+                            sticky_clip: Clip::split_sticky(clips, anchor),
                             scrollbars: false,
                         });
                         continue;
@@ -1251,6 +1308,7 @@ impl<K> Painter<'_, K> {
                             anchor,
                             port,
                             doc_clip: moving_clip(clips, anchor),
+                            sticky_clip: Clip::split_sticky(clips, anchor),
                             scrollbars: false,
                         };
                         route(d, owner, lists, adopted);
@@ -1268,6 +1326,7 @@ impl<K> Painter<'_, K> {
                             anchor,
                             port,
                             doc_clip: moving_clip(clips, anchor),
+                            sticky_clip: Clip::split_sticky(clips, anchor),
                             scrollbars: false,
                         };
                         route(d, owner, lists, adopted);
@@ -1284,6 +1343,7 @@ impl<K> Painter<'_, K> {
                             anchor,
                             port,
                             doc_clip: moving_clip(clips, anchor),
+                            sticky_clip: Clip::split_sticky(clips, anchor),
                             scrollbars: true,
                         };
                         route(d, owner, lists, adopted);
@@ -1598,6 +1658,12 @@ impl<K> Painter<'_, K> {
 /// a propagating body's, `None`, don't move).
 fn moving_clip(clips: &ClipStack, anchor: Anchor) -> bool {
     clips.iter().any(|c| c.1.is_some_and(|a| a != anchor))
+}
+
+fn scroll_clip(clips: &ClipStack) -> bool {
+    clips
+        .iter()
+        .all(|c| matches!(c.1, None | Some(Anchor::Scroll)))
 }
 
 fn find_canvas<'f, S: Style>(

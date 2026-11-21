@@ -11,6 +11,7 @@
 mod animated_images;
 mod animation;
 mod incremental;
+mod layers;
 mod render;
 mod shared_dom;
 mod svg_paint;
