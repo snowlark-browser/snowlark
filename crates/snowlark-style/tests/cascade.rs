@@ -46,6 +46,26 @@ fn ua_sheet_defaults() {
     assert_eq!(p.get("#sm", "display"), "list-item");
 }
 
+/// CSS Display 3 §2.5 "Unboxing": `display: contents` on an element that cannot be unboxed (a
+/// replaced element, a form control, a line break; an SVG element other than a nested `svg`, `a`,
+/// `g`, `use`, `tspan`, `textPath`) computes to `none`; on any other element, and on a nested `svg`,
+/// it stays `contents`.
+#[test]
+fn display_contents_on_unusual_elements_computes_to_none() {
+    let p = Page::new(
+        "<!DOCTYPE html><style>.c { display: contents }</style>         <div class=c id=div></div><span class=c id=span></span><button class=c id=button></button>         <input class=c id=input><textarea class=c id=textarea></textarea><select class=c id=select></select>         <img class=c id=img><video class=c id=video></video><canvas class=c id=canvas></canvas>         <iframe class=c id=iframe></iframe><br class=c id=br><progress class=c id=progress></progress>         <svg class=c id=top><g class=c id=g></g><rect class=c id=rect></rect>         <svg class=c id=nested></svg></svg>",
+    );
+    for id in ["div", "span", "button", "g", "nested"] {
+        assert_eq!(p.get(&format!("#{id}"), "display"), "contents", "{id}");
+    }
+    for id in [
+        "input", "textarea", "select", "img", "video", "canvas", "iframe", "br", "progress", "top",
+        "rect",
+    ] {
+        assert_eq!(p.get(&format!("#{id}"), "display"), "none", "{id}");
+    }
+}
+
 #[test]
 fn specificity_order_and_importance() {
     let p = Page::new(

@@ -87,12 +87,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 - **System-font text is not byte-stable between runs.** The same frames can differ by a few bytes from one run to the
   next. The cause is not established. (ref 87)
-- **Canvas 2D.** `ctx.filter` keeps its value but is not applied. Edges of images drawn at fractional coordinates are
-  blended by coverage instead of filled. (ref 499)
+- **Canvas 2D.** `ctx.filter` keeps its value but is not applied. (ref 499)
 - **Redundant paint.** On some animated pages the tab paints twice per frame, the second display list being identical
   to the first. The raster is skipped, but the display list work is wasted. (ref 505)
-- **A page's own scroll and a wheel at the same moment.** A wheel turned while a script-driven scroll is on its way to
-  the compositor can undo the scroll for a frame. Identified from the code, not observed. (ref 492)
 - **Pixel snapping inside transforms.** Box edges inside a scale or rotate transform are not snapped to device pixels.
   (ref 34)
 - **Unpainted areas while scrolling fast.** A sticky layer inside clips that move with the document is drawn through

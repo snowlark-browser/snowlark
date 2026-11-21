@@ -1851,11 +1851,16 @@ impl GpuCanvas {
         } else {
             D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR
         };
+        let aliased = !transform.antialiases_image(dst.width, dst.height);
         self.operation(p, |c| {
             c.flush_sprites();
             // SAFETY: drawing on a live context in drawing; the bitmap is a resource of this device.
             unsafe {
                 c.ctx.SetTransform(&matrix_3x2(&transform));
+                let mode = c.ctx.GetAntialiasMode();
+                if aliased {
+                    c.ctx.SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
+                }
                 c.ctx.DrawBitmap(
                     &image.bitmap,
                     Some(&rect_f(&dst)),
@@ -1864,6 +1869,9 @@ impl GpuCanvas {
                     Some(&rect_f(&src)),
                     None,
                 );
+                if aliased {
+                    c.ctx.SetAntialiasMode(mode);
+                }
                 c.ctx.SetTransform(&Matrix3x2::identity());
             }
             Ok(())

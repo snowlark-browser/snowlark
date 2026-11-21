@@ -372,6 +372,23 @@ impl Default for Matrix {
 }
 
 impl Matrix {
+    /// Whether a canvas image drawn into `width` × `height` of user space through this transform
+    /// has its edges antialiased: only when the transform rotates or skews it, or when it covers
+    /// less than a device pixel across (it would drop out otherwise). An axis-aligned image covers
+    /// whole device pixels, those whose centres it covers, so images drawn edge to edge at
+    /// fractional places leave no blended seams.
+    pub fn antialiases_image(&self, width: f32, height: f32) -> bool {
+        let (across, down) = if self.m12 == 0.0 && self.m21 == 0.0 {
+            (self.m11, self.m22)
+        } else if self.m11 == 0.0 && self.m22 == 0.0 {
+            // (a quarter turn: the image's width lies along the device's y axis)
+            (self.m12, self.m21)
+        } else {
+            return true;
+        };
+        (width * across).abs() < 1.0 || (height * down).abs() < 1.0
+    }
+
     pub const IDENTITY: Matrix = Matrix {
         m11: 1.0,
         m12: 0.0,

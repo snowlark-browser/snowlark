@@ -65,8 +65,9 @@ pub enum TabCommand {
     /// How much memory the tab uses: answered with [`TabEvent::Memory`] once the tab gets to it.
     Memory,
     Device(Device),
-    /// The compositor scrolled the viewport.
-    Scrolled(Point),
+    /// The compositor scrolled the viewport there, showing the frame of the page's scrolls it
+    /// names.
+    Scrolled(Point, crate::comp::ShownScroll),
     Pointer(Pointer),
     /// A drag from another program over the page: answered with [`TabEvent::DragOperation`].
     Drag(DragInput),
@@ -642,6 +643,27 @@ pub fn scroll_direction(direction: f32, anchor: f32, y: f32, threshold: f32) -> 
     (direction, anchor)
 }
 
+/// A scroll the page made of its viewport that the compositor has not shown yet: its document's
+/// generation, its serial ([`crate::comp::PageScroll::serial`]) and when the page made it.
+type UnshownScroll = (u64, u64, Instant);
+
+/// How long the tab waits for the compositor to show the page's scroll before it takes the
+/// compositor's reports again, whatever they name: past the compositor's own wait for the frame
+/// ([`crate::comp::SHOWN_WITH_FRAME_WAIT`]), so a scroll lost on its way cannot stop them for
+/// good.
+const UNSHOWN_SCROLL_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Whether a report of where the viewport is ([`TabCommand::Scrolled`]), naming the last of the
+/// page's scrolls the compositor showed (`shown`), is from before the page's own last scroll
+/// (`unshown`): it is of a frame painted for the place before that scroll (the user's wheel or a
+/// smooth scroll moving it meanwhile), and taking it would scroll the page back until the
+/// scroll's frame shows. The page's position is the one it scrolled to until then.
+fn report_predates(unshown: UnshownScroll, shown: crate::comp::ShownScroll, now: Instant) -> bool {
+    let (generation, serial, since) = unshown;
+    now.saturating_duration_since(since) < UNSHOWN_SCROLL_WAIT
+        && (shown.generation, shown.serial) < (generation, serial)
+}
+
 /// A digest of what a frame shows: its list's content (`list_hash`), its geometry (`numbers`: the
 /// band, the viewport, the document's size...), the document's generation and the rest (`other`).
 fn frame_signature(list_hash: u64, numbers: &[f32], generation: u64, other: &str) -> u64 {
@@ -753,6 +775,9 @@ struct TabRenderer {
     page_scroll: Option<crate::comp::PageScroll>,
     /// How many times the page scrolled its viewport: the last one's serial.
     page_scrolls: u64,
+    /// The page's last scroll, until the compositor reports a place with it shown
+    /// ([`report_predates`]).
+    unshown_scroll: Option<UnshownScroll>,
     /// How many frames went to the raster thread: the last one's number
     /// ([`crate::comp::FrameData::number`]).
     frames: u64,
@@ -814,6 +839,7 @@ struct ViewFields {
     scroll_paint: bool,
     page_scroll: Option<crate::comp::PageScroll>,
     page_scrolls: u64,
+    unshown_scroll: Option<UnshownScroll>,
     frames: u64,
     last_frame: Option<u64>,
     repaint: bool,
@@ -844,6 +870,7 @@ impl ViewFields {
             scroll_paint: false,
             page_scroll: None,
             page_scrolls: 0,
+            unshown_scroll: None,
             frames: 0,
             last_frame: None,
             repaint: false,
@@ -874,6 +901,7 @@ impl ViewFields {
         swap(&mut self.scroll_paint, &mut t.scroll_paint);
         swap(&mut self.page_scroll, &mut t.page_scroll);
         swap(&mut self.page_scrolls, &mut t.page_scrolls);
+        swap(&mut self.unshown_scroll, &mut t.unshown_scroll);
         swap(&mut self.frames, &mut t.frames);
         swap(&mut self.last_frame, &mut t.last_frame);
         swap(&mut self.repaint, &mut t.repaint);
@@ -1048,6 +1076,7 @@ fn run(
         scroll_paint: false,
         page_scroll: None,
         page_scrolls: 0,
+        unshown_scroll: None,
         frames: 0,
         begin_frames_to: Vec::new(),
         last_frame: None,
@@ -1274,7 +1303,13 @@ impl TabRenderer {
                     self.needs_paint = true;
                 }
             }
-            TabCommand::Scrolled(p) => {
+            TabCommand::Scrolled(p, shown) => {
+                if let Some(unshown) = self.unshown_scroll {
+                    if report_predates(unshown, shown, Instant::now()) {
+                        return true;
+                    }
+                    self.unshown_scroll = None;
+                }
                 self.scroll = p;
                 self.driver.set_scroll(p);
                 (self.scroll_dir, self.dir_anchor) = scroll_direction(
@@ -1793,6 +1828,11 @@ impl TabRenderer {
             to,
             serial: self.page_scrolls,
         });
+        self.unshown_scroll = Some((
+            self.driver.info().generation,
+            self.page_scrolls,
+            Instant::now(),
+        ));
         if self.generation == self.driver.info().generation {
             (self.scroll_dir, self.dir_anchor) = scroll_direction(
                 self.scroll_dir,
@@ -2093,7 +2133,7 @@ mod tests {
             mv(3.0),
             TabCommand::Pointer(Pointer::Leave),
             mv(4.0),
-            TabCommand::Scrolled(Point::ZERO),
+            TabCommand::Scrolled(Point::ZERO, Default::default()),
             mv(5.0),
             mv(6.0),
         ];
@@ -2104,7 +2144,7 @@ mod tests {
                 TabCommand::Pointer(Pointer::Move(p)) => format!("move {}", p.x),
                 TabCommand::Pointer(Pointer::Leave) => "leave".into(),
                 TabCommand::Wake => "wake".into(),
-                TabCommand::Scrolled(_) => "scrolled".into(),
+                TabCommand::Scrolled(..) => "scrolled".into(),
                 _ => "other".into(),
             })
             .collect();
@@ -2259,6 +2299,31 @@ mod tests {
             let (above, height) = pinned_reach(5000.0, VIEW, content, 1.0, dir);
             assert!(above <= 1.5 * VIEW.height && height - above <= 3.5 * VIEW.height);
         }
+    }
+
+    /// A report of where the viewport is, naming the last of the page's scrolls the compositor
+    /// showed, is dropped while it names one from before the page's own last scroll (of its
+    /// document, or of an earlier document), and taken once it names that scroll or a later
+    /// document, or once the wait for the scroll has run out.
+    #[test]
+    fn reports_from_before_the_pages_last_scroll_are_dropped() {
+        use crate::comp::ShownScroll;
+        let shown = |generation, serial| ShownScroll { generation, serial };
+        let at = Instant::now();
+        let unshown = (4, 7, at);
+        assert!(report_predates(unshown, shown(4, 6), at));
+        assert!(report_predates(unshown, shown(4, 0), at));
+        assert!(report_predates(unshown, shown(3, 9), at));
+        assert!(!report_predates(unshown, shown(4, 7), at));
+        assert!(!report_predates(unshown, shown(4, 8), at));
+        assert!(!report_predates(unshown, shown(5, 0), at));
+        let later = at + UNSHOWN_SCROLL_WAIT;
+        assert!(report_predates(
+            unshown,
+            shown(4, 6),
+            later - std::time::Duration::from_millis(1)
+        ));
+        assert!(!report_predates(unshown, shown(4, 6), later));
     }
 
     #[test]

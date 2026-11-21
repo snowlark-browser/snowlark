@@ -492,6 +492,38 @@ fn composite(op: &str, d: [f32; 4], s: [f32; 4]) -> [f32; 4] {
     }
 }
 
+/// `drawImage` into an axis-aligned destination at fractional coordinates covers whole pixels,
+/// those whose centres it covers, so images drawn edge to edge leave no blended seam. Rotated, or
+/// less than a pixel across, its edges are antialiased.
+#[test]
+fn axis_aligned_images_cover_whole_pixels() {
+    for backend in backends() {
+        let mut src = Canvas2D::with_backend(10, 10, backend);
+        src.state.fill = color("red");
+        src.fill_rect(0.0, 0.0, 10.0, 10.0);
+        let image = src.snapshot().unwrap();
+        let mut c = Canvas2D::with_backend(60, 40, backend);
+        // Two cells edge to edge at x = 10.3 and 20.3.
+        c.draw_image(&image, (0.0, 0.0, 10.0, 10.0), (10.3, 0.0, 10.0, 10.0));
+        c.draw_image(&image, (0.0, 0.0, 10.0, 10.0), (20.3, 0.0, 10.0, 10.0));
+        for x in [10, 19, 20, 29] {
+            assert_eq!(pixel(&mut c, x, 5), [255, 0, 0, 255], "{backend:?} x {x}");
+        }
+        assert_eq!(pixel(&mut c, 30, 5)[3], 0, "{backend:?}");
+        assert_eq!(pixel(&mut c, 9, 5)[3], 0, "{backend:?}");
+        // Under a pixel wide: antialiased, so it does not drop out.
+        c.draw_image(&image, (0.0, 0.0, 10.0, 10.0), (40.25, 0.0, 0.5, 10.0));
+        let a = pixel(&mut c, 40, 5)[3];
+        assert!(a > 64 && a < 192, "{backend:?} {a}");
+        // Rotated a little: the edges blend.
+        c.state.transform = Transform::from_rotate_at(10.0, 15.0, 30.0);
+        c.draw_image(&image, (0.0, 0.0, 10.0, 10.0), (10.0, 25.0, 10.0, 10.0));
+        let data = c.get_image_data(0, 20, 30, 20);
+        let partial = data.chunks(4).filter(|p| p[3] > 0 && p[3] < 255).count();
+        assert!(partial > 4, "{backend:?} {partial}");
+    }
+}
+
 #[test]
 fn images_text_and_shadows_draw_on_the_gpu() {
     let fonts = fonts();

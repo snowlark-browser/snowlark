@@ -489,6 +489,19 @@ fn finite(v: &[f32]) -> bool {
     v.iter().all(|v| v.is_finite())
 }
 
+/// [`snowlark_paint::Matrix::antialiases_image`] for the CPU surface's transform.
+fn image_antialiased(t: &Transform, width: f32, height: f32) -> bool {
+    snowlark_paint::Matrix {
+        m11: t.sx,
+        m12: t.ky,
+        m21: t.kx,
+        m22: t.sy,
+        dx: t.tx,
+        dy: t.ty,
+    }
+    .antialiases_image(width, height)
+}
+
 /// The uniform scale of a similarity transform (rotation, uniform scale, translation), if it is
 /// one.
 fn similarity_scale(t: &Transform) -> Option<f32> {
@@ -1994,7 +2007,7 @@ impl Canvas2D {
                 t,
             ),
             blend_mode: self.state.composite,
-            anti_alias: true,
+            anti_alias: image_antialiased(&self.state.transform, dw, dh),
             ..Paint::default()
         };
         let mut p = CanvasPath::new();

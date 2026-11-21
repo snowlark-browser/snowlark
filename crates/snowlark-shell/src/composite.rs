@@ -1424,7 +1424,13 @@ impl State {
         let p = layer.scroll.position();
         if layer.reported != Some(p) {
             layer.reported = Some(p);
-            let _ = layer.tab.send(TabCommand::Scrolled(p));
+            // (naming the last of the page's scrolls shown: a report from before the page's own
+            // last scroll is of the frame painted for the place before it)
+            let shown = snowlark_tab::comp::ShownScroll {
+                generation: layer.generation,
+                serial: layer.page_scroll,
+            };
+            let _ = layer.tab.send(TabCommand::Scrolled(p, shown));
         }
     }
 
@@ -2295,7 +2301,7 @@ mod tests {
         assert!(s.handle(CompInput::Frame(3, Box::new(frame_data(3000.0, 5)))));
         let at = Point::new(0.0, 800.0);
         assert_eq!(s.layers[&3].scroll.position(), at);
-        assert!(matches!(told.try_recv(), Ok(TabCommand::Scrolled(p)) if p == at));
+        assert!(matches!(told.try_recv(), Ok(TabCommand::Scrolled(p, _)) if p == at));
         // A new document's first frame starts at its top, as before.
         assert!(s.handle(CompInput::Frame(3, Box::new(frame_data(3000.0, 6)))));
         assert_eq!(s.layers[&3].scroll.position(), Point::ZERO);
@@ -2371,6 +2377,51 @@ mod tests {
         assert_eq!(scrolls(&told), [2540.0]);
     }
 
+    /// The compositor's reports of where the viewport is name the last of the page's scrolls it
+    /// has shown, so the tab can tell one of a frame from before its own last scroll: none while
+    /// that scroll is on its way, its serial once its frame shows, none again for another
+    /// document.
+    #[test]
+    fn reports_name_the_last_of_the_pages_scrolls_shown() {
+        let window = snowlark_paint::window::HiddenWindow::new().unwrap();
+        let mut s = state_of(&window);
+        let (tab, told) = snowlark_ipc::channel();
+        assert!(s.handle(CompInput::bind(3, tab)));
+        let reports = |told: &Receiver<TabCommand>| {
+            let mut all = Vec::new();
+            while let Ok(command) = told.try_recv() {
+                if let TabCommand::Scrolled(p, shown) = command {
+                    all.push((p.y, shown.generation, shown.serial));
+                }
+            }
+            all
+        };
+        let wheel = |s: &mut State| {
+            assert!(s.handle(
+                CompMsg::ScrollBy {
+                    tab: 3,
+                    delta: Point::new(0.0, 40.0),
+                    smooth: false,
+                    input: None,
+                }
+                .into()
+            ));
+        };
+        assert!(s.handle(numbered(1, 3000.0, 5)));
+        // The wheel turns while the page's first scroll is on its way.
+        wheel(&mut s);
+        assert_eq!(reports(&told), [(0.0, 5, 0), (40.0, 5, 0)]);
+        assert!(s.handle(scrolled(2, 3000.0, 5, 900.0, 1)));
+        wheel(&mut s);
+        assert_eq!(reports(&told), [(900.0, 5, 1), (940.0, 5, 1)]);
+        // A scroll shown as a message is named too.
+        assert!(s.handle(page_scroll(1200.0, 2, 2, 5)));
+        assert_eq!(reports(&told), [(1200.0, 5, 2)]);
+        // Another document's frame has shown none of its page's scrolls.
+        assert!(s.handle(numbered(3, 3000.0, 6)));
+        assert_eq!(reports(&told).last().map(|r| (r.1, r.2)), Some((6, 0)));
+    }
+
     /// Of a scroll that waits for a frame and the scroll that frame was painted for, the one the
     /// page made last shows.
     #[test]
@@ -2396,7 +2447,7 @@ mod tests {
     fn scrolls(told: &Receiver<TabCommand>) -> Vec<f32> {
         let mut at = Vec::new();
         while let Ok(command) = told.try_recv() {
-            if let TabCommand::Scrolled(p) = command {
+            if let TabCommand::Scrolled(p, _) = command {
                 at.push(p.y);
             }
         }

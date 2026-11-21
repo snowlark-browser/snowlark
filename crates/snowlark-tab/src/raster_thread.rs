@@ -587,7 +587,7 @@ pub fn compositor_command(command: &crate::tab::TabCommand) -> bool {
     use crate::tab::TabCommand;
     let finite = |p: &Point| p.x.is_finite() && p.y.is_finite();
     match command {
-        TabCommand::Scrolled(p) | TabCommand::ScrollContainer(_, p) => finite(p),
+        TabCommand::Scrolled(p, _) | TabCommand::ScrollContainer(_, p) => finite(p),
         TabCommand::BeginFrame(_) | TabCommand::UseBeginFrames => true,
         _ => false,
     }
@@ -1836,7 +1836,7 @@ pub(crate) mod tests {
         use crate::tab::TabCommand;
         for command in [
             TabCommand::Close,
-            TabCommand::Scrolled(Point::new(0.0, f32::NAN)),
+            TabCommand::Scrolled(Point::new(0.0, f32::NAN), Default::default()),
             TabCommand::UseBeginFrames,
         ] {
             gpu.send(&SeamDown::Tab(command)).unwrap();

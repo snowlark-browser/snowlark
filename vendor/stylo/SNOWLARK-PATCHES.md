@@ -414,5 +414,12 @@ the source; `git log -p vendor/stylo` shows the diff.
    `float`, border or outline styles, `overflow`, containment). Otherwise the rules are cascaded as
    before. No style changes.
 
+73. **Unusual elements' `display: contents` in the servo build** (`style_adjuster.rs`, CSS Display 3
+   §2.5, "Unboxing"): upstream computes `display: contents` to `none` for the elements that cannot be
+   unboxed (`br`, `wbr`, `meter`, `progress`, `canvas`, `embed`, `object`, `audio`, `iframe`, `img`,
+   `video`, `frame`, `frameset`, `input`, `textarea`, `select`; SVG elements other than a nested `svg`,
+   `a`, `g`, `use`, `tspan` and `textPath`; MathML elements) only in the gecko build. The servo build now
+   does the same, comparing local names as strings; pseudo-elements keep `contents`.
+
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

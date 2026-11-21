@@ -1738,10 +1738,10 @@ mod tests {
             command,
         };
         assert!(command(TabCommand::Close).validate(&policy).is_err());
-        assert!(command(TabCommand::Scrolled(snowlark_paint::Point::new(
-            0.0,
-            f32::NAN
-        )))
+        assert!(command(TabCommand::Scrolled(
+            snowlark_paint::Point::new(0.0, f32::NAN),
+            Default::default()
+        ))
         .validate(&policy)
         .is_err());
         assert!(command(TabCommand::UseBeginFrames)

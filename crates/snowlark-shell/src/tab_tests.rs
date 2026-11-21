@@ -1336,7 +1336,41 @@ fn a_pages_scroll_is_told_with_the_frame_painted_for_it() {
         url,
         crate::page_driver::PageDriver::factory(),
     );
-    scroll_is_told_with_its_frame(tab, &rx, &comp_rx);
+    scroll_is_told_with_its_frame(tab, &rx, &comp_rx, false);
+}
+
+/// A place the compositor reports while the page's scroll is on its way to it (the user's wheel
+/// moving the frame on screen, painted for the place before the scroll) names the last of the
+/// page's scrolls shown, and the tab does not take it: the page stays where it scrolled, and the
+/// frames go on covering the viewport there. (Taken, it scrolled the page back for a frame.)
+#[test]
+fn a_report_from_before_the_pages_scroll_does_not_undo_it() {
+    let (ctx, _net, rx, comp_rx) = remote_context();
+    let url = Url::parse(SCROLLING_PAGE).unwrap();
+    let tab = spawn(
+        1,
+        ctx,
+        DEVICE,
+        url,
+        crate::page_driver::PageDriver::factory(),
+    );
+    scroll_is_told_with_its_frame(tab, &rx, &comp_rx, true);
+}
+
+/// The same in a renderer process.
+#[test]
+fn a_report_from_before_the_pages_scroll_in_a_renderer_process_does_not_undo_it() {
+    let (ctx, _net, rx, comp_rx) = remote_context();
+    let url = Url::parse(SCROLLING_PAGE).unwrap();
+    let tab = TabHost::spawn(
+        1,
+        ctx,
+        Default::default(),
+        DEVICE,
+        url,
+        remote(child_launch()),
+    );
+    scroll_is_told_with_its_frame(tab, &rx, &comp_rx, true);
 }
 
 /// The same in a renderer process.
@@ -1352,13 +1386,16 @@ fn a_pages_scroll_in_a_renderer_process_is_told_with_the_frame_painted_for_it() 
         url,
         remote(child_launch()),
     );
-    scroll_is_told_with_its_frame(tab, &rx, &comp_rx);
+    scroll_is_told_with_its_frame(tab, &rx, &comp_rx, false);
 }
 
+/// `wheel`: once the frame with the page's scroll has come, the compositor reports the viewport
+/// at 40, moved there from the frame on screen before it showed that one.
 fn scroll_is_told_with_its_frame(
     tab: TabHost,
     rx: &std::sync::mpsc::Receiver<(TabId, TabEvent)>,
     comp_rx: &std::sync::mpsc::Receiver<crate::composite::CompInput>,
+    wheel: bool,
 ) {
     use crate::composite::{uncovered_rows, CompInput, CompMsg};
     use std::sync::mpsc::RecvTimeoutError;
@@ -1370,20 +1407,20 @@ fn scroll_is_told_with_its_frame(
     });
     // The page shows, at its top.
     let until = Instant::now() + Duration::from_secs(20);
-    loop {
+    let generation = loop {
         let left = until.saturating_duration_since(Instant::now());
         match comp_rx.recv_timeout(left) {
             Ok(CompInput::Frame(1, f)) => {
-                let shows = f.content.height == 9000.0;
+                let (shows, generation) = (f.content.height == 9000.0, f.generation);
                 f.recycle();
                 if shows {
-                    break;
+                    break generation;
                 }
             }
             Ok(_) => {}
             Err(e) => panic!("no frame of the page: {e}"),
         }
-    }
+    };
     tab.send(TabCommand::Pointer(Pointer::Down(
         Point::new(10.0, 10.0),
         snowlark_paint::input::MouseButton::Left,
@@ -1396,6 +1433,7 @@ fn scroll_is_told_with_its_frame(
         Default::default(),
     )));
     let to = Point::new(0.0, 5000.0);
+    let mut wheel = wheel;
     // Each frame's number, the scroll it brings, its content height and the rows of the viewport
     // at 5000 it leaves blank.
     let mut frames = Vec::new();
@@ -1408,6 +1446,18 @@ fn scroll_is_told_with_its_frame(
             Ok(CompInput::Frame(1, f)) => {
                 let blank = uncovered_rows(&f, to, DEVICE.viewport.height as u32);
                 frames.push((f.number, f.scroll, f.content.height, blank));
+                if wheel && f.scroll.is_some() {
+                    // The frame on screen, which shows none of the page's scrolls, moved before
+                    // this one shows.
+                    wheel = false;
+                    tab.send(TabCommand::Scrolled(
+                        Point::new(0.0, 40.0),
+                        snowlark_tab::comp::ShownScroll {
+                            generation,
+                            serial: 0,
+                        },
+                    ));
+                }
                 f.recycle();
             }
             Ok(_) => {}

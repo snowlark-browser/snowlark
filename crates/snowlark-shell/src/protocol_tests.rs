@@ -450,7 +450,13 @@ every_variant!(tab_command: TabCommand, [
             zoom: 1.25,
         },
     }),
-    TabCommand::Scrolled(_) => TabCommand::Scrolled(point()),
+    TabCommand::Scrolled(..) => TabCommand::Scrolled(
+        point(),
+        snowlark_tab::comp::ShownScroll {
+            generation: 7,
+            serial: 3,
+        },
+    ),
     TabCommand::Pointer(_) => TabCommand::Pointer(Pointer::Move(point())),
     TabCommand::Drag(_) => TabCommand::Drag(DragInput::Drop {
         at: point(),
@@ -701,7 +707,7 @@ every_variant!(gpu_up: crate::gpu_process::GpuUp, [
     crate::gpu_process::GpuUp::Tab { .. } => crate::gpu_process::GpuUp::Tab {
         window: crate::composite::WindowId(3),
         tab: 4,
-        command: TabCommand::Scrolled(point()),
+        command: TabCommand::Scrolled(point(), Default::default()),
     },
     crate::gpu_process::GpuUp::Taken { .. } => crate::gpu_process::GpuUp::Taken { tab: 4 },
     crate::gpu_process::GpuUp::Refused { .. } => crate::gpu_process::GpuUp::Refused {

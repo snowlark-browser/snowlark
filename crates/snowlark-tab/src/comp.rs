@@ -128,6 +128,18 @@ pub struct PageScroll {
     pub serial: u64,
 }
 
+/// The last of a page's scrolls ([`PageScroll`]) the compositor has shown, as its reports of where
+/// the viewport is name it ([`crate::tab::TabCommand::Scrolled`]): a report that names one from
+/// before the page's own last scroll is of a frame painted for the place before that scroll.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShownScroll {
+    /// The generation of the document whose frame the compositor shows
+    /// ([`FrameData::generation`]).
+    pub generation: u64,
+    /// The serial of that document's last scroll shown ([`PageScroll::serial`]), 0 for none.
+    pub serial: u64,
+}
+
 /// How long a compositor waits for the frame a page's scroll shows with ([`CompMsg::ScrollTo`])
 /// before it scrolls the frame it has: a frame can be lost on its way (a list refused, a raster side
 /// that ended), and the scroll must not be lost with it.
