@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use snowlark_media::fmp4::{Sample, Track};
-use snowlark_media::win::playready::{type_supported, RECOMMENDATION_3000};
+use snowlark_media::win::playready::{type_supported, RECOMMENDATION, RECOMMENDATION_3000};
 use snowlark_media::win::playready_service::{
     system_supports, Control, EngineState, Event, PlayerEvent, Service,
 };
@@ -103,6 +103,26 @@ impl ProtectedPictures for Pictures {
             );
         }
     }
+}
+
+/// The module key system that plays a key system a page asks for, as the page's EME names it (the
+/// name, or the name and a capability's robustness level after a dot). The one module is
+/// PlayReady's hardware level, `com.microsoft.playready.recommendation.3000`; its licences of a
+/// lower level play on it too, so it also plays the names Microsoft's browser answers for lower
+/// levels with the same module: `com.microsoft.playready.recommendation` with robustness `""`,
+/// `"2000"` or `"150"`, and the older `com.microsoft.playready` (deprecated, still answered) with
+/// those or `"3000"`.
+fn module_system(key_system: &str) -> Option<&'static str> {
+    const PLAIN: &str = "com.microsoft.playready";
+    // (the longer name first: the older one is its prefix)
+    let level = [RECOMMENDATION, PLAIN]
+        .into_iter()
+        .find_map(|n| key_system.strip_prefix(n))?;
+    let level = match level {
+        "" => "",
+        l => l.strip_prefix('.')?,
+    };
+    matches!(level, "" | "150" | "2000" | "3000").then_some(RECOMMENDATION_3000)
 }
 
 /// Whether `SNOWLARK_CDM_TRACE=1`: a line on stderr for each protected player made, its controls,
@@ -190,15 +210,17 @@ impl BrowserCdm {
         id
     }
 
-    fn offered(&self, key_system: &str) -> bool {
+    /// The module key system that plays `key_system`, when it is offered.
+    fn offered(&self, key_system: &str) -> Option<&'static str> {
         static SYSTEM: OnceLock<bool> = OnceLock::new();
         // (offered where the system's media engine answers "probably" for H.264 under it)
-        self.enabled
-            && key_system == RECOMMENDATION_3000
+        let module = module_system(key_system)?;
+        (self.enabled
             && *SYSTEM.get_or_init(|| {
                 system_supports()
                     && type_supported(RECOMMENDATION_3000, "video/mp4;codecs=\"avc1.42e01e\"")
-            })
+            }))
+        .then_some(module)
     }
 
     fn inbox_of_session(&self, session: u64) -> Option<(u64, Arc<CdmInbox>)> {
@@ -313,7 +335,8 @@ fn player_report(event: PlayerEvent) -> Option<PlayerReport> {
 
 impl Cdm for BrowserCdm {
     fn supports(&self, key_system: &str, content_type: &str) -> bool {
-        self.offered(key_system) && type_supported(key_system, content_type)
+        self.offered(key_system)
+            .is_some_and(|module| type_supported(module, content_type))
     }
 
     fn create_keys(
@@ -324,8 +347,8 @@ impl Cdm for BrowserCdm {
         inbox: &Arc<CdmInbox>,
     ) -> u64 {
         let keys = self.next.fetch_add(1, Ordering::Relaxed) + 1;
-        let service = self.service().filter(|_| self.offered(key_system));
-        let Some(service) = service else {
+        let offered = self.offered(key_system);
+        let (Some(service), Some(key_system)) = (self.service(), offered) else {
             inbox.deliver(CdmEvent::Done {
                 request,
                 result: Err(CdmError::NotSupported(
@@ -520,9 +543,43 @@ impl Cdm for BrowserCdm {
 mod tests {
     use super::*;
 
+    /// The names a page's EME asks of the module (the key system, and a robustness level after a
+    /// dot) that the hardware level plays: Microsoft's names for PlayReady at that level or a lower
+    /// one, as their browser answers them, and nothing else.
+    #[test]
+    fn the_names_the_hardware_level_plays() {
+        for name in [
+            "com.microsoft.playready.recommendation.3000",
+            "com.microsoft.playready.recommendation",
+            "com.microsoft.playready.recommendation.2000",
+            "com.microsoft.playready.recommendation.150",
+            "com.microsoft.playready",
+            "com.microsoft.playready.3000",
+            "com.microsoft.playready.2000",
+            "com.microsoft.playready.150",
+        ] {
+            assert_eq!(module_system(name), Some(RECOMMENDATION_3000), "{name}");
+        }
+        for name in [
+            "com.microsoft.playready.recommendation.3000.2000",
+            "com.microsoft.playready.recommendation.3000.3000",
+            "com.microsoft.playready.recommendation.1000",
+            "com.microsoft.playready.recommendationx",
+            "com.microsoft.playready.hardware",
+            "com.microsoft.playready.software",
+            "com.microsoft.playreadyx",
+            "com.microsoft.play",
+            "com.widevine.alpha",
+            "",
+        ] {
+            assert_eq!(module_system(name), None, "{name}");
+        }
+    }
+
     /// The real module through the page's calls (`SNOWLARK_PLAYREADY=1`, hardware DRM, and
     /// `SNOWLARK_PLAYREADY_MP4` naming a PlayReady `cenc` file; run by hand): an instance for an
-    /// origin, a session, and the licence request its `pssh` leads to.
+    /// origin, a session, and the licence request its `pssh` leads to; the instance is asked by the
+    /// older name, which the hardware level plays.
     #[test]
     #[ignore]
     fn the_module_makes_a_licence_request() {
@@ -539,12 +596,27 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("snowlark-cdm-test-{}", std::process::id()));
         let cdm = BrowserCdm::persistent(dir.clone());
         assert!(cdm.supports(RECOMMENDATION_3000, "video/mp4; codecs=\"avc1.64001f\""));
+        for name in [
+            "com.microsoft.playready.3000",
+            "com.microsoft.playready",
+            RECOMMENDATION,
+        ] {
+            assert!(
+                cdm.supports(name, "video/mp4;codecs=\"avc1.42E01E\""),
+                "{name}"
+            );
+            assert!(
+                cdm.supports(name, "audio/mp4; codecs=\"mp4a.40.2\""),
+                "{name}"
+            );
+        }
+        assert!(!cdm.supports("com.microsoft.playready.hardware", "video/mp4"));
         let (tx, rx) = std::sync::mpsc::channel();
         let tx = Mutex::new(tx);
         let inbox = Arc::new(CdmInbox::new(Arc::new(move || {
             let _ = tx.lock().unwrap().send(());
         })));
-        let keys = cdm.create_keys(1, RECOMMENDATION_3000, "https://example.test", &inbox);
+        let keys = cdm.create_keys(1, "com.microsoft.playready", "https://example.test", &inbox);
         let session = cdm.create_session(keys);
         cdm.generate_request(2, session, "cenc", pssh);
         let mut seen = Vec::new();
