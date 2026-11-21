@@ -162,10 +162,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **HBO Max shows no frames.** Its protected playback gets a licence and starts, but no video frame is shown: the page
   stays black with a spinner. Protected playback whose audio is still streaming does not start: the media engine
   takes every encrypted audio sample it is given and waits for more (it starts once the audio stream has ended, or
-  without an audio track). Fixed on the way: playback that starts after the first frame was shown, and a seek in
-  an ended `MediaSource`. (ref 597)
-- **xHE-AAC.** `canPlayType`, `MediaSource.isTypeSupported` and `decodingInfo` answer `mp4a.40.42` (xHE-AAC) as
-  plain AAC, without asking whether the system can decode it. (ref 574)
+  without an audio track). This happens at the hardware security level (SL3000) only: there the audio is not
+  decrypted for the media engine, while the same content plays with sound at SL2000. Fixed on the way: playback
+  that starts after the first frame was shown, and a seek in an ended `MediaSource`. (ref 597)
 - **`changeType()` to a different decoder.** Media Source Extensions `changeType()` cannot switch a set-up
   `SourceBuffer` to a stream that needs another decoder. Dolby AC-3 and E-AC-3 are not offered through MSE for that
   reason. (ref 150)

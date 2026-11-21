@@ -346,8 +346,12 @@ impl Profile {
     }
 }
 
+/// xHE-AAC (MPEG-D USAC, audio object type 42 of ISO/IEC 14496-3 §1.5.1.1, `mp4a.40.42` in RFC
+/// 6381): an AAC "profile" that only some AAC decoders take.
+pub const XHE_AAC: Profile = Profile::new(Codec::Aac, 42, 0);
+
 /// The profile and bit depth a valid VP9, AV1 or HEVC codec string names (`vp9` is profile 0 at 8
-/// bits); `None` for other codecs.
+/// bits), or [`XHE_AAC`]; `None` for other codecs.
 pub fn profile_of(s: &str) -> Option<Profile> {
     codec_of(s)?;
     let parts: Vec<&str> = s.trim().split('.').collect();
@@ -369,6 +373,7 @@ pub fn profile_of(s: &str) -> Option<Profile> {
             };
             Some(Profile::new(Codec::Hevc, profile, depth))
         }
+        ["mp4a", "40", "42"] => Some(XHE_AAC),
         _ => None,
     }
 }
@@ -380,8 +385,9 @@ pub struct Support {
     pub codecs: BTreeSet<Codec>,
     /// Video codecs the GPU decodes.
     pub hardware: BTreeSet<Codec>,
-    /// The VP9, AV1 and HEVC profiles and depths a decoder takes (a stream of one not listed does
-    /// not play, though its codec is in `codecs`).
+    /// The VP9, AV1 and HEVC profiles and depths a decoder takes, and [`XHE_AAC`] where the AAC
+    /// decoder takes it (a stream of one not listed does not play, though its codec is in
+    /// `codecs`).
     pub profiles: BTreeSet<Profile>,
 }
 
@@ -481,6 +487,7 @@ impl Support {
                 profiles.insert(Profile::new(Codec::Av1, profile, depth));
             }
         }
+        profiles.insert(XHE_AAC);
         Support {
             containers: Container::ALL.into_iter().collect(),
             codecs: Codec::ALL.into_iter().collect(),
@@ -807,6 +814,32 @@ mod tests {
         // a GPU profile without the decoder: nothing
         s.codecs.remove(&Codec::Hevc);
         assert!(!s.mse_supports(main));
+    }
+
+    /// xHE-AAC (`mp4a.40.42`) plays only where the AAC decoder takes it: an AAC decoder alone
+    /// answers the other AAC object types, not this one.
+    #[test]
+    fn xhe_aac_only_where_the_decoder_takes_it() {
+        assert_eq!(profile_of("mp4a.40.42"), Some(XHE_AAC));
+        assert_eq!(profile_of("mp4a.40.2"), None);
+        assert_eq!(profile_of("mp4a.40.5"), None);
+        let mut s = Support::everything();
+        s.profiles.remove(&XHE_AAC);
+        let xhe = "audio/mp4; codecs=\"mp4a.40.42\"";
+        let both = "video/mp4; codecs=\"avc1.42E01E, mp4a.40.42\"";
+        for t in [xhe, both] {
+            assert_eq!(s.can_play_type(t), CanPlay::No, "{t}");
+            assert!(!s.mse_supports(t), "{t}");
+            assert!(!s.decodes_file(t), "{t}");
+        }
+        // (other AAC still plays)
+        assert!(s.mse_supports("audio/mp4; codecs=\"mp4a.40.2\""));
+        assert!(s.mse_supports("audio/mp4; codecs=\"mp4a.40.29\""));
+        s.profiles.insert(XHE_AAC);
+        for t in [xhe, both] {
+            assert_eq!(s.can_play_type(t), CanPlay::Probably, "{t}");
+            assert!(s.mse_supports(t), "{t}");
+        }
     }
 
     /// Dolby audio plays from a file, but MSE does not offer it: a `SourceBuffer` could not be

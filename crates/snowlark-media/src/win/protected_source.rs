@@ -544,9 +544,7 @@ impl IMFTrustedInput_Impl for Source_Impl {
 /// `None` for other codecs.
 pub fn media_type(track: &crate::fmp4::Track) -> Option<Result<IMFMediaType>> {
     use crate::fmp4::Codec;
-    // SAFETY: media type creation and attribute calls on a live object; the wave format is a
-    // byte buffer of exactly the length passed, laid out as the packed WAVEFORMATEX and
-    // HEAACWAVEINFO fields followed by the configuration.
+    // SAFETY: media type creation and attribute calls on a live object.
     let build = |codec: &Codec| unsafe {
         let t = MFCreateMediaType()?;
         match codec {
@@ -563,26 +561,7 @@ pub fn media_type(track: &crate::fmp4::Track) -> Option<Result<IMFMediaType>> {
                 }
             }
             Codec::Aac { config } => {
-                const WAVE_FORMAT_MPEG_HEAAC: u16 = 0x1610;
-                let channels = track.channels.max(1);
-                let rate = track.sample_rate;
-                let mut w = Vec::with_capacity(30 + config.len());
-                w.extend_from_slice(&WAVE_FORMAT_MPEG_HEAAC.to_le_bytes());
-                w.extend_from_slice(&channels.to_le_bytes());
-                w.extend_from_slice(&rate.to_le_bytes());
-                w.extend_from_slice(&(rate * channels as u32 * 2).to_le_bytes());
-                w.extend_from_slice(&1u16.to_le_bytes()); // nBlockAlign
-                w.extend_from_slice(&16u16.to_le_bytes()); // wBitsPerSample
-                w.extend_from_slice(&((12 + config.len()) as u16).to_le_bytes()); // cbSize
-                w.extend_from_slice(&0u16.to_le_bytes()); // wPayloadType: raw
-                w.extend_from_slice(&0xfeu16.to_le_bytes()); // no profile and level given
-                w.extend_from_slice(&[0; 8]); // wStructType 0 (a config follows), reserved
-                w.extend_from_slice(config);
-                MFInitMediaTypeFromWaveFormatEx(
-                    &t,
-                    w.as_ptr() as *const windows::Win32::Media::Audio::WAVEFORMATEX,
-                    w.len() as u32,
-                )?;
+                return aac_media_type(config, track.sample_rate, track.channels);
             }
             Codec::Other(_) => unreachable!(),
         }
@@ -591,6 +570,37 @@ pub fn media_type(track: &crate::fmp4::Track) -> Option<Result<IMFMediaType>> {
     match &track.codec {
         Codec::Other(_) => None,
         codec => Some(build(codec)),
+    }
+}
+
+/// The media type of raw AAC (`HEAACWAVEINFO`, payload type 0) with its `AudioSpecificConfig`
+/// (ISO/IEC 14496-3 §1.6.2.1) at a sample rate and channel count.
+pub fn aac_media_type(config: &[u8], rate: u32, channels: u16) -> Result<IMFMediaType> {
+    const WAVE_FORMAT_MPEG_HEAAC: u16 = 0x1610;
+    let channels = channels.max(1);
+    let mut w = Vec::with_capacity(30 + config.len());
+    w.extend_from_slice(&WAVE_FORMAT_MPEG_HEAAC.to_le_bytes());
+    w.extend_from_slice(&channels.to_le_bytes());
+    w.extend_from_slice(&rate.to_le_bytes());
+    w.extend_from_slice(&(rate * channels as u32 * 2).to_le_bytes());
+    w.extend_from_slice(&1u16.to_le_bytes()); // nBlockAlign
+    w.extend_from_slice(&16u16.to_le_bytes()); // wBitsPerSample
+    w.extend_from_slice(&((12 + config.len()) as u16).to_le_bytes()); // cbSize
+    w.extend_from_slice(&0u16.to_le_bytes()); // wPayloadType: raw
+    w.extend_from_slice(&0xfeu16.to_le_bytes()); // no profile and level given
+    w.extend_from_slice(&[0; 8]); // wStructType 0 (a config follows), reserved
+    w.extend_from_slice(config);
+    // SAFETY: media type creation on a live object; the wave format is a byte buffer of exactly
+    // the length passed, laid out as the packed WAVEFORMATEX and HEAACWAVEINFO fields followed by
+    // the configuration.
+    unsafe {
+        let t = MFCreateMediaType()?;
+        MFInitMediaTypeFromWaveFormatEx(
+            &t,
+            w.as_ptr() as *const windows::Win32::Media::Audio::WAVEFORMATEX,
+            w.len() as u32,
+        )?;
+        Ok(t)
     }
 }
 

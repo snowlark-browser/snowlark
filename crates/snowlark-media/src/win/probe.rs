@@ -108,9 +108,61 @@ fn decoder_installed(c: Codec) -> bool {
     count > 0
 }
 
+/// An xHE-AAC `AudioSpecificConfig` (ISO/IEC 14496-3 §1.6.2.1): audio object type 42 (escaped),
+/// 48 kHz, mono, then its `UsacConfig` (ISO/IEC 23003-3 §5.2): 48 kHz, 1024-sample frames without
+/// SBR, one single channel element without time-warped MDCT or noise filling, no extensions.
+pub(crate) const USAC_CONFIG: [u8; 6] = [0xf9, 0x46, 0x23, 0x21, 0x00, 0x00];
+
+/// Whether the first AAC decoder installed takes raw AAC with this `AudioSpecificConfig` (it
+/// reads the configuration when the input type is set, and refuses object types it cannot
+/// decode).
+pub(crate) fn aac_decoder_takes(config: &[u8], rate: u32, channels: u16) -> bool {
+    let Ok(t) = super::protected_source::aac_media_type(config, rate, channels) else {
+        return false;
+    };
+    let input = MFT_REGISTER_TYPE_INFO {
+        guidMajorType: MFMediaType_Audio,
+        guidSubtype: MFAudioFormat_AAC,
+    };
+    let mut activates: *mut Option<IMFActivate> = std::ptr::null_mut();
+    let mut count = 0u32;
+    // SAFETY: MFTEnumEx fills an array of `count` activation objects allocated with
+    // CoTaskMemAlloc; the first is used, each is released (dropped) and the array freed here.
+    unsafe {
+        if MFTEnumEx(
+            MFT_CATEGORY_AUDIO_DECODER,
+            MFT_ENUM_FLAG_SYNCMFT | MFT_ENUM_FLAG_LOCALMFT | MFT_ENUM_FLAG_SORTANDFILTER,
+            Some(&input),
+            None,
+            &mut activates,
+            &mut count,
+        )
+        .is_err()
+        {
+            return false;
+        }
+        let takes = count > 0
+            && (*activates)
+                .as_ref()
+                .and_then(|a| a.ActivateObject::<IMFTransform>().ok())
+                .is_some_and(|d| d.SetInputType(0, &t, 0).is_ok());
+        for i in 0..count as usize {
+            if let Some(a) = (*activates.add(i)).as_ref() {
+                let _ = a.ShutdownObject();
+            }
+            std::ptr::drop_in_place(activates.add(i));
+        }
+        if !activates.is_null() {
+            CoTaskMemFree(Some(activates as *const _));
+        }
+        takes
+    }
+}
+
 /// Asks the system what it plays: the sources and decoders installed and the GPU's decoder
-/// profiles, once (most of it is creating a Direct3D device, about 180 ms). No decoder is brought
-/// up: what VP9 and AV1 profiles play comes from the decoder profiles the GPU lists.
+/// profiles, once (most of it is creating a Direct3D device, about 180 ms). One decoder is brought
+/// up, the AAC one, to ask whether it takes xHE-AAC; what VP9 and AV1 profiles play comes from the
+/// decoder profiles the GPU lists.
 pub fn probe() -> Support {
     super::ensure_com();
     let containers = Container::ALL
@@ -138,6 +190,9 @@ pub fn probe() -> Support {
     if codecs.contains(&Codec::Av1) {
         profiles.insert(Profile::new(Codec::Av1, 0, 8));
         profiles.insert(Profile::new(Codec::Av1, 0, 10));
+    }
+    if codecs.contains(&Codec::Aac) && aac_decoder_takes(&USAC_CONFIG, 48000, 1) {
+        profiles.insert(crate::caps::XHE_AAC);
     }
     // (a GPU profile is of no use without the codec's decoder, which drives it)
     profiles.retain(|p| codecs.contains(&p.codec));
@@ -258,6 +313,20 @@ mod tests {
         assert!(s.codecs.contains(&Codec::H264), "{s:?}");
         assert!(s.codecs.contains(&Codec::Aac), "{s:?}");
         assert!(mse_type_supported("video/mp4; codecs=\"avc1.42E01E\""));
+    }
+
+    /// The AAC decoder is asked by configuration: it takes AAC-LC and refuses an undefined object
+    /// type, so its answer for xHE-AAC is its own (printed: it depends on the Windows build).
+    #[test]
+    fn the_aac_decoder_answers_by_object_type() {
+        super::super::ensure_com();
+        // AAC-LC, 44.1 kHz, stereo.
+        assert!(aac_decoder_takes(&[0x12, 0x10], 44100, 2));
+        // Object type 63 (escaped; not defined), 48 kHz, mono.
+        assert!(!aac_decoder_takes(&[0xfb, 0xe6, 0x20], 48000, 1));
+        let xhe = aac_decoder_takes(&USAC_CONFIG, 48000, 1);
+        eprintln!("xHE-AAC: {xhe}");
+        assert_eq!(probe().profiles.contains(&crate::caps::XHE_AAC), xhe);
     }
 
     /// `isTypeSupported()`'s table against Media Foundation's own MSE check, which it replaces (that
