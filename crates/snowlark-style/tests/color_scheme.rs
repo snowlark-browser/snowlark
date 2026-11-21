@@ -58,6 +58,18 @@ fn the_used_color_scheme_decides_canvas_text_and_initial_color() {
 }
 
 #[test]
+fn highlight_system_colors_are_the_selection_colors() {
+    // CSS Color 4 §6.2: `Highlight` and `HighlightText` are the background and text of selected
+    // text; in the light scheme they are the colors a selection without `::selection` colors is
+    // painted in (Windows' default: rgb(0, 120, 215), white).
+    let p = Page::new(
+        "<!DOCTYPE html><div id=h style='color: HighlightText; background-color: Highlight'></div>",
+    );
+    assert_eq!(p.get("#h", "background-color"), "rgb(0, 120, 215)");
+    assert_eq!(p.get("#h", "color"), WHITE);
+}
+
+#[test]
 fn links_follow_the_used_color_scheme() {
     // HTML's rendering section: `:link { color: LinkText }`. On a dark canvas the light blue is
     // 1.99:1 against the background; LinkText of the dark scheme is 7.84:1.

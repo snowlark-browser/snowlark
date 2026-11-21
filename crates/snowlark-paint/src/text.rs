@@ -807,6 +807,28 @@ impl TextEngine {
         }
     }
 
+    /// The advance of a face's space glyph at `size` CSS px (0 when it has none).
+    pub fn space_advance(&self, font: FontId, size: f32) -> f32 {
+        let Some((face, _)) = self.face(font) else {
+            return 0.0;
+        };
+        let mut glyph = [0u16; 1];
+        // SAFETY: one code point in, one glyph index out, both arrays of length one.
+        if unsafe { face.GetGlyphIndices([32u32].as_ptr(), 1, glyph.as_mut_ptr()) }.is_err()
+            || glyph[0] == 0
+        {
+            return 0.0;
+        }
+        let mut m = [DWRITE_GLYPH_METRICS::default()];
+        // SAFETY: one glyph index in, one metrics record out, both arrays of length one.
+        if unsafe { face.GetDesignGlyphMetrics(glyph.as_ptr(), 1, m.as_mut_ptr(), false) }.is_err()
+        {
+            return 0.0;
+        }
+        let units = self.metrics(font, size).units_per_em.max(1);
+        m[0].advanceWidth as f32 * size / units as f32
+    }
+
     /// The width of `text` in one line (shapes it; for a quick measurement).
     pub fn measure(&self, text: &str, list: FontListId, size: f32) -> Result<f32> {
         let mut out = ShapedText::default();

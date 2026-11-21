@@ -64,9 +64,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   the CSS animation's values. Script animations on pseudo-elements do not reach the cascade. (ref 115, 33)
 - **`getComputedStyle()` on pseudo-elements.** For a `::before` or `::after` that generates a box, `width` and
   `height` read their computed value (such as `auto`) rather than the used size. (ref 96)
-- **Highlight pseudo-elements.** The `::selection` highlight covers the font's ascent and descent rather than the line
-  box. `text-shadow` and
-  `text-decoration` on `::selection` are not applied, and a selected replaced element gets no highlight.
+- **Highlight pseudo-elements.** `text-shadow` and
+  `text-decoration` on `::selection` are not applied, and a selected image or other replaced element that is
+  positioned gets no highlight.
   `::highlight()` and `::search-text` are not parsed. (ref 502)
 - **`clip-path`.** `margin-box` resolves percentage and `auto` margins against the box's own width. `url()` on a
   pseudo-element does not clip, a `clip-path` on a shape inside a `<clipPath>` is ignored, and `url()` to a

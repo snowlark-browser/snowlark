@@ -477,6 +477,140 @@ fn selected_text_without_selection_colors_is_highlighttext_on_highlight() {
 }
 
 #[test]
+fn a_selection_highlights_the_whole_line_box() {
+    // CSS Pseudo-Elements 4 §3.4: the highlighted area of selected text may be its line box; it
+    // is the text's own box united with the line box in the block direction, so a tall line is
+    // filled from top to bottom and a short one still covers the glyphs. Vertical text the same
+    // way across the line.
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>\
+         body { margin: 0; font: 20px monospace; color: rgb(0, 0, 0); background: rgb(255, 255, 255) }\
+         p { margin: 0 }\
+         #a { line-height: 50px }\
+         #b { line-height: 4px; position: absolute; top: 100px }\
+         #c { line-height: 50px; writing-mode: vertical-rl; position: absolute; top: 200px; left: 0 }\
+         </style><p id=a>aaaa</p><p id=b>bbbb</p><p id=c>cccc</p>\
+         <script>var r = document.createRange();\
+         r.setStart(document.getElementById('a').firstChild, 0);\
+         r.setEnd(document.getElementById('c').firstChild, 4);\
+         getSelection().addRange(r);</script>",
+    );
+    page.update_the_rendering();
+    let list = page.engine().paint(Point::ZERO, 1.0).unwrap();
+    let mut fills = vec![];
+    let mut transform = snowlark_paint::Matrix::IDENTITY;
+    for i in &list.items {
+        match i {
+            Item::PushTransform { matrix, .. } => transform = *matrix,
+            Item::PopTransform => transform = snowlark_paint::Matrix::IDENTITY,
+            Item::FillRect { rect, color, .. } if (color.r, color.g, color.b) == (0, 86, 205) => {
+                fills.push(transform.apply_rect(rect))
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(fills.len(), 3, "{fills:?}");
+    // #a: the full 50 px line (the text's own box is about 23 px tall, centred in it)
+    assert_eq!((fills[0].y, fills[0].height), (0.0, 50.0), "{fills:?}");
+    // #b: a 4 px line inside the glyphs' box: the glyphs' box
+    assert!(
+        fills[1].y < 100.0 && fills[1].y + fills[1].height > 104.0 && fills[1].height < 30.0,
+        "{fills:?}"
+    );
+    // #c: vertical, the full 50 px column
+    assert_eq!((fills[2].x, fills[2].width), (0.0, 50.0), "{fills:?}");
+    // The selection goes on past the ends of #a's and #b's lines, which take a space's width more
+    // (a monospace font: five advances); it ends with #c's text, whose line takes none (four).
+    let advance = fills[2].height / 4.0;
+    assert!((fills[0].width - 5.0 * advance).abs() < 0.5, "{fills:?}");
+    assert!((fills[1].width - 5.0 * advance).abs() < 0.5, "{fills:?}");
+}
+
+#[test]
+fn a_selected_replaced_element_is_covered_by_its_highlight() {
+    // CSS Pseudo-Elements 4 §3.6.4: a selected replaced element gets its highlight's background
+    // over its content, translucent when that background is opaque (so the content shows), and as
+    // tall as its line box; a block-level one over its own box. An element outside the selection
+    // gets none.
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>\
+         body { margin: 0; font: 20px monospace; color: rgb(0, 0, 0); background: rgb(255, 255, 255) }\
+         p { margin: 0; line-height: 50px }\
+         canvas { width: 30px; height: 30px; vertical-align: middle }\
+         #r::selection { background: rgb(255, 0, 0) }\
+         </style><p id=a>a<canvas></canvas>a</p><canvas id=r style='display: block'></canvas>\
+         <p id=b>b<canvas></canvas></p>\
+         <script>var r = document.createRange();\
+         r.setStart(document.getElementById('a').firstChild, 0);\
+         r.setEnd(document.getElementById('b').firstChild, 1);\
+         getSelection().addRange(r);</script>",
+    );
+    page.update_the_rendering();
+    let list = page.engine().paint(Point::ZERO, 1.0).unwrap();
+    let overlays: Vec<_> = list
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            Item::FillRect { rect, color } if color.a < 255 && color.a > 0 => {
+                Some((*rect, (color.r, color.g, color.b, color.a)))
+            }
+            _ => None,
+        })
+        .collect();
+    let canvases: Vec<_> = overlays.iter().filter(|(r, _)| r.width == 30.0).collect();
+    assert_eq!(canvases.len(), 2, "{overlays:?}");
+    // the inline canvas: the default highlight over its 30 px, as tall as the 50 px line
+    let (inline, color) = canvases[0];
+    assert_eq!(
+        (inline.y, inline.height, *color),
+        (0.0, 50.0, (0, 86, 205, 204))
+    );
+    // the block canvas: its `::selection` red at 80%, over its own 30 px box
+    let (block, color) = canvases[1];
+    assert_eq!(
+        (block.y, block.height, *color),
+        (50.0, 30.0, (255, 0, 0, 204))
+    );
+}
+
+#[test]
+fn a_selection_ending_inside_a_line_does_not_cover_its_end() {
+    // The space's width at a line's end is for a selection that goes on to the next line: one that
+    // ends at the last character of the line, or within the node, does not take it.
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>\
+         body { margin: 0; font: 20px monospace; color: rgb(0, 0, 0); background: rgb(255, 255, 255) }\
+         p { margin: 0 }\
+         </style><p id=a>aaaa</p><p id=b>bbbb</p>\
+         <script>var r = document.createRange();\
+         r.setStart(document.getElementById('a').firstChild, 0);\
+         r.setEnd(document.getElementById('a').firstChild, 4);\
+         getSelection().addRange(r);</script>",
+    );
+    page.update_the_rendering();
+    let list = page.engine().paint(Point::ZERO, 1.0).unwrap();
+    let fills: Vec<snowlark_paint::Rect> = list
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            Item::FillRect { rect, color } if (color.r, color.g, color.b) == (0, 86, 205) => {
+                Some(*rect)
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(fills.len(), 1, "{fills:?}");
+    // four advances of the 20 px monospace font (0.6 em each in the common ones)
+    assert!(fills[0].width > 40.0 && fills[0].width < 52.0, "{fills:?}");
+}
+
+#[test]
 fn selection_colors_follow_a_style_change_alone() {
     // A rule added through the CSSOM changes no node: the selection's highlight colors still come
     // from the styles that are painted (CSS Pseudo-Elements 4 §3.5), in the same rendering update.

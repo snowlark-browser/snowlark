@@ -431,5 +431,10 @@ the source; `git log -p vendor/stylo` shows the diff.
    restrictions). `pseudo_none_array` is built with `std::array::from_fn`: with more than 32 pseudo-elements
    the array has no `Default`.
 
+75. **`Highlight` and `HighlightText`** (`device/servo.rs`, CSS Color 4 §6.2): in the light color scheme the
+   system colors of selected text are Windows' default selection colors, rgb(0, 120, 215) and white (upstream:
+   rgb(0, 65, 198) and black), the colors the engine paints a selection in where no `::selection` colors are
+   declared. The dark scheme keeps upstream's values.
+
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

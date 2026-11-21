@@ -67,6 +67,17 @@ impl<'a> EditInput<'a> {
 const SELECTION_BG: Color = blend_with_white(0x00, 0x78, 0xd7);
 const SELECTION_TEXT: Color = Color::rgba(0xff, 0xff, 0xff, 0xff);
 
+/// The elements laid out as replaced boxes whose selection paints a highlight over them.
+fn is_replaced_name(name: &snowlark_dom::LocalName) -> bool {
+    *name == local_name!("img")
+        || *name == local_name!("video")
+        || *name == local_name!("canvas")
+        || *name == local_name!("svg")
+        || *name == local_name!("iframe")
+        || *name == local_name!("embed")
+        || *name == local_name!("object")
+}
+
 /// The translucent color that looks like the opaque `(r, g, b)` over white: the least opacity of
 /// 60%, 66.7%, 73.3% and 80% that needs no negative component (at 80%, those still negative are
 /// 0), so text and backgrounds under a highlight show through it.
@@ -795,6 +806,10 @@ impl Engine {
         // and each text node's place among them.
         let mut origins: Vec<NodeId> = Vec::new();
         let mut styled: Vec<(NodeId, usize)> = Vec::new();
+        // The replaced elements inside it, each its own originating element (only those laid out as
+        // replaced boxes are painted).
+        let mut replaced: Vec<(NodeId, usize)> = Vec::new();
+        let mut last = None;
         while let Some(n) = cur {
             if Some(n) == stop {
                 break;
@@ -810,8 +825,10 @@ impl Engine {
                             start: byte_of(s, a) as u32,
                             end: byte_of(s, b) as u32,
                             highlight: None,
+                            continues: true,
                         },
                     );
+                    last = Some(n);
                     if let Some(el) = dom.parent_element(n) {
                         if origins.last() != Some(&el) {
                             origins.push(el);
@@ -820,10 +837,17 @@ impl Engine {
                     }
                 }
             }
+            if dom.is_element(n) && is_replaced_name(dom.local_name(n)) {
+                origins.push(n);
+                replaced.push((n, origins.len() - 1));
+            }
             if end_in_data && n == r.end.0 {
                 break;
             }
             cur = dom.next_in_tree_order(n, None);
+        }
+        if let Some(r) = last.and_then(|n| sel.ranges.get_mut(&n)) {
+            r.continues = false;
         }
         drop(dom);
         // Each text node's highlight colors are its originating element's (CSS Pseudo-Elements 4
@@ -835,6 +859,22 @@ impl Engine {
             for (n, i) in styled {
                 if let (Some(range), Some(&Some(c))) = (sel.ranges.get_mut(&n), colors.get(i)) {
                     range.highlight = Some(c);
+                }
+            }
+            // A replaced element is covered by its highlight's background, drawn translucent if
+            // it is opaque (so the content shows through), as the default one is.
+            for (n, i) in replaced {
+                let background = match colors.get(i) {
+                    Some(&Some((background, _))) => background,
+                    _ => SELECTION_BG,
+                };
+                let overlay = if background.a == 0xff {
+                    blend_with_white(background.r, background.g, background.b)
+                } else {
+                    background
+                };
+                if !overlay.is_transparent() {
+                    sel.replaced.insert(n, overlay);
                 }
             }
         }

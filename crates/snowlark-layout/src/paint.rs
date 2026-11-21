@@ -60,6 +60,16 @@ pub(crate) trait Sink<S: Style> {
     /// A text fragment of `size` (in the text's own frame: see [`TextFragment::flip`]) at `at`.
     fn text(&mut self, size: Size, t: &TextFragment<S>, at: Point);
     fn replaced(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point);
+    /// A selected replaced element's highlight, over its content (CSS Pseudo-Elements 4 §3.6.4);
+    /// `line` is the line box it is on, in the coordinates of `at`.
+    fn selected_replaced(
+        &mut self,
+        _f: &Fragment<S>,
+        _b: &BoxFragment<S>,
+        _at: Point,
+        _line: Option<Rect>,
+    ) {
+    }
     fn collapsed_borders(&mut self, segments: &[CollapsedBorderSegment], at: Point);
     /// The column rules of multi-column container `b` (at `at`, its content scrolled by
     /// `scroll`), in `gaps`.
@@ -1326,7 +1336,7 @@ impl<K> Painter<'_, K> {
     {
         self.blocks(f, at, top);
         self.floats(f, at, top);
-        self.inline_content(f, at, top);
+        self.inline_content(f, at, None);
     }
 
     /// Children of `f` that this pass descends into, with the clip of `f` applied.
@@ -1426,8 +1436,9 @@ impl<K> Painter<'_, K> {
         }
     }
 
-    /// Phase 5: line boxes (text, inline boxes, atomic inlines) and replaced content.
-    fn inline_content<S: Style>(&mut self, f: &Fragment<S>, at: Point, _top: bool)
+    /// Phase 5: line boxes (text, inline boxes, atomic inlines) and replaced content. `line` is
+    /// the line box `f` is on when it is an inline box, in the coordinates of `at`.
+    fn inline_content<S: Style>(&mut self, f: &Fragment<S>, at: Point, line: Option<Rect>)
     where
         K: Sink<S>,
     {
@@ -1435,6 +1446,10 @@ impl<K> Painter<'_, K> {
             if let BoxContent::Replaced { .. } = b.content {
                 if b.style.visibility() == Visibility::Visible {
                     self.sink.replaced(f, b, at);
+                    // (an atomic inline's highlight is painted from its line, which it reaches)
+                    if b.flags & fragment_flags::ATOMIC_INLINE == 0 {
+                        self.sink.selected_replaced(f, b, at, None);
+                    }
                 }
             }
         }
@@ -1490,7 +1505,10 @@ impl<K> Painter<'_, K> {
                         p.sink.text(local, t, Point::ZERO);
                         p.sink.pop_transform();
                     }
-                    FragmentKind::Line { .. } => p.inline_content(cf, cat, false),
+                    FragmentKind::Line { .. } => {
+                        let line = Rect::new(cat.x, cat.y, cf.size.width, cf.size.height);
+                        p.inline_content(cf, cat, Some(line))
+                    }
                     FragmentKind::Box(cb) => {
                         if skip_in_flow(cb) || is_float(cb) {
                             continue;
@@ -1500,11 +1518,17 @@ impl<K> Painter<'_, K> {
                             // Painted as if it were a stacking context.
                             p.decorations_of(cf, cb, cat);
                             p.paint_flow(cf, cat, false);
+                            if cb.flags & fragment_flags::ATOMIC_INLINE != 0
+                                && matches!(cb.content, BoxContent::Replaced { .. })
+                                && cb.style.visibility() == Visibility::Visible
+                            {
+                                p.sink.selected_replaced(cf, cb, cat, line);
+                            }
                         } else if cb.flags & fragment_flags::INLINE_BOX != 0 {
                             p.decorations_of(cf, cb, cat);
-                            p.inline_content(cf, cat, false);
+                            p.inline_content(cf, cat, line);
                         } else {
-                            p.inline_content(cf, cat, false);
+                            p.inline_content(cf, cat, line);
                         }
                         p.sink.leave();
                     }
@@ -2168,14 +2192,24 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                     let (background, highlight_color) =
                         r.highlight.unwrap_or((sel.background, sel.color));
                     if !background.is_transparent() {
+                        // The highlighted area (§3.4): the text's own height united with its line
+                        // box's, and, where the selection goes on past the end of the line, a
+                        // space's width more at that end.
                         let m = self.text.metrics(run.font, run.size);
+                        let top = (origin.y - m.ascent).min(at.y + t.line.0);
+                        let bottom = (origin.y + m.descent).max(at.y + t.line.1);
+                        let (mut left, mut right) = (x0, x1);
+                        let past_end = hi == t.text_range.end && (r.end > hi || r.continues);
+                        if t.line_end && past_end {
+                            let space = self.text.space_advance(run.font, run.size);
+                            if run.bidi_level % 2 == 1 {
+                                left -= space;
+                            } else {
+                                right += space;
+                            }
+                        }
                         self.out.fill_rect(
-                            Rect::new(
-                                at.x + x0,
-                                origin.y - m.ascent,
-                                x1 - x0,
-                                m.ascent + m.descent,
-                            ),
+                            Rect::new(at.x + left, top, right - left, bottom - top),
                             background,
                         );
                     }
@@ -2250,6 +2284,33 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                 }
             }
         }
+    }
+
+    fn selected_replaced(
+        &mut self,
+        f: &Fragment<S>,
+        b: &BoxFragment<S>,
+        at: Point,
+        line: Option<Rect>,
+    ) {
+        let Some(&color) = self
+            .selection
+            .zip(b.node)
+            .and_then(|(sel, n)| sel.replaced.get(&n))
+        else {
+            return;
+        };
+        // Its border box, as tall as its line box across the line (§3.4).
+        let (mut lo, mut hi) = ((at.x, at.y), (at.x + f.size.width, at.y + f.size.height));
+        if let Some(l) = line {
+            if crate::logical::is_horizontal(b.style.writing_mode()) {
+                (lo.1, hi.1) = (lo.1.min(l.y), hi.1.max(l.y + l.height));
+            } else {
+                (lo.0, hi.0) = (lo.0.min(l.x), hi.0.max(l.x + l.width));
+            }
+        }
+        self.out
+            .fill_rect(Rect::new(lo.0, lo.1, hi.0 - lo.0, hi.1 - lo.1), color);
     }
 
     fn replaced(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point) {
@@ -3808,6 +3869,9 @@ fn unused(_: Color) {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextSelection {
     pub ranges: std::collections::HashMap<NodeId, SelectedText>,
+    /// The replaced elements the selection contains, with the translucent color painted over each
+    /// (CSS Pseudo-Elements 4 §3.6.4).
+    pub replaced: std::collections::HashMap<NodeId, Color>,
     pub caret: Option<(NodeId, u32)>,
     /// The user agent's highlight background (CSS Pseudo-Elements 4 §3.3), where a text node has
     /// no [`SelectedText::highlight`].
@@ -3829,6 +3893,8 @@ pub struct SelectedText {
     /// §3.5): the background (transparent when only a `color` is given, §3.3.1) and the text's
     /// color (`None`: the text keeps its own). `None`: the user agent's highlight colors.
     pub highlight: Option<(Color, Option<Color>)>,
+    /// The selection goes on past this node's text (it is not the last selected text node).
+    pub continues: bool,
 }
 
 /// The shaped text offset of the cluster boundary nearest to `x` (from the fragment's start).

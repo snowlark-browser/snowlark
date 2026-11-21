@@ -346,6 +346,11 @@ pub struct TextFragment<S: Style> {
     /// `text-combine-upright`: the text is one 1em square of horizontal text on a vertical line
     /// (CSS Writing Modes 4 §9.1.2), of this natural width.
     pub combined: Option<f32>,
+    /// The over and under edges of the line box the fragment is on, from its top, in its own frame.
+    pub line: (f32, f32),
+    /// The fragment is the last leaf of its line in the line's direction (before a forced break,
+    /// if any): a selection that goes on past it also covers the line's end.
+    pub line_end: bool,
 }
 
 /// A processed (shaped) text offset → its byte offset in the DOM text.

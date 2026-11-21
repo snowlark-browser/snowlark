@@ -481,8 +481,9 @@ impl Device {
                 SystemColor::Graytext
                 // Deprecated system colors (CSS Color 4) mapped to Graytext.
                 | SystemColor::Inactivecaptiontext => srgb(109, 109, 109),
-                SystemColor::Highlight => srgb(0, 65, 198),
-                SystemColor::Highlighttext => srgb(0, 0, 0),
+                // Snowlark patch: Highlight and HighlightText are Windows' default selection colors.
+                SystemColor::Highlight => srgb(0, 120, 215),
+                SystemColor::Highlighttext => srgb(255, 255, 255),
                 SystemColor::Mark => srgb(255, 235, 59),
                 SystemColor::Marktext => srgb(0, 0, 0),
                 SystemColor::Selecteditem => srgb(0, 102, 204),

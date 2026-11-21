@@ -3411,6 +3411,7 @@ fn build_line<S: Style>(
         content_width,
         cb_height,
         Point::ZERO,
+        line_end_leaf(&root, base_level),
     );
     // Out-of-flow descendants of atomic inlines whose containing block is further up, from the
     // line's coordinates to the formatting context's.
@@ -3978,6 +3979,7 @@ fn place_nodes<S: Style>(
     cb_width: f32,
     cb_height: Option<f32>,
     origin: Point,
+    line_end: Option<usize>,
 ) {
     // Visual order of this level (UAX #9 L2).
     let levels: SmallVec<[u8; 16]> = nodes.iter().map(|n| n.level()).collect();
@@ -4099,6 +4101,7 @@ fn place_nodes<S: Style>(
                     cb_width,
                     cb_height,
                     Point::new(x0, frag_top),
+                    line_end,
                 );
                 // children were placed relative to the line: shift into the box
                 let rel = cx.relative_offset(&it.style, cb_width, cb_height);
@@ -4199,6 +4202,8 @@ fn place_nodes<S: Style>(
                                 .iter()
                                 .sum::<f32>()
                         }),
+                        line: (a - bl, line_height + a - bl),
+                        line_end: line_end == Some(starts[i]),
                     }),
                     children: Vec::new(),
                     overflow: Rect::new(0.0, 0.0, w, a + d),
@@ -4352,6 +4357,8 @@ fn place_nodes<S: Style>(
                                 text_range: owner.as_ref().map_or(0..0, |o| o.2.clone()),
                                 dom_start: owner.as_ref().map_or(0, |o| o.3),
                                 collapsed: None,
+                                line: (a - bl, line_height + a - bl),
+                                line_end: owner.is_some() && line_end == Some(starts[i]),
                             }),
                             children: Vec::new(),
                             overflow: Rect::new(0.0, 0.0, w, a + d),
@@ -4378,5 +4385,49 @@ fn subtree_len(n: &LNode) -> usize {
     match n {
         LNode::Box { children, .. } => 1 + children.iter().map(subtree_len).sum::<usize>(),
         _ => 1,
+    }
+}
+
+/// The line's last leaf in logical order, skipping a forced break at its end, by its index in the
+/// logical pre-order of `nodes`: when it is text (or a hyphen) in the line's direction, a
+/// selection that goes on past it covers the end of the line (CSS Pseudo-Elements 4 §3.4 leaves
+/// the highlighted area to the UA; a space's width there shows that the line break is selected).
+fn line_end_leaf(nodes: &[LNode], base_level: u8) -> Option<usize> {
+    // (index, is text in the base direction) of the last leaf, and of the one before a break
+    fn walk(
+        nodes: &[LNode],
+        i: &mut usize,
+        base: u8,
+        last: &mut Option<(usize, bool)>,
+        before: &mut Option<(usize, bool)>,
+    ) {
+        for n in nodes {
+            let at = *i;
+            *i += 1;
+            match n {
+                LNode::Box { children, .. } if !children.is_empty() => {
+                    walk(children, i, base, last, before)
+                }
+                LNode::Text { clusters, .. } if clusters.is_empty() => {}
+                LNode::Break { .. } => {
+                    *before = *last;
+                    *last = None;
+                }
+                _ => {
+                    let text = matches!(
+                        n,
+                        LNode::Text { .. } | LNode::Ellipsis { item: Some(_), .. }
+                    );
+                    *last = Some((at, text && n.level() % 2 == base % 2));
+                    *before = None;
+                }
+            }
+        }
+    }
+    let (mut i, mut last, mut before) = (0, None, None);
+    walk(nodes, &mut i, base_level, &mut last, &mut before);
+    match last.or(before) {
+        Some((at, true)) => Some(at),
+        _ => None,
     }
 }
