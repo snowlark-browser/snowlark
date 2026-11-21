@@ -673,6 +673,84 @@ fn a_seek_past_the_buffered_data_waits_for_the_page_to_append_there() {
     );
 }
 
+/// Whether the page's display list (at 1 device px per CSS px) shows a video's frames.
+fn paints_a_video(page: &Page) -> bool {
+    page.engine()
+        .paint(snowlark_paint::Point::new(0.0, 0.0), 1.0)
+        .is_some_and(|l| l.items.iter().any(|i| i.is_video()))
+}
+
+/// A paused video that seeks shows the last frame it rendered until the new one is there (HTML
+/// §4.8.9 "the video element": "when the video element is paused and the frame of video
+/// corresponding to the current playback position is not available (e.g. because the video is
+/// seeking or buffering), the video element represents the last frame of the video to have been
+/// rendered"), though `readyState` is HAVE_METADATA meanwhile: only HAVE_NOTHING, or
+/// HAVE_METADATA before any video data was obtained, shows the poster. A page that scrubs a video
+/// by seeking it as it scrolls would otherwise blink between the frame and the poster.
+#[test]
+fn a_seeking_video_shows_its_last_frame() {
+    let clip = std::fs::read(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../snowlark-media/tests/fixtures/pattern-frag.mp4"),
+    )
+    .unwrap();
+    let moof = clip.windows(4).position(|w| w == b"moof").unwrap() - 4;
+    let bytes = |b: &[u8]| {
+        b.iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = page(
+        &net,
+        &format!(
+            "<video muted style='width:320px;height:180px'></video>{LOG}<script>
+             const init = new Uint8Array([{}]), media = new Uint8Array([{}]);
+             const ms = new MediaSource();
+             let sb;
+             ms.addEventListener('sourceopen', () => {{
+               sb = ms.addSourceBuffer('video/mp4; codecs=\"avc1.42C00D\"');
+               ms.duration = 30;
+               sb.addEventListener('updateend', function first() {{
+                 sb.removeEventListener('updateend', first);
+                 sb.appendBuffer(media);
+               }});
+               sb.appendBuffer(init);
+             }});
+             v.src = URL.createObjectURL(ms);
+             </script>",
+            bytes(&clip[..moof]),
+            bytes(&clip[moof..])
+        ),
+        AutoplayPolicy::Allowed,
+    );
+    assert!(
+        wait_for(&mut page, "v.buffered.length == 1 && v.readyState == 4", 20),
+        "readyState {}",
+        eval(&mut page, "v.readyState")
+    );
+    // (a seek inside the data first: the show poster flag is unset, and a frame is rendered)
+    eval(&mut page, "log = []; v.currentTime = 1;");
+    assert!(wait_for(&mut page, "log.includes('seeked')", 10));
+    settle(&mut page, 300);
+    assert!(paints_a_video(&page), "no frame before the seek");
+    // Out of the buffered data: the seek waits at HAVE_METADATA, and the last frame stays.
+    assert_eq!(
+        eval(
+            &mut page,
+            "v.currentTime = 20; [v.seeking, v.readyState].join()"
+        ),
+        "true,1"
+    );
+    settle(&mut page, 500);
+    assert_eq!(
+        eval(&mut page, "[v.seeking, v.readyState].join()"),
+        "true,1"
+    );
+    assert!(paints_a_video(&page), "the frame went away while seeking");
+}
+
 #[test]
 fn content_security_policy_blocks_media() {
     let net = NetThread::start(NetConfig::default()).unwrap();

@@ -1755,7 +1755,11 @@ impl Engine {
                 };
                 snowlark_render::source::MediaState {
                     natural: (m.video_size.0 > 0).then_some(m.video_size),
-                    show_poster: m.show_poster || m.ready < HAVE_CURRENT_DATA,
+                    // (HTML §4.8.9: no video data yet shows the poster; a seek or a stall
+                    // after data came keeps the last frame rendered, at HAVE_METADATA too)
+                    show_poster: m.show_poster
+                        || m.ready == HAVE_NOTHING
+                        || (m.ready < HAVE_CURRENT_DATA && !m.loaded_data),
                     video,
                     protected: m.protected.as_ref().and_then(|p| p.player()),
                     controls: controls.then(|| snowlark_layout::media::MediaControls {

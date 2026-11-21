@@ -53,6 +53,13 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## CSS and style
 
+- **`-webkit-` pseudo-elements.** `::-webkit-scrollbar` and its parts, `::-webkit-input-placeholder`,
+  `::-webkit-inner-spin-button`, `::-webkit-search-cancel-button`, `::-webkit-slider-*`, `::-webkit-file-upload-button`,
+  `:-webkit-autofill` and similar names do not parse, so every rule whose selector list names one is dropped. Pages
+  that hide or restyle their scrollbars this way show default ones. (ref 621)
+- **Properties not built.** `word-break: break-word`, `resize`, `scroll-snap-type`, `scroll-snap-align`,
+  `scroll-snap-stop`, `-webkit-text-fill-color`, `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink`
+  and `accent-color` do not parse, so their declarations are dropped. (ref 622)
 - **Filters.** `filter` functions and `backdrop-filter` work. Not done: `filter: url()` pointing to an external SVG
   document, `linearRGB` interpolation in SVG filters, `filter` on the root element, `will-change: filter` as a
   compositing reason, and running filter animations on the compositor. (ref 40)
