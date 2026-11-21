@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 // Snowlark's testdriver backend: the WPT runner serves this in place of /resources/testdriver-vendor.js.
-// Clicks, keys and action sequences (WebDriver "Actions") are not synthesized here: the script resolves
-// element origins to viewport points and hands the runner a plan of ticks, which the runner feeds to the
+// Clicks, keys and action sequences (WebDriver "Actions") are not synthesized here: the script hands the
+// runner a plan of ticks (element origins resolved to viewport points when each action is dispatched,
+// through `__snowlarkWptOrigin`), which the runner feeds to the
 // page's input entry points (the ones the window's input takes: hit testing, then pointer, mouse, wheel
 // and keyboard events and their default actions, as trusted events). Actions it does not support reject.
 (function () {
@@ -15,15 +16,26 @@
 
   // The runner reads `__snowlarkWptActions` (a plan) between event loop turns, clears it, and calls
   // `__snowlarkWptActionsDone(error)` when the plan has run. Neither is enumerable.
+  // A plan names element origins by index (`e<i>`); the runner asks `__snowlarkWptOrigin(i)` for the
+  // element's in-view center point when it dispatches the action, as WebDriver resolves an origin then
+  // (layout may change between the call and the action, a web font arriving for one).
   var queue = Promise.resolve();
-  function submit(lines) {
+  function submit(lines, origins) {
     var run = function () {
       return new Promise(function (resolve, reject) {
+        Object.defineProperty(window, "__snowlarkWptOrigin", {
+          configurable: true,
+          writable: true,
+          value: function (i) {
+            return centerOf(origins[i]).join(" ");
+          },
+        });
         Object.defineProperty(window, "__snowlarkWptActionsDone", {
           configurable: true,
           writable: true,
           value: function (error) {
             delete window.__snowlarkWptActionsDone;
+            delete window.__snowlarkWptOrigin;
             if (error) reject(new Error("snowlark testdriver: " + error));
             else resolve();
           },
@@ -87,7 +99,7 @@
 
   // WebDriver's tick: each source's action at that index, in source order; the tick lasts as long as
   // its longest pause or move.
-  function plan(sources) {
+  function plan(sources, origins) {
     var lines = [];
     var ticks = 0;
     sources.forEach(function (s) { ticks = Math.max(ticks, s.actions.length); });
@@ -120,9 +132,10 @@
         var x = num(a.x, 0), y = num(a.y, 0), base = "v";
         if (origin === "pointer") base = "p";
         else if (origin !== "viewport") {
-          var c = centerOf(origin);
-          x += c[0];
-          y += c[1];
+          if (!frameOf(origin)) throw new Error("snowlark testdriver: element in a different document or frame");
+          var i = origins.indexOf(origin);
+          if (i === -1) i = origins.push(origin) - 1;
+          base = "e" + i;
         }
         if (s.type === "pointer") {
           if (a.type === "pointerMove") {
@@ -136,7 +149,7 @@
         } else if (s.type === "wheel" && a.type === "scroll") {
           if (base === "p") throw new Error("snowlark testdriver: a scroll's origin cannot be the pointer");
           duration = Math.max(duration, num(a.duration, 0));
-          body.push("scroll " + x + " " + y + " " + num(a.deltaX, 0) + " " + num(a.deltaY, 0));
+          body.push("scroll " + x + " " + y + " " + num(a.deltaX, 0) + " " + num(a.deltaY, 0) + " " + base);
         } else {
           throw new Error("snowlark testdriver: unknown " + s.type + " action " + a.type);
         }
@@ -151,14 +164,14 @@
     if (window.top !== window) {
       return Promise.reject(new Error("snowlark testdriver: actions are sent from the top-level window only"));
     }
-    var lines;
-    try { lines = plan(actions); } catch (e) { return Promise.reject(e); }
-    return submit(lines);
+    var lines, origins = [];
+    try { lines = plan(actions, origins); } catch (e) { return Promise.reject(e); }
+    return submit(lines, origins);
   };
 
   // testdriver.js has scrolled the element into view and found its in-view center.
   internal.click = function (element, coords) {
-    return submit(["tick 0", "move " + coords.x + " " + coords.y + " 0 v", "down 0", "up 0"]);
+    return submit(["tick 0", "move " + coords.x + " " + coords.y + " 0 v", "down 0", "up 0"], []);
   };
 
   // WebDriver "Element Send Keys": focus, then each character's key down and up; a shifted character
@@ -190,7 +203,7 @@
     }
     if (shifted) lines.push("kup " + 0xE008);
     held.forEach(function (m) { lines.push("kup " + m); });
-    return submit(lines);
+    return submit(lines, []);
   };
 
   internal.set_permission = function () {

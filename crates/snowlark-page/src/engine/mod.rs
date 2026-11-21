@@ -501,10 +501,11 @@ pub struct Engine {
     /// Each document's `Selection` object.
     pub(crate) selections: RefCell<rustc_hash::FxHashMap<NodeId, Handle>>,
     /// What each document's selection paint was computed from (selection, editing host, DOM
-    /// version).
+    /// version, and its renderer's count of restyled elements: a style change alone can change
+    /// the highlight colors).
     #[allow(clippy::type_complexity)]
     pub(crate) selection_paint_key: RefCell<
-        rustc_hash::FxHashMap<NodeId, (Option<(ranges::Bp, ranges::Bp)>, Option<NodeId>, u64)>,
+        rustc_hash::FxHashMap<NodeId, (Option<(ranges::Bp, ranges::Bp)>, Option<NodeId>, u64, u64)>,
     >,
     /// Documents with a `selectionchange` queued.
     pub(crate) selectionchange_pending: RefCell<rustc_hash::FxHashSet<NodeId>>,

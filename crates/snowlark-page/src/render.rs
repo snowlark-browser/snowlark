@@ -1312,7 +1312,6 @@ impl Engine {
         self.sync_media_rendering(cx);
         self.sync_form_states(Some(cx), crate::engine::forms::FormSync::Connected);
         self.sync_controls();
-        self.sync_selection_paint();
         // Content blocking: generic hiding for new classes and ids, procedural filters.
         self.content_filter_pass(cx);
         self.sync_animation_styles();
@@ -1349,6 +1348,8 @@ impl Engine {
                 }
             }
         }
+        // The selection's paint, with the highlight colors of the styles just computed.
+        self.sync_selection_paint();
         // (the canvas frames queued before style and layout)
         self.finish_canvas_frames();
         // Paint Timing "mark paint timing", and Event Timing's pending entries end here.

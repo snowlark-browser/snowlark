@@ -60,8 +60,38 @@ impl<'a> EditInput<'a> {
     }
 }
 
-/// The default selection highlight (the page's `::selection` overrides it).
-const SELECTION_BG: Color = Color::rgba(0x00, 0x78, 0xd7, 90);
+/// The user agent's selection colors, where the originating element's `::selection` declares
+/// neither `color` nor `background-color` (CSS Pseudo-Elements 4 §3.3, §3.3.1): text in
+/// `HighlightText` on `Highlight`, here Windows' default highlight (0, 120, 215), drawn translucent
+/// so that it looks the same over white, and white text.
+const SELECTION_BG: Color = blend_with_white(0x00, 0x78, 0xd7);
+const SELECTION_TEXT: Color = Color::rgba(0xff, 0xff, 0xff, 0xff);
+
+/// The translucent color that looks like the opaque `(r, g, b)` over white: the least opacity of
+/// 60%, 66.7%, 73.3% and 80% that needs no negative component (at 80%, those still negative are
+/// 0), so text and backgrounds under a highlight show through it.
+const fn blend_with_white(r: u8, g: u8, b: u8) -> Color {
+    const fn component(c: u8, a: i32) -> i32 {
+        (c as i32 - (255 - a)) * 255 / a
+    }
+    const fn clamp(v: i32) -> u8 {
+        if v < 0 {
+            0
+        } else if v > 255 {
+            255
+        } else {
+            v as u8
+        }
+    }
+    let mut a = 153;
+    loop {
+        let (cr, cg, cb) = (component(r, a), component(g, a), component(b, a));
+        if (cr >= 0 && cg >= 0 && cb >= 0) || a >= 204 {
+            return Color::rgba(clamp(cr), clamp(cg), clamp(cb), a as u8);
+        }
+        a += 17;
+    }
+}
 
 fn utf16_len(s: &str) -> u32 {
     s.encode_utf16().count() as u32
@@ -666,17 +696,22 @@ impl Engine {
     // ----- painting ----------------------------------------------------------------------------------------
 
     /// The rendering of each rendered document's selection: the selected bytes of its text nodes,
-    /// the caret of a focused editing host, `::selection` colors.
+    /// the caret of a focused editing host, `::selection` colors. Runs after the rendering
+    /// update's style and layout, so that the colors are those of the styles about to be painted.
     pub(crate) fn sync_selection_paint(&self) {
         let editing = self.active_editing_host();
         let version = self.dom().version();
         for doc in self.rendered_documents() {
-            // Unchanged selection, focus and DOM: the paint stays (a large selection is walked once).
-            let key = (
-                self.doc_selection(doc).map(|(r, _)| (r.start, r.end)),
-                editing,
-                version,
-            );
+            // Unchanged selection, focus and DOM, and for selected text no restyle since: the paint
+            // stays (a large selection is walked once).
+            let range = self.doc_selection(doc).map(|(r, _)| (r.start, r.end));
+            let restyled = match range {
+                Some((start, end)) if start != end => self
+                    .with_doc_renderer(doc, |r, _| r.stats().restyled)
+                    .unwrap_or(0),
+                _ => 0,
+            };
+            let key = (range, editing, version, restyled);
             if self.selection_paint_key.borrow().get(&doc) == Some(&key) {
                 continue;
             }
@@ -706,6 +741,7 @@ impl Engine {
         }
         let mut sel = snowlark_layout::TextSelection {
             background: SELECTION_BG,
+            color: Some(SELECTION_TEXT),
             ..Default::default()
         };
         if r.start == r.end {

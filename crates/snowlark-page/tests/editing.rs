@@ -409,7 +409,7 @@ fn selected_text_is_painted_in_its_own_elements_selection_colors() {
     // `aa` and `bbbb` on #p's yellow, `cccc` on nothing, `dddd` on the default, `ee` on green.
     assert_eq!(
         fills,
-        vec![(255, 255, 0), (255, 255, 0), (0, 0x78, 0xd7), (0, 128, 0)]
+        vec![(255, 255, 0), (255, 255, 0), (0, 86, 205), (0, 128, 0)]
     );
     let runs: Vec<(u8, u8, u8)> = list
         .items
@@ -433,6 +433,79 @@ fn selected_text_is_painted_in_its_own_elements_selection_colors() {
             white,
         ]
     );
+}
+
+#[test]
+fn selected_text_without_selection_colors_is_highlighttext_on_highlight() {
+    // CSS Pseudo-Elements 4 §3.3: where no `::selection` colors are declared, the selected text
+    // is painted in `HighlightText` on `Highlight` (Windows' highlight (0, 120, 215), translucent
+    // so that it looks the same over white: rgba(0, 86, 205, 0.8) paints (51, 120, 215) there).
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>\
+         body { margin: 0; font: 20px monospace; color: rgb(0, 0, 0); background: rgb(255, 255, 255) }\
+         </style><p id=p>aaaa</p>\
+         <script>var r = document.createRange();\
+         r.setStart(document.getElementById('p').firstChild, 2);\
+         r.setEnd(document.getElementById('p').firstChild, 4);\
+         getSelection().addRange(r);</script>",
+    );
+    page.update_the_rendering();
+    let list = page.engine().paint(Point::ZERO, 1.0).unwrap();
+    let rgba = |c: &snowlark_paint::Color| (c.r, c.g, c.b, c.a);
+    let fills: Vec<_> = list
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            Item::FillRect { color, .. } => Some(rgba(color)),
+            _ => None,
+        })
+        .filter(|c| *c != (255, 255, 255, 255))
+        .collect();
+    assert_eq!(fills, vec![(0, 86, 205, 204)]);
+    let runs: Vec<_> = list
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            Item::Text(t) => Some(rgba(&t.color)),
+            _ => None,
+        })
+        .collect();
+    // `aa|aa`: the part not selected keeps its black, the selected part is white
+    assert_eq!(runs, vec![(0, 0, 0, 255), (255, 255, 255, 255)]);
+}
+
+#[test]
+fn selection_colors_follow_a_style_change_alone() {
+    // A rule added through the CSSOM changes no node: the selection's highlight colors still come
+    // from the styles that are painted (CSS Pseudo-Elements 4 §3.5), in the same rendering update.
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>\
+         body { margin: 0; font: 20px monospace; color: rgb(0, 0, 0); background: rgb(255, 255, 255) }\
+         </style><p id=p>aaaa</p>\
+         <script>getSelection().selectAllChildren(document.getElementById('p'));</script>",
+    );
+    let fills = |page: &mut Page| -> Vec<(u8, u8, u8)> {
+        page.update_the_rendering();
+        let list = page.engine().paint(Point::ZERO, 1.0).unwrap();
+        list.items
+            .iter()
+            .filter_map(|i| match i {
+                Item::FillRect { color, .. } => Some((color.r, color.g, color.b)),
+                _ => None,
+            })
+            .filter(|c| *c != (255, 255, 255))
+            .collect()
+    };
+    assert_eq!(fills(&mut page), vec![(0, 86, 205)]);
+    eval(
+        &mut page,
+        "document.styleSheets[0].insertRule('#p::selection { background: rgb(0, 255, 0) }', 1)",
+    );
+    assert_eq!(fills(&mut page), vec![(0, 255, 0)]);
 }
 
 #[test]
@@ -464,7 +537,7 @@ fn the_mouse_and_keyboard_select_page_text() {
     page.update_the_rendering();
     let list = page.engine().paint(Point::ZERO, 1.0).unwrap();
     let highlighted = list.items.iter().any(
-        |i| matches!(i, Item::FillRect { color, rect } if color.b == 0xd7 && rect.width > w * 6.0),
+        |i| matches!(i, Item::FillRect { color, rect } if (color.r, color.g, color.b) == (0, 86, 205) && rect.width > w * 6.0),
     );
     assert!(highlighted, "a highlight under the selected text");
     // A double-click selects a word, a triple-click the paragraph.
@@ -621,7 +694,9 @@ fn a_selection_ending_in_an_element_highlights_the_text_before_its_end() {
         list.items
             .iter()
             .filter_map(|i| match i {
-                Item::FillRect { color, rect } if color.b == 0xd7 => Some(rect.y.round() as i32),
+                Item::FillRect { color, rect } if (color.r, color.g, color.b) == (0, 86, 205) => {
+                    Some(rect.y.round() as i32)
+                }
                 _ => None,
             })
             .collect::<Vec<_>>()

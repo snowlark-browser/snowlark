@@ -6,16 +6,22 @@
 //! `send_keys`, fed to the page's input entry points, the ones the window's input reaches (hit
 //! testing, pointer and mouse events, wheel events, key events and their default actions).
 //!
-//! The runner's testdriver backend (`testdriver-vendor.js`) resolves element origins to viewport
-//! points and leaves a plan in the page's `__snowlarkWptActions`, one instruction per line:
+//! The runner's testdriver backend (`testdriver-vendor.js`) leaves a plan in the page's
+//! `__snowlarkWptActions`, one instruction per line:
 //!
 //! - `tick <ms>`: a new tick, lasting at least `<ms>` and at least one frame;
-//! - `move <x> <y> <ms> <v|p>`: a pointer move to a viewport point (`p`: relative to the pointer),
-//!   over `<ms>` with a move each frame;
+//! - `move <x> <y> <ms> <origin>`: a pointer move over `<ms>` with a move each frame, to a point
+//!   relative to its origin: `v` the viewport, `p` the pointer, `e<i>` the in-view center point of
+//!   the plan's element `i`;
 //! - `down <button>`, `up <button>`: a pointer button (0 primary, 1 middle, 2 secondary, 3 back,
 //!   4 forward);
 //! - `kdown <code point>`, `kup <code point>`: a key, by WebDriver's key value;
-//! - `scroll <x> <y> <dx> <dy>`: a wheel turn at a viewport point.
+//! - `scroll <x> <y> <dx> <dy> [<origin>]`: a wheel turn at a point (origin `v`, the default, or
+//!   `e<i>`).
+//!
+//! An element origin is resolved when its action is dispatched, as WebDriver's "get coordinates
+//! relative to an origin" is a step of dispatching (§15.7): the player asks the page's
+//! `__snowlarkWptOrigin(i)`, which answers `"<x> <y>"` in the viewport.
 //!
 //! The player takes the plan between event loop turns, runs its ticks as their times come, and
 //! then calls the page's `__snowlarkWptActionsDone`, with an error message if the plan was refused.
@@ -35,13 +41,32 @@ const FRAME: Duration = Duration::from_millis(16);
 const MULTI_CLICK_TIME: Duration = Duration::from_millis(500);
 const MULTI_CLICK_RANGE: f32 = 2.0;
 
+/// What a move's or a wheel turn's point is relative to (WebDriver's `origin`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Origin {
+    Viewport,
+    Pointer,
+    /// The plan's element by index, resolved at dispatch.
+    Element(u32),
+}
+
+impl Origin {
+    fn parse(word: Option<&&str>) -> Option<Origin> {
+        match word.copied() {
+            None | Some("v") => Some(Origin::Viewport),
+            Some("p") => Some(Origin::Pointer),
+            Some(w) => w.strip_prefix('e')?.parse().ok().map(Origin::Element),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum Step {
     Move {
         x: f32,
         y: f32,
         ms: f64,
-        relative: bool,
+        origin: Origin,
     },
     Down(u16),
     Up(u16),
@@ -52,6 +77,7 @@ enum Step {
         y: f32,
         dx: f32,
         dy: f32,
+        origin: Origin,
     },
 }
 
@@ -80,12 +106,14 @@ fn parse(plan: &str) -> Result<VecDeque<Tick>, String> {
             });
             continue;
         }
+        let origin =
+            |i: usize| Origin::parse(args.get(i)).ok_or_else(|| format!("bad action line: {line}"));
         let step = match op {
             "move" => Step::Move {
                 x: n(0)? as f32,
                 y: n(1)? as f32,
                 ms: n(2)?.max(0.0),
-                relative: args.get(3) == Some(&"p"),
+                origin: origin(3)?,
             },
             "down" => Step::Down(n(0)? as u16),
             "up" => Step::Up(n(0)? as u16),
@@ -96,6 +124,10 @@ fn parse(plan: &str) -> Result<VecDeque<Tick>, String> {
                 y: n(1)? as f32,
                 dx: n(2)? as f32,
                 dy: n(3)? as f32,
+                origin: match origin(4)? {
+                    Origin::Pointer => return Err(format!("bad action line: {line}")),
+                    o => o,
+                },
             },
             _ => return Err(format!("bad action line: {line}")),
         };
@@ -329,6 +361,16 @@ impl Player {
             let Some(plan) = page.global_string("__snowlarkWptActions") else {
                 return;
             };
+            // A WebDriver remote end with the "normal" page load strategy runs a command once the
+            // pending navigation is done: the document's readiness is "complete" (its load event,
+            // which in-flight fetches such as a web font's delay).
+            if page
+                .eval("document.readyState", "snowlark-testdriver")
+                .as_deref()
+                != Ok("complete")
+            {
+                return;
+            }
             let _ = page.eval("delete window.__snowlarkWptActions", "snowlark-testdriver");
             self.active = true;
             match parse(&plan) {
@@ -388,12 +430,8 @@ impl Player {
         let mut glides = Vec::new();
         for step in tick.steps {
             match step {
-                Step::Move { x, y, ms, relative } => {
-                    let to = if relative {
-                        Point::new(self.pointer.x + x, self.pointer.y + y)
-                    } else {
-                        Point::new(x, y)
-                    };
+                Step::Move { x, y, ms, origin } => {
+                    let to = self.resolve(page, origin, x, y)?;
                     if ms > 0.0 {
                         glides.push(Glide {
                             from: self.pointer,
@@ -408,7 +446,16 @@ impl Player {
                 Step::Up(b) => self.release(page, b),
                 Step::KeyDown(cp) => self.key(page, cp, true)?,
                 Step::KeyUp(cp) => self.key(page, cp, false)?,
-                Step::Scroll { x, y, dx, dy } => self.scroll(page, Point::new(x, y), dx, dy),
+                Step::Scroll {
+                    x,
+                    y,
+                    dx,
+                    dy,
+                    origin,
+                } => {
+                    let at = self.resolve(page, origin, x, y)?;
+                    self.scroll(page, at, dx, dy)
+                }
             }
         }
         let ends = now + Duration::from_secs_f64(tick.ms / 1000.0).max(FRAME);
@@ -418,6 +465,29 @@ impl Player {
             glides,
         });
         Ok(())
+    }
+
+    /// WebDriver's "get coordinates relative to an origin", at the action's dispatch: an element's
+    /// in-view center point is read from the page now, with the layout it has now.
+    fn resolve(&self, page: &mut Page, origin: Origin, x: f32, y: f32) -> Result<Point, String> {
+        let base = match origin {
+            Origin::Viewport => Point::ZERO,
+            Origin::Pointer => self.pointer,
+            Origin::Element(i) => {
+                let at = page
+                    .eval(&format!("__snowlarkWptOrigin({i})"), "snowlark-testdriver")
+                    .map_err(|e| {
+                        let e = e.trim_start_matches("Error: ");
+                        e.trim_start_matches("snowlark testdriver: ").to_owned()
+                    })?;
+                let mut it = at.split(' ').map(|v| v.parse::<f32>().ok());
+                match (it.next().flatten(), it.next().flatten()) {
+                    (Some(cx), Some(cy)) if cx.is_finite() && cy.is_finite() => Point::new(cx, cy),
+                    _ => return Err(format!("no point for the action's element: {at}")),
+                }
+            }
+        };
+        Ok(Point::new(base.x + x, base.y + y))
     }
 
     fn finish(&mut self, page: &mut Page, error: Option<String>) {
@@ -670,6 +740,33 @@ mod tests {
         assert_eq!(t[1].steps[0], Step::KeyDown(0xE008));
         assert!(parse("down 0").is_err());
         assert!(parse("tick 0\nfly 1").is_err());
+        let t = parse("tick 0\nmove -90 0 0 e1\nscroll 0 0 0 5 e0\nmove 1 1 0 p").unwrap();
+        assert_eq!(
+            t[0].steps,
+            [
+                Step::Move {
+                    x: -90.0,
+                    y: 0.0,
+                    ms: 0.0,
+                    origin: Origin::Element(1)
+                },
+                Step::Scroll {
+                    x: 0.0,
+                    y: 0.0,
+                    dx: 0.0,
+                    dy: 5.0,
+                    origin: Origin::Element(0)
+                },
+                Step::Move {
+                    x: 1.0,
+                    y: 1.0,
+                    ms: 0.0,
+                    origin: Origin::Pointer
+                },
+            ]
+        );
+        assert!(parse("tick 0\nscroll 0 0 0 5 p").is_err());
+        assert!(parse("tick 0\nmove 0 0 0 ex").is_err());
     }
 
     #[test]
@@ -723,6 +820,11 @@ mod tests {
             "test.js",
         )
         .unwrap();
+        play(page)
+    }
+
+    /// Runs the player until the page's `log` has the plan's answer, and returns the log.
+    fn play(page: &mut Page) -> String {
         let mut player = Player::new();
         let deadline = Instant::now() + Duration::from_secs(10);
         let answered = |p: &mut Page| {
@@ -783,5 +885,65 @@ mod tests {
         let mut page = page_with(LOGGED);
         let log = run(&mut page, "tick 0\nkdown 57599");
         assert_eq!(log, "done:no key for the code point U+E0FF");
+    }
+
+    /// A plan sent while the document is still loading (a test's script runs during parsing, a
+    /// web font may still be on its way) starts once its readiness is "complete".
+    #[test]
+    fn a_plan_waits_for_the_document_to_finish_loading() {
+        let mut page = page_with(LOGGED);
+        page.eval(
+            "window.ready = 'interactive'; \
+             Object.defineProperty(document, 'readyState', {get: () => ready}); \
+             log.length = 0; window.__snowlarkWptActionsDone = e => log.push('done:' + e); \
+             window.__snowlarkWptActions = 'tick 0\\nmove 140 70 0 v\\ndown 0\\nup 0'",
+            "test.js",
+        )
+        .unwrap();
+        let mut player = Player::new();
+        for _ in 0..5 {
+            player.poll(&mut page);
+            page.turn();
+        }
+        assert_eq!(page.eval("log.join(' ')", "test.js").unwrap(), "");
+        assert_eq!(player.due(), None, "nothing taken");
+        page.eval("ready = 'complete'", "test.js").unwrap();
+        assert_eq!(
+            play(&mut page),
+            "pointerdown mousedown pointerup mouseup click:b1 done:null"
+        );
+    }
+
+    /// WebDriver resolves an element origin when the action is dispatched (§15.7 "dispatch a
+    /// pointerMove action"), not when the sequence is sent: here the element moves right after
+    /// the call, as text does when a web font arrives, and the press still reaches it.
+    #[test]
+    fn an_element_origin_is_resolved_when_its_action_is_dispatched() {
+        const VENDOR: &str = include_str!("../../snowlark/src/cli/wpt/testdriver-vendor.js");
+        let mut page = page_with(LOGGED);
+        page.eval("window.test_driver_internal = {}", "test.js")
+            .unwrap();
+        page.eval(VENDOR, "testdriver-vendor.js").unwrap();
+        page.eval(
+            "log.length = 0; \
+             test_driver_internal.action_sequence([{type: 'pointer', id: 'm', actions: [\
+               {type: 'pointerMove', x: 10, y: 0, origin: b}, {type: 'pointerDown', button: 0}, \
+               {type: 'pointerUp', button: 0}]}])\
+             .then(() => log.push('done:null'), e => log.push('done:' + e.message)); \
+             b.style.left = '400px';",
+            "test.js",
+        )
+        .unwrap();
+        let log = play(&mut page);
+        assert_eq!(
+            log,
+            "pointerdown mousedown pointerup mouseup click:b1 done:null"
+        );
+        assert!(
+            page.eval("String(window.__snowlarkWptOrigin)", "test.js")
+                .unwrap()
+                == "undefined",
+            "the origin lookup is removed with the answer"
+        );
     }
 }
