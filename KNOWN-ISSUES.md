@@ -162,6 +162,11 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   error D7701-1003. Protected video plays through Media Source Extensions only, with temporary sessions only, and stays
   black with the GPU process (`--gpu-process`). Clear Key decrypts `cenc` and `cbcs` MP4 through Media Source
   Extensions only (not a `src` file or WebM). (ref 548)
+- **HBO Max reads the browser from its user agent string.** It offers PlayReady only to a browser it reads as Edge,
+  so with the Default user agent its domains get the Edge preset's string (`EDGE_SITES` in
+  `crates/snowlark-net/src/ua.rs`). HBO Max keeps the browser it read in the page's local storage for up to 7 days:
+  after an earlier visit with another string, run `localStorage.removeItem('clientInformation')` in the devtools
+  Console on play.hbomax.com, or wait. A user agent chosen in Settings is sent as chosen. (ref 580)
 - **xHE-AAC.** `canPlayType`, `MediaSource.isTypeSupported` and `decodingInfo` answer `mp4a.40.42` (xHE-AAC) as
   plain AAC, without asking whether the system can decode it. (ref 574)
 - **`changeType()` to a different decoder.** Media Source Extensions `changeType()` cannot switch a set-up

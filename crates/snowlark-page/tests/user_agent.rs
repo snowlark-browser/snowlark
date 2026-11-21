@@ -532,3 +532,109 @@ fn listed_sites_get_the_compatibility_string_in_requests_and_navigator() {
         "off: navigator"
     );
 }
+
+/// HBO Max (its app, its API and its licence host) gets the Edge preset's identity in the window with
+/// the Default setting: the requests' header, `navigator.userAgent` and the `Microsoft Edge` brand
+/// of `navigator.userAgentData` in its documents and workers; a request from it to another site
+/// carries that site's string.
+#[test]
+fn hbo_max_gets_the_edge_identity_in_requests_and_navigator() {
+    let (base, seen) = serve();
+    let port = base.rsplit(':').next().unwrap().to_owned();
+    let config = snowlark_net::NetConfig {
+        host_rules: snowlark_net::HostRule::parse_list(
+            "MAP play.hbomax.com 127.0.0.1, MAP default.any-any.prd.api.hbomax.com 127.0.0.1, \
+             MAP busy.any-any.prd.api.discomax.com 127.0.0.1, MAP other.test 127.0.0.1",
+        ),
+        ..Default::default()
+    };
+    let net = snowlark_net::NetThread::start(config).unwrap();
+    net.client()
+        .set_user_agent(UserAgent::default_with_site_compat());
+    let edge = UserAgent::preset("edge").unwrap();
+    let plain = UserAgent::default().value;
+    let app = format!("http://play.hbomax.com:{port}");
+    let api = format!("http://default.any-any.prd.api.hbomax.com:{port}");
+    let licence = format!("http://busy.any-any.prd.api.discomax.com:{port}");
+    let other = format!("http://other.test:{port}");
+
+    seen.lock().unwrap().clear();
+    let mut page = open(&app, &net);
+    let doc = seen.lock().unwrap()[0].clone();
+    assert_eq!(
+        header(&doc, "user-agent"),
+        Some(edge.value.as_str()),
+        "document"
+    );
+    assert_eq!(eval(&mut page, "navigator.userAgent"), edge.value);
+    let profile = edge.profile();
+    let want: Vec<String> = profile
+        .brands(false)
+        .iter()
+        .map(|(b, v)| format!("{b}/{v}"))
+        .collect();
+    let brands_js = "navigator.userAgentData.brands.map(b => b.brand + '/' + b.version).join(',')";
+    assert_eq!(eval(&mut page, brands_js), want.join(","));
+    assert!(want.iter().any(|b| b == "Microsoft Edge/150"), "{want:?}");
+    assert_eq!(
+        eval(&mut page, "navigator.userAgentData.platform"),
+        "Windows"
+    );
+    assert_eq!(
+        eval(
+            &mut page,
+            "const f = document.createElement('iframe'); document.body.append(f); \
+             f.contentWindow.navigator.userAgentData.brands.map(b => b.brand + '/' + b.version).join(',')"
+        ),
+        want.join(","),
+        "an about:blank frame of the app"
+    );
+    eval(
+        &mut page,
+        "window.fv = null; navigator.userAgentData.getHighEntropyValues(['fullVersionList', 'uaFullVersion']) \
+         .then(v => { window.fv = v.fullVersionList.map(b => b.brand).sort().join() + '|' + v.uaFullVersion; }); 1",
+    );
+    wait_for(&mut page, "window.fv");
+    let mut full: Vec<String> = profile.brands(true).into_iter().map(|(b, _)| b).collect();
+    full.sort();
+    assert_eq!(
+        eval(&mut page, "window.fv"),
+        format!("{}|{}", full.join(","), profile.ua_full_version())
+    );
+    eval(
+        &mut page,
+        "window.w = null; const w = new Worker('/w.js'); w.onmessage = e => { window.w = e.data; }; 1",
+    );
+    wait_for(&mut page, "window.w");
+    assert_eq!(
+        eval(&mut page, "window.w.split('|')[0]"),
+        edge.value,
+        "the app's worker"
+    );
+    // Its API and licence host get the same identity; another site gets its own.
+    for (i, (to, want)) in [
+        (&api, edge.value.as_str()),
+        (&licence, edge.value.as_str()),
+        (&other, plain.as_str()),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let marker = format!("/from-app-{i}");
+        eval(
+            &mut page,
+            &format!("fetch('{to}{marker}', {{mode: 'no-cors'}}); 1"),
+        );
+        let r = request_with(&mut page, &seen, &marker);
+        assert_eq!(header(&r, "user-agent"), Some(want), "app -> {to}");
+    }
+
+    // A chosen preset wins: the Chrome preset is sent to the app as chosen.
+    let chrome = UserAgent::preset("chrome").unwrap();
+    net.client().set_user_agent(chrome.clone());
+    seen.lock().unwrap().clear();
+    let mut page = open(&app, &net);
+    let doc = seen.lock().unwrap()[0].clone();
+    assert_eq!(header(&doc, "user-agent"), Some(chrome.value.as_str()));
+    assert_eq!(eval(&mut page, "navigator.userAgent"), chrome.value);
+}

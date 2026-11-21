@@ -34,6 +34,9 @@ pub const COMPAT_VERSION: &str = "150.0.0.0";
 /// The Chrome preset's value.
 const CHROME_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36";
 
+/// The Edge preset's value, which the sites in [`EDGE_SITES`] also get.
+const EDGE_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0";
+
 /// A choice in Settings. The values are the strings the browsers send today; update the versions
 /// here, this table is the only place they are written.
 pub struct Preset {
@@ -59,7 +62,7 @@ pub const PRESETS: [Preset; 5] = [
     Preset {
         id: "edge",
         name: "Edge",
-        value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+        value: EDGE_UA,
     },
     Preset {
         id: "firefox",
@@ -97,9 +100,10 @@ pub struct UserAgent {
     /// before 2026-11-09 (`navigator.vendor` empty, `userAgentData` and `oscpu` both present, no client
     /// hint headers), kept only so a value of that shape still means what it did.
     pub strict: bool,
-    /// Whether the sites in [`COMPAT_HOSTS`] get [`compat_value`] in place of the default string
-    /// ([`UserAgent::for_url`]). Only the window turns it on, and only for the default identity: a
-    /// preset or custom string is sent as chosen, and the headless modes see no site differently.
+    /// Whether the sites in [`COMPAT_HOSTS`] get [`compat_value`], and those in [`EDGE_SITES`] the
+    /// Edge preset's string, in place of the default string ([`UserAgent::for_url`]). Only the window
+    /// turns it on, and only for the default identity: a preset or custom string is sent as chosen,
+    /// and the headless modes see no site differently.
     #[serde(default)]
     pub site_compat: bool,
     /// The compatibility string of a listed site ([`UserAgent::for_url`]): its brands leave out the
@@ -161,9 +165,10 @@ impl UserAgent {
         }
     }
 
-    /// The user agent a request to `url`, or a document or worker of its origin, gets: the
-    /// compatibility string when [`UserAgent::site_compat`] is on, this is the default identity and the
-    /// host is in [`COMPAT_HOSTS`]; otherwise this one.
+    /// The user agent a request to `url`, or a document or worker of its origin, gets: when
+    /// [`UserAgent::site_compat`] is on and this is the default identity, the compatibility string for
+    /// a host in [`COMPAT_HOSTS`] and the Edge preset's for a host in [`EDGE_SITES`]; otherwise this
+    /// one.
     pub fn for_url(&self, url: &url::Url) -> std::borrow::Cow<'_, UserAgent> {
         match url.origin() {
             url::Origin::Tuple(_, host, _) => self.for_host(&host.to_string()),
@@ -174,13 +179,19 @@ impl UserAgent {
     /// [`UserAgent::for_url`] by host name.
     pub fn for_host(&self, host: &str) -> std::borrow::Cow<'_, UserAgent> {
         let host = host.trim_end_matches('.');
-        if self.site_compat
-            && self.value == DEFAULT_UA
-            && COMPAT_HOSTS.iter().any(|h| h.eq_ignore_ascii_case(host))
-        {
+        if !self.site_compat || self.value != DEFAULT_UA {
+            return std::borrow::Cow::Borrowed(self);
+        }
+        if COMPAT_HOSTS.iter().any(|h| h.eq_ignore_ascii_case(host)) {
             std::borrow::Cow::Owned(UserAgent {
                 value: compat_value(),
                 unbranded: true,
+                ..self.clone()
+            })
+        } else if EDGE_SITES.iter().any(|d| in_domain(host, d)) {
+            std::borrow::Cow::Owned(UserAgent {
+                value: EDGE_UA.to_owned(),
+                unbranded: false,
                 ..self.clone()
             })
         } else {
@@ -188,6 +199,31 @@ impl UserAgent {
         }
     }
 }
+
+/// Whether `host` is `domain` or one of its subdomains (ASCII case-insensitive).
+fn in_domain(host: &str, domain: &str) -> bool {
+    let (h, d) = (host.as_bytes(), domain.as_bytes());
+    h.len() >= d.len()
+        && h[h.len() - d.len()..].eq_ignore_ascii_case(d)
+        && (h.len() == d.len() || h[h.len() - d.len() - 1] == b'.')
+}
+
+/// Domains (each with all its subdomains) of a service that picks its DRM system by the browser it
+/// reads from the user agent string and offers PlayReady, the system this engine plays, only to
+/// Edge. They get the Edge preset's string ([`UserAgent::for_host`]), and with it the Edge brand
+/// (`Microsoft Edge`) in `navigator.userAgentData` and `Sec-CH-UA`; the rest of `navigator` is the
+/// same as the default's. The page, its scripts, its API and its licence server all see that one
+/// identity. Like [`COMPAT_HOSTS`], keep it short and give each entry its evidence.
+pub const EDGE_SITES: [&str; 3] = [
+    // HBO Max: its player sends its server the browser a user agent parser reads from
+    // `navigator.userAgent`; the default string (no `Chrome/` token) reads as Safari and is offered
+    // only Apple's DRM, the Edge string is offered PlayReady (2026-11-21, a window trace). The app
+    // and its API are on `hbomax.com`, its licence server on `discomax.com`, its media and older
+    // addresses on `max.com`.
+    "hbomax.com",
+    "discomax.com",
+    "max.com",
+];
 
 /// Hosts whose servers refuse the default string and accept the same identity once it carries the
 /// compatibility product token (`Chrome/<major>` of a recent release), as other engines keep a short
@@ -697,6 +733,79 @@ mod tests {
             chosen.for_url(&mail),
             std::borrow::Cow::Borrowed(_)
         ));
+    }
+
+    #[test]
+    fn hbo_max_gets_the_edge_identity_in_the_header_and_the_hints() {
+        let ua = UserAgent::default_with_site_compat();
+        let edge = UserAgent::preset("edge").unwrap();
+        let at = |u: &str| ua.for_url(&url::Url::parse(u).unwrap()).into_owned();
+        for listed in [
+            "https://hbomax.com/",
+            "https://www.hbomax.com/play/assets/main.js",
+            "https://play.hbomax.com/video/watch/x/y",
+            "https://default.any-any.prd.api.hbomax.com/any/playback/v1/playbackInfo",
+            "https://busy.any-any.prd.api.discomax.com/drm-proxy/x/key",
+            "https://akm.eu.prd.media.max.com/x.mp4",
+            "https://max.com/",
+            "https://PLAY.HBOMax.com./x",
+            "blob:https://play.hbomax.com/1234",
+        ] {
+            let got = at(listed);
+            assert_eq!(got.value, edge.value, "{listed}");
+            assert_eq!(got.header_value(), edge.header_value(), "{listed}");
+            // The same identity everywhere a site reads it: the brands, the full version and the
+            // client hint headers are the Edge preset's.
+            assert_eq!(got.profile(), edge.profile(), "{listed}");
+            let hints = got.profile().client_hint_headers();
+            assert_eq!(hints, edge.profile().client_hint_headers());
+            assert!(
+                hints[0].1.contains("\"Microsoft Edge\";v=\"150\"")
+                    && hints[0].1.contains("\"Chromium\";v=\"150\"")
+                    && !hints[0].1.contains(PRODUCT),
+                "{}",
+                hints[0].1
+            );
+            assert_eq!(hints[1].1, "?0");
+            assert_eq!(hints[2].1, "\"Windows\"");
+        }
+        let p = at("https://play.hbomax.com/").profile();
+        assert!(p.edge && p.family == Family::Chromium && !p.unbranded);
+        assert_eq!(p.os, "Windows");
+        assert_eq!(p.ua_full_version(), "150.0.0.0");
+        // The rest of `navigator` is the default's, so nothing a tab decided at start changes.
+        let d = UserAgent::default().profile();
+        assert_eq!(
+            (p.vendor(), p.nav_platform(), p.product_sub()),
+            (d.vendor(), d.nav_platform(), d.product_sub())
+        );
+        assert_eq!(
+            (p.has_ua_data(), p.has_oscpu()),
+            (d.has_ua_data(), d.has_oscpu())
+        );
+        for other in [
+            "https://example.com/",
+            "https://nothbomax.com/",
+            "https://hbomax.com.evil.example/",
+            "https://hbomax.co/",
+            "https://minmax.com/",
+            "https://max.co/",
+            "https://discomax.com.evil.example/",
+            "https://www.google.com/",
+        ] {
+            assert_eq!(at(other).value, DEFAULT_UA, "{other}");
+        }
+        // Off unless the window turns it on; a chosen preset or custom string wins.
+        let page = url::Url::parse("https://play.hbomax.com/").unwrap();
+        assert_eq!(UserAgent::default().for_url(&page).value, DEFAULT_UA);
+        for mut chosen in [
+            UserAgent::preset("chrome").unwrap(),
+            UserAgent::preset("firefox").unwrap(),
+            UserAgent::chosen("Custom/1.0"),
+        ] {
+            chosen.site_compat = true;
+            assert_eq!(chosen.for_url(&page).value, chosen.value);
+        }
     }
 
     #[test]

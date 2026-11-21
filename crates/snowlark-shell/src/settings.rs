@@ -341,7 +341,7 @@ impl Settings {
     }
 
     /// The user agent chosen: a preset, the custom text, or the default when that is empty. The
-    /// Default preset carries the per-site compatibility strings (`snowlark_net::ua::COMPAT_HOSTS`); a
+    /// Default preset carries the per-site strings (`snowlark_net::ua::COMPAT_HOSTS`, `EDGE_SITES`); a
     /// preset or custom string is sent as chosen.
     pub fn user_agent_setting(&self) -> snowlark_net::ua::UserAgent {
         if self.user_agent == "custom" {
