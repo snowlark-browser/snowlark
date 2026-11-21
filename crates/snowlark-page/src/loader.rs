@@ -368,6 +368,9 @@ pub struct ParserState {
     pub encoding_decided: bool,
     pub pending_bytes: Vec<u8>,
     pub transport_charset: Option<String>,
+    /// The scan for a `<meta>` declaration, while it goes on past the bytes the encoding was
+    /// decided from.
+    pub meta_scan: Option<snowlark_net::encoding::MetaScanner>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1915,6 +1918,7 @@ impl Engine {
                 encoding_decided: false,
                 pending_bytes: Vec::new(),
                 transport_charset: charset,
+                meta_scan: None,
             });
             d.end = None;
         });
@@ -2106,19 +2110,38 @@ impl Engine {
                     let mut input = snowlark_net::encoding::SniffInput::new(&p.pending_bytes);
                     input.transport_charset = p.transport_charset.as_deref();
                     input.parent = parent_encoding;
-                    let (enc, _) = snowlark_net::encoding::sniff_html_encoding(&input);
+                    let mut scan = snowlark_net::encoding::MetaScanner::default();
+                    let (enc, _) =
+                        snowlark_net::encoding::sniff_html_encoding_with(&input, &mut scan);
                     let pending = std::mem::take(&mut p.pending_bytes);
                     p.encoding_decided = true;
+                    p.meta_scan = (scan.running() && !last).then_some(scan);
                     if let Some(parser) = p.parser.as_mut() {
                         parser.set_encoding(enc);
                         parser.push_bytes(&pending, last);
                     }
                 }
             } else if let Some(parser) = p.parser.as_mut() {
-                parser.push_bytes(bytes, last);
+                // A `<meta>` declaration after the bytes the encoding was decided from changes it
+                // for the bytes after its tag (HTML §13.2.3.4 "change the encoding").
+                use snowlark_net::encoding::MetaScan;
+                match p.meta_scan.as_mut().map(|s| s.feed(bytes)) {
+                    Some(MetaScan::Found(enc, end)) => {
+                        p.meta_scan = None;
+                        parser.push_bytes(&bytes[..end], false);
+                        parser.change_encoding(enc);
+                        parser.push_bytes(&bytes[end..], last);
+                    }
+                    Some(MetaScan::NotFound) => {
+                        p.meta_scan = None;
+                        parser.push_bytes(bytes, last);
+                    }
+                    _ => parser.push_bytes(bytes, last),
+                }
             }
             if last {
                 p.eof = true;
+                p.meta_scan = None;
             }
             Got::Fed
         });
@@ -3325,6 +3348,7 @@ impl Engine {
                 encoding_decided: true,
                 pending_bytes: Vec::new(),
                 transport_charset: None,
+                meta_scan: None,
             });
             d.end = None;
         });

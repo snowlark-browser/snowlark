@@ -612,6 +612,65 @@ fn urls_encoding_parsed_with_the_document_encoding() {
     assert_eq!(r, "\u{FFFD}x,3;xx,2");
 }
 
+/// HTML §13.2.3.4 "change the encoding": a document whose transport layer names no charset and
+/// whose `<meta charset>` comes after its first kilobyte (a long head, sent before the rest) is
+/// decoded as UTF-8 from that tag on, and a classic script with no charset of its own is decoded
+/// with the document's encoding (a title it sets keeps its non-ASCII characters).
+#[test]
+fn a_meta_charset_after_the_first_kilobyte_of_the_head_counts() {
+    let head = format!(
+        "<!doctype html><html><head><script>{}</script>",
+        "/* a long inline script */".repeat(60)
+    );
+    let rest = "<meta charset=\"utf-8\"><title>Home \u{2022} A</title><script src=/t.js></script>\
+                </head><body><p>caf\u{e9}</p>";
+    let script = "document.title = '\u{2068}Home\u{2069} \u{2022} B';";
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { continue };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut first = String::new();
+            let _ = reader.read_line(&mut first);
+            loop {
+                let mut h = String::new();
+                if reader.read_line(&mut h).is_err() || h == "\r\n" || h.is_empty() {
+                    break;
+                }
+            }
+            if first.contains("/t.js") {
+                let _ = stream.write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/javascript\r\nContent-Length: {}\r\n\
+                         Connection: close\r\n\r\n{script}",
+                        script.len()
+                    )
+                    .as_bytes(),
+                );
+                continue;
+            }
+            let _ = stream.write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\
+                     Connection: close\r\n\r\n{head}",
+                    head.len() + rest.len()
+                )
+                .as_bytes(),
+            );
+            let _ = stream.flush();
+            std::thread::sleep(Duration::from_millis(300));
+            let _ = stream.write_all(rest.as_bytes());
+        }
+    });
+    let (mut page, _net) = page_at(&format!("http://{addr}"), "/");
+    let r = eval(
+        &mut page,
+        "[document.characterSet, document.title, document.querySelector('p').textContent].join('|')",
+    );
+    assert_eq!(r, "UTF-8|\u{2068}Home\u{2069} \u{2022} B|caf\u{e9}");
+}
+
 /// Like [`serve`], one thread per connection, and `/slow` answers after `slow`.
 fn serve_with_slow(page: &'static str, slow: Duration) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();

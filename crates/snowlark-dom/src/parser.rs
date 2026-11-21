@@ -541,6 +541,19 @@ impl<D: Borrow<RefCell<Dom>>> HtmlParser<D> {
             .set_encoding(self.document, encoding);
     }
 
+    /// HTML §13.2.3.4 "change the encoding" on the fly: the bytes pushed from now on are decoded
+    /// with `encoding` (those already pushed stay as they were decoded), and it is the document's.
+    /// The caller changes at a point where the old decoder holds no partial character.
+    pub fn change_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
+        if self.decoder.as_ref().map(|d| d.encoding()) == Some(encoding) {
+            return;
+        }
+        self.decoder = Some(encoding.new_decoder_without_bom_handling());
+        self.dom()
+            .borrow_mut()
+            .set_encoding(self.document, encoding);
+    }
+
     /// Appends bytes to the input stream; `last` marks the end of the byte stream.
     pub fn push_bytes(&mut self, bytes: &[u8], last: bool) {
         let decoder = self

@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! Character encodings: `encoding_rs` for the Encoding Standard's encodings, plus HTML §13.2.3
-//! "determining the character encoding" (BOM, then the transport's charset, then the `<meta>` prescan of
-//! the first 1024 bytes, then the parent's encoding, then the default), and the Encoding Standard's
+//! "determining the character encoding" (BOM, then the transport's charset, then a `<meta>` in the
+//! document's head, then the parent's encoding, then the default), and the Encoding Standard's
 //! decode helpers.
 
 use std::borrow::Cow;
@@ -67,16 +67,28 @@ impl<'a> SniffInput<'a> {
     }
 }
 
-/// HTML §13.2.3.1 "determining the character encoding".
+/// HTML §13.2.3.1 "determining the character encoding", with the `<meta>` declaration found by a
+/// [`MetaScanner`] of `input.bytes`.
 pub fn sniff_html_encoding(input: &SniffInput<'_>) -> (&'static Encoding, Confidence) {
+    sniff_html_encoding_with(input, &mut MetaScanner::default())
+}
+
+/// [`sniff_html_encoding`] that keeps its `<meta>` scan in `scan`: when the scan is still running
+/// afterwards ([`MetaScanner::running`]), a declaration may come in the bytes after `input.bytes`,
+/// which the caller gives it (HTML §13.2.3.4 "change the encoding").
+pub fn sniff_html_encoding_with(
+    input: &SniffInput<'_>,
+    scan: &mut MetaScanner,
+) -> (&'static Encoding, Confidence) {
     if let Some(e) = bom_sniff(input.bytes) {
+        scan.stop();
         return (e, Confidence::Certain);
     }
     if let Some(e) = input.transport_charset.and_then(encoding_for_label) {
+        scan.stop();
         return (e, Confidence::Certain);
     }
-    let head = &input.bytes[..input.bytes.len().min(1024)];
-    if let Some(e) = prescan(head) {
+    if let MetaScan::Found(e, _) = scan.feed(input.bytes) {
         return (e, Confidence::Tentative);
     }
     if let Some(parent) = input.parent {
@@ -192,6 +204,62 @@ pub fn encoding_from_meta_content(content: &[u8]) -> Option<&'static Encoding> {
     }
 }
 
+/// The encoding a `<meta>` start tag declares (the prescan's `<meta` step, HTML §13.2.3.2), its
+/// attributes read from `pos` (just after the tag name) to its '>', where `pos` is left: `None` when
+/// the input ends first, `Some(None)` when the tag declares none.
+fn meta_declaration(bytes: &[u8], pos: &mut usize) -> Option<Option<&'static Encoding>> {
+    let mut seen: Vec<Vec<u8>> = Vec::new();
+    let mut got_pragma = false;
+    let mut need_pragma: Option<bool> = None;
+    let mut charset: Option<&'static Encoding> = None;
+    loop {
+        let Some((name, value)) = get_attribute(bytes, pos) else {
+            if *pos >= bytes.len() {
+                return None;
+            }
+            break;
+        };
+        if seen.contains(&name) {
+            continue;
+        }
+        seen.push(name.clone());
+        match name.as_slice() {
+            b"http-equiv" => {
+                if value == b"content-type" {
+                    got_pragma = true;
+                }
+            }
+            b"content" => {
+                if charset.is_none() {
+                    if let Some(e) = encoding_from_meta_content(&value) {
+                        charset = Some(e);
+                        need_pragma = Some(true);
+                    }
+                }
+            }
+            b"charset" => {
+                charset = Encoding::for_label(&value);
+                need_pragma = Some(false);
+            }
+            _ => {}
+        }
+    }
+    let decided = match need_pragma {
+        None => None,
+        Some(true) if !got_pragma => None,
+        _ => charset,
+    };
+    Some(decided.map(|e| {
+        if e == UTF_16BE || e == UTF_16LE {
+            UTF_8
+        } else if e == X_USER_DEFINED {
+            WINDOWS_1252
+        } else {
+            e
+        }
+    }))
+}
+
 /// HTML §13.2.3.2 "prescan a byte stream to determine its encoding".
 pub fn prescan(bytes: &[u8]) -> Option<&'static Encoding> {
     let mut pos = 0;
@@ -215,54 +283,7 @@ pub fn prescan(bytes: &[u8]) -> Option<&'static Encoding> {
             && (is_space(rest[5]) || rest[5] == b'/')
         {
             pos += 5;
-            let mut seen: Vec<Vec<u8>> = Vec::new();
-            let mut got_pragma = false;
-            let mut need_pragma: Option<bool> = None;
-            let mut charset: Option<&'static Encoding> = None;
-            loop {
-                let Some((name, value)) = get_attribute(bytes, &mut pos) else {
-                    if pos >= bytes.len() {
-                        return None;
-                    }
-                    break;
-                };
-                if seen.contains(&name) {
-                    continue;
-                }
-                seen.push(name.clone());
-                match name.as_slice() {
-                    b"http-equiv" => {
-                        if value == b"content-type" {
-                            got_pragma = true;
-                        }
-                    }
-                    b"content" => {
-                        if charset.is_none() {
-                            if let Some(e) = encoding_from_meta_content(&value) {
-                                charset = Some(e);
-                                need_pragma = Some(true);
-                            }
-                        }
-                    }
-                    b"charset" => {
-                        charset = Encoding::for_label(&value);
-                        need_pragma = Some(false);
-                    }
-                    _ => {}
-                }
-            }
-            let decided = match need_pragma {
-                None => None,
-                Some(true) if !got_pragma => None,
-                _ => charset,
-            };
-            if let Some(mut e) = decided {
-                if e == UTF_16BE || e == UTF_16LE {
-                    e = UTF_8;
-                }
-                if e == X_USER_DEFINED {
-                    e = WINDOWS_1252;
-                }
+            if let Some(e) = meta_declaration(bytes, &mut pos)? {
                 return Some(e);
             }
         } else if rest.len() >= 2
@@ -283,6 +304,204 @@ pub fn prescan(bytes: &[u8]) -> Option<&'static Encoding> {
         pos += 1;
     }
     None
+}
+
+/// Where a [`MetaScanner`] stands after the bytes it was given.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MetaScan {
+    /// A `<meta>` declares this encoding; its tag ends at this offset in the bytes of the call
+    /// that found it.
+    Found(&'static Encoding, usize),
+    /// The scan ended without one.
+    NotFound,
+    /// The scan needs the bytes that follow.
+    NeedMore,
+}
+
+/// The `<meta>` element's encoding declaration in a document's head, found by a scan of its bytes
+/// as they arrive. It replaces the prescan of the first 1024 bytes (HTML §13.2.3.2) with what the
+/// engines in use do and the web relies on (whatwg/html#6962; the cases are WPT's
+/// `html/syntax/charset`): the scan reads tags as the tokenizer does, so a `<meta>` in a comment or
+/// in the text of `script`, `style`, `title` or `textarea` does not count; it goes on past the first
+/// 1024 bytes while only elements that belong in a head have been seen, so a declaration after a
+/// long head still counts (HTML §13.2.3.4 "change the encoding"), and it ends at the first of the
+/// first 1024 bytes that comes after another element.
+#[derive(Debug, Default)]
+pub struct MetaScanner {
+    /// The bytes from the first token not scanned yet.
+    buf: Vec<u8>,
+    /// The bytes given before `buf`.
+    consumed: usize,
+    /// An element that does not belong in a head was seen.
+    left_head: bool,
+    /// Inside the text of this raw text element: the end tag's name.
+    raw: Option<&'static [u8]>,
+    done: bool,
+}
+
+/// Elements whose text the tokenizer does not read as markup (HTML §13.2.6.4.7 and the states it
+/// switches to for them); `noscript` is not one, as for a parser with scripting disabled.
+const RAW_TEXT_ELEMENTS: [&[u8]; 8] = [
+    b"script",
+    b"style",
+    b"title",
+    b"textarea",
+    b"xmp",
+    b"iframe",
+    b"noembed",
+    b"noframes",
+];
+
+/// Elements that keep the scan in the head.
+const HEAD_ELEMENTS: [&[u8]; 8] = [
+    b"script",
+    b"noscript",
+    b"style",
+    b"link",
+    b"meta",
+    b"object",
+    b"title",
+    b"base",
+];
+
+impl MetaScanner {
+    /// Whether the scan goes on (it has neither found a declaration nor ended).
+    pub fn running(&self) -> bool {
+        !self.done
+    }
+
+    /// Ends the scan (the encoding came from elsewhere, or the input ended).
+    pub fn stop(&mut self) {
+        self.done = true;
+        self.buf = Vec::new();
+    }
+
+    /// Scans `bytes`, which follow those of earlier calls.
+    pub fn feed(&mut self, bytes: &[u8]) -> MetaScan {
+        if self.done {
+            return MetaScan::NotFound;
+        }
+        let before = self.consumed + self.buf.len();
+        self.buf.extend_from_slice(bytes);
+        let result = self.scan();
+        match result {
+            MetaScan::Found(e, end) => {
+                self.stop();
+                MetaScan::Found(e, end.saturating_sub(before))
+            }
+            MetaScan::NotFound => {
+                self.stop();
+                MetaScan::NotFound
+            }
+            MetaScan::NeedMore => MetaScan::NeedMore,
+        }
+    }
+
+    /// Scans `buf`; a found tag's end is given as an offset in all the bytes scanned.
+    fn scan(&mut self) -> MetaScan {
+        let mut pos = 0;
+        let result = loop {
+            let bytes = &self.buf[..];
+            if let Some(name) = self.raw {
+                // the end tag of the raw text element
+                let end = (pos..bytes.len()).find(|&i| {
+                    bytes[i] == b'<'
+                        && bytes.get(i + 1) == Some(&b'/')
+                        && bytes
+                            .get(i + 2..i + 2 + name.len())
+                            .is_some_and(|n| n.eq_ignore_ascii_case(name))
+                        && bytes
+                            .get(i + 2 + name.len())
+                            .is_some_and(|&b| is_space(b) || b == b'/' || b == b'>')
+                });
+                match end {
+                    Some(i) => {
+                        self.raw = None;
+                        pos = i;
+                    }
+                    None => {
+                        // keep what could be the start of the end tag
+                        pos = pos.max(bytes.len().saturating_sub(name.len() + 2));
+                        break MetaScan::NeedMore;
+                    }
+                }
+                continue;
+            }
+            if self.left_head && self.consumed + pos >= 1024 {
+                break MetaScan::NotFound;
+            }
+            if pos >= bytes.len() {
+                break MetaScan::NeedMore;
+            }
+            let rest = &bytes[pos..];
+            if rest[0] != b'<' {
+                pos += rest.iter().position(|&b| b == b'<').unwrap_or(rest.len());
+                continue;
+            }
+            if rest.len() < 4 {
+                break MetaScan::NeedMore;
+            }
+            if rest.starts_with(b"<!--") {
+                // the first '>' preceded by "--" after the '<' (the dashes may be those of "<!--")
+                let Some(i) = (pos + 3..bytes.len())
+                    .find(|&i| bytes[i] == b'>' && bytes[i - 1] == b'-' && bytes[i - 2] == b'-')
+                else {
+                    break MetaScan::NeedMore;
+                };
+                pos = i + 1;
+            } else if rest[1].is_ascii_alphabetic()
+                || (rest[1] == b'/' && rest[2].is_ascii_alphabetic())
+            {
+                let end_tag = rest[1] == b'/';
+                let start = pos + if end_tag { 2 } else { 1 };
+                let mut i = start;
+                while i < bytes.len() && !is_space(bytes[i]) && bytes[i] != b'/' && bytes[i] != b'>'
+                {
+                    i += 1;
+                }
+                let name = bytes[start..i].to_ascii_lowercase();
+                let decided = if !end_tag && name == b"meta" {
+                    match meta_declaration(bytes, &mut i) {
+                        Some(d) => d,
+                        None => break MetaScan::NeedMore,
+                    }
+                } else {
+                    while get_attribute(bytes, &mut i).is_some() {}
+                    if i >= bytes.len() {
+                        break MetaScan::NeedMore;
+                    }
+                    None
+                };
+                pos = i + 1;
+                if let Some(e) = decided {
+                    break MetaScan::Found(e, self.consumed + pos);
+                }
+                let in_head = HEAD_ELEMENTS.contains(&name.as_slice())
+                    || (!end_tag && (name == b"html" || name == b"head"));
+                if !in_head {
+                    self.left_head = true;
+                }
+                if !end_tag {
+                    self.raw = RAW_TEXT_ELEMENTS
+                        .iter()
+                        .find(|&&r| r == name.as_slice())
+                        .copied();
+                }
+            } else if rest[1] == b'!' || rest[1] == b'/' || rest[1] == b'?' {
+                // a bogus comment or a DOCTYPE, to the first '>'
+                let Some(i) = rest.iter().position(|&b| b == b'>') else {
+                    break MetaScan::NeedMore;
+                };
+                pos += i + 1;
+            } else {
+                pos += 1;
+            }
+        };
+        let scanned = pos.min(self.buf.len());
+        self.buf.drain(..scanned);
+        self.consumed += scanned;
+        result
+    }
 }
 
 /// Encoding Standard "decode": a BOM overrides `fallback`; errors become U+FFFD.
@@ -395,6 +614,99 @@ mod tests {
             Some("GBK")
         );
         assert_eq!(p(b"<meta charset=\"unterminated"), None);
+    }
+
+    /// The cases of WPT `html/syntax/charset`: where a `<meta>` declaration counts.
+    #[test]
+    fn meta_scan_cases() {
+        let pad = " ".repeat(1100);
+        let found = |doc: String| {
+            let mut s = MetaScanner::default();
+            match s.feed(doc.as_bytes()) {
+                MetaScan::Found(e, _) => Some(e.name()),
+                _ => None,
+            }
+        };
+        let m = "<meta charset=windows-1251>";
+        let cases: [(String, Option<&str>); 17] = [
+            (format!("<!doctype html><head>{m}"), Some("windows-1251")),
+            // in the head after the first kilobyte
+            (
+                format!("<head><link rel=x>{pad}{m}</head>"),
+                Some("windows-1251"),
+            ),
+            (
+                format!("<head><script></script>{pad}{m}"),
+                Some("windows-1251"),
+            ),
+            // after another element: within the first kilobyte only
+            (format!("<head><bogus>{m}"), Some("windows-1251")),
+            (format!("<head>{pad}<bogus>{m}"), None),
+            (format!("<head></head>{m}"), Some("windows-1251")),
+            (format!("<head>{pad}</head>{m}"), None),
+            (format!("<head>{pad}<template>{m}</template>"), None),
+            (
+                format!("<head>{pad}<noscript><template></template>{m}"),
+                None,
+            ),
+            (format!("<head><object>{m}</object>"), Some("windows-1251")),
+            (format!("<head></head><body><svg>{m}"), Some("windows-1251")),
+            // markup that is not a tag
+            (format!("<head><!--{m}-->"), None),
+            (format!("<head><script>{m}</script>"), None),
+            (format!("<head><style>{m}</style>"), None),
+            (format!("<head><title>{m}</title>"), None),
+            (format!("<svg><![CDATA[{m}]]></svg>"), None),
+            (
+                format!("<head><title>\u{e9}</title>{m}"),
+                Some("windows-1251"),
+            ),
+        ];
+        for (doc, want) in cases {
+            assert_eq!(found(doc.clone()), want, "{}", doc.trim());
+        }
+        // the end of a raw text element ends at its own end tag only
+        assert_eq!(
+            found(format!("<script>'</style>{m}'</SCRIPT >{m}")),
+            Some("windows-1251")
+        );
+    }
+
+    /// Bytes arriving in pieces: the scan waits for the rest of a tag, and says where in the last
+    /// piece the declaring tag ends.
+    #[test]
+    fn meta_scan_in_pieces() {
+        let doc = format!(
+            "<!doctype html><head><script>{}</script><meta charset=\"utf-8\"><title>x</title>",
+            "/* a long inline script */".repeat(60)
+        );
+        let bytes = doc.as_bytes();
+        let end = doc.find("<title>").unwrap();
+        for cut in [1, 1024, end - 20, end - 1] {
+            let mut s = MetaScanner::default();
+            let mut got = None;
+            for (i, piece) in [&bytes[..cut], &bytes[cut..]].into_iter().enumerate() {
+                match s.feed(piece) {
+                    MetaScan::NeedMore => {}
+                    MetaScan::Found(e, at) => got = Some((i, e.name(), at)),
+                    MetaScan::NotFound => panic!("not found, cut at {cut}"),
+                }
+            }
+            assert_eq!(got, Some((1, "UTF-8", end - cut)), "cut at {cut}");
+            assert!(!s.running());
+        }
+        // the scan ends at the first of the first kilobyte after the head
+        let mut s = MetaScanner::default();
+        assert_eq!(s.feed(b"<head></head><body>"), MetaScan::NeedMore);
+        assert_eq!(s.feed(" ".repeat(1100).as_bytes()), MetaScan::NotFound);
+        assert!(!s.running());
+        // a document's sniffing keeps the scan running for the bytes after its first ones
+        let mut s = MetaScanner::default();
+        let head = format!("<head><link rel=x>{}", " ".repeat(1100));
+        let (e, _) = sniff_html_encoding_with(&SniffInput::new(head.as_bytes()), &mut s);
+        assert_eq!(e.name(), "windows-1252");
+        assert!(s.running());
+        assert_eq!(s.feed(b"<meta charset=utf-8>"), MetaScan::Found(UTF_8, 20));
     }
 
     #[test]

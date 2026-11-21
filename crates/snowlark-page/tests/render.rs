@@ -1869,6 +1869,26 @@ fn textarea_scroll_height_counts_its_lines() {
     assert_eq!(r, "20 20|20 20|100 100|28 28");
 }
 
+/// HTML §15.5.15: a textarea "is expected to render as an inline-block box", so with only the UA
+/// sheet it computes `display: inline-block` and CSSOM View §6 gives it client and scroll sizes
+/// (an inline box would read 0 for all of them, and a field grown to its `scrollHeight` collapse).
+#[test]
+fn default_styled_textarea_is_an_inline_block() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><textarea id=t rows=3>1\n2\n3\n4\n5</textarea>",
+    );
+    let r = eval(
+        &mut page,
+        "const s = getComputedStyle(t);
+         const sizes = t.clientWidth > 0 && t.clientHeight > 0 && t.scrollHeight > t.clientHeight;
+         t.style.height = t.scrollHeight + 'px';
+         [s.display, sizes, t.offsetHeight > 0].join('|')",
+    );
+    assert_eq!(r, "inline-block|true|true");
+}
+
 /// CSSOM View §6.1 `getBoundingClientRect()`: the union leaves out only rects whose width and
 /// height are both zero, so an inline box's 0-wide piece on a line holding only a `<br>` counts.
 #[test]

@@ -20,8 +20,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Positioned layout.** Anchor positioning is not implemented. Also missing: bidi reordering of absolutely positioned
   placeholders, single-axis scroll containers (`overflow-x` and `overflow-y` computed to different values),
   sticky positioning inside a split inline, and 3D transforms in client rects. (ref 48)
-- **Multi-column layout.** Columns and balancing work. `column-span`, column rules, `getClientRects()` across columns,
-  intrinsic column sizes, `break-*` properties, and orphans and widows are open. (ref 217)
+- **Multi-column layout.** Columns, balancing, spanners, column rules, intrinsic sizes, `break-*` properties, orphans
+  and widows work. Open: a spanner inside a nested multi-column container, `display: flow-root` blocks breaking across
+  columns (they stay whole), and tables with collapsed borders across columns. (ref 217)
 - **Tables.** Missing: `baseline-table` handling, merged colspan tracks in auto tables, percentage handling in quirks
   mode and fixed-layout min/max cases, percentage heights of cell content against the final row height, and some
   collapsed-border painting order. (ref 68)
@@ -40,11 +41,18 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   visually hidden absolutely positioned span in an inline-flex label reports an empty rect. (ref 31)
 - **Incremental layout differs from a fresh build in rare cases.** When a text node is edited so that it holds only
   collapsible white space, the incremental update can keep a text box that a fresh build would not generate. Found with
-  the layout fuzz tests, in `snowlark-layout`. (ref 266, 351)
+  the layout fuzz tests, in `snowlark-layout`. (ref 351)
 - **Inline box background across lines.** A background image on an inline box that wraps across lines is positioned per
   line piece instead of once for the whole box (for example an external-link icon on a wrapped link). (ref 311)
 - **`getBoundingClientRect()` of an inline.** The rect includes the transformed box of a descendant, where CSSOM View
   says only the inline's own fragments count. (ref 95)
+- **Geometry under transforms.** A frame's container is placed by its untransformed content box, and an absolutely
+  positioned element's containing block chain skips a static transformed ancestor, so that ancestor's clip is missed.
+  (ref 99)
+- **Geometry reads near split inlines.** An inline box split around a block still walks the tree on geometry reads,
+  which costs time on large pages. (ref 97)
+- **Block details.** `align-content` on block containers that are not independent formatting contexts is not applied,
+  and hit testing treats rounded clips as rectangles. (ref 41)
 
 ## CSS and style
 
@@ -74,6 +82,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `<clipPath>` in another document names nothing. (ref 63)
 - **Backdrop filter over scrolling content.** Content that scrolls over a fixed layer does not blur that layer with its
   `backdrop-filter`, because the filter only sees its own raster piece. (ref 495)
+- **CSS Scoping details.** `:host-context()`, `:has-slotted`, tree-scoped `@font-face` and `@keyframes` names in
+  shadow trees, `::part()` followed by pseudo-classes, `@import` through `insertRule()`, `<style>` load and error
+  events, and the `CSSScopeRule` interface are not implemented. (ref 45)
 
 ## Painting and compositing
 
@@ -87,6 +98,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   to the first. The raster is skipped, but the display list work is wasted. (ref 505)
 - **A page's own scroll and a wheel at the same moment.** A wheel turned while a script-driven scroll is on its way to
   the compositor can undo the scroll for a frame. Identified from the code, not observed. (ref 492)
+- **Pixel snapping inside transforms.** Box edges inside a scale or rotate transform are not snapped to device pixels.
+  (ref 34)
+- **Unpainted areas while scrolling fast.** A sticky layer inside clips that move with the document is drawn through
+  them, and a page whose main thread is busy can show its background where the view outruns the painted band. (ref 52)
 - **Autoscroll cursor.** With middle-button autoscroll, circling the origin marker quickly makes the cursor icon draw
   wrongly. (ref 88)
 
@@ -97,22 +112,16 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## DOM and HTML
 
-- **`delegatesFocus` does nothing.** The flag is parsed and reflected, but clicks, `focus()` and sequential
-  navigation ignore it. (ref 66)
 - **`<link rel=expect>` does not block rendering.** `blocking=render` on `rel=expect` is not implemented. (ref 58)
-- **No `unload` or `pagehide` events.** When a navigation replaces a document, `pagehide` and `unload` are not fired
-  (only `beforeunload` is). (ref 108)
 - **A removed stylesheet link can still fire `load`.** A `<link rel=stylesheet>` removed before its sheet arrives still
   fires `load`. (ref 122)
-- **`about:srcdoc` base URL.** A srcdoc document resolves relative URLs against `about:srcdoc` instead of its
-  container's base URL, so `window.open('/x.html')` inside a srcdoc frame throws. (ref 226)
-- **Text controls.** A textarea does not scroll its own long text, by script or by the user. (ref 65)
+- **Text controls.** A textarea does not scroll its own long text, by script or by the user (ref 65).
 - **Selection across shadow trees.** A selection cannot keep its two ends in different trees, so dragging across a
   shadow boundary and `getComposedRanges()` crossing ranges do not work as in other browsers. (ref 62)
 - **`[SecureContext]` members on insecure pages.** `navigator.credentials`, `navigator.clipboard` and
   `PasswordCredential` exist on `http://` pages, although `isSecureContext` is false. (ref 82)
-- **`window.open()` is a stub.** It returns null, because auxiliary browsing contexts do not exist, so `opener` is
-  always null. (ref 126)
+- **Google's sign-in button.** The "Continue with Google" button that Google's sign-in script builds can stay empty
+  (seen on reddit). (ref 46)
 
 ## Scripting and bindings
 
@@ -128,8 +137,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   the wrong error, and a truncated body over TLS has no test. (ref 83)
 - **`use` trees are stale for script reads.** In the task that changes a `<use>` target, `elementFromPoint()` and
   `getBBox()` still see the old instance until the next rendering update. (ref 84)
-- **Missing or partial APIs.** `LargestContentfulPaint`, `performance.eventCounts`, `ClipboardEvent`/`DataTransfer`, and
-  Trusted Types on the attribute-node paths are not implemented. Frames share the top-level document's time origin. (ref 33)
+- **Missing or partial APIs.** `LargestContentfulPaint`, `performance.eventCounts` and Trusted Types on the
+  attribute-node paths are not implemented. Frames share the top-level document's time origin. (ref 33)
+- **No WebGL, `OffscreenCanvas` or WebGPU.** `getContext('webgl')` returns null, and `OffscreenCanvas` and
+  `navigator.gpu` are absent. (ref 117)
 - **Service workers.** `navigator.serviceWorker` and the Cache API are not implemented. Pages that check for service
   workers print a warning. (ref 127)
 - **IndexedDB.** Names with lone surrogates are not supported, there is no storage partitioning by top-level site,
@@ -167,6 +178,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `crates/snowlark-net/src/ua.rs`). HBO Max keeps the browser it read in the page's local storage for up to 7 days:
   after an earlier visit with another string, run `localStorage.removeItem('clientInformation')` in the devtools
   Console on play.hbomax.com, or wait. A user agent chosen in Settings is sent as chosen. (ref 580)
+- **HBO Max shows no frames.** Its protected playback gets a licence and starts, but no video frame is shown: the page
+  stays black with a spinner. (ref 597)
 - **xHE-AAC.** `canPlayType`, `MediaSource.isTypeSupported` and `decodingInfo` answer `mp4a.40.42` (xHE-AAC) as
   plain AAC, without asking whether the system can decode it. (ref 574)
 - **`changeType()` to a different decoder.** Media Source Extensions `changeType()` cannot switch a set-up
@@ -200,6 +213,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   (ref 542)
 - **Incognito windows are not finished.** They keep nothing on disk, but open the settings, history and bookmark
   pages in themselves rather than in a regular window, and lose bookmarks added in them when they close. (ref 540)
+- **Devtools Console.** A multi-line paste arrives as one line, so a pasted script that starts with a `//` comment does
+  nothing (ref 576), and uncaught errors are printed without their stack (ref 579).
 
 ## Tooling
 
@@ -209,5 +224,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   deep-tree test `a_deep_tree_overflows_one_renderer_only` returns early in debug builds because the debug renderer is
   too slow to crash. The Media Source test `an_append_ends_once_however_the_media_side_reports_it` fails in a debug
   build (its `update` and `updateend` events arrive after the check) and passes in optimised builds. (ref 56, 91, 560)
+- **Other test-suite problems.** Debug-profile tests overflow their stack in `snowlark-ipc` and `snowlark-js` (ref 562);
+  `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572); the WPT files
+  `navigation-timing/test-document-open.html` and `fetch/api/abort/general.any.html` vary from run to run (ref 60,
+  563); a headless Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py`
+  can read one arm slower than the other for the same binary when the arms share a core (ref 509).
 - **Reftest hangs.** Two reftests, `background-size-near-zero-png` and the flexbox `flex-1-N-N-shrink` pages, hang in
   the runner in ways its watchdog cannot stop. (ref 39)
