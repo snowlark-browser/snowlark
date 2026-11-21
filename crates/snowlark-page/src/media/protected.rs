@@ -297,9 +297,20 @@ impl Engine {
             })
             .collect();
         self.media_el(el, |m| {
+            let at = m.current_position();
             let keeper = m.player.replace(player);
             if let Some(k) = &keeper {
                 k.pause();
+            }
+            // (an element past its metadata already told its player where it is and that it
+            // plays: the player that takes over is told the same)
+            if let (Some(p), true) = (&m.player, m.ready >= super::HAVE_METADATA) {
+                if at > 0.0 {
+                    p.seek(at);
+                }
+                if !m.paused {
+                    p.play();
+                }
             }
             m.protected = Some(Box::new(Protected {
                 feeder,

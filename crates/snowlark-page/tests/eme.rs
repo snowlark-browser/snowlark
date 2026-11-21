@@ -504,6 +504,53 @@ fn module_instances_are_released_with_their_document() {
     assert_eq!(*fake.released.lock().unwrap(), vec![7, 8]);
 }
 
+/// An element that already plays its `MediaSource` (clear media first, as a streaming service's
+/// advertisement) when it is given keys of the embedder's module: the module's player that takes
+/// over is told to play, as the element's player is when its metadata arrives, without the page
+/// calling `play()` again.
+#[test]
+fn a_modules_player_that_takes_over_a_playing_element_plays() {
+    let clip = std::fs::read(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../snowlark-media/tests/fixtures/pattern-frag.mp4"),
+    )
+    .unwrap();
+    let bytes: Vec<String> = clip.iter().map(|b| b.to_string()).collect();
+    let fake = Arc::new(Fake::default());
+    let mut p = media_page(&fake);
+    let r = run_async(
+        &mut p,
+        &format!(
+            r#"
+        const clip = new Uint8Array([{}]);
+        const v = document.createElement('video');
+        v.muted = true;
+        document.body.append(v);
+        const ms = new MediaSource();
+        v.src = URL.createObjectURL(ms);
+        await new Promise(r => ms.addEventListener('sourceopen', r, {{once: true}}));
+        const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.42C00D"');
+        sb.appendBuffer(clip);
+        await new Promise(r => sb.addEventListener('updateend', r, {{once: true}}));
+        v.play().catch(() => {{}});
+        const out = [v.readyState >= 1, v.paused];
+        const a = await navigator.requestMediaKeySystemAccess('org.test.module',
+            [{{initDataTypes: ['cenc'], videoCapabilities: [{{contentType: 'video/mp4; codecs="avc1.64001f"'}}]}}]);
+        await v.setMediaKeys(await a.createMediaKeys());
+        sb.appendBuffer(clip);
+        await new Promise(r => sb.addEventListener('updateend', r, {{once: true}}));
+        out.push(v.paused);
+        return out.join();
+    "#,
+            bytes.join(",")
+        ),
+    );
+    assert_eq!(r, "true,false,false");
+    let log = fake.player.lock().unwrap().clone();
+    assert_eq!(log[0], "play 7 1:video", "{log:?}");
+    assert!(log.contains(&"Play".to_string()), "{log:?}");
+}
+
 /// A media element whose `MediaKeys` are the embedder's module's and whose source is a
 /// `MediaSource` plays through the module's protected player: it is made with the tracks of the
 /// initialization segment, handed every sample and the element's play, seek and end of stream; a

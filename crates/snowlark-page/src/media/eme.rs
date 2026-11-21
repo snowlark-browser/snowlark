@@ -991,14 +991,13 @@ impl MediaKeysImpl for Engine {
         policy: MediaKeysPolicy,
     ) -> rt::Result<JsPromise> {
         // (no HDCP restriction applies to Clear Key: any valid policy is usable)
-        if super::trace_on() {
-            eprintln!(
-                "[eme] {:.3} getStatusForPolicy({:?})",
-                super::trace_clock(),
-                policy.min_hdcp_version
-            );
-        }
         let Some(v) = policy.min_hdcp_version else {
+            if super::trace_on() {
+                eprintln!(
+                    "[eme] {:.3} getStatusForPolicy(None) = TypeError",
+                    super::trace_clock()
+                );
+            }
             return self.eme_rejected(cx, rt::Error::Type("The policy is empty".into()));
         };
         let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
@@ -1007,6 +1006,13 @@ impl MediaKeysImpl for Engine {
             v.as_str(),
             "" | "1.0" | "1.1" | "1.2" | "1.3" | "1.4" | "2.0" | "2.1" | "2.2" | "2.3"
         );
+        if super::trace_on() {
+            eprintln!(
+                "[eme] {:.3} getStatusForPolicy({v:?}) = {}",
+                super::trace_clock(),
+                if known { "usable" } else { "TypeError" }
+            );
+        }
         self.queue_task(TaskSource::DomManipulation, move |_, cx| {
             if known {
                 resolve.resolve(cx, MediaKeyStatus::Usable);
