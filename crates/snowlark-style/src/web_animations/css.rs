@@ -167,7 +167,16 @@ pub(crate) fn animation_local(a: &Animation, start: f64, now: f64) -> f64 {
     match a.state {
         AnimationState::Paused(p) => {
             let (cur, _) = iteration_of(a);
-            (a.delay + (cur + p) * a.duration) * 1000.0
+            if a.duration > 0.0 {
+                (a.delay + (cur + p) * a.duration) * 1000.0
+            } else if p < 0.0 {
+                // (zero-length iterations paused in the delay: its start, where the effect is
+                // before its active interval)
+                0.0
+            } else {
+                // (past the delay, zero-length iterations are over: the end of the effect)
+                a.delay * 1000.0
+            }
         }
         _ => (now - start) * 1000.0,
     }
@@ -326,7 +335,13 @@ pub(crate) fn control_animation(a: &mut Animation, now: f64, local: f64, paused:
     let t = local / 1000.0;
     let d = a.duration;
     let (_, max) = iteration_of(a);
-    let (cur, into) = seek_position(t, a.delay, d, max);
+    let (mut cur, into) = seek_position(t, a.delay, d, max);
+    // Zero-length iterations (CSS Animations 1 §3.4) are all over once the delay is: the last one
+    // is current (an infinite count of them counts as one, as stylo keeps it).
+    let zero_over = d <= 0.0 && into >= 0.0;
+    if zero_over && max.is_finite() {
+        cur = (max.ceil() - 1.0).max(0.0);
+    }
     a.started_at = now - into;
     a.iteration_state = match a.iteration_state {
         KeyframesIterationState::Finite(_, m) => KeyframesIterationState::Finite(cur, m),
@@ -337,6 +352,10 @@ pub(crate) fn control_animation(a: &mut Animation, now: f64, local: f64, paused:
         AnimationDirection::Alternate | AnimationDirection::AlternateReverse
     ) && cur % 2.0 == 1.0;
     let base = match a.direction {
+        // (an infinite current iteration alternates forwards, Web Animations 1 §4.7.6)
+        AnimationDirection::AlternateReverse if d <= 0.0 && max.is_infinite() => {
+            AnimationDirection::Normal
+        }
         AnimationDirection::Reverse | AnimationDirection::AlternateReverse => {
             AnimationDirection::Reverse
         }
@@ -348,7 +367,13 @@ pub(crate) fn control_animation(a: &mut Animation, now: f64, local: f64, paused:
         (b, _) => b,
     };
     a.state = if paused {
-        AnimationState::Paused(if d > 0.0 { into / d } else { 0.0 })
+        AnimationState::Paused(if d > 0.0 {
+            into / d
+        } else if zero_over {
+            f64::INFINITY
+        } else {
+            f64::NEG_INFINITY
+        })
     } else if a.started_at > now {
         AnimationState::Pending
     } else {

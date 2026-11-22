@@ -120,6 +120,71 @@ fn keyframes_animation_sampled_over_time() {
     assert_eq!(p.get("#f", "width"), "300px");
 }
 
+/// CSS Animations 1 §3.4: an animation of zero duration still runs. Its iterations take no time, so
+/// once its delay is over it is at its end (Web Animations 1 §4.7: the after phase, iteration
+/// progress 1 in the last iteration's direction; an infinite count of them is current iteration
+/// infinity, which alternates forwards); its fills apply as for any other.
+#[test]
+fn a_zero_duration_animation_fills_at_its_end() {
+    let mut p = Page::new(
+        "<!DOCTYPE html><style>
+           @keyframes grow { from { width: 0px } 50% { width: 100px } to { width: 300px } }
+           div { width: 7px; }
+           #f { animation: grow 0s forwards; }
+           #n { animation: grow 0s; }
+           #b { animation: grow 0s linear 1s both; }
+           #alt { animation: grow 0s 2 alternate forwards; }
+           #odd { animation: grow 0s 3 alternate forwards; }
+           #half { animation: grow 0s linear 2.5 forwards; }
+           #inf { animation: grow 0s infinite alternate-reverse forwards; }
+           #rev { animation: grow 0s infinite reverse forwards; }
+         </style><div id=f></div><div id=n></div><div id=b></div><div id=alt></div>
+         <div id=odd></div><div id=half></div><div id=inf></div><div id=rev></div>",
+    );
+    p.restyle_at(0.0);
+    assert_eq!(p.get("#f", "width"), "300px");
+    // No fill: over at once, the underlying value.
+    assert_eq!(p.get("#n", "width"), "7px");
+    // In its delay a backwards fill shows the first keyframe.
+    assert_eq!(p.get("#b", "width"), "0px");
+    // Two iterations alternating: the second, reversed, ends at the first keyframe; three: forwards.
+    assert_eq!(p.get("#alt", "width"), "0px");
+    assert_eq!(p.get("#odd", "width"), "300px");
+    // 2.5 iterations end halfway through the third.
+    assert_eq!(p.get("#half", "width"), "100px");
+    assert_eq!(p.get("#inf", "width"), "300px");
+    assert_eq!(p.get("#rev", "width"), "0px");
+    p.restyle_at(0.5);
+    assert_eq!(p.get("#b", "width"), "0px");
+    assert!(p.engine.animations_active());
+    p.restyle_at(1.0);
+    assert_eq!(p.get("#b", "width"), "300px");
+    p.restyle_at(2.0);
+    assert_eq!(p.get("#b", "width"), "300px");
+    assert_eq!(p.get("#f", "width"), "300px");
+    assert!(!p.engine.animations_active());
+}
+
+/// A running animation whose duration changes to 0s is over at once, not canceled: its forwards
+/// fill holds (CSS Animations 1 §3.4).
+#[test]
+fn a_duration_changed_to_zero_ends_the_animation() {
+    let mut p = Page::new(
+        "<!DOCTYPE html><style>
+           @keyframes grow { from { width: 0px } to { width: 300px } }
+           #a { width: 7px; animation: grow 10s linear forwards; }
+           #a.now { animation-duration: 0s; }
+         </style><div id=a></div>",
+    );
+    p.restyle_at(0.0);
+    p.restyle_at(1.0);
+    assert_eq!(p.get("#a", "width"), "30px");
+    let a = p.q("#a");
+    p.dom.set_attribute(a, "class", "now").unwrap();
+    p.restyle_at(1.5);
+    assert_eq!(p.get("#a", "width"), "300px");
+}
+
 #[test]
 fn an_infinite_animation_skips_whole_iterations() {
     let mut p = Page::new(

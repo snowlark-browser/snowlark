@@ -109,12 +109,13 @@ pub fn run(start: Option<&str>, model: ProcessModel, flags: WindowFlags) -> i32 
     // Every panic, caught or not, goes to the profile's crash log first.
     crash::install_panic_hook(profile.dir.join("crash.log"));
     // Where the last run of this profile left the window (the window checks it against the monitors).
-    // (an Incognito window's placement is not the regular window's)
+    // (an Incognito window opens there too, as a regular one would; it keeps no placement)
+    let placement = window_state::load(&profile.window_file());
     let options = if incognito {
-        browser::incognito::App::incognito_window_options()
+        browser::incognito::App::incognito_window_options(placement)
     } else {
         WindowOptions {
-            placement: window_state::load(&profile.window_file()),
+            placement,
             ..WindowOptions::default()
         }
     };

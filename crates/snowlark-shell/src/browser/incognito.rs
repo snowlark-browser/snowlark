@@ -118,14 +118,17 @@ impl Browser {
         self.app.open_window(None, placement, None);
     }
 
-    /// Ctrl+Shift+N, the app menu's "New Incognito window": a new one, at its new-tab page.
-    pub(super) fn new_incognito_window(&self) {
-        self.app.open_incognito_window(None);
+    /// Ctrl+Shift+N, the app menu's "New Incognito window": a new one, at its new-tab page,
+    /// beside this window as a new regular window would be.
+    pub(super) fn new_incognito_window(&self, window: &window::Window) {
+        let placement = window.placement().map(|p| crate::window_state::beside(&p));
+        self.app.open_incognito_window(None, placement);
     }
 
-    /// "Open link in Incognito window".
-    pub(super) fn open_in_incognito(&self, url: Url) {
-        self.app.open_incognito_window(Some(url));
+    /// "Open link in Incognito window": beside this window, as Ctrl+Shift+N.
+    pub(super) fn open_in_incognito(&self, window: &window::Window, url: Url) {
+        let placement = window.placement().map(|p| crate::window_state::beside(&p));
+        self.app.open_incognito_window(Some(url), placement);
     }
 }
 
@@ -390,10 +393,14 @@ impl App {
         })
     }
 
-    /// An Incognito window's: its title until its first tab has one, the default placement.
-    pub fn incognito_window_options() -> WindowOptions {
+    /// An Incognito window's: its title until its first tab has one, and `placement` (when it fits
+    /// the monitors). An Incognito window is placed as a regular one is: beside the window it is
+    /// opened from, or where the profile's last regular window was; it only keeps no placement of
+    /// its own ([`Browser::save_window`]).
+    pub fn incognito_window_options(placement: Option<Placement>) -> WindowOptions {
         WindowOptions {
             title: "Snowlark (Incognito)".into(),
+            placement,
             ..WindowOptions::default()
         }
     }
@@ -428,12 +435,13 @@ impl App {
         }
     }
 
-    /// Opens a new Incognito window, at `url` or its new-tab page. Called on the window thread.
-    pub fn open_incognito_window(self: &Rc<App>, url: Option<Url>) {
+    /// Opens a new Incognito window, at `url` or its new-tab page, at `placement` (when it fits the
+    /// monitors). Called on the window thread.
+    pub fn open_incognito_window(self: &Rc<App>, url: Option<Url>, placement: Option<Placement>) {
         let app = self.clone();
         let partition = self.off_the_record();
         let spares = self.spares();
-        let options = App::incognito_window_options();
+        let options = App::incognito_window_options(placement);
         if let Err(e) = window::open_browser_window(options, move |w| {
             Route::main(Browser::new(w, app, partition, url, spares))
         }) {

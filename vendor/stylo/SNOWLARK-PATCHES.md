@@ -517,6 +517,16 @@ the source; `git log -p vendor/stylo` shows the diff.
 91. **`word-break: auto-phrase`** (`values/specified/text.rs`, CSS Text 4 §5.2): a `WordBreak` value.
    snowlark-layout breaks it as `normal`, which the specification allows for languages without phrase
    analysis (all of them here).
+92. **CSS animations of zero duration run** (`servo/animation.rs`, CSS Animations 1 §3.4, Web Animations 1
+   §4.6.5.2 and §4.7): `maybe_start_animations` no longer skips a 0s animation and
+   `is_cancelled_in_new_style` no longer cancels one whose duration becomes 0s. A zero-length iteration is
+   over as soon as the delay is: `progress_since` gives negative infinity before the start and infinity
+   after it in place of dividing by the duration (`has_ended`, the value at a time, the starting and paused
+   progress, `update_from_other`), `iterate_if_necessary` moves to the last iteration at once, an infinite
+   count of zero-length iterations counts as one (`remaining_iterations`, now public) whose
+   `alternate-reverse` direction is forwards (an infinite current iteration), and a keyframe interval's
+   easing precision stays finite. Fills apply and `animationstart`/`animationend` fire as for any other
+   animation (snowlark-style's event tracker already follows the Web Animations timing model).
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

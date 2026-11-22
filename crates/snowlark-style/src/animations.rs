@@ -305,20 +305,27 @@ fn fills_forwards(a: &Animation) -> bool {
 /// stopping at the last one; alternating directions flip with each iteration. Stylo's own
 /// `iterate_if_necessary` steps one iteration per call.
 fn iterate(a: &mut Animation, now: f64) -> bool {
-    if a.state != AnimationState::Running || a.duration <= 0.0 {
+    if a.state != AnimationState::Running || a.duration < 0.0 {
         return false;
     }
     let elapsed = now - a.started_at;
-    if elapsed <= a.duration {
-        return false;
-    }
-    let remaining = match a.iteration_state {
-        KeyframesIterationState::Finite(current, max) => max - current,
-        KeyframesIterationState::Infinite(_) => f64::INFINITY,
+    // (an infinite count of zero-length iterations counts as one: stylo's `remaining_iterations`)
+    let remaining = a.remaining_iterations();
+    let n = if a.duration == 0.0 {
+        // Zero-length iterations (CSS Animations 1 §3.4) are all over once the delay is: the last
+        // one is current, its direction as the alternation leaves it.
+        if elapsed < 0.0 {
+            return false;
+        }
+        remaining.ceil() - 1.0
+    } else {
+        if elapsed <= a.duration {
+            return false;
+        }
+        // The current iteration is over once `now` is past its end: skip the whole iterations that
+        // fit before `now`, but not past the start of the last one.
+        ((elapsed / a.duration).ceil() - 1.0).min(remaining.ceil() - 1.0)
     };
-    // The current iteration is over once `now` is past its end: skip the whole iterations that fit
-    // before `now`, but not past the start of the last one.
-    let n = ((elapsed / a.duration).ceil() - 1.0).min(remaining.ceil() - 1.0);
     if n < 1.0 {
         return false;
     }

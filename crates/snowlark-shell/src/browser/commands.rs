@@ -268,8 +268,8 @@ impl Browser {
         match cmd {
             Command::NewTab => self.new_tab(),
             Command::NewWindow => self.new_window(window),
-            Command::NewIncognitoWindow => self.new_incognito_window(),
-            Command::OpenInIncognito(u) => self.open_in_incognito(u),
+            Command::NewIncognitoWindow => self.new_incognito_window(window),
+            Command::OpenInIncognito(u) => self.open_in_incognito(window, u),
             Command::ReopenClosedTab => {
                 let last = self.closed.borrow_mut().pop();
                 if let Some(url) = last.and_then(|u| Url::parse(&u).ok()) {

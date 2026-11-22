@@ -81,7 +81,9 @@ impl PropertyAnimation {
 
     /// The output of the timing function given the progress ration of this animation.
     fn timing_function_output(&self, progress: f64) -> f64 {
-        let epsilon = 1. / (200. * self.duration);
+        // (Snowlark patch 92: a zero-length keyframe interval of a 0s animation still gets a finite
+        // precision)
+        let epsilon = 1. / (200. * self.duration.max(1e-3));
         // FIXME: Need to set the before flag correctly.
         // In order to get the before flag, we have to know the current animation phase
         // and whether the iteration is reversed. For now, we skip this calculation
@@ -641,7 +643,33 @@ impl Animation {
             None => return true,
         };
 
-        new_ui.animation_duration_mod(index).seconds() == 0.
+        // (Snowlark patch 92: a duration that becomes 0s does not cancel the animation: it is
+        // over at once, CSS Animations 1 §3.4)
+        let _ = index;
+        false
+    }
+
+    /// Snowlark patch 92: how many iterations (fractional) have passed between `from` and `time`.
+    /// With a zero duration (CSS Animations 1 §3.4, Web Animations 1 §4.8.3.1) an iteration takes
+    /// no time: before `from` it is before the start (negative infinity), from `from` on every
+    /// iteration is over (infinity). Callers clamp it to the iterations there are.
+    fn progress_since(&self, from: f64, time: f64) -> f64 {
+        if self.duration > 0. {
+            (time - from) / self.duration
+        } else if time < from {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        }
+    }
+
+    /// Snowlark patch 92: the time `progress` iterations take (zero when the duration is zero).
+    fn time_of(&self, progress: f64) -> f64 {
+        if self.duration > 0. {
+            self.duration * progress
+        } else {
+            0.
+        }
     }
 
     /// The properties that change in this animation (Snowlark patch 41).
@@ -681,7 +709,9 @@ impl Animation {
             return false;
         }
 
-        self.iterate_by(1.) == 1.
+        // (Snowlark patch 92: zero-length iterations are all over at once)
+        let n = if self.duration > 0. { 1. } else { f64::INFINITY };
+        self.iterate_by(n) >= 1.
     }
 
     /// Attempts to advance this animation by `n` iterations, but stops when reaching
@@ -727,9 +757,14 @@ impl Animation {
         n
     }
 
-    fn remaining_iterations(&self) -> f64 {
+    /// The iterations left, the current one included. (Snowlark patch 92: an infinite count of
+    /// zero-length iterations has an active duration of zero, Web Animations 1 §4.6.5.2: it is over
+    /// at once, at the end of the iteration it started in; [`maybe_start_animations`] gives it the
+    /// forwards direction of an infinite current iteration, §4.7.6.)
+    pub fn remaining_iterations(&self) -> f64 {
         match self.iteration_state {
             KeyframesIterationState::Finite(current, max) => max - current,
+            KeyframesIterationState::Infinite(_) if self.duration <= 0. => 1.,
             KeyframesIterationState::Infinite(_) => f64::INFINITY,
         }
     }
@@ -770,7 +805,7 @@ impl Animation {
         let progress = match self.state {
             AnimationState::Finished => return true,
             AnimationState::Paused(progress) => progress,
-            AnimationState::Running => (time - self.started_at) / self.duration,
+            AnimationState::Running => self.progress_since(self.started_at, time),
             AnimationState::Pending | AnimationState::Canceled => return false,
         };
 
@@ -811,7 +846,12 @@ impl Animation {
 
             match old_state {
                 Paused(old_progress) => {
-                    let mut progress = old_progress + (old_delay - self.delay) / self.duration;
+                    // (Snowlark patch 92: zero-length iterations keep their progress)
+                    let mut progress = if self.duration > 0. {
+                        old_progress + (old_delay - self.delay) / self.duration
+                    } else {
+                        old_progress
+                    };
                     progress -= self.iterate_by(progress);
                     self.state = Paused(progress);
                 },
@@ -826,7 +866,7 @@ impl Animation {
                 },
                 Canceled | Pending | Running => {
                     // Re-advance iterations from a fresh iteration state.
-                    let new_starting_progress = (now - self.started_at) / self.duration;
+                    let new_starting_progress = self.progress_since(self.started_at, now);
                     match self.iteration_state {
                         KeyframesIterationState::Finite(ref mut current, _) => *current = 0.0,
                         _ => {},
@@ -873,11 +913,18 @@ impl Animation {
             // If we're pausing the animation, compute the progress value.
             match (&mut self.state, &old_state) {
                 (&mut Pending, &Paused(progress)) => {
-                    self.started_at = now - (self.duration * progress);
+                    self.started_at = now - self.time_of(progress);
                 },
                 (&mut Paused(ref mut new), &Paused(old)) => *new = old,
                 (&mut Paused(ref mut progress), &Running) => {
-                    *progress = (now - old_started_at) / old_duration
+                    // (Snowlark patch 92: no division by a zero duration)
+                    *progress = if old_duration > 0. {
+                        (now - old_started_at) / old_duration
+                    } else if now < old_started_at {
+                        f64::NEG_INFINITY
+                    } else {
+                        f64::INFINITY
+                    }
                 },
                 _ => {},
             }
@@ -902,7 +949,7 @@ impl Animation {
         // >1.0 (after end or during multiple iterations).
         let progress = match self.state {
             AnimationState::Running | AnimationState::Pending | AnimationState::Finished => {
-                (now - self.started_at) / self.duration
+                self.progress_since(self.started_at, now)
             },
             AnimationState::Paused(progress) => progress,
             AnimationState::Canceled => return,
@@ -1953,10 +2000,9 @@ pub fn maybe_start_animations<E>(
         };
 
         debug!("maybe_start_animations: name={}", name);
-        let duration = style.animation_duration_mod(i).seconds() as f64;
-        if duration == 0. {
-            continue;
-        }
+        // (Snowlark patch 92: a 0s animation runs too, CSS Animations 1 §3.4: its fill applies and
+        // its events fire; a negative duration is invalid and never computed)
+        let duration = (style.animation_duration_mod(i).seconds() as f64).max(0.);
 
         let Some(keyframe_animation) =
             context
@@ -1986,6 +2032,13 @@ pub fn maybe_start_animations<E>(
             AnimationDirection::Normal | AnimationDirection::Alternate => {
                 AnimationDirection::Normal
             },
+            // (Snowlark patch 92: the current iteration of infinitely many zero-length ones is
+            // infinite, which alternates forwards, Web Animations 1 §4.7.6)
+            AnimationDirection::AlternateReverse
+                if duration == 0. && iteration_count.0.is_infinite() =>
+            {
+                AnimationDirection::Normal
+            },
             AnimationDirection::Reverse | AnimationDirection::AlternateReverse => {
                 AnimationDirection::Reverse
             },
@@ -1993,7 +2046,14 @@ pub fn maybe_start_animations<E>(
 
         let now = context.current_time_for_animations;
         let started_at = now + delay;
-        let starting_progress = (now - started_at) / duration;
+        // (Snowlark patch 92: no division by a zero duration)
+        let starting_progress = if duration > 0. {
+            (now - started_at) / duration
+        } else if now < started_at {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        };
         let state = match style.animation_play_state_mod(i) {
             AnimationPlayState::Paused => AnimationState::Paused(starting_progress),
             AnimationPlayState::Running => AnimationState::Pending,

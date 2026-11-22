@@ -231,10 +231,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   (ref 542)
 - **Incognito windows are not finished.** They keep nothing on disk, but open the settings, history and bookmark
   pages in themselves rather than in a regular window, and lose bookmarks added in them when they close. (ref 540)
-  An Incognito window opens at the default place on the primary monitor, not where windows were last placed.
-  (ref 669)
-- **Task manager.** While it is open, an idle tab and the browser process use a steady share of the CPU. (ref 668)
-- **Closing a window can take several seconds** when it has several tabs, or is an Incognito window. (ref 670)
+- **Animated pseudo-elements repaint the page.** A `transform` or `opacity` animation on a `::before` or
+  `::after` (Wikipedia's pulsing watch-star dot) is not run by the compositor: the whole page is painted again
+  every frame, and an idle tab and the browser process keep using CPU. (ref 668)
 
 ## Tooling
 

@@ -2539,7 +2539,7 @@ impl Browser {
             }
             k if ctrl && k == b'T' as u16 => self.new_tab(),
             k if ctrl && !mods.shift && k == b'N' as u16 => self.new_window(window),
-            k if ctrl && mods.shift && k == b'N' as u16 => self.new_incognito_window(),
+            k if ctrl && mods.shift && k == b'N' as u16 => self.new_incognito_window(window),
             k if ctrl && (k == b'W' as u16 || k == keys::F4) => {
                 let i = self.tabs.active_index();
                 self.close_tab(i, window);
