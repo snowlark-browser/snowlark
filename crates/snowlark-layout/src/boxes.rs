@@ -161,6 +161,8 @@ pub struct LayoutBox<S: Style> {
     pub(crate) style: S,
     pub(crate) node: Option<NodeId>,
     pub(crate) pseudo: Option<PseudoElement>,
+    /// The originating element of a generated `::before` or `::after` box (`node` is `None`).
+    pub(crate) pseudo_of: Option<NodeId>,
     pub(crate) parent: Option<BoxId>,
     pub(crate) children: Vec<BoxId>,
     pub(crate) flags: u32,
@@ -467,6 +469,7 @@ impl<S: Style> BoxTree<S> {
             style: style.own_view(),
             node,
             pseudo: None,
+            pseudo_of: None,
             parent: None,
             children: Vec::new(),
             flags: flags::DIRTY,

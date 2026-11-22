@@ -945,6 +945,7 @@ impl<'a, Src: StyleSource> Builder<'a, Src> {
             return;
         }
         if let Some(b) = self.principal_box(None, Some(which), style, ctx, false, generated) {
+            self.tree.b_mut(b).pseudo_of = Some(el);
             out.push(b);
         }
     }

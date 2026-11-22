@@ -851,6 +851,7 @@ pub(crate) fn box_fragment<S: Style>(
             box_id: Some(id),
             node: b.node,
             pseudo: b.pseudo,
+            pseudo_of: b.pseudo_of,
             border,
             padding,
             flags: box_flags(b) | extra_flags,

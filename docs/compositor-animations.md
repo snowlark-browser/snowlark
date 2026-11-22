@@ -157,6 +157,13 @@ makes the box a stacking context (`ANIMATES_FILTER`, as `will-change: filter`). 
 keyframes, lists that do not interpolate, and a box with a `backdrop-filter` (its backdrop takes the box's filter)
 stay with the page: its box is still a layer, which the page repaints at each frame.
 
+**Pseudo-elements.** *Done 2026-11-22.* A generated `::before` or `::after` box is composited and animated apart
+from its element, as Blink's pseudo-elements have layout objects and paint layers of their own: the layer and
+animation key is `snowlark_layout::composited_key` (the element's id with the pseudo-element in the top two bits;
+generations have 30), the box and its fragments carry the originating element (`pseudo_of`), and the style
+engine keys composited targets, animation flags and what the compositor runs by element and pseudo-element. Their
+CSS animations and transitions go; script animations of pseudo-elements stay with the page.
+
 ## Left out on purpose
 
 Pixel-moving filter animations and backdrop-filter animations (a layer holding a backdrop is not split off; the

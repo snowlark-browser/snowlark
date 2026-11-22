@@ -4374,30 +4374,42 @@ impl Renderer {
         if let Some(doc) = self.doc.as_deref() {
             doc.read_motion_paths();
             if let Some(root) = &doc.fragments {
-                // (for a compositor: the elements with a transform or opacity animation in effect)
-                let mut animated = Vec::new();
+                // (for a compositor: the elements and pseudo-elements with a transform or opacity
+                // animation in effect, by `composited_key`)
+                let mut animated: Vec<u64> = Vec::new();
                 if layers {
-                    doc.engine.composited_animation_targets(&mut animated);
+                    let (mut elements, mut pseudos) = (Vec::new(), Vec::new());
+                    doc.engine
+                        .composited_animation_targets(&mut elements, &mut pseudos);
+                    animated.extend(elements.iter().map(|n| n.to_bits()));
+                    animated.extend(pseudos.iter().filter_map(|(n, p)| {
+                        snowlark_layout::composited_key(*n, Some(crate::source::layout_pseudo(p)?))
+                    }));
+                    animated.sort_unstable();
                 }
-                let composited = |n: NodeId| {
-                    animated
-                        .binary_search_by_key(&n.to_bits(), |a| a.to_bits())
-                        .is_ok()
-                };
+                let composited = |key: u64| animated.binary_search(&key).is_ok();
                 // (and the animations of theirs the compositor runs, on a timeline that follows
                 // the monotonic clock: S2)
                 let origin = snowlark_paint::Ticks::now().before(doc.timeline_origin.elapsed());
-                let compositor_animations = |n: NodeId,
+                let compositor_animations = |key: u64,
                                              reference: snowlark_paint::Rect,
                                              at: snowlark_paint::Point,
                                              out: &mut Vec<
                     snowlark_paint::layer_animation::LayerAnimation,
                 >| {
-                    if let Some(values) = doc.data.styles(n) {
+                    let Some((n, pseudo)) = snowlark_layout::composited_target(key) else {
+                        return;
+                    };
+                    let pseudo = pseudo.and_then(crate::source::stylo_pseudo);
+                    let values = match &pseudo {
+                        None => doc.data.styles_arc(n),
+                        Some(p) => doc.data.eager_pseudo_styles(n, p),
+                    };
+                    if let Some(values) = values {
                         crate::compositor_animations::collect(
                             (&doc.engine, &doc.data),
-                            n,
-                            values,
+                            (n, pseudo.as_ref(), key),
+                            &values,
                             reference,
                             at,
                             origin,
@@ -4414,7 +4426,7 @@ impl Renderer {
                     find: doc.find.as_ref(),
                     layers,
                     device_scale: scale,
-                    composited: layers.then_some(&composited as &dyn Fn(NodeId) -> bool),
+                    composited: layers.then_some(&composited as &dyn Fn(u64) -> bool),
                     animations: layers.then_some(
                         &compositor_animations as &snowlark_layout::CompositorAnimations,
                     ),
@@ -4470,7 +4482,8 @@ impl Renderer {
                                 snowlark_style::LonghandId::Filter
                             }
                         };
-                        Some((NodeId::from_bits(a.element)?, id))
+                        let (n, pseudo) = snowlark_layout::composited_target(a.element)?;
+                        Some((n, pseudo.and_then(crate::source::stylo_pseudo), id))
                     }));
             }
         }

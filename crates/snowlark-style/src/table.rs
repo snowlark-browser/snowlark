@@ -433,6 +433,22 @@ impl StyleData {
         slot.primary.clone()
     }
 
+    /// The computed style of an eager pseudo-element of `element` (`::before`, `::after`,
+    /// `::first-line`, `::first-letter`) as cascaded with it, if it has been styled and the
+    /// pseudo-element exists (use `StyleEngine::pseudo_style` for the others).
+    pub fn eager_pseudo_styles(
+        &self,
+        element: NodeId,
+        pseudo: &style::selector_parser::PseudoElement,
+    ) -> Option<Arc<ComputedValues>> {
+        let slot = self.slot(element)?;
+        if !slot.has(bits::HAS_DATA) || !pseudo.is_eager() {
+            return None;
+        }
+        let data = slot.data.borrow();
+        data.styles.pseudos.get(pseudo).cloned()
+    }
+
     /// The element's current state (what `:hover`, `:checked`, ... match against).
     pub fn state(&self, element: NodeId) -> ElementState {
         self.slot(element)

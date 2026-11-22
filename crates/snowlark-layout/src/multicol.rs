@@ -2252,6 +2252,7 @@ fn piece<S: Style>(
             box_id: b.box_id,
             node: b.node,
             pseudo: b.pseudo,
+            pseudo_of: b.pseudo_of,
             border,
             padding,
             flags: b.flags,

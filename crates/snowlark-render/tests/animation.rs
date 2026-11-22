@@ -562,6 +562,101 @@ fn compositor_animations_ask_only_for_their_changes() {
     assert!(r.animating());
 }
 
+/// A `::before` or `::after` with a transform or opacity animation is a composited layer of its
+/// own, keyed apart from its element's (which has an animation of its own here), and the
+/// compositor runs its animations: what it samples is what the page paints, and once a frame
+/// carries them the page asks for no rendering update for them. Blink gives a pseudo-element a
+/// layout object and paint layer of its own and starts its animations on the compositor as an
+/// element's (`CompositorAnimations::CheckCanStartElementOnCompositor`).
+#[test]
+fn a_pseudo_elements_animation_runs_on_the_compositor() {
+    use snowlark_paint::layer_animation::{Property, Sample};
+    use snowlark_paint::LayerKind;
+    let server = Server::start(routes);
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut r = renderer(&net);
+    let html = "<!DOCTYPE html><style>
+                  @keyframes pulse { from { transform: scale(.1); opacity: 0 }
+                                     50% { opacity: .5 } to { transform: scale(1); opacity: 0 } }
+                  @keyframes spin { to { transform: rotate(1turn) } }
+                  #d { position: absolute; left: 100px; top: 100px; width: 40px; height: 40px;
+                       background: teal; animation: spin 2s linear infinite }
+                  #d::before { content: ''; position: absolute; left: 4px; top: 4px; width: 12px;
+                               height: 12px; background: red; border-radius: 50%;
+                               animation: pulse 3s ease-out infinite }
+                  #d::after { content: 'x'; position: absolute; left: 20px }
+                </style><div id=d></div>";
+    r.load_html(html.as_bytes(), &server.url("/page.html"), None);
+    at(&mut r, 0);
+    at(&mut r, 100);
+    let d = by_id(&r, "d");
+    let element = d.to_bits();
+    let before =
+        snowlark_layout::composited_key(d, Some(snowlark_layout::style::PseudoElement::Before))
+            .unwrap();
+    assert_ne!(element, before);
+    let mut checked = 0;
+    for ms in [100, 400, 1250, 2000, 2990, 3600] {
+        at(&mut r, ms);
+        let list = r.paint_with_embeds(VIEWPORT, snowlark_paint::Point::ZERO, 1.0, None, true);
+        let mut keys: Vec<(u64, Property)> = list
+            .animations
+            .iter()
+            .map(|a| (a.element, a.property()))
+            .collect();
+        keys.sort_unstable_by_key(|(k, p)| (*k, *p as u8));
+        let mut want = vec![
+            (element, Property::Transform),
+            (before, Property::Transform),
+            (before, Property::Opacity),
+        ];
+        want.sort_unstable_by_key(|(k, p)| (*k, *p as u8));
+        assert_eq!(keys, want, "at {ms} ms");
+        let split = list.split_layers();
+        let layers: Vec<u64> = split
+            .layers
+            .iter()
+            .filter_map(|l| match l.kind {
+                Some(LayerKind::Composited(k)) => Some(k),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            layers.contains(&element) && layers.contains(&before),
+            "{layers:?}"
+        );
+        let now = ms as f64 / 1000.0;
+        for piece in &split.layers {
+            for (k, transform, opacity) in own_steps(&piece.state) {
+                for anim in list.animations.iter().filter(|x| x.element == k) {
+                    match (anim.sample(now), anim.property()) {
+                        (Some(Sample::Transform(m)), Property::Transform) => {
+                            let got = [m.m11, m.m12, m.m21, m.m22, m.dx, m.dy];
+                            for (g, p) in got.iter().zip(transform) {
+                                assert!(
+                                    (g - p).abs() < 2e-3,
+                                    "{ms} ms, {k}: sampled {got:?}, painted {transform:?}"
+                                );
+                            }
+                        }
+                        (Some(Sample::Opacity(o)), Property::Opacity) => {
+                            assert!(
+                                (o - opacity).abs() < 1e-4,
+                                "{ms} ms, {k}: sampled {o}, painted {opacity}"
+                            );
+                        }
+                        (s, p) => panic!("{ms} ms, {k}: {p:?} sampled as {s:?}"),
+                    }
+                    checked += 1;
+                }
+            }
+        }
+        // (the compositor runs all three: nothing is left for the page to tick)
+        assert!(!r.animating(), "at {ms} ms the page still ticks");
+    }
+    assert!(checked >= 18, "{checked}");
+}
+
 /// Web Animations 1 §5.3.4: in a reversed iteration the interval is chosen by the directed progress,
 /// and the easing of its first keyframe (by offset) applies to the distance from it.
 /// With `steps(2, jump-end)` 100 ms into a reversed 1 s iteration (directed progress 0.9) the value

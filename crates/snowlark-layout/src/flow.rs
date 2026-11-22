@@ -136,6 +136,7 @@ fn map_fragment_inner<S: Style>(f: &Fragment<S>, m: Flip, view: Flip, line: bool
                 box_id: b.box_id,
                 node: b.node,
                 pseudo: b.pseudo,
+                pseudo_of: b.pseudo_of,
                 border: m.sides(b.border),
                 padding: m.sides(b.padding),
                 flags,

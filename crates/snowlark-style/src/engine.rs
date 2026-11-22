@@ -659,11 +659,12 @@ pub struct StyleEngine {
     css_controlled: FxHashSet<NodeId>,
     /// Nodes DOM's move (`moveBefore`) moved since the last restyle ([`StyleEngine::node_moved`]).
     moved: FxHashSet<NodeId>,
-    /// What the compositor animates of each element, as of the last frame painted for one
-    /// ([`StyleEngine::set_on_compositor`]).
-    on_compositor: FxHashMap<NodeId, SmallVec<[LonghandId; 2]>>,
-    /// Each element's [`StyleEngine::animation_flags`] as of the last restyle (only those not 0).
-    animation_flags: FxHashMap<NodeId, u8>,
+    /// What the compositor animates of each element or pseudo-element, as of the last frame
+    /// painted for one ([`StyleEngine::set_on_compositor`]).
+    on_compositor: FxHashMap<(NodeId, Option<PseudoElement>), SmallVec<[LonghandId; 2]>>,
+    /// Each element's and pseudo-element's [`StyleEngine::animation_flags`] as of the last restyle
+    /// (only those not 0).
+    animation_flags: FxHashMap<(NodeId, Option<PseudoElement>), u8>,
     /// The page takes the events ([`StyleEngine::css_animation_events`] has been called).
     css_events_taken: bool,
     /// Events found by scans, for the page to take.
@@ -3673,39 +3674,42 @@ impl StyleEngine {
     /// page does not service the animations and transitions they show
     /// ([`StyleEngine::animations_need_page_ticks`]), only their changes
     /// ([`StyleEngine::compositor_next_change`]).
-    pub fn set_on_compositor(&mut self, entries: impl IntoIterator<Item = (NodeId, LonghandId)>) {
+    pub fn set_on_compositor(
+        &mut self,
+        entries: impl IntoIterator<Item = (NodeId, Option<PseudoElement>, LonghandId)>,
+    ) {
         self.on_compositor.clear();
-        for (element, id) in entries {
-            let on = self.on_compositor.entry(element).or_default();
+        for (element, pseudo, id) in entries {
+            let on = self.on_compositor.entry((element, pseudo)).or_default();
             if !on.contains(&id) {
                 on.push(id);
             }
         }
     }
 
-    /// The properties of `element` a compositor animates (empty for none).
+    /// The properties of the element or pseudo-element `key` names a compositor animates (empty
+    /// for none).
     fn compositor_properties(&self, key: &AnimationSetKey) -> &[LonghandId] {
-        if self.on_compositor.is_empty() || key.pseudo_element.is_some() {
+        if self.on_compositor.is_empty() {
             return &[];
         }
         node_from_opaque(key.node)
-            .and_then(|id| self.on_compositor.get(&id))
+            .and_then(|id| self.on_compositor.get(&(id, key.pseudo_element)))
             .map_or(&[], |on| on.as_slice())
     }
 
     /// Whether the CSS animation or transition `key` names runs on a compositor (Blink's
     /// `Animation::HasActiveAnimationsOnCompositor`).
     pub fn css_key_on_compositor(&self, key: &crate::web_animations::CssKey) -> bool {
-        if key.pseudo.is_some() || self.css_controlled.contains(&key.element) {
+        if self.css_controlled.contains(&key.element) {
             return false;
         }
-        let Some(on) = self.on_compositor.get(&key.element) else {
+        let Some(on) = self.on_compositor.get(&(key.element, key.pseudo)) else {
             return false;
         };
         let sets = self.animations.sets.read();
-        let Some(set) = sets.get(&AnimationSetKey::new_for_non_pseudo(opaque_node(
-            key.element,
-        ))) else {
+        let Some(set) = sets.get(&AnimationSetKey::new(opaque_node(key.element), key.pseudo))
+        else {
             return false;
         };
         if key.transition {
@@ -3783,25 +3787,31 @@ impl StyleEngine {
             .reduce(f64::min)
     }
 
-    /// Whether some script animation is in effect.
     /// The elements with an animation in effect of a property a compositor animates (CSS
-    /// animations and transitions, and script animations; pseudo-elements left out), sorted by id:
-    /// Blink's `HasCurrentTransformAnimation` and `HasCurrentOpacityAnimation`, which
-    /// `CompositingReasonFinder::CompositingReasonsForAnimation` turns into a layer.
-    pub fn composited_animation_targets(&self, out: &mut Vec<NodeId>) {
+    /// animations and transitions, and script animations), sorted by id, and in `pseudos` the
+    /// pseudo-elements with such a CSS animation or transition: Blink's
+    /// `HasCurrentTransformAnimation` and `HasCurrentOpacityAnimation`, which
+    /// `CompositingReasonFinder::CompositingReasonsForAnimation` turns into a layer (a
+    /// pseudo-element's own, as it has a layout object of its own).
+    pub fn composited_animation_targets(
+        &self,
+        out: &mut Vec<NodeId>,
+        pseudos: &mut Vec<(NodeId, PseudoElement)>,
+    ) {
         out.clear();
+        pseudos.clear();
         if let Ok(script) = self.script_animations.read() {
             script.targets_animating(&crate::animations::composited_property, out);
         }
         for (key, set) in self.animations.sets.read().iter() {
-            if key.pseudo_element.is_some() {
-                continue;
-            }
             let Some(id) = node_from_opaque(key.node) else {
                 continue;
             };
             if crate::animations::has_composited_animation(set) {
-                out.push(id);
+                match &key.pseudo_element {
+                    None => out.push(id),
+                    Some(p) => pseudos.push((id, *p)),
+                }
             }
         }
         out.sort_unstable_by_key(|n| n.to_bits());
@@ -3815,9 +3825,24 @@ impl StyleEngine {
     /// those properties), as Blink's `ComputedStyle::HasCurrentOpacityAnimation` and
     /// `HasCurrentTransformRelatedAnimation` make it a stacking context
     /// (`CalculateIsStackingContextWithoutContainment`, `HasNonInitialOpacity`), and, for a
-    /// transform, a containing block (`HasTransform`). Pseudo-elements are left out.
+    /// transform, a containing block (`HasTransform`).
     pub fn animation_flags(&self, element: NodeId) -> u8 {
-        self.animation_flags.get(&element).copied().unwrap_or(0)
+        self.animation_flags
+            .get(&(element, None))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// [`StyleEngine::animation_flags`] of a pseudo-element of `element` (CSS animations and
+    /// transitions; script animations of pseudo-elements are left out).
+    pub fn pseudo_animation_flags(&self, element: NodeId, pseudo: &PseudoElement) -> u8 {
+        if self.animation_flags.is_empty() {
+            return 0;
+        }
+        self.animation_flags
+            .get(&(element, Some(*pseudo)))
+            .copied()
+            .unwrap_or(0)
     }
 
     /// Recomputes [`StyleEngine::animation_flags`] after a restyle and logs, for each element
@@ -3825,28 +3850,26 @@ impl StyleEngine {
     /// context, as an opacity below 1 makes one), a relayout for a transform (also a containing
     /// block for positioned descendants).
     fn update_animation_flags(&mut self, data: &mut StyleData) {
-        let mut flags: FxHashMap<NodeId, u8> = FxHashMap::default();
+        let mut flags: FxHashMap<(NodeId, Option<PseudoElement>), u8> = FxHashMap::default();
         if let Ok(script) = self.script_animations.read() {
             script.each_animated(&mut |target, id| {
                 let f = crate::animations::animation_flag(id);
                 if f != 0 {
-                    *flags.entry(target).or_default() |= f;
+                    *flags.entry((target, None)).or_default() |= f;
                 }
             });
         }
         for (key, set) in self.animations.sets.read().iter() {
-            if key.pseudo_element.is_some() {
-                continue;
-            }
             let f = crate::animations::current_flags(set);
             if let (Some(id), true) = (node_from_opaque(key.node), f != 0) {
-                *flags.entry(id).or_default() |= f;
+                *flags.entry((id, key.pseudo_element)).or_default() |= f;
             }
         }
         if flags.is_empty() && self.animation_flags.is_empty() {
             return;
         }
-        let changed = |id: NodeId, old: u8, new: u8| {
+        // (a pseudo-element's change is its element's restyle: its boxes are the element's)
+        let changed = |(id, _): (NodeId, Option<PseudoElement>), old: u8, new: u8| {
             (old != new).then_some(crate::damage::ElementRestyle {
                 element: id,
                 change: if (old ^ new) & crate::animations::ANIMATES_TRANSFORM != 0 {
@@ -3859,16 +3882,16 @@ impl StyleEngine {
             })
         };
         let mut records = Vec::new();
-        for (&id, &new) in &flags {
+        for (key, &new) in &flags {
             records.extend(changed(
-                id,
-                self.animation_flags.get(&id).copied().unwrap_or(0),
+                *key,
+                self.animation_flags.get(key).copied().unwrap_or(0),
                 new,
             ));
         }
-        for (&id, &old) in &self.animation_flags {
-            if !flags.contains_key(&id) {
-                records.extend(changed(id, old, 0));
+        for (key, &old) in &self.animation_flags {
+            if !flags.contains_key(key) {
+                records.extend(changed(*key, old, 0));
             }
         }
         for r in records {
@@ -3928,17 +3951,20 @@ impl StyleEngine {
     /// style data, `values` its computed values) are left out whole, as Blink's
     /// `KeyframeEffect::CheckCanStartAnimationOnCompositor` does with `AffectsImportantProperty`
     /// (`keyframe_effect.cc`): the page shows the important value (CSS Cascade 5 §6.1).
-    /// Pseudo-elements are left out. The caller checks the values (keyframes it can interpolate).
+    /// With `pseudo`, those of that pseudo-element of `element` (`values` its computed values):
+    /// its CSS animations and transitions (script animations of pseudo-elements stay with the
+    /// page). The caller checks the values (keyframes it can interpolate).
     pub fn compositor_candidates(
         &self,
         element: NodeId,
+        pseudo: Option<&PseudoElement>,
         data: &StyleData,
         values: &ComputedValues,
         f: &mut dyn FnMut(crate::animations::CompositorCandidate<'_>),
     ) {
         let script = self.script_animations.read().ok();
-        let script = script.as_deref();
-        let key = AnimationSetKey::new_for_non_pseudo(opaque_node(element));
+        let script = script.as_deref().filter(|_| pseudo.is_none());
+        let key = AnimationSetKey::new(opaque_node(element), pseudo.copied());
         let sets = self.animations.sets.read();
         let set = sets.get(&key);
         let alone = |id: LonghandId| self.alone_on(element, set, script, id);
@@ -3966,8 +3992,11 @@ impl StyleEngine {
             return false;
         };
         let sets = self.animations.sets.read();
-        let on =
-            |n: NodeId, p: LonghandId| self.on_compositor.get(&n).is_some_and(|o| o.contains(&p));
+        let on = |n: NodeId, p: LonghandId| {
+            self.on_compositor
+                .get(&(n, None))
+                .is_some_and(|o| o.contains(&p))
+        };
         let alone = |n: NodeId, p: LonghandId| {
             let set = sets.get(&AnimationSetKey::new_for_non_pseudo(opaque_node(n)));
             self.alone_on(n, set, Some(&script), p)

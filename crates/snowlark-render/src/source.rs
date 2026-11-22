@@ -72,6 +72,17 @@ pub(crate) fn stylo_pseudo(p: PseudoElement) -> Option<StyloPseudo> {
     })
 }
 
+/// The generated box a stylo pseudo-element is, for those a compositor animates apart
+/// (`snowlark_layout::composited_key`): `::before`, `::after`, `::marker`.
+pub(crate) fn layout_pseudo(p: &StyloPseudo) -> Option<PseudoElement> {
+    Some(match p {
+        StyloPseudo::Before => PseudoElement::Before,
+        StyloPseudo::After => PseudoElement::After,
+        StyloPseudo::Marker => PseudoElement::Marker,
+        _ => return None,
+    })
+}
+
 fn stylo_part(p: FormPart) -> StyloPseudo {
     match p {
         FormPart::ProgressInner => StyloPseudo::WebkitProgressInnerElement,
@@ -768,6 +779,8 @@ impl StyleSource for DocumentStyles<'_> {
         } else {
             None
         };
+        let animations =
+            stylo_pseudo(pseudo).map_or(0, |p| self.engine.pseudo_animation_flags(element, &p));
         Some(RenderStyle {
             values,
             env: self.env.clone(),
@@ -776,7 +789,7 @@ impl StyleSource for DocumentStyles<'_> {
             filter_references: None,
             remembered: None,
             view: snowlark_layout::style::Flip::IDENTITY,
-            animations: 0,
+            animations,
             custom_scrollbar: None,
         })
     }

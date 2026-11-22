@@ -27,21 +27,26 @@ use style::properties::{ComputedValues, LonghandId, PropertyDeclarationId};
 use style::values::computed::{Length, TimingFunction};
 use style::values::generics::easing::{StepPosition as Steps, TimingFunction as Tf, TimingKeyword};
 
-/// Pushes into `out` the compositor animations of `element` (of the document whose style engine
-/// and data come first), a composited box whose transform reference box is `reference` (its
+/// Pushes into `out` the compositor animations of `element`, or of its pseudo-element `pseudo`
+/// (of the document whose style engine and data come first), a composited box keyed `key`
+/// (`snowlark_layout::composited_key`) whose transform reference box is `reference` (its
 /// coordinates) and which is painted at `at` (the list's), with the computed values `values`; the
 /// page's timeline reads 0 at `origin`.
 pub(crate) fn collect(
     (engine, data): (&snowlark_style::StyleEngine, &snowlark_style::StyleData),
-    element: snowlark_dom::NodeId,
+    (element, pseudo, key): (
+        snowlark_dom::NodeId,
+        Option<&style::selector_parser::PseudoElement>,
+        u64,
+    ),
     values: &ComputedValues,
     reference: Rect,
     at: Point,
     origin: Ticks,
     out: &mut Vec<LayerAnimation>,
 ) {
-    engine.compositor_candidates(element, data, values, &mut |c| {
-        if let Some(a) = convert(c, element, values, reference, at, origin) {
+    engine.compositor_candidates(element, pseudo, data, values, &mut |c| {
+        if let Some(a) = convert(c, key, values, reference, at, origin) {
             if a.is_valid() {
                 out.push(a);
             }
@@ -51,7 +56,7 @@ pub(crate) fn collect(
 
 fn convert(
     c: CompositorCandidate<'_>,
-    element: snowlark_dom::NodeId,
+    key: u64,
     values: &ComputedValues,
     reference: Rect,
     at: Point,
@@ -211,7 +216,7 @@ fn convert(
     };
     let easings = easings?;
     Some(LayerAnimation {
-        element: element.to_bits(),
+        element: key,
         origin,
         start,
         playback_rate: timing.playback_rate,

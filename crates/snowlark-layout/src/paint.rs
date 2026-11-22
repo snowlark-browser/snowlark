@@ -626,7 +626,7 @@ pub(crate) struct Painter<'k, K> {
     /// box around them that is not an inline box).
     pub sticky_cb: std::cell::Cell<Rect>,
     /// See [`crate::PaintOptions::composited`].
-    pub composited: Option<&'k dyn Fn(NodeId) -> bool>,
+    pub composited: Option<&'k dyn Fn(u64) -> bool>,
     /// See [`crate::PaintOptions::animations`].
     pub animations: Option<&'k crate::CompositorAnimations<'k>>,
 }
@@ -1041,20 +1041,23 @@ impl<K> Painter<'_, K> {
         // stacking context a layer of its own inside its transform and opacity groups, which a
         // compositor draws through them: a frame that changes only those repaints nothing. Not
         // inside a fixed or sticky layer, which moves as a whole.
+        // (a generated `::before`, `::after` or `::marker` box is keyed apart from its element's:
+        // Blink gives it a layout object and paint layer of its own)
         let composited = (self.layers && !self.in_layer)
-            .then_some(b.node)
+            .then_some(b.node.or(b.pseudo_of))
             .flatten()
-            .filter(|&n| self.composited.is_some_and(|c| c(n)) || s.will_change_composited());
+            .and_then(|n| crate::composited_key(n, b.pseudo))
+            .filter(|&k| self.composited.is_some_and(|c| c(k)) || s.will_change_composited());
         // The animations a compositor runs for it (S2): only for a transform in the box's own
         // coordinates (no writing mode flip, no motion path, which need more than a list).
         let mut animations = Vec::new();
-        if let (Some(node), Some(f_anim)) = (composited, self.animations) {
+        if let (Some(key), Some(f_anim)) = (composited, self.animations) {
             if s.view().is_identity() && !s.transform_needs_containing() {
                 let mut reference = Rect::new(0.0, 0.0, f.size.width, f.size.height);
                 if s.transform_box_is_content() {
                     reference = reference.deflate(&b.border).deflate(&b.padding);
                 }
-                f_anim(node, reference, at, &mut animations);
+                f_anim(key, reference, at, &mut animations);
             }
         }
         // (a box with compositor animations always has its own transform and opacity groups, the
@@ -1108,8 +1111,8 @@ impl<K> Painter<'_, K> {
             self.sink.push_filter(&filters, group_bounds());
             self.groups += 1;
         }
-        if let Some(node) = composited {
-            self.sink.push_layer(LayerKind::Composited(node.to_bits()));
+        if let Some(key) = composited {
+            self.sink.push_layer(LayerKind::Composited(key));
             for a in animations {
                 self.sink.add_animation(a);
             }

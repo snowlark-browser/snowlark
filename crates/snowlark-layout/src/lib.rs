@@ -405,6 +405,7 @@ impl<S: Style> LayoutTree<S> {
                 box_id: Some(root),
                 node: None,
                 pseudo: None,
+                pseudo_of: None,
                 border: Default::default(),
                 padding: Default::default(),
                 flags: fragment_flags::INITIAL_CONTAINING_BLOCK,
@@ -854,22 +855,51 @@ pub struct PaintOptions<'a> {
     /// Device pixels per CSS px (0 counts as 1): overflow of less than a device pixel shows no
     /// scroll bar.
     pub device_scale: f32,
-    /// With `layers`, the elements with a transform or opacity animation in effect (Blink's
-    /// direct compositing reasons `kActiveTransformAnimation`, `kActiveOpacityAnimation`): their
-    /// stacking contexts are marked [`snowlark_paint::LayerKind::Composited`], as are those of
-    /// elements whose `will-change` names transform or opacity.
-    pub composited: Option<&'a dyn Fn(NodeId) -> bool>,
-    /// The transform and opacity animations a compositor can run for a composited element
-    /// (`docs/compositor-animations.md`, S2), pushed into the vector: given the element, its
-    /// transform reference box (the box's coordinates) and where the box is painted (the list's
-    /// coordinates). An element with any always paints its own transform and opacity groups, and
-    /// its animations go into the list ([`snowlark_paint::DisplayList::animations`]).
+    /// With `layers`, the elements and pseudo-elements (by [`composited_key`]) with a transform or
+    /// opacity animation in effect (Blink's direct compositing reasons `kActiveTransformAnimation`,
+    /// `kActiveOpacityAnimation`): their stacking contexts are marked
+    /// [`snowlark_paint::LayerKind::Composited`], as are those of elements whose `will-change`
+    /// names transform or opacity.
+    pub composited: Option<&'a dyn Fn(u64) -> bool>,
+    /// The transform and opacity animations a compositor can run for a composited element or
+    /// pseudo-element (`docs/compositor-animations.md`, S2), pushed into the vector: given its
+    /// [`composited_key`], its transform reference box (the box's coordinates) and where the box is
+    /// painted (the list's coordinates). A box with any always paints its own transform and opacity
+    /// groups, and its animations go into the list ([`snowlark_paint::DisplayList::animations`]).
     pub animations: Option<&'a CompositorAnimations<'a>>,
 }
 
 /// See [`PaintOptions::animations`].
 pub type CompositorAnimations<'a> =
-    dyn Fn(NodeId, Rect, Point, &mut Vec<snowlark_paint::layer_animation::LayerAnimation>) + 'a;
+    dyn Fn(u64, Rect, Point, &mut Vec<snowlark_paint::layer_animation::LayerAnimation>) + 'a;
+
+/// The key of the composited layer of an element's box, or of one of its `::before`, `::after`
+/// or `::marker` boxes, and of the compositor animations drawn through it
+/// ([`snowlark_paint::LayerKind::Composited`], `LayerAnimation::element`): the element's
+/// [`NodeId::to_bits`] (62 bits, as generations have 30) with the pseudo-element in the top two,
+/// as Blink's `CompositorElementIdFromUniqueObjectId` puts a namespace beside the object's id.
+/// `None` for other pseudo-elements, which are not composited apart.
+pub fn composited_key(node: NodeId, pseudo: Option<style::PseudoElement>) -> Option<u64> {
+    let part: u64 = match pseudo {
+        None => 0,
+        Some(style::PseudoElement::Before) => 1,
+        Some(style::PseudoElement::After) => 2,
+        Some(style::PseudoElement::Marker) => 3,
+        Some(_) => return None,
+    };
+    Some(node.to_bits() | part << 62)
+}
+
+/// The element and pseudo-element a [`composited_key`] names.
+pub fn composited_target(key: u64) -> Option<(NodeId, Option<style::PseudoElement>)> {
+    let pseudo = match key >> 62 {
+        0 => None,
+        1 => Some(style::PseudoElement::Before),
+        2 => Some(style::PseudoElement::After),
+        _ => Some(style::PseudoElement::Marker),
+    };
+    Some((NodeId::from_bits(key & ((1 << 62) - 1))?, pseudo))
+}
 
 impl PaintOptions<'_> {
     /// A viewport with nothing scrolled.

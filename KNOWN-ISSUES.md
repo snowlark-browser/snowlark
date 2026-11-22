@@ -105,8 +105,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **System-font text is not byte-stable between runs.** The same frames can differ by a few bytes from one run to the
   next. The cause is not established. (ref 87)
 - **Canvas 2D.** `ctx.filter` keeps its value but is not applied. (ref 499)
-- **Redundant paint.** On some animated pages the tab paints twice per frame, the second display list being identical
-  to the first. The raster is skipped, but the display list work is wasted. (ref 505)
+- **Redundant paint.** A page that draws into a 2D canvas every animation frame is painted twice per frame: the
+  canvas's new contents arrive after the frame's paint and cause a second display list. The raster is skipped for
+  one of them, but the display list work is wasted. (ref 505)
 - **Pixel snapping inside transforms.** Box edges inside a scale or rotate transform are not snapped to device pixels.
   (ref 34)
 - **Unpainted areas while scrolling fast.** A page whose main thread is busy can show its background where the view
@@ -231,9 +232,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   (ref 542)
 - **Incognito windows are not finished.** They keep nothing on disk, but open the settings, history and bookmark
   pages in themselves rather than in a regular window, and lose bookmarks added in them when they close. (ref 540)
-- **Animated pseudo-elements repaint the page.** A `transform` or `opacity` animation on a `::before` or
-  `::after` (Wikipedia's pulsing watch-star dot) is not run by the compositor: the whole page is painted again
-  every frame, and an idle tab and the browser process keep using CPU. (ref 668)
 
 ## Tooling
 

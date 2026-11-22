@@ -306,6 +306,7 @@ impl<S: Style> Refresh<'_, S> {
                     box_id: b.box_id,
                     node: b.node,
                     pseudo: b.pseudo,
+                    pseudo_of: b.pseudo_of,
                     border: b.border,
                     padding: b.padding,
                     flags: b.flags,

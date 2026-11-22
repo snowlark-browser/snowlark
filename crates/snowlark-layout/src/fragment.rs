@@ -157,6 +157,8 @@ pub struct BoxFragment<S: Style> {
     /// The generating DOM node (`None` for anonymous boxes).
     pub node: Option<NodeId>,
     pub pseudo: Option<PseudoElement>,
+    /// The originating element of a generated `::before` or `::after` box.
+    pub pseudo_of: Option<NodeId>,
     /// Used border widths (zero on the sliced sides of an inline box piece; collapsed-border halves
     /// for cells in the collapsing model).
     pub border: Sides,
