@@ -17,12 +17,15 @@
 //!
 //! The browser's process ends when its last window (regular or Incognito) closes.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
 use snowlark_net::Url;
+use snowlark_paint::placement::Placement;
 use snowlark_paint::window::{self, WindowOptions, WindowProxy};
+
+use crate::restore::{SavedWindow, SessionFile, Store};
 
 use super::{Browser, Route};
 use crate::chrome;
@@ -108,10 +111,11 @@ impl Browser {
         }
     }
 
-    /// Ctrl+N, the app menu's "New window": a new regular window. In an Incognito window it is a
-    /// regular one too (Ctrl+Shift+N opens another Incognito window).
-    pub(super) fn new_window(&self) {
-        self.app.open_window(None);
+    /// Ctrl+N, the app menu's "New window": a new regular window, beside this one. In an Incognito
+    /// window it is a regular one too (Ctrl+Shift+N opens another Incognito window).
+    pub(super) fn new_window(&self, window: &window::Window) {
+        let placement = window.placement().map(|p| crate::window_state::beside(&p));
+        self.app.open_window(None, placement, None);
     }
 
     /// Ctrl+Shift+N, the app menu's "New Incognito window": a new one, at its new-tab page.
@@ -148,6 +152,11 @@ pub struct App {
     pub(super) closed: Rc<RefCell<Vec<String>>>,
     /// The regular profile's downloads, loaded when its first window opens.
     downloads: RefCell<Option<Arc<std::sync::Mutex<crate::downloads::DownloadHistory>>>>,
+    /// The process's session file, which every regular window keeps its part of; opened by the
+    /// first regular window.
+    session: RefCell<Option<Store>>,
+    /// The id the next regular window has in the session file.
+    next_window: Cell<u64>,
 }
 
 /// What the regular profile's windows share besides the partition: each window works on its own
@@ -160,6 +169,12 @@ pub(crate) struct Shared {
     settings: Option<(u64, crate::settings::Settings)>,
     bookmarks: Option<(u64, crate::bookmarks::Bookmarks)>,
 }
+
+/// What [`Shared::since`] gives: the settings and the bookmarks that changed, each with its count.
+pub(crate) type Changes = (
+    Option<(u64, crate::settings::Settings)>,
+    Option<(u64, crate::bookmarks::Bookmarks)>,
+);
 
 impl Shared {
     /// The counts of the settings' and the bookmarks' changes so far.
@@ -189,13 +204,7 @@ impl Shared {
 
     /// What changed since a window had the counts `seen`: the settings and the bookmarks (a
     /// copy that saves nowhere), each with its count.
-    pub(crate) fn since(
-        &self,
-        seen: (u64, u64),
-    ) -> (
-        Option<(u64, crate::settings::Settings)>,
-        Option<(u64, crate::bookmarks::Bookmarks)>,
-    ) {
+    pub(crate) fn since(&self, seen: (u64, u64)) -> Changes {
         (
             self.settings
                 .as_ref()
@@ -236,7 +245,51 @@ impl App {
             shared: RefCell::default(),
             closed: Rc::default(),
             downloads: RefCell::default(),
+            session: RefCell::default(),
+            next_window: Cell::new(1),
         })
+    }
+
+    /// A regular window opened: it joins the session file (opened by the first one, or again by
+    /// a regular window opened after the last one closed while an Incognito window stayed).
+    /// Returns its id there and, when this call opened the file, the session of an unexpected
+    /// end to offer.
+    pub(super) fn join_session(&self) -> (u64, Option<SessionFile>) {
+        let id = self.next_window.get();
+        self.next_window.set(id + 1);
+        let mut session = self.session.borrow_mut();
+        let mut offer = None;
+        if !session.as_ref().is_some_and(Store::is_open) {
+            let (store, o) = Store::open(&self.profile.dir);
+            *session = Some(store);
+            offer = o;
+        }
+        if let Some(s) = session.as_mut() {
+            s.register(id);
+        }
+        (id, offer)
+    }
+
+    /// Regular window `id`'s tabs and placement as they are now.
+    pub(super) fn session_update(&self, id: u64, window: SavedWindow) {
+        if let Some(s) = self.session.borrow_mut().as_mut() {
+            s.update(id, window);
+        }
+    }
+
+    /// Regular window `id` closed ([`Store::window_closed`]).
+    pub(super) fn leave_session(&self, id: u64) {
+        if let Some(s) = self.session.borrow_mut().as_mut() {
+            s.window_closed(id);
+        }
+    }
+
+    /// Windows ends the session (a shutdown is not a crash): the file is closed normally with
+    /// every window in it.
+    pub(super) fn end_session(&self) {
+        if let Some(s) = self.session.borrow_mut().as_mut() {
+            s.close_clean();
+        }
     }
 
     /// The downloads list a new window shows: the regular profile's one, or an Incognito
@@ -345,20 +398,31 @@ impl App {
         }
     }
 
-    /// Opens a new regular window, at `url` or the start page: it shares the regular partition,
-    /// the settings, the bookmarks, the downloads and the recently closed tabs with the other
-    /// regular windows; its tabs' renderers come from a spare pool of its own. Called on the
-    /// window thread.
-    pub fn open_window(self: &Rc<App>, url: Option<Url>) {
+    /// Opens a new regular window, at `url` or the start page, at `placement` (when it fits the
+    /// monitors), with the tabs of `restored` (a window of a session being restored) in place of
+    /// the start page: it shares the regular partition, the settings, the bookmarks, the
+    /// downloads, the recently closed tabs and the session file with the other regular windows;
+    /// its tabs' renderers come from a spare pool of its own. Called on the window thread.
+    pub fn open_window(
+        self: &Rc<App>,
+        url: Option<Url>,
+        placement: Option<Placement>,
+        restored: Option<SavedWindow>,
+    ) {
         let app = self.clone();
         let partition = self.regular.clone();
         let spares = self.spares();
         let options = WindowOptions {
             title: "Snowlark".into(),
+            placement,
             ..WindowOptions::default()
         };
         if let Err(e) = window::open_browser_window(options, move |w| {
-            Route::main(Browser::new(w, app, partition, url, spares))
+            let mut b = Browser::new(w, app, partition, url, spares);
+            if let Some(saved) = restored {
+                b.restore_window(saved);
+            }
+            Route::main(b)
         }) {
             eprintln!("[browser] no new window: {e}");
         }

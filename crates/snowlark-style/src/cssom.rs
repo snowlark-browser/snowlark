@@ -10,6 +10,7 @@
 
 use servo_arc::Arc;
 use style::shared_lock::{Locked, SharedRwLock, ToCssWithGuard};
+use style::stylesheets::keyframes_rule::{Keyframe, KeyframesRule};
 use style::stylesheets::{
     AllowImportRules, CssRule, CssRuleType, CssRuleTypes, CssRules, RulesMutateError,
     StylesheetInDocument,
@@ -38,13 +39,21 @@ impl From<RulesMutateError> for RuleError {
     }
 }
 
-/// A list of rules: a sheet's, or a grouping rule's.
+/// A list of rules: a sheet's, a grouping rule's, or a `@keyframes` rule's keyframes.
 #[derive(Clone)]
 pub struct RuleList {
-    rules: Arc<Locked<CssRules>>,
+    source: Source,
     sheet: Sheet,
     containing: CssRuleTypes,
     relative: Option<CssRuleType>,
+}
+
+/// What a [`RuleList`] lists.
+#[derive(Clone)]
+enum Source {
+    Rules(Arc<Locked<CssRules>>),
+    /// The keyframes of a `@keyframes` rule (CSS Animations 1 §6.2 `cssRules`).
+    Keyframes(Arc<Locked<KeyframesRule>>),
 }
 
 /// One rule of a sheet.
@@ -53,6 +62,8 @@ pub struct Rule {
     rule: CssRule,
     sheet: Sheet,
     containing: CssRuleTypes,
+    /// A keyframe of the `@keyframes` rule `rule` (a `CSSKeyframeRule`), when this is one.
+    keyframe: Option<Arc<Locked<Keyframe>>>,
 }
 
 /// What kind of rule a [`Rule`] is (which CSSOM interface it gets).
@@ -64,6 +75,8 @@ pub enum RuleKind {
     Supports,
     FontFace,
     Keyframes,
+    /// A keyframe in a `@keyframes` rule.
+    Keyframe,
     Namespace,
     Page,
     LayerBlock,
@@ -116,7 +129,7 @@ impl Sheet {
         let rules = self.0 .0.contents(&guard).rules.clone();
         drop(guard);
         RuleList {
-            rules,
+            source: Source::Rules(rules),
             sheet: self.clone(),
             containing: CssRuleTypes::default(),
             relative: None,
@@ -172,12 +185,27 @@ impl Sheet {
 impl RuleList {
     /// A stable identity for the list (the CSSOM's `[SameObject]`).
     pub fn id(&self) -> usize {
-        ptr(&self.rules)
+        match &self.source {
+            Source::Rules(r) => ptr(r),
+            // (the list of a `@keyframes` rule is an object of its own beside the rule)
+            Source::Keyframes(r) => ptr(r) + 1,
+        }
     }
 
     pub fn len(&self) -> usize {
         let guard = lock(&self.sheet).read();
-        self.rules.read_with(&guard).0.len()
+        match &self.source {
+            Source::Rules(r) => r.read_with(&guard).0.len(),
+            Source::Keyframes(r) => r.read_with(&guard).keyframes.len(),
+        }
+    }
+
+    /// The rules of a list of rules; `None` for a list of keyframes.
+    fn css_rules(&self) -> Option<&Arc<Locked<CssRules>>> {
+        match &self.source {
+            Source::Rules(r) => Some(r),
+            Source::Keyframes(_) => None,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -187,21 +215,36 @@ impl RuleList {
     /// The rule at `index`.
     pub fn get(&self, index: usize) -> Option<Rule> {
         let guard = lock(&self.sheet).read();
-        let rule = self.rules.read_with(&guard).0.get(index)?.clone();
-        Some(Rule {
-            rule,
-            sheet: self.sheet.clone(),
-            containing: self.containing,
-        })
+        match &self.source {
+            Source::Rules(r) => {
+                let rule = r.read_with(&guard).0.get(index)?.clone();
+                Some(Rule {
+                    rule,
+                    sheet: self.sheet.clone(),
+                    containing: self.containing,
+                    keyframe: None,
+                })
+            }
+            Source::Keyframes(r) => {
+                let keyframe = r.read_with(&guard).keyframes.get(index)?.clone();
+                Some(Rule {
+                    rule: CssRule::Keyframes(r.clone()),
+                    sheet: self.sheet.clone(),
+                    containing: self.containing,
+                    keyframe: Some(keyframe),
+                })
+            }
+        }
     }
 
     /// CSSOM "insert a CSS rule": parses `text` and inserts it at `index`. Returns the index.
     pub fn insert(&self, text: &str, index: usize) -> Result<usize, RuleError> {
         let lock = lock(&self.sheet);
+        let rules = self.css_rules().ok_or(RuleError::HierarchyRequest)?;
         let rule = {
             let guard = lock.read();
             let contents = self.sheet.0 .0.contents(&guard);
-            self.rules.read_with(&guard).parse_rule_for_insert(
+            rules.read_with(&guard).parse_rule_for_insert(
                 lock,
                 text,
                 contents,
@@ -213,14 +256,15 @@ impl RuleList {
             )?
         };
         let mut guard = lock.write();
-        self.rules.write_with(&mut guard).0.insert(index, rule);
+        rules.write_with(&mut guard).0.insert(index, rule);
         Ok(index)
     }
 
     /// CSSOM "remove a CSS rule".
     pub fn remove(&self, index: usize) -> Result<(), RuleError> {
+        let rules = self.css_rules().ok_or(RuleError::HierarchyRequest)?;
         let mut guard = lock(&self.sheet).write();
-        self.rules.write_with(&mut guard).remove_rule(index)?;
+        rules.write_with(&mut guard).remove_rule(index)?;
         Ok(())
     }
 }
@@ -228,6 +272,9 @@ impl RuleList {
 impl Rule {
     /// A stable identity for the rule (its shared pointer).
     pub fn id(&self) -> usize {
+        if let Some(k) = &self.keyframe {
+            return ptr(k);
+        }
         match &self.rule {
             CssRule::Style(r) => ptr(r),
             CssRule::Namespace(r) => ptr(r),
@@ -257,6 +304,9 @@ impl Rule {
     }
 
     pub fn kind(&self) -> RuleKind {
+        if self.keyframe.is_some() {
+            return RuleKind::Keyframe;
+        }
         match &self.rule {
             CssRule::Style(_) => RuleKind::Style,
             CssRule::Import(_) => RuleKind::Import,
@@ -285,6 +335,7 @@ impl Rule {
             RuleKind::FontFace => 5,
             RuleKind::Page => 6,
             RuleKind::Keyframes => 7,
+            RuleKind::Keyframe => 8,
             RuleKind::Namespace => 10,
             RuleKind::Supports => 12,
             RuleKind::FontFeatureValues => 14,
@@ -296,7 +347,10 @@ impl Rule {
     pub fn css_text(&self) -> String {
         let guard = lock(&self.sheet).read();
         let mut out = CssStringWriter::new();
-        let _ = self.rule.to_css(&guard, &mut out);
+        let _ = match &self.keyframe {
+            Some(k) => k.read_with(&guard).to_css(&guard, &mut out),
+            None => self.rule.to_css(&guard, &mut out),
+        };
         out
     }
 
@@ -373,11 +427,12 @@ impl Rule {
         copy.family_names = names;
         let rule = CssRule::FontFeatureValues(Arc::new(copy));
         let mut guard = lock(&self.sheet).write();
-        list.rules.write_with(&mut guard).0[index] = rule.clone();
+        list.css_rules()?.write_with(&mut guard).0[index] = rule.clone();
         Some(Rule {
             rule,
             sheet: self.sheet.clone(),
             containing: self.containing,
+            keyframe: None,
         })
     }
 
@@ -414,6 +469,9 @@ impl Rule {
     /// The child rules of a grouping rule (`@media`, `@supports`, `@layer {}`, `@container`, nested
     /// style rules).
     pub fn child_rules(&self) -> Option<RuleList> {
+        if self.keyframe.is_some() {
+            return None;
+        }
         let guard = lock(&self.sheet).read();
         let (rules, ty) = match &self.rule {
             CssRule::Media(r) => (r.rules.clone(), CssRuleType::Media),
@@ -430,7 +488,7 @@ impl Rule {
         let mut containing = self.containing;
         containing.insert(ty);
         Some(RuleList {
-            rules,
+            source: Source::Rules(rules),
             sheet: self.sheet.clone(),
             containing,
             relative: (ty == CssRuleType::Style).then_some(CssRuleType::Style),
@@ -440,9 +498,10 @@ impl Rule {
     /// The declarations of a style rule (`CSSStyleRule.style`).
     pub fn declarations(&self) -> Option<RuleDeclarations> {
         let guard = lock(&self.sheet).read();
-        let block = match &self.rule {
-            CssRule::Style(r) => r.read_with(&guard).block.clone(),
-            CssRule::Page(r) => r.read_with(&guard).block.clone(),
+        let block = match (&self.keyframe, &self.rule) {
+            (Some(k), _) => k.read_with(&guard).block.clone(),
+            (None, CssRule::Style(r)) => r.read_with(&guard).block.clone(),
+            (None, CssRule::Page(r)) => r.read_with(&guard).block.clone(),
             _ => return None,
         };
         let url = self.sheet.0 .0.contents(&guard).url_data.clone();
@@ -694,6 +753,118 @@ impl Rule {
         };
         let guard = lock(&self.sheet).read();
         Some(r.read_with(&guard).name.as_atom().to_string())
+    }
+
+    /// The `@keyframes` rule itself, unless this is one of its keyframes.
+    fn keyframes_rule(&self) -> Option<&Arc<Locked<KeyframesRule>>> {
+        match (&self.rule, &self.keyframe) {
+            (CssRule::Keyframes(r), None) => Some(r),
+            _ => None,
+        }
+    }
+
+    /// CSS Animations 1 §6.2: sets a `@keyframes` rule's `name` (a CSS-wide keyword or `none`
+    /// then serializes as a string). Returns whether it changed.
+    pub fn set_keyframes_name(&self, name: &str) -> bool {
+        let Some(r) = self.keyframes_rule() else {
+            return false;
+        };
+        let mut guard = lock(&self.sheet).write();
+        let rule = r.write_with(&mut guard);
+        let name = style::values::KeyframesName::from_ident(name);
+        if rule.name == name {
+            return false;
+        }
+        rule.name = name;
+        true
+    }
+
+    /// The keyframes of a `@keyframes` rule (`CSSKeyframesRule.cssRules`).
+    pub fn keyframe_rules(&self) -> Option<RuleList> {
+        let r = self.keyframes_rule()?;
+        let mut containing = self.containing;
+        containing.insert(CssRuleType::Keyframes);
+        Some(RuleList {
+            source: Source::Keyframes(r.clone()),
+            sheet: self.sheet.clone(),
+            containing,
+            relative: None,
+        })
+    }
+
+    /// CSS Animations 1 §6.2 `appendRule()`: parses `text` as one keyframe and appends it; a text
+    /// that is not exactly one keyframe is ignored. Returns whether one was appended.
+    pub fn append_keyframe(&self, text: &str) -> bool {
+        let Some(r) = self.keyframes_rule() else {
+            return false;
+        };
+        let lock = lock(&self.sheet);
+        let keyframe = {
+            let guard = lock.read();
+            let contents = self.sheet.0 .0.contents(&guard);
+            match Keyframe::parse(text, contents, lock) {
+                Ok(k) => k,
+                Err(_) => return false,
+            }
+        };
+        let mut guard = lock.write();
+        r.write_with(&mut guard).keyframes.push(keyframe);
+        true
+    }
+
+    /// The index of the last keyframe whose key text matches `select` (CSS Animations 1 §6.2
+    /// `findRule()` and `deleteRule()`).
+    fn find_keyframe_index(&self, select: &str) -> Option<usize> {
+        let r = self.keyframes_rule()?;
+        let guard = lock(&self.sheet).read();
+        r.read_with(&guard).find_rule(&guard, select)
+    }
+
+    /// `findRule()`: the last keyframe whose key text matches `select`.
+    pub fn find_keyframe(&self, select: &str) -> Option<Rule> {
+        let index = self.find_keyframe_index(select)?;
+        self.keyframe_rules()?.get(index)
+    }
+
+    /// `deleteRule()`: removes the last keyframe whose key text matches `select`; returns the
+    /// removed keyframe's identity ([`Rule::id`]).
+    pub fn delete_keyframe(&self, select: &str) -> Option<usize> {
+        let index = self.find_keyframe_index(select)?;
+        let r = self.keyframes_rule()?;
+        let mut guard = lock(&self.sheet).write();
+        let removed = r.write_with(&mut guard).keyframes.remove(index);
+        Some(ptr(&removed))
+    }
+
+    /// CSS Animations 1 §6.3 `CSSKeyframeRule.keyText`: the keyframe's selectors, serialized.
+    pub fn key_text(&self) -> Option<String> {
+        let k = self.keyframe.as_ref()?;
+        let guard = lock(&self.sheet).read();
+        let mut out = String::new();
+        let _ = k
+            .read_with(&guard)
+            .selector
+            .to_css(&mut style_traits::CssWriter::new(&mut out));
+        Some(out)
+    }
+
+    /// Sets `keyText`: `Err(Syntax)` when `text` is not a keyframe selector list. Returns whether
+    /// it changed.
+    pub fn set_key_text(&self, text: &str) -> Result<bool, RuleError> {
+        use style::stylesheets::keyframes_rule::KeyframeSelectors;
+        let Some(k) = &self.keyframe else {
+            return Ok(false);
+        };
+        let selector = cssparser::Parser::new(text)
+            .parse_entirely(KeyframeSelectors::parse)
+            .map_err(|_| RuleError::Syntax)?;
+        let mut guard = lock(&self.sheet).write();
+        let k = k.write_with(&mut guard);
+        if k.selector == selector {
+            return Ok(false);
+        }
+        k.selector = selector;
+        Ok(true)
     }
 
     /// The sheet the rule belongs to.

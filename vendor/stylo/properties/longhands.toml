@@ -2579,7 +2579,6 @@ affects = "layout"
 type = "Color"
 initial = "computed_value::T::currentcolor()"
 struct = "inherited_text"
-engine = "gecko"
 ignored_when_colors_disabled = true
 spec = "https://compat.spec.whatwg.org/#the-webkit-text-fill-color"
 affects = "paint"
@@ -4327,6 +4326,51 @@ spec = "Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/box-orient
 animation_type = "discrete"
 affects = "layout"
 keyword = { values = ["horizontal", "vertical"], servo_aliases = ["inline-axis=horizontal", "block-axis=vertical"] }
+
+# Snowlark patch (SNOWLARK-PATCHES.md 81): the rest of the legacy `-webkit-box` properties in the
+# servo build (Gecko has them as aliases of its XUL `-moz-box-*`). snowlark-render lays a
+# `-webkit-box` out as a flex container from them (Compat, `display: -webkit-box`).
+[-webkit-box-align]
+struct = "box"
+engine = "servo"
+spec = "Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/box-align)"
+animation_type = "discrete"
+affects = "layout"
+keyword = { values = ["stretch", "start", "center", "baseline", "end"] }
+
+[-webkit-box-direction]
+struct = "box"
+engine = "servo"
+spec = "Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/box-direction)"
+animation_type = "discrete"
+affects = "layout"
+keyword = { values = ["normal", "reverse"] }
+
+[-webkit-box-pack]
+struct = "box"
+engine = "servo"
+spec = "Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/box-pack)"
+animation_type = "discrete"
+affects = "layout"
+keyword = { values = ["start", "center", "end", "justify"] }
+
+[-webkit-box-flex]
+type = "NonNegativeNumber"
+initial = "From::from(0.)"
+struct = "box"
+engine = "servo"
+spec = "Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/box-flex)"
+affects = "layout"
+
+[-webkit-box-ordinal-group]
+type = "Integer"
+initial = "1"
+struct = "box"
+engine = "servo"
+parse_method = "parse_non_negative"
+animation_type = "discrete"
+spec = "Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/-moz-box-ordinal-group)"
+affects = "layout"
 
 [-moz-box-pack]
 struct = "xul"

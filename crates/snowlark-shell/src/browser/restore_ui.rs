@@ -9,22 +9,23 @@
 use snowlark_paint::Point;
 
 use super::Browser;
-use crate::restore::{self, SavedTab};
+use crate::restore::{self, SavedTab, SavedWindow};
 use crate::restore_bubble::{BubbleHit, RestoreBubble};
 use crate::tabs::Placement;
 
 impl Browser {
-    /// Opens the profile's session store and, when the last run ended unexpectedly, the prompt.
-    /// `SNOWLARK_NO_SESSION=1` turns it off.
+    /// A regular window joins the profile's session file (the first one opens it) and, when the
+    /// last run ended unexpectedly, the first one shows the prompt. `SNOWLARK_NO_SESSION=1` turns
+    /// it off.
     pub(super) fn start_session(&mut self) {
         if std::env::var_os("SNOWLARK_NO_SESSION").is_some_and(|v| v == "1") {
             return;
         }
-        let (store, offer) = restore::Store::open(&self.profile.dir);
-        self.session = Some(store);
+        let (id, offer) = self.app.join_session();
+        self.session = Some(id);
         if let Some(offer) = offer {
             let area = self.content_dips();
-            self.restore_bubble = Some(RestoreBubble::new(offer.tabs.len(), area));
+            self.restore_bubble = Some(RestoreBubble::new(offer.tab_count(), area));
             self.offer = Some(offer);
             self.overlay_dirty = true;
         }
@@ -80,23 +81,34 @@ impl Browser {
         (out, at)
     }
 
-    /// Hands the session file's writer the tabs as they are (it writes when they changed).
+    /// Hands the session file's writer this window's tabs and placement as they are (it writes
+    /// when they changed).
     pub(super) fn save_session(&mut self) {
-        if self.session.is_none() {
+        let Some(id) = self.session else {
             return;
-        }
+        };
         let (tabs, active) = self.session_snapshot();
-        if let Some(s) = &mut self.session {
-            s.update(tabs, active);
+        let window = SavedWindow {
+            tabs,
+            active,
+            placement: self.placed.map(Into::into),
+        };
+        self.app.session_update(id, window);
+    }
+
+    /// The window closes for real: it leaves the session file, or closes it as the last regular
+    /// window ([`restore::Store::window_closed`]).
+    pub(super) fn close_session(&mut self) {
+        self.save_session();
+        if let Some(id) = self.session.take() {
+            self.app.leave_session(id);
         }
     }
 
-    /// The window closes for real (or Windows ends the session): the file says so.
-    pub(super) fn close_session(&mut self) {
+    /// Windows ends the session: the file is closed normally with every window in it.
+    pub(super) fn end_session(&mut self) {
         self.save_session();
-        if let Some(s) = &mut self.session {
-            s.close_clean();
-        }
+        self.app.end_session();
     }
 
     /// The active tab shows for the first time since a restore: its history loads.
@@ -111,12 +123,26 @@ impl Browser {
         e.tab.restore(saved.to_trail());
     }
 
-    /// Reopens the tabs of the offered session (replacing a lone start page).
+    /// Reopens the windows of the offered session: the first one's tabs in this window, each
+    /// other one as a new window where it was.
     pub(super) fn restore_session(&mut self) {
         let Some(offer) = self.offer.take() else {
             return;
         };
         self.dismiss_restore();
+        let mut windows = offer.windows.into_iter();
+        if let Some(first) = windows.next() {
+            self.restore_window(first);
+        }
+        for w in windows {
+            let placement = w.placement.map(Into::into);
+            self.app.open_window(None, placement, Some(w));
+        }
+    }
+
+    /// Opens the tabs of a saved window in this one (replacing a lone start page), the active
+    /// one loading at once and the others when they are first selected.
+    pub(super) fn restore_window(&mut self, saved: SavedWindow) {
         let lone_start_page = self.tabs.len() == 1
             && self.active_url() == crate::address::START_PAGE
             && self.tabs.active().is_some_and(|e| e.tab.history_len() <= 1);
@@ -127,11 +153,11 @@ impl Browser {
         }
         let base = self.tabs.len();
         let blank = snowlark_net::Url::parse("about:blank").expect("about:blank");
-        for t in offer.tabs {
+        for t in saved.tabs {
             let entry = self.make_tab(blank.clone(), Some(t));
             self.tabs.add(entry, Placement::End);
         }
-        self.tabs.select(base + offer.active);
+        self.tabs.select(base + saved.active);
         self.activated();
         self.save_session();
         self.chrome_dirty = true;

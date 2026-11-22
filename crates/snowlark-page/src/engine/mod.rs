@@ -379,6 +379,8 @@ pub enum Object {
         rule: snowlark_style::cssom::Rule,
         sheet: Handle,
         parent: Option<Handle>,
+        /// Removed from its parent (a keyframe `deleteRule()` took out): no parent rule or sheet.
+        detached: bool,
     },
     MediaList(stylesheets::MediaOwner),
     Canvas2D(Box<canvas::ContextObj>),

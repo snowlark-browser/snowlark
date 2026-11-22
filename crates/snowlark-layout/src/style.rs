@@ -767,7 +767,7 @@ impl CustomScrollbar {
                 Some(CustomScrollbarThumb {
                     color: fill(t)?,
                     radius: (r.length, r.percent.unwrap_or(0.0)),
-                    inset: if t.background_color_area().0 == BoxArea::BorderBox {
+                    inset: if t.background_color_layer().clip == BoxArea::BorderBox {
                         0.0
                     } else {
                         t.phys_border_width(Side::Left)
@@ -1541,6 +1541,9 @@ pub struct BackgroundLayer {
     pub repeat: (BackgroundRepeat, BackgroundRepeat),
     pub origin: BoxArea,
     pub clip: BoxArea,
+    /// `background-clip: text` (CSS Backgrounds 4 §2.1): painted only where the box's text is,
+    /// within `clip` (the border box).
+    pub clip_text: bool,
     pub attachment: BackgroundAttachment,
 }
 
@@ -1553,6 +1556,7 @@ impl Default for BackgroundLayer {
             repeat: (BackgroundRepeat::Repeat, BackgroundRepeat::Repeat),
             origin: BoxArea::PaddingBox,
             clip: BoxArea::BorderBox,
+            clip_text: false,
             attachment: BackgroundAttachment::Scroll,
         }
     }
@@ -2329,6 +2333,11 @@ pub trait Style: Clone {
 
     // ----- text (css-text-3, css-inline-3, CSS 2 §10.8) -----
     fn color(&self) -> Color;
+    /// The colour glyphs are filled with: `-webkit-text-fill-color` (Compat §5.4), `color` when it
+    /// is `currentcolor`.
+    fn text_fill_color(&self) -> Color {
+        self.color()
+    }
     fn line_height(&self) -> LineHeight;
     fn vertical_align(&self) -> VerticalAlign;
     fn text_box_trim(&self) -> TextBoxTrim {
@@ -2490,15 +2499,12 @@ pub trait Style: Clone {
     fn background_layer(&self, _index: usize) -> BackgroundLayer {
         BackgroundLayer::default()
     }
-    /// The bottom layer's `background-clip` and `background-attachment`, which place the
+    /// The bottom layer, whose `background-clip` and `background-attachment` place the
     /// background color (CSS Backgrounds 3 §3.10), also when no layer has an image.
-    fn background_color_area(&self) -> (BoxArea, BackgroundAttachment) {
+    fn background_color_layer(&self) -> BackgroundLayer {
         match self.background_layer_count() {
-            0 => (BoxArea::BorderBox, BackgroundAttachment::Scroll),
-            n => {
-                let l = self.background_layer(n - 1);
-                (l.clip, l.attachment)
-            }
+            0 => BackgroundLayer::default(),
+            n => self.background_layer(n - 1),
         }
     }
     /// How many `mask-image` layers there are (CSS Masking 1 §7; none when the only one is `none`).

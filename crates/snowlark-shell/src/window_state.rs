@@ -13,9 +13,11 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use snowlark_paint::placement::Placement;
 
+/// A placement as the profile's files keep it (`window.json`, and each window of the session
+/// file).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct File {
+pub struct SavedPlacement {
     x: i32,
     y: i32,
     width: i32,
@@ -24,29 +26,55 @@ struct File {
     dpi: u32,
 }
 
+impl From<Placement> for SavedPlacement {
+    fn from(p: Placement) -> SavedPlacement {
+        SavedPlacement {
+            x: p.x,
+            y: p.y,
+            width: p.width,
+            height: p.height,
+            maximized: p.maximized,
+            dpi: p.dpi,
+        }
+    }
+}
+
+impl From<SavedPlacement> for Placement {
+    fn from(f: SavedPlacement) -> Placement {
+        Placement {
+            x: f.x,
+            y: f.y,
+            width: f.width,
+            height: f.height,
+            maximized: f.maximized,
+            dpi: f.dpi,
+        }
+    }
+}
+
 /// The saved placement; `None` when there is no usable file.
 pub fn load(file: &Path) -> Option<Placement> {
-    let f: File = serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()?;
-    Some(Placement {
-        x: f.x,
-        y: f.y,
-        width: f.width,
-        height: f.height,
-        maximized: f.maximized,
-        dpi: f.dpi,
-    })
+    let f: SavedPlacement = serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()?;
+    Some(f.into())
 }
+
+/// Where a new regular window opens beside `from`, an open one: its restored rectangle moved
+/// right and down by ten device-independent pixels, maximized if it is.
+pub fn beside(from: &Placement) -> Placement {
+    let step = (TILE * from.dpi as i32 / 96).max(1);
+    Placement {
+        x: from.x + step,
+        y: from.y + step,
+        ..*from
+    }
+}
+
+/// How far a new window is set off from the one it opens beside (device-independent pixels).
+const TILE: i32 = 10;
 
 /// Writes the placement (a temporary file renamed over the old one: a kill never leaves half a file).
 pub fn save(file: &Path, p: &Placement) -> std::io::Result<()> {
-    let f = File {
-        x: p.x,
-        y: p.y,
-        width: p.width,
-        height: p.height,
-        maximized: p.maximized,
-        dpi: p.dpi,
-    };
+    let f = SavedPlacement::from(*p);
     let text = serde_json::to_string(&f).unwrap_or_default();
     crate::restore::write_atomic(file, text.as_bytes())
 }

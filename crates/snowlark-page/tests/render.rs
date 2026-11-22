@@ -2048,6 +2048,90 @@ fn nested_subgrid_items_size_the_outer_grids_rows() {
     assert_eq!(r, "33 53 93 53 93 63 40");
 }
 
+/// CSS Animations 1 §6.2-6.3: a `@keyframes` rule's `cssRules` are its keyframes
+/// (`CSSKeyframeRule`, type 8, `keyText`, `style`); `appendRule`, `findRule` (the last match) and
+/// `deleteRule` (which detaches the removed keyframe) edit them, and `name` renames the rule.
+#[test]
+fn keyframes_rule_cssom() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style id=s>@keyframes k { from { margin-left: 0px } to { margin-left: 100px } }\
+         </style>",
+    );
+    let r = eval(
+        &mut page,
+        "const s = document.getElementById('s').sheet, k = s.cssRules[0];
+         const out = [k.type, k.name, k.cssRules.length, k.length, k.cssRules === k.cssRules,
+           k.cssRules[0] === k[0], k[0].type, k[0].keyText, k[1].cssText, k[0].parentRule === k,
+           k[0].parentStyleSheet === s, k[0].style.marginLeft];
+         k.appendRule('50% { margin-left: 10px }');
+         k.appendRule('to { margin-left: 1px } garbage');
+         k.appendRule('from { margin-left: 1px } to { margin-left: 2px }');
+         out.push(k.cssRules.length, k.findRule('50%').cssText, k.findRule('70%'), k.findRule('50%') === k[2]);
+         const first = k[0];
+         k.deleteRule('from');
+         k.deleteRule('80%');
+         out.push(k.length, first.parentRule, first.parentStyleSheet, k[0].keyText, k[0].parentRule === k);
+         k[1].keyText = '50%, 60%';
+         let err; try { k[1].keyText = '200%' } catch (e) { err = e.name }
+         out.push(k[1].keyText, err);
+         k[1].style.marginLeft = '30px';
+         k.name = 'none';
+         out.push(k.name, k.cssText.replace(/\\s+/g, ' '));
+         out.join('|')",
+    );
+    assert_eq!(
+        r,
+        "7|k|2|2|true|true|8|0%|100% { margin-left: 100px; }|true|true|0px|\
+         3|50% { margin-left: 10px; }||true|\
+         2|||100%|true|50%, 60%|SyntaxError|\
+         none|@keyframes \"none\" { 100% { margin-left: 100px; } 50%, 60% { margin-left: 30px; } }"
+    );
+}
+
+/// The legacy `display: -webkit-box` (Compat) lays its items out as a single-line flex container
+/// from the `-webkit-box-*` properties: `-webkit-box-pack` packs them along the main axis,
+/// `-webkit-box-align` aligns every item across it, `-webkit-box-direction: reverse` reverses the
+/// main axis, an item's `-webkit-box-flex` is its flex (grow and shrink, `flex-grow` ignored), its
+/// `-webkit-box-ordinal-group` its order, and its automatic minimum size is zero. The computed
+/// values stay what they are (`flex-grow` of an item stays `0`).
+#[test]
+fn legacy_webkit_box_properties() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0 } .w { display: -webkit-box }\
+         .i { width: 50px; height: 20px }</style>\
+         <div class=w id=p style='width: 300px; height: 100px; -webkit-box-pack: end; -webkit-box-align: center'>\
+           <div class=i id=p1></div><div class=i id=p2 style='align-self: flex-start'></div></div>\
+         <div class=w style='width: 450px'><div class=i id=f1 style='-webkit-box-flex: 1'></div>\
+           <div class=i id=f2 style='-webkit-box-flex: 2; flex-grow: 5'></div><div class=i id=f3 style='flex-grow: 1'></div></div>\
+         <div class=w style='width: 300px; -webkit-box-direction: reverse'>\
+           <div class=i id=o1 style='-webkit-box-ordinal-group: 2'></div><div class=i id=o2></div></div>\
+         <div class=w style='-webkit-box-orient: vertical; -webkit-box-pack: justify; width: 100px; height: 100px'>\
+           <div id=v1 style='height: 10px'></div><div id=v2 style='height: 10px'></div></div>\
+         <div class=w style='width: 100px'><div id=m1 style='-webkit-box-flex: 1; width: 200px'>\
+           <div style='width: 150px; height: 5px'></div></div></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const b = id => document.getElementById(id).getBoundingClientRect();
+         const at = id => { const e = document.getElementById(id), r = b(id),
+           p = e.parentElement.getBoundingClientRect();
+           return `${Math.round(r.left - p.left)},${Math.round(r.top - p.top)},${Math.round(r.width)}`; };
+         const cs = id => getComputedStyle(document.getElementById(id));
+         [at('p1'), at('p2'), at('f1'), at('f2'), at('f3'), at('o1'), at('o2'), at('v1'), at('v2'),
+          at('m1'), cs('f2').flexGrow, cs('f1').webkitBoxFlex, cs('o1').getPropertyValue('-webkit-box-ordinal-group'),
+          CSS.supports('-webkit-box-pack', 'justify'), CSS.supports('-webkit-box-align', 'baseline')].join('|')",
+    );
+    assert_eq!(
+        r,
+        "200,40,50|250,40,50|0,0,150|150,0,250|400,0,50|200,0,50|250,0,50|0,0,100|0,90,100|\
+         0,0,100|5|1|2|true|true"
+    );
+}
+
 /// CSS Overflow 4 §5.2 legacy line clamping: `display: -webkit-box;
 /// -webkit-box-orient: vertical; -webkit-line-clamp: N` computes to `flow-root` (as in Chrome and
 /// Gecko) and keeps N lines; `-webkit-box` without a clamp is a flex container in its orient's

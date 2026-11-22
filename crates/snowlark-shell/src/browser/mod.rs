@@ -362,8 +362,9 @@ pub struct Browser {
         crate::task_manager::TaskManager,
         task_manager_ui::TaskSampler,
     )>,
-    /// This process's session file (the tabs, kept for a restore after an unexpected exit).
-    session: Option<crate::restore::Store>,
+    /// This window's id in the process's session file (`App::join_session`: the tabs, kept for
+    /// a restore after an unexpected exit); `None` in an Incognito window.
+    session: Option<u64>,
     /// Middle-button autoscroll in progress, and a middle press waiting for the page's answer to
     /// its `mousedown` ([`autoscroll`]).
     autoscroll: Option<autoscroll::Session>,
@@ -611,9 +612,9 @@ impl Browser {
         };
         b.comp.send(CompMsg::Dark(b.chrome_dark()));
         b.apply_user_agent();
-        // (the session file keeps the first regular window's tabs; a window opened beside it
-        // offers no restore)
-        if !off_the_record && b.app.regular_window_count() == 0 {
+        // (every regular window keeps its part of the session file; only the first one offers a
+        // restore)
+        if !off_the_record {
             b.start_session();
         }
         let url = start.unwrap_or_else(|| b.startup_url());
@@ -2527,7 +2528,7 @@ impl Browser {
                 }
             }
             k if ctrl && k == b'T' as u16 => self.new_tab(),
-            k if ctrl && !mods.shift && k == b'N' as u16 => self.new_window(),
+            k if ctrl && !mods.shift && k == b'N' as u16 => self.new_window(window),
             k if ctrl && mods.shift && k == b'N' as u16 => self.new_incognito_window(),
             k if ctrl && (k == b'W' as u16 || k == keys::F4) => {
                 let i = self.tabs.active_index();
@@ -2954,8 +2955,9 @@ impl WindowHandler for Browser {
                     .save();
             }
             Event::Timer(TIMER_SESSION) => {
-                self.save_session();
+                // (the placement first: the session file keeps it too)
                 self.save_window(window, false);
+                self.save_session();
             }
             Event::Timer(TIMER_HANG) => self.hang_timer(window),
             Event::Timer(TIMER_TASKS) => self.refresh_task_manager(window),
@@ -3005,7 +3007,7 @@ impl WindowHandler for Browser {
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .save();
-                self.close_session();
+                self.end_session();
             }
             Event::Destroyed => {
                 self.save_window(window, true);

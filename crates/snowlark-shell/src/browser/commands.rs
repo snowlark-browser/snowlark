@@ -267,7 +267,7 @@ impl Browser {
     pub(super) fn run(&mut self, window: &Window, cmd: Command) {
         match cmd {
             Command::NewTab => self.new_tab(),
-            Command::NewWindow => self.new_window(),
+            Command::NewWindow => self.new_window(window),
             Command::NewIncognitoWindow => self.new_incognito_window(),
             Command::OpenInIncognito(u) => self.open_in_incognito(u),
             Command::ReopenClosedTab => {

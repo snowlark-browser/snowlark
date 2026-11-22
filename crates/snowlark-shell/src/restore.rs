@@ -5,7 +5,8 @@
 //! Restoring the open tabs after the browser ended unexpectedly (a crash, a kill from Task Manager).
 //!
 //! A process that is killed runs no exit code, so the session is kept on disk while the browser
-//! runs: [`Store`] gets a snapshot of the tabs whenever they change and a writer thread (never the
+//! runs: [`Store`] gets a snapshot of each regular window (its tabs and its place on the screen)
+//! whenever it changes, and a writer thread (never the
 //! window's) writes it to `session-<pid>.json` through a temporary file and a rename, so a kill in
 //! the middle of a write leaves the last good file. A real close (the window destroyed, or Windows
 //! ending the session) writes the file once more with `clean` set. At the next start, the files of
@@ -19,6 +20,10 @@
 //! as it lives, so a second window or process never touches this one's file and a file whose lock
 //! can be opened belongs to a process that is gone (a process id that is reused cannot be mistaken
 //! for the owner).
+//!
+//! The process's regular windows share the file. A window closed while another stays open leaves
+//! it; the last one to close leaves it as it is, marked clean. So a restore after a crash brings
+//! back the windows that were open at the end, each with its tabs, where it was.
 
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -33,8 +38,8 @@ use snowlark_paint::Point;
 
 use crate::session::{SessionEntry, Trail};
 
-/// The file format's version.
-const VERSION: u32 = 1;
+/// The file format's version (1: one window's tabs; 2: a list of windows).
+const VERSION: u32 = 2;
 /// Tabs and history entries read from a file: more is not a session of ours.
 const MAX_TABS: usize = 500;
 const MAX_ENTRIES: usize = 100;
@@ -127,7 +132,50 @@ impl SavedTab {
     }
 }
 
-/// The tabs of one browser process at one moment.
+/// One regular window: its tabs, the index of the active one, and where it was on the screen.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct SavedWindow {
+    pub tabs: Vec<SavedTab>,
+    #[serde(default)]
+    pub active: usize,
+    #[serde(default)]
+    pub placement: Option<crate::window_state::SavedPlacement>,
+}
+
+impl SavedWindow {
+    pub fn new(tabs: Vec<SavedTab>, active: usize) -> SavedWindow {
+        SavedWindow {
+            tabs,
+            active,
+            placement: None,
+        }
+    }
+
+    /// The window's tabs with only the entries a restore may open (`None` when none is left):
+    /// a tab whose current entry may not be opened goes, and the active one stays the active one.
+    fn checked(mut self) -> Option<SavedWindow> {
+        let mut active_url = None;
+        let was_active = self.active;
+        let mut tabs = Vec::new();
+        for (n, t) in std::mem::take(&mut self.tabs).into_iter().enumerate() {
+            let Some(t) = t.checked() else {
+                continue;
+            };
+            if n == was_active {
+                active_url = Some(tabs.len());
+            }
+            tabs.push(t);
+        }
+        if tabs.is_empty() {
+            return None;
+        }
+        self.active = active_url.unwrap_or(0);
+        self.tabs = tabs;
+        Some(self)
+    }
+}
+
+/// The regular windows of one browser process at one moment, in the order they opened.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SessionFile {
     pub version: u32,
@@ -136,19 +184,32 @@ pub struct SessionFile {
     /// When it was written (seconds since the Unix epoch); the newest unclean file is offered.
     pub saved: u64,
     pub pid: u32,
-    pub active: usize,
-    pub tabs: Vec<SavedTab>,
+    pub windows: Vec<SavedWindow>,
+}
+
+/// A session file as read: version 1 had one window's `tabs` and `active` at the top.
+#[derive(Deserialize)]
+struct RawFile {
+    version: u32,
+    clean: bool,
+    saved: u64,
+    pid: u32,
+    #[serde(default)]
+    windows: Vec<SavedWindow>,
+    #[serde(default)]
+    tabs: Vec<SavedTab>,
+    #[serde(default)]
+    active: usize,
 }
 
 impl SessionFile {
-    pub fn new(tabs: Vec<SavedTab>, active: usize) -> SessionFile {
+    pub fn new(windows: Vec<SavedWindow>) -> SessionFile {
         SessionFile {
             version: VERSION,
             clean: false,
             saved: now(),
             pid: std::process::id(),
-            active,
-            tabs,
+            windows,
         }
     }
 
@@ -158,62 +219,83 @@ impl SessionFile {
 
     /// A session from a file's text; `None` for anything that is not a usable one (corrupt,
     /// another version, nothing in it). Entries that are not web, file or browser pages are
-    /// dropped, and a tab left with none is too.
+    /// dropped, a tab left with none is too, and so is a window left with no tab. A version 1
+    /// file is one window.
     pub fn parse(text: &str) -> Option<SessionFile> {
-        let mut f: SessionFile = serde_json::from_str(text).ok()?;
-        if f.version != VERSION || f.tabs.len() > MAX_TABS {
+        let raw: RawFile = serde_json::from_str(text).ok()?;
+        let windows = match raw.version {
+            1 => vec![SavedWindow::new(raw.tabs, raw.active)],
+            VERSION => raw.windows,
+            _ => return None,
+        };
+        if windows.iter().map(|w| w.tabs.len()).sum::<usize>() > MAX_TABS
+            || windows
+                .iter()
+                .any(|w| w.tabs.iter().any(|t| t.entries.len() > MAX_ENTRIES))
+        {
             return None;
         }
-        let mut active_url = None;
-        let was_active = f.active;
-        let mut tabs = Vec::new();
-        for (n, mut t) in std::mem::take(&mut f.tabs).into_iter().enumerate() {
-            if t.entries.len() > MAX_ENTRIES {
-                return None;
-            }
-            // (a session saved before the rename: its internal pages under today's scheme)
-            for e in &mut t.entries {
-                if let std::borrow::Cow::Owned(url) = crate::address::renamed(&e.url) {
-                    e.url = url;
-                }
-            }
-            let current = t.index.min(t.entries.len().saturating_sub(1));
-            let mut kept = Vec::new();
-            let mut index = 0;
-            for (i, e) in t.entries.iter().enumerate() {
-                if e.url.len() > MAX_URL || !allowed(&e.url) {
-                    continue;
-                }
-                if i <= current {
-                    index = kept.len();
-                }
-                kept.push(e.clone());
-            }
-            // (the current entry itself must be a page we may open)
-            if kept.is_empty() || !t.entries.get(current).is_some_and(|e| allowed(&e.url)) {
-                continue;
-            }
-            t.entries = kept;
-            t.index = index;
-            if !t.zoom.is_finite() || !(0.25..=5.0).contains(&t.zoom) {
-                t.zoom = 1.0;
-            }
-            if n == was_active {
-                active_url = Some(tabs.len());
-            }
-            tabs.push(t);
-        }
-        if tabs.is_empty() {
+        let windows: Vec<SavedWindow> = windows
+            .into_iter()
+            .filter_map(SavedWindow::checked)
+            .collect();
+        if windows.is_empty() {
             return None;
         }
-        f.active = active_url.unwrap_or(0);
-        f.tabs = tabs;
-        Some(f)
+        Some(SessionFile {
+            version: VERSION,
+            clean: raw.clean,
+            saved: raw.saved,
+            pid: raw.pid,
+            windows,
+        })
     }
 
     /// Whether any tab has a page worth reopening.
     pub fn worth_offering(&self) -> bool {
-        self.tabs.iter().any(SavedTab::worth_restoring)
+        self.windows
+            .iter()
+            .any(|w| w.tabs.iter().any(SavedTab::worth_restoring))
+    }
+
+    /// How many tabs the session has, in all its windows.
+    pub fn tab_count(&self) -> usize {
+        self.windows.iter().map(|w| w.tabs.len()).sum()
+    }
+}
+
+impl SavedTab {
+    /// The tab with only the entries a restore may open; `None` when its current entry is not
+    /// one of them.
+    fn checked(mut self) -> Option<SavedTab> {
+        // (a session saved before the rename: its internal pages under today's scheme)
+        for e in &mut self.entries {
+            if let std::borrow::Cow::Owned(url) = crate::address::renamed(&e.url) {
+                e.url = url;
+            }
+        }
+        let current = self.index.min(self.entries.len().saturating_sub(1));
+        let mut kept = Vec::new();
+        let mut index = 0;
+        for (i, e) in self.entries.iter().enumerate() {
+            if e.url.len() > MAX_URL || !allowed(&e.url) {
+                continue;
+            }
+            if i <= current {
+                index = kept.len();
+            }
+            kept.push(e.clone());
+        }
+        // (the current entry itself must be a page we may open)
+        if kept.is_empty() || !self.entries.get(current).is_some_and(|e| allowed(&e.url)) {
+            return None;
+        }
+        self.entries = kept;
+        self.index = index;
+        if !self.zoom.is_finite() || !(0.25..=5.0).contains(&self.zoom) {
+            self.zoom = 1.0;
+        }
+        Some(self)
     }
 }
 
@@ -325,7 +407,8 @@ enum Msg {
     Close(SessionFile),
 }
 
-/// This process's session file and its writer thread.
+/// This process's session file and its writer thread: one for the regular windows of the
+/// process, each window updating its own part (by an id of its own).
 pub struct Store {
     dir: PathBuf,
     pid: u32,
@@ -333,7 +416,10 @@ pub struct Store {
     thread: Option<JoinHandle<()>>,
     /// The lock file, open for as long as the process lives.
     lock: Option<File>,
-    last: Option<SessionFile>,
+    /// The windows as last given, in the order they opened.
+    windows: Vec<(u64, SavedWindow)>,
+    /// The regular windows open now.
+    open: Vec<u64>,
 }
 
 impl Store {
@@ -383,37 +469,71 @@ impl Store {
             tx: Some(tx),
             thread,
             lock,
-            last: None,
+            windows: Vec::new(),
+            open: Vec::new(),
         };
         (store, offer)
     }
 
-    /// The tabs as they are now; written (off the caller's thread) when they differ from what was
-    /// last given.
-    pub fn update(&mut self, tabs: Vec<SavedTab>, active: usize) {
-        let unchanged = self
-            .last
-            .as_ref()
-            .is_some_and(|l| l.tabs == tabs && l.active == active);
-        if unchanged {
-            return;
-        }
-        let s = SessionFile::new(tabs, active);
-        self.last = Some(s.clone());
+    /// Whether the file is still being kept (not closed yet).
+    pub fn is_open(&self) -> bool {
+        self.tx.is_some()
+    }
+
+    fn snapshot(&self) -> SessionFile {
+        SessionFile::new(self.windows.iter().map(|(_, w)| w.clone()).collect())
+    }
+
+    fn write(&self) {
         if let Some(tx) = &self.tx {
-            let _ = tx.send(Msg::Save(s));
+            let _ = tx.send(Msg::Save(self.snapshot()));
         }
     }
 
-    /// The browser is closing normally: the file says so, and the call returns once it is written.
+    /// Window `id`'s tabs and placement as they are now; the file is written (off the caller's
+    /// thread) when they differ from what was last given.
+    pub fn update(&mut self, id: u64, window: SavedWindow) {
+        if !self.is_open() {
+            return;
+        }
+        match self.windows.iter_mut().find(|(i, _)| *i == id) {
+            Some((_, w)) if *w == window => return,
+            Some((_, w)) => *w = window,
+            None => self.windows.push((id, window)),
+        }
+        self.write();
+    }
+
+    /// Regular window `id` opened: it is part of the session until it closes.
+    pub fn register(&mut self, id: u64) {
+        if !self.open.contains(&id) {
+            self.open.push(id);
+        }
+    }
+
+    /// Regular window `id` closed. While another regular window stays open it is no longer part
+    /// of the session (a restore after a crash does not bring it back); the last one to close
+    /// closes the file normally, keeping every window it had.
+    pub fn window_closed(&mut self, id: u64) {
+        self.open.retain(|i| *i != id);
+        if self.open.is_empty() {
+            self.close_clean();
+            return;
+        }
+        let before = self.windows.len();
+        self.windows.retain(|(i, _)| *i != id);
+        if self.windows.len() != before {
+            self.write();
+        }
+    }
+
+    /// The browser is closing normally (its last regular window, or Windows ends the session):
+    /// the file says so, with every window it still had, and the call returns once it is written.
     pub fn close_clean(&mut self) {
+        let s = self.snapshot();
         let Some(tx) = self.tx.take() else {
             return;
         };
-        let s = self
-            .last
-            .take()
-            .unwrap_or_else(|| SessionFile::new(Vec::new(), 0));
         let _ = tx.send(Msg::Close(s));
         if let Some(t) = self.thread.take() {
             let _ = t.join();
@@ -471,7 +591,46 @@ mod tests {
     }
 
     fn session(tabs: Vec<SavedTab>, active: usize) -> SessionFile {
-        SessionFile::new(tabs, active)
+        SessionFile::new(vec![SavedWindow::new(tabs, active)])
+    }
+
+    /// The file as the writer thread leaves it, once it has something.
+    fn written(path: &Path) -> String {
+        for _ in 0..200 {
+            let text = fs::read_to_string(path).unwrap_or_default();
+            if !text.is_empty() {
+                return text;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        String::new()
+    }
+
+    /// Waits until the file holds what `ok` accepts.
+    fn written_as(path: &Path, ok: impl Fn(&SessionFile) -> bool) -> SessionFile {
+        for _ in 0..200 {
+            if let Some(s) = fs::read_to_string(path)
+                .ok()
+                .and_then(|t| SessionFile::parse(&t))
+                .filter(|s| ok(s))
+            {
+                return s;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        panic!("the session file never got there");
+    }
+
+    fn placement(x: i32) -> crate::window_state::SavedPlacement {
+        snowlark_paint::placement::Placement {
+            x,
+            y: 40,
+            width: 1000,
+            height: 700,
+            maximized: false,
+            dpi: 144,
+        }
+        .into()
     }
 
     /// A session file as a process that was killed would have left it, owned by `pid` (which is
@@ -495,12 +654,10 @@ mod tests {
         );
         let back = SessionFile::parse(&s.to_json()).unwrap();
         assert_eq!(back, s);
-        assert_eq!(
-            back.tabs[0].current().unwrap().url,
-            "https://a.example/next"
-        );
-        assert_eq!(back.tabs[0].entries[0].y, 12.5);
-        assert!(back.tabs[0].muted && back.tabs[0].zoom == 1.25);
+        let tabs = &back.windows[0].tabs;
+        assert_eq!(tabs[0].current().unwrap().url, "https://a.example/next");
+        assert_eq!(tabs[0].entries[0].y, 12.5);
+        assert!(tabs[0].muted && tabs[0].zoom == 1.25);
         assert!(back.worth_offering());
         // Only start pages: nothing worth restoring.
         assert!(!session(vec![tab(&["about:home"], 0)], 0).worth_offering());
@@ -546,7 +703,7 @@ mod tests {
         let s = session(vec![tab(&["https://a.example/"], 0)], 0);
         let cut = &s.to_json()[..30];
         assert!(SessionFile::parse(cut).is_none(), "a truncated write");
-        let other = s.to_json().replace("\"version\":1", "\"version\":9");
+        let other = s.to_json().replace("\"version\":2", "\"version\":9");
         assert!(SessionFile::parse(&other).is_none());
         assert!(SessionFile::parse(&session(vec![], 0).to_json()).is_none());
     }
@@ -571,19 +728,17 @@ mod tests {
         let back = SessionFile::parse(&s.to_json()).unwrap();
         // The first and last tabs are gone (their current entry is not openable); the second keeps
         // its web and file entries, current still the file.
-        assert_eq!(back.tabs.len(), 1);
-        let urls: Vec<&str> = back.tabs[0]
-            .entries
-            .iter()
-            .map(|e| e.url.as_str())
-            .collect();
+        let w = &back.windows[0];
+        assert_eq!(w.tabs.len(), 1);
+        let urls: Vec<&str> = w.tabs[0].entries.iter().map(|e| e.url.as_str()).collect();
         assert_eq!(urls, ["https://a.example/", "file:///C:/x.html"]);
-        assert_eq!(back.tabs[0].index, 1);
-        assert_eq!(back.active, 0);
+        assert_eq!(w.tabs[0].index, 1);
+        assert_eq!(w.active, 0);
         // A bad zoom becomes 1.
         let mut z = session(vec![tab(&["https://a.example/"], 0)], 0);
-        z.tabs[0].zoom = 99.0;
-        assert_eq!(SessionFile::parse(&z.to_json()).unwrap().tabs[0].zoom, 1.0);
+        z.windows[0].tabs[0].zoom = 99.0;
+        let z = SessionFile::parse(&z.to_json()).unwrap();
+        assert_eq!(z.windows[0].tabs[0].zoom, 1.0);
     }
 
     #[test]
@@ -618,7 +773,7 @@ mod tests {
         // An unclean one: offered, moved to the offer file.
         dead_file(&d, 4_000_002, &s, false);
         let offer = find_offer(&d, 1).expect("an offer");
-        assert_eq!(offer.tabs, s.tabs);
+        assert_eq!(offer.windows, s.windows);
         assert!(offer_file(&d).exists() && !file_of(&d, 4_000_002).exists());
         // The offer stays across starts until answered, even when the next run (which crashed
         // before saving anything worth keeping) left only a start page.
@@ -628,12 +783,12 @@ mod tests {
             &session(vec![tab(&["about:home"], 0)], 0),
             false,
         );
-        assert_eq!(find_offer(&d, 1).unwrap().tabs, s.tabs);
+        assert_eq!(find_offer(&d, 1).unwrap().windows, s.windows);
         // A newer unclean session replaces it.
         let mut newer = session(vec![tab(&["https://b.example/"], 0)], 0);
         newer.saved += 10;
         dead_file(&d, 4_000_004, &newer, false);
-        assert_eq!(find_offer(&d, 1).unwrap().tabs, newer.tabs);
+        assert_eq!(find_offer(&d, 1).unwrap().windows, newer.windows);
         // Answered: gone.
         clear_offer(&d);
         assert!(find_offer(&d, 1).is_none());
@@ -681,20 +836,13 @@ mod tests {
             tab(&["https://a.example/"], 0),
             tab(&["https://b.example/"], 0),
         ];
-        store.update(tabs.clone(), 1);
+        store.register(1);
+        store.update(1, SavedWindow::new(tabs.clone(), 1));
         // The writer thread writes; wait for it.
         let path = file_of(&d, pid);
-        let mut text = String::new();
-        for _ in 0..200 {
-            text = fs::read_to_string(&path).unwrap_or_default();
-            if !text.is_empty() {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        let saved = SessionFile::parse(&text).expect("a session was written");
+        let saved = SessionFile::parse(&written(&path)).expect("a session was written");
         assert!(!saved.clean);
-        assert_eq!((saved.tabs.clone(), saved.active), (tabs.clone(), 1));
+        assert_eq!(saved.windows, [SavedWindow::new(tabs.clone(), 1)]);
         // Our own file is not an unexpected end of another process, even unclean.
         assert!(find_offer(&d, pid).is_none());
         // A second store in the folder (another window) leaves ours alone: the lock is ours.
@@ -703,7 +851,7 @@ mod tests {
         store.close_clean();
         let closed = SessionFile::parse(&fs::read_to_string(&path).unwrap()).unwrap();
         assert!(closed.clean);
-        assert_eq!(closed.tabs, tabs);
+        assert_eq!(closed.windows[0].tabs, tabs);
         assert!(!owner_alive(&d, pid));
         assert!(find_offer(&d, 1).is_none());
         let _ = fs::remove_dir_all(&d);
@@ -713,10 +861,13 @@ mod tests {
     fn a_store_dropped_without_closing_is_an_unexpected_end() {
         let d = dir("killed");
         let (mut store, _) = Store::open(&d);
-        store.update(vec![tab(&["https://a.example/"], 0)], 0);
+        store.update(
+            1,
+            SavedWindow::new(vec![tab(&["https://a.example/"], 0)], 0),
+        );
         drop(store); // (the writer finishes what it was given; no clean mark)
         let offer = find_offer(&d, 1).expect("offered at the next start");
-        assert_eq!(offer.tabs.len(), 1);
+        assert_eq!(offer.tab_count(), 1);
         assert!(!offer.clean);
         let _ = fs::remove_dir_all(&d);
     }
@@ -731,6 +882,100 @@ mod tests {
         store.close_clean();
         let (_store, offer) = Store::open(&d);
         assert!(offer.is_none());
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn two_windows_round_trip_with_their_placements() {
+        let mut a = SavedWindow::new(
+            vec![
+                tab(&["https://a.example/"], 0),
+                tab(&["https://a.example/2"], 0),
+            ],
+            1,
+        );
+        a.placement = Some(placement(-1200));
+        let mut b = SavedWindow::new(vec![tab(&["https://b.example/"], 0)], 0);
+        b.placement = Some(placement(300));
+        let s = SessionFile::new(vec![a.clone(), b.clone()]);
+        let back = SessionFile::parse(&s.to_json()).unwrap();
+        assert_eq!(back.windows, [a, b]);
+        assert_eq!(back.tab_count(), 3);
+        // A window left with no tab it may open is dropped, the others stay.
+        let only_bad = SavedWindow::new(vec![tab(&["javascript:x"], 0)], 0);
+        let s = SessionFile::new(vec![only_bad, back.windows[1].clone()]);
+        let back = SessionFile::parse(&s.to_json()).unwrap();
+        assert_eq!(back.windows.len(), 1);
+        assert_eq!(back.windows[0].tabs[0].entries[0].url, "https://b.example/");
+    }
+
+    #[test]
+    fn a_version_1_file_reads_as_one_window() {
+        let v1 = r#"{"version":1,"clean":false,"saved":5,"pid":7,"active":1,"tabs":[
+            {"entries":[{"url":"https://a.example/","title":"A","x":0,"y":3}],"index":0,"zoom":1.0,"muted":false},
+            {"entries":[{"url":"https://b.example/","title":"B"}],"index":0}]}"#;
+        let s = SessionFile::parse(v1).expect("a version 1 session");
+        assert_eq!((s.version, s.saved, s.pid, s.clean), (VERSION, 5, 7, false));
+        assert_eq!(s.windows.len(), 1);
+        let w = &s.windows[0];
+        assert_eq!((w.tabs.len(), w.active, w.placement), (2, 1, None));
+        assert_eq!(w.tabs[1].current().unwrap().title, "B");
+        assert!(s.worth_offering());
+        // Written again, it is version 2.
+        assert!(s.to_json().contains("\"version\":2"));
+    }
+
+    #[test]
+    fn a_window_closed_beside_another_leaves_the_session_and_the_last_keeps_it() {
+        let d = dir("windows");
+        let (mut store, _) = Store::open(&d);
+        let path = file_of(&d, std::process::id());
+        let a = SavedWindow::new(vec![tab(&["https://a.example/"], 0)], 0);
+        let b = SavedWindow::new(vec![tab(&["https://b.example/"], 0)], 0);
+        let c = SavedWindow::new(vec![tab(&["https://c.example/"], 0)], 0);
+        for (id, w) in [(1, &a), (2, &b), (3, &c)] {
+            store.register(id);
+            store.update(id, w.clone());
+        }
+        written_as(&path, |s| s.windows.len() == 3);
+        // Window 2 closes while 1 and 3 stay: it is gone from the file, which stays unclean.
+        store.window_closed(2);
+        let s = written_as(&path, |s| s.windows.len() == 2);
+        assert!(!s.clean);
+        assert_eq!(s.windows, [a.clone(), c.clone()]);
+        assert!(store.is_open());
+        // A window that never saved anything closes: nothing changes.
+        store.register(4);
+        store.window_closed(4);
+        // Window 1 closes, then 3, the last: the file is closed clean, still with window 3.
+        store.window_closed(1);
+        written_as(&path, |s| s.windows == [c.clone()]);
+        store.window_closed(3);
+        assert!(!store.is_open());
+        let s = SessionFile::parse(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(s.clean);
+        assert_eq!(s.windows, [c]);
+        // Updates after the close write nothing.
+        store.update(5, a);
+        let again = SessionFile::parse(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(again.windows, s.windows);
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_crash_with_two_windows_open_offers_both() {
+        let d = dir("two-crash");
+        let (mut store, _) = Store::open(&d);
+        let a = SavedWindow::new(vec![tab(&["https://a.example/"], 0)], 0);
+        let mut b = SavedWindow::new(vec![tab(&["https://b.example/"], 0)], 0);
+        b.placement = Some(placement(500));
+        store.register(1);
+        store.register(2);
+        store.update(1, a.clone());
+        store.update(2, b.clone());
+        drop(store);
+        let offer = find_offer(&d, 1).expect("offered at the next start");
+        assert_eq!(offer.windows, [a, b]);
         let _ = fs::remove_dir_all(&d);
     }
 }

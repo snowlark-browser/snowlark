@@ -221,6 +221,7 @@ impl Engine {
             rule,
             sheet,
             parent,
+            detached: false,
         });
         self.cssom.borrow_mut().rules.insert(id, h);
         h
@@ -249,6 +250,7 @@ impl Engine {
             RuleKind::Supports => InterfaceId::CSSSupportsRule,
             RuleKind::FontFace => InterfaceId::CSSFontFaceRule,
             RuleKind::Keyframes => InterfaceId::CSSKeyframesRule,
+            RuleKind::Keyframe => InterfaceId::CSSKeyframeRule,
             RuleKind::Namespace => InterfaceId::CSSNamespaceRule,
             RuleKind::LayerBlock => InterfaceId::CSSLayerBlockRule,
             RuleKind::LayerStatement => InterfaceId::CSSLayerStatementRule,
@@ -695,12 +697,23 @@ impl CSSRuleImpl for Engine {
     }
     fn parent_rule(&self, this: Handle) -> Option<Handle> {
         match &*self.obj(this) {
-            Object::CssRule { parent, .. } => *parent,
+            Object::CssRule {
+                parent,
+                detached: false,
+                ..
+            } => *parent,
             _ => None,
         }
     }
     fn parent_style_sheet(&self, this: Handle) -> Option<Handle> {
-        Some(self.rule_sheet(this))
+        match &*self.obj(this) {
+            Object::CssRule {
+                sheet,
+                detached: false,
+                ..
+            } => Some(*sheet),
+            _ => None,
+        }
     }
     fn type_(&self, this: Handle) -> u16 {
         self.rule_of(this).type_code()
@@ -901,38 +914,73 @@ impl CSSFontPaletteValuesRuleImpl for Engine {
     }
 }
 
+/// CSS Animations 1 §6.2.
 impl CSSKeyframesRuleImpl for Engine {
     fn name(&self, this: Handle) -> DomStr<'_> {
         DomStr::Owned(self.rule_of(this).keyframes_name().unwrap_or_default())
     }
-    fn set_name(&self, _cx: &mut Cx, _this: Handle, _value: &str) -> rt::Result<()> {
+    fn set_name(&self, _cx: &mut Cx, this: Handle, value: &str) -> rt::Result<()> {
+        if self.rule_of(this).set_keyframes_name(value) {
+            self.sheets_mutated();
+        }
         Ok(())
     }
     fn css_rules(&self, this: Handle) -> Handle {
-        CSSGroupingRuleImpl::css_rules(self, this)
+        match self.rule_of(this).keyframe_rules() {
+            Some(list) => self.rule_list_handle(list, self.rule_sheet(this), Some(this)),
+            None => CSSGroupingRuleImpl::css_rules(self, this),
+        }
     }
-    fn length(&self, _this: Handle) -> u32 {
-        0
+    fn length(&self, this: Handle) -> u32 {
+        self.rule_of(this)
+            .keyframe_rules()
+            .map_or(0, |l| l.len() as u32)
     }
-    fn indexed_getter(&self, _this: Handle, _index: u32) -> Option<Handle> {
-        None
+    fn indexed_getter(&self, this: Handle, index: u32) -> Option<Handle> {
+        let rule = self.rule_of(this).keyframe_rules()?.get(index as usize)?;
+        Some(self.rule_handle(rule, self.rule_sheet(this), Some(this)))
     }
-    fn append_rule(&self, _cx: &mut Cx, _this: Handle, _rule: &str) -> rt::Result<()> {
+    fn append_rule(&self, _cx: &mut Cx, this: Handle, rule: &str) -> rt::Result<()> {
+        if self.rule_of(this).append_keyframe(rule) {
+            self.sheets_mutated();
+        }
         Ok(())
     }
-    fn delete_rule(&self, _cx: &mut Cx, _this: Handle, _select: &str) -> rt::Result<()> {
+    fn delete_rule(&self, _cx: &mut Cx, this: Handle, select: &str) -> rt::Result<()> {
+        let Some(removed) = self.rule_of(this).delete_keyframe(select) else {
+            return Ok(());
+        };
+        // The removed keyframe's object, if script holds one, has no parent any more.
+        let object = self.cssom.borrow_mut().rules.remove(&removed);
+        if let Some(h) = object {
+            if let Object::CssRule { detached, .. } = &mut *self.obj_mut(h) {
+                *detached = true;
+            }
+        }
+        self.sheets_mutated();
         Ok(())
     }
-    fn find_rule(&self, _cx: &mut Cx, _this: Handle, _select: &str) -> rt::Result<Option<Handle>> {
-        Ok(None)
+    fn find_rule(&self, _cx: &mut Cx, this: Handle, select: &str) -> rt::Result<Option<Handle>> {
+        let Some(rule) = self.rule_of(this).find_keyframe(select) else {
+            return Ok(None);
+        };
+        Ok(Some(self.rule_handle(
+            rule,
+            self.rule_sheet(this),
+            Some(this),
+        )))
     }
 }
 
+/// CSS Animations 1 §6.3.
 impl CSSKeyframeRuleImpl for Engine {
-    fn key_text(&self, _this: Handle) -> DomStr<'_> {
-        DomStr::Borrowed("")
+    fn key_text(&self, this: Handle) -> DomStr<'_> {
+        DomStr::Owned(self.rule_of(this).key_text().unwrap_or_default())
     }
-    fn set_key_text(&self, _cx: &mut Cx, _this: Handle, _value: &str) -> rt::Result<()> {
+    fn set_key_text(&self, _cx: &mut Cx, this: Handle, value: &str) -> rt::Result<()> {
+        if self.rule_of(this).set_key_text(value).map_err(rule_error)? {
+            self.sheets_mutated();
+        }
         Ok(())
     }
     fn style(&self, this: Handle) -> Handle {

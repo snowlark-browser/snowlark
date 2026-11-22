@@ -77,6 +77,28 @@ pub(crate) fn svg_reference_box(values: &ComputedValues) -> SvgReferenceBox {
 }
 
 impl RenderStyle {
+    /// Whether this is a legacy `display: -webkit-box` (Compat), laid out as a single-line flex
+    /// container whose direction, packing and alignment come from the `-webkit-box-*` properties.
+    fn is_webkit_box(&self) -> bool {
+        self.values.get_box().display.inside()
+            == style::values::specified::box_::DisplayInside::WebkitBox
+    }
+
+    /// Whether this is an item of a legacy `-webkit-box`: its flex is its `-webkit-box-flex`, its
+    /// order its `-webkit-box-ordinal-group`, and its automatic minimum size zero.
+    fn is_webkit_box_item(&self) -> bool {
+        use style::computed_value_flags::ComputedValueFlags as F;
+        self.values.flags.contains(F::IS_WEBKIT_BOX_ITEM)
+    }
+
+    /// A legacy box's item has no automatic minimum size: `min-width`/`min-height: auto` is zero.
+    fn webkit_box_min(&self, v: ls::SizeValue) -> ls::SizeValue {
+        if v == ls::SizeValue::Auto && self.is_webkit_box_item() {
+            return ls::SizeValue::px(0.0);
+        }
+        v
+    }
+
     /// A computed `filter` or `backdrop-filter` list's functions, lengths in px and colors
     /// resolved, a `url()`'s filter for the border box `reference_box`; empty when a `url()`
     /// names no `<filter>` (Filter Effects 1 §5: the whole list is ignored).
@@ -1446,11 +1468,11 @@ impl ls::Style for RenderStyle {
     }
 
     fn phys_min_width(&self) -> ls::SizeValue {
-        size(&self.values.get_position().min_width)
+        self.webkit_box_min(size(&self.values.get_position().min_width))
     }
 
     fn phys_min_height(&self) -> ls::SizeValue {
-        size(&self.values.get_position().min_height)
+        self.webkit_box_min(size(&self.values.get_position().min_height))
     }
 
     fn phys_max_width(&self) -> ls::MaxSizeValue {
@@ -1786,13 +1808,17 @@ impl ls::Style for RenderStyle {
     }
 
     fn flex_direction(&self) -> ls::FlexDirection {
+        use style::properties::longhands::_webkit_box_direction::computed_value::T as Direction;
         use style::properties::longhands::_webkit_box_orient::computed_value::T as Orient;
         use style::properties::longhands::flex_direction::computed_value::T;
         let b = self.values.get_box();
-        if b.display.inside() == style::values::specified::box_::DisplayInside::WebkitBox {
-            return match b._webkit_box_orient {
-                Orient::Vertical => ls::FlexDirection::Column,
-                Orient::Horizontal => ls::FlexDirection::Row,
+        if self.is_webkit_box() {
+            let reverse = b._webkit_box_direction == Direction::Reverse;
+            return match (b._webkit_box_orient, reverse) {
+                (Orient::Vertical, false) => ls::FlexDirection::Column,
+                (Orient::Vertical, true) => ls::FlexDirection::ColumnReverse,
+                (Orient::Horizontal, false) => ls::FlexDirection::Row,
+                (Orient::Horizontal, true) => ls::FlexDirection::RowReverse,
             };
         }
         match self.values.get_position().flex_direction {
@@ -1805,6 +1831,10 @@ impl ls::Style for RenderStyle {
 
     fn flex_wrap(&self) -> ls::FlexWrap {
         use style::values::computed::FlexWrap as W;
+        // (a legacy box is a single line)
+        if self.is_webkit_box() {
+            return ls::FlexWrap::Nowrap;
+        }
         let w = self.values.get_position().flex_wrap;
         if w.contains(W::WRAP_REVERSE) {
             ls::FlexWrap::WrapReverse
@@ -1816,10 +1846,17 @@ impl ls::Style for RenderStyle {
     }
 
     fn flex_grow(&self) -> f32 {
+        // (a legacy box's item grows and shrinks by its `-webkit-box-flex`)
+        if self.is_webkit_box_item() {
+            return self.values.get_box()._webkit_box_flex.0.max(0.0);
+        }
         self.values.get_position().flex_grow.0
     }
 
     fn flex_shrink(&self) -> f32 {
+        if self.is_webkit_box_item() {
+            return self.values.get_box()._webkit_box_flex.0.max(0.0);
+        }
         self.values.get_position().flex_shrink.0
     }
 
@@ -1836,10 +1873,22 @@ impl ls::Style for RenderStyle {
     }
 
     fn order(&self) -> i32 {
+        if self.is_webkit_box_item() {
+            return self.values.get_box()._webkit_box_ordinal_group;
+        }
         self.values.get_position().order
     }
 
     fn justify_content(&self) -> ls::Align {
+        use style::properties::longhands::_webkit_box_pack::computed_value::T as Pack;
+        if self.is_webkit_box() {
+            return match self.values.get_box()._webkit_box_pack {
+                Pack::Start => ls::Align::FlexStart,
+                Pack::Center => ls::Align::Center,
+                Pack::End => ls::Align::FlexEnd,
+                Pack::Justify => ls::Align::SpaceBetween,
+            };
+        }
         align(self.values.get_position().justify_content.primary())
     }
 
@@ -1848,10 +1897,24 @@ impl ls::Style for RenderStyle {
     }
 
     fn align_items(&self) -> ls::Align {
+        use style::properties::longhands::_webkit_box_align::computed_value::T as BoxAlign;
+        if self.is_webkit_box() {
+            return match self.values.get_box()._webkit_box_align {
+                BoxAlign::Stretch => ls::Align::Stretch,
+                BoxAlign::Start => ls::Align::FlexStart,
+                BoxAlign::Center => ls::Align::Center,
+                BoxAlign::Baseline => ls::Align::Baseline,
+                BoxAlign::End => ls::Align::FlexEnd,
+            };
+        }
         align(self.values.get_position().align_items.0)
     }
 
     fn align_self(&self) -> ls::Align {
+        // (a legacy box aligns every item by its own `-webkit-box-align`)
+        if self.is_webkit_box_item() {
+            return ls::Align::Auto;
+        }
         align(self.values.get_position().align_self.0)
     }
 
@@ -1867,14 +1930,23 @@ impl ls::Style for RenderStyle {
 
     fn align_safety(&self) -> ls::AlignSafety {
         let p = self.values.get_position();
-        ls::AlignSafety {
+        let mut s = ls::AlignSafety {
             justify_content: overflow_position(p.justify_content.primary()),
             align_content: overflow_position(p.align_content.primary()),
             align_items: overflow_position(p.align_items.0),
             align_self: overflow_position(p.align_self.0),
             justify_items: overflow_position(p.justify_items.computed.0 .0),
             justify_self: overflow_position(p.justify_self.0),
+        };
+        // (a legacy box's packing and alignment have no overflow position)
+        if self.is_webkit_box() {
+            s.justify_content = ls::OverflowPosition::Default;
+            s.align_items = ls::OverflowPosition::Default;
         }
+        if self.is_webkit_box_item() {
+            s.align_self = ls::OverflowPosition::Default;
+        }
+        s
     }
 
     fn row_gap(&self) -> Option<ls::LengthPercentage> {
@@ -2387,6 +2459,10 @@ impl ls::Style for RenderStyle {
         }
     }
 
+    fn text_fill_color(&self) -> Color {
+        self.color_of(&self.values.get_inherited_text()._webkit_text_fill_color)
+    }
+
     fn text_decoration_color(&self) -> Color {
         self.color_of(&self.values.get_text().text_decoration_color)
     }
@@ -2722,12 +2798,11 @@ impl ls::Style for RenderStyle {
         }
     }
 
-    fn background_color_area(&self) -> (ls::BoxArea, ls::BackgroundAttachment) {
+    fn background_color_layer(&self) -> ls::BackgroundLayer {
         // (the bottom layer is the last image's, `none` included: the other lists repeat to the
         // images' count)
         let n = self.values.get_background().background_image.0.len().max(1);
-        let l = self.background_layer(n - 1);
-        (l.clip, l.attachment)
+        self.background_layer(n - 1)
     }
 
     fn background_layer(&self, index: usize) -> ls::BackgroundLayer {
@@ -2772,13 +2847,12 @@ impl ls::Style for RenderStyle {
                 O::ContentBox => ls::BoxArea::ContentBox,
             }
         };
-        let area_clip = {
-            use style::values::computed::BackgroundClip as Cl;
-            match nth(&b.background_clip.0, index) {
-                Cl::BorderBox | Cl::BorderArea => ls::BoxArea::BorderBox,
-                Cl::PaddingBox => ls::BoxArea::PaddingBox,
-                Cl::ContentBox => ls::BoxArea::ContentBox,
-            }
+        use style::values::computed::BackgroundClip as Cl;
+        let clip = nth(&b.background_clip.0, index);
+        let area_clip = match clip {
+            Cl::BorderBox | Cl::BorderArea | Cl::Text => ls::BoxArea::BorderBox,
+            Cl::PaddingBox => ls::BoxArea::PaddingBox,
+            Cl::ContentBox => ls::BoxArea::ContentBox,
         };
         let attachment = {
             use style::properties::longhands::background_attachment::single_value::computed_value::T as A;
@@ -2798,6 +2872,7 @@ impl ls::Style for RenderStyle {
             repeat: (repeat(r.0), repeat(r.1)),
             origin: area_origin,
             clip: area_clip,
+            clip_text: *clip == Cl::Text,
             attachment,
         }
     }
@@ -2871,6 +2946,7 @@ impl ls::Style for RenderStyle {
                 repeat: (repeat(r.0), repeat(r.1)),
                 origin,
                 clip,
+                clip_text: false,
                 attachment: ls::BackgroundAttachment::Scroll,
             },
             // (`match-source` takes an image's alpha; only an SVG `<mask>` reference, not

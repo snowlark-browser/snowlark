@@ -457,6 +457,16 @@ the source; `git log -p vendor/stylo` shows the diff.
 79. **`resize` in the servo build** (`properties/longhands.toml`, CSS UI 4 §5.1): upstream builds the
    longhand only for the `gecko` engine. The computed value (logical `block`/`inline` resolved against the
    writing mode) is upstream's; snowlark-layout reads it to place the resizer of a scroll container.
+80. **Gradient text in the servo build** (`values/specified/background.rs`, `properties/longhands.toml`): upstream
+   parses `background-clip: text` (CSS Backgrounds 4 §2.1) and builds `-webkit-text-fill-color` (Compat §5.4)
+   only with the `gecko` feature. Both are in the servo build: snowlark-layout clips a `text` layer to the
+   glyphs of the box's text and fills glyphs with the fill colour.
+81. **The legacy `-webkit-box` properties in the servo build** (`properties/longhands.toml`,
+   `properties/computed_value_flags.rs`, `style_adjuster.rs`): upstream has `-webkit-box-align`, `-direction`,
+   `-pack`, `-flex` and `-ordinal-group` only as Gecko aliases of its XUL properties. They are servo longhands
+   in the box struct, as `-webkit-box-orient` is (patch 11). An element whose layout parent is a `-webkit-box`
+   gets the flag `IS_WEBKIT_BOX_ITEM`, so snowlark-render can give it the legacy box's item rules (its flex
+   from `-webkit-box-flex`, its order from `-webkit-box-ordinal-group`) without changing computed values.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

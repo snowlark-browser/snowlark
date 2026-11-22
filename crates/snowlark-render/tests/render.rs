@@ -903,3 +903,101 @@ fn layout_after_resizes_keeps_root_relative_lengths() {
         assert_eq!(width("mq"), mq, "at {w}");
     }
 }
+
+/// `background-clip: text` (CSS Backgrounds 4 §2.1): the layer and the color under it are painted
+/// in a mask group whose mask is the box's text (its descendants' too) as opaque glyphs, and
+/// `-webkit-text-fill-color` (Compat §5.4) fills the glyphs themselves.
+#[test]
+fn background_clip_text_masks_the_background_with_the_text() {
+    use snowlark_paint::display_list::Item;
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let url = Url::parse("http://example.test/").unwrap();
+    let mut r = renderer(&net, 400.0, 600.0);
+    r.load_html(
+        b"<!doctype html><body style='margin:0; font-size:40px'>\
+          <div style='background: linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255));\
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;\
+            color: rgb(0, 128, 0)'>Hi <span>there</span></div>\
+          <div style='background-color: rgb(255, 0, 255); background-clip: text'>X</div>\
+          <div style='color: rgb(0, 128, 0); -webkit-text-fill-color: rgb(0, 0, 128)'>fill</div>\
+          <div style='color: rgb(0, 128, 0)'>plain</div>",
+        &url,
+        None,
+    );
+    let viewport = Size::new(400.0, 600.0);
+    r.layout(viewport).unwrap();
+    let list = r.paint(viewport, Point::ZERO);
+    let items = &list.items;
+    let masks: Vec<usize> = (0..items.len())
+        .filter(|&i| matches!(items[i], Item::PushMask { .. }))
+        .collect();
+    assert_eq!(masks.len(), 2, "{items:?}");
+    let group = |at: usize| {
+        let content = (at..items.len())
+            .find(|&i| matches!(items[i], Item::MaskContent))
+            .unwrap();
+        let end = (content..items.len())
+            .find(|&i| matches!(items[i], Item::PopMask))
+            .unwrap();
+        (&items[at + 1..content], &items[content + 1..end], end)
+    };
+    let texts = |part: &[Item]| -> Vec<Color> {
+        part.iter()
+            .filter_map(|i| match i {
+                Item::Text(t) => Some(t.color),
+                _ => None,
+            })
+            .collect()
+    };
+    // The first box: both of its text runs (its span's too) are the mask, in opaque black; the
+    // gradient is what the mask shows.
+    let (mask, shown, end) = group(masks[0]);
+    assert_eq!(texts(mask), [Color::BLACK, Color::BLACK], "{mask:?}");
+    assert!(
+        matches!(
+            items[masks[0]],
+            Item::PushMask {
+                luminance: false,
+                ..
+            }
+        ),
+        "{:?}",
+        items[masks[0]]
+    );
+    assert!(
+        shown
+            .iter()
+            .any(|i| matches!(i, Item::LinearGradient { .. })),
+        "{shown:?}"
+    );
+    assert!(texts(shown).is_empty());
+    // The gradient is painted nowhere else.
+    let gradients = items
+        .iter()
+        .filter(|i| matches!(i, Item::LinearGradient { .. }))
+        .count();
+    assert_eq!(gradients, 1);
+    // Its glyphs are then filled with the transparent fill colour (nothing drawn), not `color`.
+    let green = Color::rgb(0, 128, 0);
+    let after = texts(&items[end..masks[1]]);
+    assert!(after.iter().all(|c| c.is_transparent()), "{after:?}");
+    // The second: the background color alone, clipped to the text.
+    let magenta = Color::rgb(255, 0, 255);
+    let (mask, shown, _) = group(masks[1]);
+    assert_eq!(texts(mask), [Color::BLACK]);
+    let fills = |part: &[Item]| {
+        part.iter().any(|i| {
+            matches!(i, Item::FillRect { color, .. } | Item::FillRoundedRect { color, .. }
+                if *color == magenta)
+        })
+    };
+    assert!(fills(shown), "{shown:?}");
+    assert!(!fills(&items[..masks[1]]));
+    // Boxes without it: no mask; glyphs in the fill colour where it is set, else in `color`.
+    let rest = texts(&items[masks[1]..]);
+    assert_eq!(
+        rest[rest.len() - 2..],
+        [Color::rgb(0, 0, 128), green],
+        "{rest:?}"
+    );
+}

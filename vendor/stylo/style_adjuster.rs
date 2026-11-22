@@ -289,6 +289,11 @@ impl<'a, 'b: 'a> StyleAdjuster<'a, 'b> {
         if !self.skip_item_display_fixup(element) {
             let parent_display = layout_parent_style.get_box().clone_display();
             blockify_if!(parent_display.is_item_container());
+            // Snowlark patch (SNOWLARK-PATCHES.md 81): an item of a legacy `-webkit-box`.
+            if parent_display.inside() == crate::values::specified::box_::DisplayInside::WebkitBox
+            {
+                self.style.add_flags(ComputedValueFlags::IS_WEBKIT_BOX_ITEM);
+            }
         }
 
         let is_item_or_root = blockify;

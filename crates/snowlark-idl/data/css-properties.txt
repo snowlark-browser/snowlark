@@ -21,7 +21,12 @@
 -webkit-border-radius
 -webkit-border-top-left-radius
 -webkit-border-top-right-radius
+-webkit-box-align
+-webkit-box-direction
+-webkit-box-flex
+-webkit-box-ordinal-group
 -webkit-box-orient
+-webkit-box-pack
 -webkit-box-shadow
 -webkit-box-sizing
 -webkit-clip-path
@@ -49,6 +54,7 @@
 -webkit-order
 -webkit-perspective
 -webkit-perspective-origin
+-webkit-text-fill-color
 -webkit-text-security
 -webkit-transform
 -webkit-transform-origin

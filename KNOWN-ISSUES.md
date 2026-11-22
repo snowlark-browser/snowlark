@@ -58,12 +58,13 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `:active` rules do not apply, the buttons and corner are not drawn, and the scrollbar pseudo-classes
   (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
   parse but style nothing. (ref 627)
-- **Properties not built.** `scroll-snap-type`, `scroll-snap-align`, `scroll-snap-stop`, `-webkit-text-fill-color`, `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink`
+- **Properties not built.** `scroll-snap-type`, `scroll-snap-align`, `scroll-snap-stop`, `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink`
   and `accent-color` do not parse, so their declarations are dropped. (ref 622)
 - **Filters.** `filter` functions and `backdrop-filter` work. Not done: `filter: url()` pointing to an external SVG
   document, `linearRGB` interpolation in SVG filters, `filter` on the root element, `will-change: filter` as a
   compositing reason, and running filter animations on the compositor. (ref 40)
-- **Backgrounds and borders.** Open: `background-clip: text` and `border-area`, border images from SVGs without a natural
+- **Backgrounds and borders.** Open: `background-clip: border-area`, `text` layers drawn above the box's other
+  layers whatever their order and not on the root's canvas, border images from SVGs without a natural
   size, box-shadow and background slicing across fragments, backgrounds on `::first-line`/`::first-letter`, and
   gradient interpolation color spaces for some cases. (ref 35)
 - **CSS images.** Open: `object`/`embed` showing an SVG document under `object-fit`, `image-resolution`,
@@ -73,7 +74,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   descriptors, `size-adjust`, metric override descriptors, `font-display` periods, `FontFaceSet` loading events, and
   lazy loading of faces nothing uses. Request modifiers on a `src` URL are not parsed. (ref 68)
 - **Animations.** Replacing the effect of a CSS animation (`animation.effect = ...`) does nothing: the element keeps
-  the CSS animation's values. Script animations on pseudo-elements do not reach the cascade. (ref 115, 33)
+  the CSS animation's values. Script animations on pseudo-elements do not reach the cascade. A running CSS
+  animation keeps the keyframes it started with when script edits, renames or removes its `@keyframes` rule.
+  (ref 115, 33, 635)
 - **`getComputedStyle()` on pseudo-elements.** For a `::before` or `::after` that generates a box, `width` and
   `height` read their computed value (such as `auto`) rather than the used size. (ref 96)
 - **Highlight pseudo-elements.** A `text-decoration` declared on `::selection` is not painted, and a selected
@@ -207,10 +210,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   (for example a long Reddit thread) lags behind the pointer. Not measured. (ref 92)
 
 ## Browser UI
-
-- **Several regular windows, one session.** Ctrl+N opens a new regular window, but only the first regular window's
-  tabs are kept for a restore after an unexpected exit, and each window that closes writes its own placement. (ref
-  631)
 
 - **Scroll bar details.** A classic scroll bar is drawn for the page, but frames keep overlay bars (none drawn) and
   `scrollbar-gutter` is not implemented. (ref 8)

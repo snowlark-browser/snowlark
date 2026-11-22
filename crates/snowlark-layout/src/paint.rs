@@ -122,6 +122,26 @@ pub(crate) trait Sink<S: Style> {
         false
     }
     fn pop_mask(&mut self) {}
+    /// Starts the `background-clip: text` layers of box `b` (at `at`; CSS Backgrounds 4 §2.1),
+    /// if the sink paints them: what follows, up to [`Sink::text_clip_layers`], is the box's text
+    /// as their mask, painted as glyph coverage alone. Whether it did.
+    fn push_text_clip(&mut self, _f: &Fragment<S>, _b: &BoxFragment<S>, _at: Point) -> bool {
+        false
+    }
+    /// Ends the mask [`Sink::push_text_clip`] began and paints the box's text-clipped layers in
+    /// it (the background colour too when the bottom layer is one).
+    fn text_clip_layers(
+        &mut self,
+        _f: &Fragment<S>,
+        _b: &BoxFragment<S>,
+        _at: Point,
+        _scroll: Option<Point>,
+    ) {
+    }
+    /// Whether the text of a `background-clip: text` mask is being painted.
+    fn in_text_clip(&self) -> bool {
+        false
+    }
     /// A scroll container's scroll bars, over its content: `scroll` is its scroll position,
     /// `device_scale` the device pixels per CSS px.
     fn scrollbars(
@@ -142,6 +162,19 @@ pub(crate) trait Sink<S: Style> {
     fn wants(&self, _bounds: Rect) -> bool {
         true
     }
+}
+
+/// Whether a box has a `background-clip: text` layer that paints (the colour counts when the
+/// bottom layer is one).
+fn has_text_clip<S: Style>(s: &S) -> bool {
+    if s.visibility() != Visibility::Visible {
+        return false;
+    }
+    let n = s.background_layer_count();
+    (0..n).any(|i| {
+        let l = s.background_layer(i);
+        l.clip_text && l.image != Image::None
+    }) || (s.background_color_layer().clip_text && !s.background_color().is_transparent())
 }
 
 /// Whether a box fragment's style makes a stacking context.
@@ -1382,6 +1415,20 @@ impl<K> Painter<'_, K> {
         if pinned {
             self.sink.pop_layer();
         }
+        // `background-clip: text` (CSS Backgrounds 4 §2.1): those layers show through the glyphs
+        // of the box's text and its in-flow and floated descendants' (not through its stacking
+        // contexts' or positioned boxes').
+        if has_text_clip(&b.style)
+            && !self.sink.in_text_clip()
+            && self.sink.push_text_clip(f, b, at)
+        {
+            if b.flags & fragment_flags::INLINE_BOX != 0 {
+                self.inline_content(f, at, None);
+            } else {
+                self.paint_flow(f, at, false);
+            }
+            self.sink.text_clip_layers(f, b, at, scroll);
+        }
         match &b.content {
             BoxContent::CollapsedBorders(segments) => self.sink.collapsed_borders(segments, at),
             BoxContent::ColumnGaps(gaps) => self.sink.column_rules(f, b, gaps, at, scroll),
@@ -1881,6 +1928,9 @@ pub(crate) struct DisplayListSink<'a> {
     pub device_scale: f32,
     /// Transforms open around what is being painted (culling compares untransformed bounds).
     transforms: u32,
+    /// Painting the text of a `background-clip: text` mask: glyphs and their decorations only,
+    /// opaque, no shadows, highlights or boxes.
+    text_clip: bool,
     glyphs: Vec<u16>,
     advances: Vec<f32>,
     offsets: Vec<snowlark_paint::GlyphOffset>,
@@ -1899,9 +1949,42 @@ impl<'a> DisplayListSink<'a> {
             cull: None,
             device_scale: 1.0,
             transforms: 0,
+            text_clip: false,
             glyphs: Vec::new(),
             advances: Vec::new(),
             offsets: Vec::new(),
+        }
+    }
+
+    /// The geometry the background layers of box `b` (fragment `f` at `at`, scrolled by
+    /// `scroll`) are placed in and painted to.
+    fn layer_area<S: Style>(
+        &self,
+        f: &Fragment<S>,
+        b: &BoxFragment<S>,
+        border_box: Rect,
+        radii: Radii,
+        at: Point,
+        scroll: Option<Point>,
+    ) -> LayerArea {
+        let padding_box = border_box.deflate(&b.border);
+        let content_box = padding_box.deflate(&b.padding);
+        LayerArea {
+            boxes: [border_box, padding_box, content_box],
+            radii: [
+                radii,
+                radii.inner(&b.border),
+                radii.inner(&inset_sides(&b.border, &b.padding)),
+            ],
+            // `fixed` backgrounds are positioned in the viewport, except under a transform,
+            // where they are treated as `scroll` (CSS Transforms 1 §6).
+            viewport: (self.transforms == 0).then_some(self.viewport),
+            local: scroll.map(|sc| scrolled_area(f, b, at, sc)),
+            clip_override: None,
+            strip: (b.flags & fragment_flags::INLINE_BOX != 0)
+                .then(|| b.strip.get())
+                .flatten()
+                .map(|s| s.map(|r| r.translate(at.x, at.y))),
         }
     }
 }
@@ -1972,7 +2055,10 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
         scroll: Option<Point>,
     ) {
         let s = &b.style;
-        if s.visibility() != Visibility::Visible || b.flags & fragment_flags::HIDE_EMPTY != 0 {
+        if self.text_clip
+            || s.visibility() != Visibility::Visible
+            || b.flags & fragment_flags::HIDE_EMPTY != 0
+        {
             return;
         }
         let border_box = Rect::new(at.x, at.y, f.size.width, f.size.height);
@@ -1998,7 +2084,7 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                 clip_override: Some(area),
                 strip: None,
             };
-            paint_background_layers(self.out, s, &geo);
+            paint_background_layers(self.out, s, &geo, None);
             return;
         }
         let to_canvas = b.flags & fragment_flags::BACKGROUND_TO_CANVAS != 0;
@@ -2019,38 +2105,17 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                 }
             }
             let padding_box = border_box.deflate(&b.border);
-            let content_box = padding_box.deflate(&b.padding);
-            let geo = LayerArea {
-                boxes: [border_box, padding_box, content_box],
-                radii: [
-                    radii,
-                    radii.inner(&b.border),
-                    radii.inner(&inset_sides(&b.border, &b.padding)),
-                ],
-                viewport,
-                local: scroll.map(|sc| scrolled_area(f, b, at, sc)),
-                clip_override: None,
-                strip: (b.flags & fragment_flags::INLINE_BOX != 0)
-                    .then(|| b.strip.get())
-                    .flatten()
-                    .map(|s| s.map(|r| r.translate(at.x, at.y))),
-            };
-            // The color is painted under the bottom layer, clipped as it is (§3.10).
-            let bottom = match s.background_layer_count() {
-                0 => {
-                    let (clip, attachment) = s.background_color_area();
-                    BackgroundLayer {
-                        clip,
-                        attachment,
-                        ..BackgroundLayer::default()
-                    }
-                }
-                n => s.background_layer(n - 1),
-            };
-            let (_, color_rect, color_radii) = geo.layer_areas(&bottom);
-            self.out
-                .fill_rounded_rect(color_rect, color_radii, s.background_color());
-            paint_background_layers(self.out, s, &geo);
+            let geo = self.layer_area(f, b, border_box, radii, at, scroll);
+            // The color is painted under the bottom layer, clipped as it is (§3.10); a layer
+            // clipped to the text, and the color under one, are painted with the text as their
+            // mask (`text_clip_layers`).
+            let bottom = s.background_color_layer();
+            if !bottom.clip_text {
+                let (_, color_rect, color_radii) = geo.layer_areas(&bottom);
+                self.out
+                    .fill_rounded_rect(color_rect, color_radii, s.background_color());
+            }
+            paint_background_layers(self.out, s, &geo, Some(false));
             for i in (0..s.box_shadow_count()).rev() {
                 let sh = s.box_shadow(i);
                 if sh.inset {
@@ -2171,7 +2236,8 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
             let m = crate::inline::line_metrics(self.text.metrics(run.font, run.size));
             origin.y += m.ascent - crate::inline::centered(m).ascent;
         }
-        let color = s.color();
+        // (glyphs are filled with `-webkit-text-fill-color`; decorations keep their own colour)
+        let color = s.text_fill_color();
         // Decorations (CSS Text Decoration 3 §2.3): underlines and overlines paint below the text,
         // line-throughs above it.
         let metrics = if t.decorations.is_empty() {
@@ -2261,6 +2327,17 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                 out.pop_filter();
             }
         };
+        if self.text_clip {
+            // A `background-clip: text` mask: only the coverage counts, so glyphs and
+            // decorations in one opaque colour, without shadows or highlights.
+            let opaque = Some(Color::BLACK);
+            decorate(self.out, Lines::UnderOver, Point::ZERO, opaque);
+            if c0 < c1 {
+                draw(self.out, origin, Color::BLACK);
+            }
+            decorate(self.out, Lines::Through, Point::ZERO, opaque);
+            return;
+        }
         for i in (0..s.text_shadow_count()).rev() {
             shadow(self.out, &s.text_shadow(i));
         }
@@ -2424,6 +2501,9 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
         at: Point,
         line: Option<Rect>,
     ) {
+        if self.text_clip {
+            return;
+        }
         let Some(&color) = self
             .selection
             .zip(b.node)
@@ -2445,6 +2525,9 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
     }
 
     fn replaced(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point) {
+        if self.text_clip {
+            return;
+        }
         if let BoxContent::Replaced {
             content,
             rect,
@@ -2552,6 +2635,9 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
     }
 
     fn collapsed_borders(&mut self, segments: &[CollapsedBorderSegment], at: Point) {
+        if self.text_clip {
+            return;
+        }
         for s in segments {
             if !s.style.is_invisible() {
                 self.out.fill_rect(s.rect.translate(at.x, at.y), s.color);
@@ -2567,6 +2653,9 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
         at: Point,
         scroll: Option<Point>,
     ) {
+        if self.text_clip {
+            return;
+        }
         let s = &b.style;
         let width = s.column_rule_width();
         // (CSS Multi-column Layout 1 §4.2: the styles are those of the collapsing border model,
@@ -2632,6 +2721,9 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
     }
 
     fn outline(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point) {
+        if self.text_clip {
+            return;
+        }
         let s = &b.style;
         let w = s.outline_width();
         let o = s.outline_offset();
@@ -2789,6 +2881,42 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
         self.out.pop_mask();
     }
 
+    fn push_text_clip(&mut self, f: &Fragment<S>, _b: &BoxFragment<S>, at: Point) -> bool {
+        // (the layers are clipped to the border box too: the mask shows nothing outside it)
+        let border_box = Rect::new(at.x, at.y, f.size.width, f.size.height);
+        self.out.push_mask(border_box, false);
+        self.text_clip = true;
+        true
+    }
+
+    fn text_clip_layers(
+        &mut self,
+        f: &Fragment<S>,
+        b: &BoxFragment<S>,
+        at: Point,
+        scroll: Option<Point>,
+    ) {
+        self.text_clip = false;
+        self.out.mask_content();
+        let s = &b.style;
+        let border_box = Rect::new(at.x, at.y, f.size.width, f.size.height);
+        let (border_box, _) = fieldset_border(f, b, border_box);
+        let radii = radii(s, Size::new(border_box.width, border_box.height));
+        let geo = self.layer_area(f, b, border_box, radii, at, scroll);
+        let bottom = s.background_color_layer();
+        if bottom.clip_text {
+            let (_, color_rect, color_radii) = geo.layer_areas(&bottom);
+            self.out
+                .fill_rounded_rect(color_rect, color_radii, s.background_color());
+        }
+        paint_background_layers(self.out, s, &geo, Some(true));
+        self.out.pop_mask();
+    }
+
+    fn in_text_clip(&self) -> bool {
+        self.text_clip
+    }
+
     fn scrollbars(
         &mut self,
         f: &Fragment<S>,
@@ -2798,7 +2926,7 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
         device_scale: f32,
     ) {
         let s = &b.style;
-        if s.visibility() != Visibility::Visible {
+        if self.text_clip || s.visibility() != Visibility::Visible {
             return;
         }
         if let Some(look) = ScrollbarLook::of(s) {
@@ -3120,12 +3248,21 @@ fn scrolled_area<S: Style>(
     [border, padding, padding.deflate(&b.padding)]
 }
 
-/// Paints `background-image` layers, bottom layer first (CSS Backgrounds 3 §3).
-fn paint_background_layers<S: Style>(out: &mut DisplayListBuilder, s: &S, geo: &LayerArea) {
+/// Paints `background-image` layers, bottom layer first (CSS Backgrounds 3 §3): those clipped to
+/// the text (`Some(true)`), the others (`Some(false)`), or all of them (the canvas: its painting area is the whole canvas, §2.11.1).
+fn paint_background_layers<S: Style>(
+    out: &mut DisplayListBuilder,
+    s: &S,
+    geo: &LayerArea,
+    text: Option<bool>,
+) {
     let n = s.background_layer_count();
     paint_image_layers(
         out,
-        (0..n).rev().map(|i| s.background_layer(i)),
+        (0..n)
+            .rev()
+            .map(|i| s.background_layer(i))
+            .filter(|l| text.is_none_or(|t| l.clip_text == t)),
         s.image_rendering(),
         geo,
     );
