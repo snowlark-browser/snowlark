@@ -282,6 +282,14 @@ impl<S: Style> LayoutTree<S> {
         }
     }
 
+    /// Whether a box was marked for layout since the last layout (or nothing was laid out yet).
+    pub fn needs_layout(&self) -> bool {
+        match (self.tree.root, &self.root) {
+            (Some(root), Some(_)) => self.tree.b(root).is_dirty(),
+            _ => true,
+        }
+    }
+
     /// Lays out the tree in a viewport (the initial containing block), reusing clean boxes'
     /// fragments. Returns the root fragment: the initial containing block, holding the root element's
     /// fragment and fixed/absolute boxes positioned against it.

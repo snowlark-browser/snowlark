@@ -478,6 +478,8 @@ struct Doc {
     /// The initial containing block of the last layout: the viewport without the classic vertical
     /// scroll bar when one shows.
     last_viewport: Option<Size>,
+    /// The viewport the last layout was asked for (scroll anchoring: a new size can move boxes).
+    anchor_viewport: Option<Size>,
     /// The last layout showed the viewport's vertical scroll bar (the next one starts from that).
     vertical_scrollbar: bool,
     /// The width of the gutter the last layout left for it (`scrollbar-width` on the root decides it).
@@ -684,6 +686,8 @@ pub struct Renderer {
     stats: RenderStats,
     /// Style and layout are being brought up to date for a script's read.
     script_read: bool,
+    /// CSS Scroll Anchoring 1 for the viewport ([`Renderer::set_viewport_scroll`]).
+    anchoring: crate::scroll_anchor::Anchoring,
     trace: bool,
     clock: TimelineClock,
     render_blocking_timeout: Duration,
@@ -938,6 +942,7 @@ impl Renderer {
             timings: Timings::default(),
             stats: RenderStats::default(),
             script_read: false,
+            anchoring: Default::default(),
             trace: false,
             clock: TimelineClock::Monotonic,
             render_blocking_timeout: DEFAULT_RENDER_BLOCKING_TIMEOUT,
@@ -1377,6 +1382,7 @@ impl Renderer {
             remembered: HashMap::new(),
             fragments: None,
             last_viewport: None,
+            anchor_viewport: None,
             vertical_scrollbar: false,
             vertical_scrollbar_width: 0.0,
             viewport_custom_scrollbar: None,
@@ -3927,7 +3933,32 @@ impl Renderer {
             }
             root = self.layout_once(viewport)?;
         }
+        // CSS Scroll Anchoring 1 §2.2: the anchor's movement is the viewport's adjustment (taken
+        // by the embedder after each layout, forced ones included: a script reading the scroll
+        // position sees it).
+        if self.anchoring.is_queued() {
+            if let Some(doc) = self.doc.as_deref() {
+                let data = &doc.data;
+                self.anchoring.after_layout(
+                    &doc.layout,
+                    |n| data.styles(n),
+                    self.config.device_pixel_ratio,
+                );
+            }
+        }
         Some(root)
+    }
+
+    /// Where the viewport is scrolled, which CSS Scroll Anchoring 1 selects its anchor node for:
+    /// told before each layout.
+    pub fn set_viewport_scroll(&mut self, scroll: Point) {
+        self.anchoring.scroll = scroll;
+    }
+
+    /// The scroll anchoring adjustments of the viewport (physical CSS px) the layouts since the
+    /// last call made: the embedder scrolls the viewport by them (CSS Scroll Anchoring 1 §2.2).
+    pub fn take_scroll_adjustment(&mut self) -> Option<Point> {
+        self.anchoring.take_adjustment()
     }
 
     /// [`Renderer::layout`] for a script's read (`getBoundingClientRect`, `offsetWidth`...). An inline
@@ -4105,6 +4136,40 @@ impl Renderer {
         let dom_rc = doc.dom.clone();
         let dom = dom_rc.borrow();
         let restyles = doc.data.take_restyles();
+        // CSS Scroll Anchoring 1 §2.1: before a layout that can move boxes, the viewport's anchor
+        // node from the last layout's fragments (the box tree still has its old styles here).
+        let may_move = doc.needs_build
+            || restyles.overflowed
+            || !restyles.elements.is_empty()
+            || !doc.changes.is_empty()
+            || !doc.fonts_arrived.is_empty()
+            || doc.layout.needs_layout()
+            || doc.anchor_viewport != Some(viewport);
+        if may_move {
+            if let (Some(root), Some(port)) = (doc.fragments.as_deref(), doc.last_viewport) {
+                self.anchoring.before_layout(
+                    root,
+                    &doc.layout,
+                    port,
+                    self.config.device_pixel_ratio,
+                );
+            }
+            // §2.2.2: an element that becomes or stops being absolutely positioned.
+            if self.anchoring.is_queued() {
+                let boxes = doc.layout.boxes();
+                for r in &restyles.elements {
+                    if r.strongest() < StyleChange::Relayout {
+                        continue;
+                    }
+                    let old = boxes.box_of(r.element).and_then(|b| boxes.get(b));
+                    if let Some(new) = doc.data.styles(r.element) {
+                        let old = old.map(|b| &**b.style().values());
+                        self.anchoring.position_changed(old, new);
+                    }
+                }
+            }
+        }
+        doc.anchor_viewport = Some(viewport);
         // CSS Sizing 4 5.2.1: an element that lost `contain-intrinsic-size: auto` in an axis
         // forgets its last remembered size there at once.
         if !doc.remembered.is_empty() {

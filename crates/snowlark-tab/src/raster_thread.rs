@@ -232,9 +232,10 @@ impl FrameMeta {
         if self.restore.is_none() {
             self.restore = old.restore;
         }
-        if self.scroll.is_none() {
-            self.scroll = old.scroll;
-        }
+        self.scroll = match (self.scroll, old.scroll) {
+            (Some(new), Some(old)) => Some(PageScroll::merge(new, old)),
+            (new, old) => new.or(old),
+        };
     }
 }
 
@@ -1930,12 +1931,7 @@ pub(crate) mod tests {
     /// was drawn, unless that one was painted for a scroll of its own or is another document's.
     #[test]
     fn a_replaced_job_leaves_the_pages_scroll_it_was_painted_for() {
-        let scroll = |y: f32, serial: u64| {
-            Some(PageScroll {
-                to: Point::new(0.0, y),
-                serial,
-            })
-        };
+        let scroll = |y: f32, serial: u64| Some(PageScroll::to(Point::new(0.0, y), serial));
         let scrolled = |bytes: usize, generation: u64, s: Option<PageScroll>| {
             let mut job = job(bytes, generation, None);
             job.head.meta.scroll = s;

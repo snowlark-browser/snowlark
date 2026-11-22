@@ -43123,6 +43123,102 @@ pub(crate) fn attr_prop_overflow_set<D: Dom, const LO: u16, const HI: u16>(
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=overflow-anchor] attribute CSSOMString overflowAnchor;`.
+pub(crate) fn attr_prop_overflow_anchor_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.overflowAnchor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "overflow-anchor");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=overflow-anchor] attribute CSSOMString overflowAnchor;`.
+pub(crate) fn attr_prop_overflow_anchor_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.overflowAnchor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "overflow-anchor",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=overflow-anchor] attribute CSSOMString overflow-anchor;`.
+pub(crate) fn attr_prop_dash_overflow_anchor_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.overflow-anchor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "overflow-anchor");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=overflow-anchor] attribute CSSOMString overflow-anchor;`.
+pub(crate) fn attr_prop_dash_overflow_anchor_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.overflow-anchor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "overflow-anchor",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=overflow-block] attribute CSSOMString overflowBlock;`.
 pub(crate) fn attr_prop_overflow_block_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -74073,6 +74169,44 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "overflow", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_overflow_anchor_get::<D, LO, HI>),
+            "overflowAnchor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_overflow_anchor_set::<D, LO, HI>),
+            "overflowAnchor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "overflowAnchor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_overflow_anchor_get::<D, LO, HI>,
+            ),
+            "overflow-anchor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_overflow_anchor_set::<D, LO, HI>,
+            ),
+            "overflow-anchor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "overflow-anchor", g, s, false);
     }
     {
         let g = rt::getter(

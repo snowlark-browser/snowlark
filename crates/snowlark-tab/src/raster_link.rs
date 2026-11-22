@@ -278,6 +278,7 @@ mod tests {
                 scroll: Some(crate::comp::PageScroll {
                     to: Point::new(0.0, 1200.0),
                     serial: 7,
+                    by: Some(Point::new(0.0, 40.0)),
                 }),
             },
             band: (-200.0, 1400.0),

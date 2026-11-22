@@ -96,6 +96,10 @@ pub struct RenderState {
     pub(crate) smooth: Vec<crate::engine::view::SmoothScroll>,
     /// Script scrolled the viewport to this position; the embedder moves its view there.
     pub scroll_request: Option<Point>,
+    /// Scroll anchoring moved the viewport by this much (CSS Scroll Anchoring 1 §2.2) since the
+    /// embedder last heard: it moves its view by as much, from wherever the user has scrolled it
+    /// meanwhile. Never set together with [`RenderState::scroll_request`], which takes it in.
+    pub scroll_adjust: Option<Point>,
     /// The images of the page's renderers (made with the top-level one).
     pub images: Option<Arc<ImageStore>>,
     /// How the renderers' document timelines read the time (the top-level state's, for every
@@ -150,6 +154,7 @@ fn swap_document_state(a: &mut RenderState, b: &mut RenderState) {
     std::mem::swap(&mut a.pending_scrollend, &mut b.pending_scrollend);
     std::mem::swap(&mut a.smooth, &mut b.smooth);
     std::mem::swap(&mut a.scroll_request, &mut b.scroll_request);
+    std::mem::swap(&mut a.scroll_adjust, &mut b.scroll_adjust);
 }
 
 /// A hit in a document: the topmost element and the point in its document's viewport.
@@ -381,6 +386,7 @@ impl Engine {
         st.pending_scrollend.clear();
         st.smooth.clear();
         st.scroll_request = None;
+        st.scroll_adjust = None;
         st.dirty = true;
         st.needs_paint = true;
         drop(st);
@@ -1019,6 +1025,28 @@ impl Engine {
         node: NodeId,
         f: impl FnOnce(&mut Renderer, &RenderState) -> R,
     ) -> Option<R> {
+        self.layout_for_read(node, true, f)
+    }
+
+    /// [`Engine::with_layout`] for a read whose result does not depend on the scroll position
+    /// (`offsetTop`, `clientWidth`, `scrollHeight`...): scroll anchoring's adjustments wait
+    /// (CSS Scroll Anchoring 1 §2.2.1: the suppression window ends before an operation whose
+    /// result a scroll would change, and at the end of the event loop iteration), so that movements
+    /// that undo each other in one task scroll nothing.
+    pub(crate) fn with_layout_unscrolled<R>(
+        &self,
+        node: NodeId,
+        f: impl FnOnce(&mut Renderer, &RenderState) -> R,
+    ) -> Option<R> {
+        self.layout_for_read(node, false, f)
+    }
+
+    fn layout_for_read<R>(
+        &self,
+        node: NodeId,
+        adjust: bool,
+        f: impl FnOnce(&mut Renderer, &RenderState) -> R,
+    ) -> Option<R> {
         let doc = {
             let dom = self.dom();
             if !dom.is_alive(node) {
@@ -1044,13 +1072,19 @@ impl Engine {
             self.sync_controls();
         }
         let now = self.document_time(doc);
+        let top = self.rendered_top() == Some(doc);
         self.with_doc_renderer(doc, |r, st| {
             let probe = self.profile.as_ref().map(|_| (Instant::now(), r.stats()));
             // (CSS animations at the time script sees: rendering updates may not have run for them)
             if let Some(now) = now {
                 r.advance_timeline_for_script(now / 1000.0);
             }
+            r.set_viewport_scroll(st.scroll);
             r.layout_for_script(st.viewport)?;
+            // (CSS Scroll Anchoring 1: what the read sees is after the adjustment)
+            if adjust {
+                crate::engine::view::apply_scroll_anchoring(r, st, doc, top);
+            }
             if let (Some(p), Some((t, before))) = (&self.profile, probe) {
                 p.forced("layout", t.elapsed(), &before, &r.stats());
             }
@@ -1321,12 +1355,15 @@ impl Engine {
                 self.sync_frame_viewport(doc);
             }
             let hidden = self.render.borrow().hidden;
+            let top = self.rendered_top() == Some(doc);
             let laid_out = self
                 .with_doc_renderer(doc, |r, st| {
                     st.dirty = false;
                     r.set_image_animation_view(st.animation_view(hidden));
                     r.set_frame_time(r.clock_at(page_now / 1000.0));
+                    r.set_viewport_scroll(st.scroll);
                     if r.update_rendering(st.viewport).is_some() {
+                        crate::engine::view::apply_scroll_anchoring(r, st, doc, top);
                         st.needs_paint = true;
                         true
                     } else {
@@ -1342,7 +1379,9 @@ impl Engine {
                     if let Some(state) = self.control_render_state(el, doc) {
                         self.with_doc_renderer(doc, |r, st| {
                             r.set_control_state(el, state);
+                            r.set_viewport_scroll(st.scroll);
                             r.layout(st.viewport);
+                            crate::engine::view::apply_scroll_anchoring(r, st, doc, top);
                         });
                     }
                 }
@@ -1545,6 +1584,13 @@ impl Engine {
     /// Script scrolled the viewport since the last call: where to.
     pub fn take_scroll_request(&self) -> Option<Point> {
         self.render.borrow_mut().scroll_request.take()
+    }
+
+    /// Scroll anchoring moved the viewport since the last call (CSS Scroll Anchoring 1 §2.2): by
+    /// how much. The embedder moves its view by as much from where it is; a scroll request
+    /// ([`Engine::take_scroll_request`]) never comes with one.
+    pub fn take_scroll_adjustment(&self) -> Option<Point> {
+        self.render.borrow_mut().scroll_adjust.take()
     }
 
     /// The embedder scrolled the viewport (the user did): a `scroll` event follows at the next

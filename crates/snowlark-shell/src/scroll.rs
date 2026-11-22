@@ -86,6 +86,16 @@ impl SmoothScroll {
         (self.pos, self.target) != before
     }
 
+    /// Moves the position and the target by `delta` together (clamped): the content moved under
+    /// the view (scroll anchoring), and a smooth scroll under way goes on as far from it as it
+    /// was. Returns whether anything moved.
+    pub fn shift(&mut self, delta: Point) -> bool {
+        let before = (self.pos, self.target);
+        self.pos = self.clamp(Point::new(self.pos.x + delta.x, self.pos.y + delta.y));
+        self.target = self.clamp(Point::new(self.target.x + delta.x, self.target.y + delta.y));
+        (self.pos, self.target) != before
+    }
+
     /// Whether `delta` would move anything (at the edges it doesn't: the wheel then goes to an
     /// outer scroller).
     pub fn can_scroll(&self, delta: Point) -> bool {
@@ -257,6 +267,23 @@ mod tests {
         assert_eq!(s.position().y, 0.0);
         assert!(!s.can_scroll(Point::new(0.0, -10.0)));
         assert!(!s.can_scroll(Point::new(10.0, 0.0)));
+    }
+
+    /// A scroll anchoring shift during a smooth scroll moves where it is and where it goes alike:
+    /// the rest of the wheel's scroll is not lost.
+    #[test]
+    fn a_shift_keeps_a_smooth_scroll_going() {
+        let mut s = page(5000.0);
+        s.scroll_by(Point::new(0.0, 300.0), true);
+        s.tick(FRAME);
+        let (pos, target) = (s.position().y, s.target().y);
+        assert!(s.shift(Point::new(0.0, 120.0)));
+        assert_eq!(s.position().y, pos + 120.0);
+        assert_eq!(s.target().y, target + 120.0);
+        assert!(s.is_animating());
+        // (clamped to the range)
+        s.shift(Point::new(0.0, 10_000.0));
+        assert_eq!(s.position().y, 4200.0);
     }
 
     #[test]

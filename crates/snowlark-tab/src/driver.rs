@@ -476,6 +476,9 @@ pub struct Update {
     pub next: Option<Instant>,
     /// Script scrolled the viewport here (CSS px): the compositor moves to it.
     pub scroll_to: Option<Point>,
+    /// Scroll anchoring moved the viewport by this much (CSS px; CSS Scroll Anchoring 1): the
+    /// compositor moves by as much from where it is. Never set with `scroll_to`.
+    pub scroll_by: Option<Point>,
 }
 
 /// A tab's document, driven by its tab's thread. See the module documentation.

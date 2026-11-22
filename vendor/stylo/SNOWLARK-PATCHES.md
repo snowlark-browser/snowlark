@@ -527,6 +527,10 @@ the source; `git log -p vendor/stylo` shows the diff.
    `alternate-reverse` direction is forwards (an infinite current iteration), and a keyframe interval's
    easing precision stays finite. Fills apply and `animationstart`/`animationend` fire as for any other
    animation (snowlark-style's event tracker already follows the Web Animations timing model).
+93. **`overflow-anchor` in the servo build** (`properties/longhands.toml`, CSS Scroll Anchoring 1 §2.2): the
+   longhand loses its gecko-only engine line (its gecko pref does not apply to servo) and changes to it
+   repaint instead of rebuilding boxes. snowlark-render leaves boxes with `none` and their subtrees out of
+   the scroll anchor selection.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

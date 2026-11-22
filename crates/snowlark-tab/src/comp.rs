@@ -126,6 +126,36 @@ pub struct PageScroll {
     /// Counted from 1 in the order the page scrolled: a scroll is shown only while none after it
     /// has been (one comes in its frame, another as a message, by different ways).
     pub serial: u64,
+    /// Scroll anchoring moved the content by this much (CSS Scroll Anchoring 1): the compositor
+    /// moves the view by as much from where it is, keeping what the user scrolled since the page
+    /// last heard (and the rest of a smooth scroll), rather than going to `to`, the page's own idea
+    /// of the place. `None`: a scroll to `to`.
+    #[serde(default)]
+    pub by: Option<Point>,
+}
+
+impl PageScroll {
+    /// A scroll to `to`.
+    pub fn to(to: Point, serial: u64) -> PageScroll {
+        PageScroll {
+            to,
+            serial,
+            by: None,
+        }
+    }
+
+    /// Two of a page's scrolls neither of which the compositor has shown, as one: the later one
+    /// (by serial) after the earlier. A scroll to a place leaves nothing of what came before it;
+    /// an adjustment after a scroll to a place is a scroll to where the page has it now; two
+    /// adjustments add up.
+    pub fn merge(a: PageScroll, b: PageScroll) -> PageScroll {
+        let (earlier, later) = if a.serial <= b.serial { (a, b) } else { (b, a) };
+        let by = match (earlier.by, later.by) {
+            (Some(e), Some(l)) => Some(Point::new(e.x + l.x, e.y + l.y)),
+            _ => None,
+        };
+        PageScroll { by, ..later }
+    }
 }
 
 /// The last of a page's scrolls ([`PageScroll`]) the compositor has shown, as its reports of where

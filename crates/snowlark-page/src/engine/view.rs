@@ -165,6 +165,44 @@ pub(crate) fn viewport_range(r: &Renderer, st: &RenderState) -> (Point, Point) {
     (Point::new(x.0, y.0), Point::new(x.1, y.1))
 }
 
+/// CSS Scroll Anchoring 1 §2.2: scrolls a rendered document's viewport by the adjustments its
+/// layouts made, clamped to its scrolling area; it is a scroll, so a `scroll` event follows. The
+/// top-level document's embedder moves its view by as much (`top`).
+pub(crate) fn apply_scroll_anchoring(
+    r: &mut Renderer,
+    st: &mut RenderState,
+    doc: NodeId,
+    top: bool,
+) {
+    let Some(d) = r.take_scroll_adjustment() else {
+        return;
+    };
+    let (min, max) = viewport_range(r, st);
+    let to = Point::new(
+        (st.scroll.x + d.x).clamp(min.x, max.x),
+        (st.scroll.y + d.y).clamp(min.y, max.y),
+    );
+    if to == st.scroll {
+        return;
+    }
+    let by = Point::new(to.x - st.scroll.x, to.y - st.scroll.y);
+    st.scroll = to;
+    if top {
+        // (a scroll to a place the embedder has not been told yet takes the adjustment in)
+        match &mut st.scroll_request {
+            Some(request) => *request = to,
+            None => {
+                let a = st.scroll_adjust.get_or_insert(Point::ZERO);
+                *a = Point::new(a.x + by.x, a.y + by.y);
+            }
+        }
+    }
+    if !st.pending_scroll.contains(&doc) {
+        st.pending_scroll.push(doc);
+    }
+    st.needs_paint = true;
+}
+
 /// The range of scroll positions of a scroll container, if `el` is one: (min, max) per axis,
 /// measured from its scroll origin (CSS Overflow 3 §2.3), so `min` is negative on an axis whose
 /// origin is at the right or bottom edge (rtl, reversed flex containers).
@@ -482,7 +520,7 @@ pub(crate) fn bounding_rect(rects: Vec<geometry::Rect>) -> geometry::Rect {
 impl Engine {
     /// CSSOM View §7 `offsetParent`.
     pub(crate) fn view_offset_parent(&self, el: NodeId) -> Option<NodeId> {
-        self.with_layout(el, |r, _| {
+        self.with_layout_unscrolled(el, |r, _| {
             let dom = self.dom();
             let doc = dom.node_document(el);
             if r.box_rects(el).is_none() && r.client_rects(el).is_empty() {
@@ -547,7 +585,7 @@ impl Engine {
     /// CSSOM View §7 `offsetTop`, `offsetLeft`, `offsetWidth`, `offsetHeight`.
     pub(crate) fn view_offset(&self, el: NodeId) -> (i32, i32, i32, i32) {
         let parent = self.view_offset_parent(el);
-        self.with_layout(el, |r, st| {
+        self.with_layout_unscrolled(el, |r, st| {
             // (css-position-3 §3.4.1: sticky boxes at their offset position)
             let sticky = |n: NodeId| r.sticky_offset(n, st.viewport, st.scroll, &st.element_scroll);
             let dom = self.dom();
@@ -617,7 +655,7 @@ impl Engine {
     /// CSSOM View §6 `clientTop`, `clientLeft`, `clientWidth`, `clientHeight`.
     pub(crate) fn view_client(&self, el: NodeId) -> (i32, i32, i32, i32) {
         let own_scroll = self.is_potentially_scrollable_body(el);
-        self.with_layout(el, |r, st| {
+        self.with_layout_unscrolled(el, |r, st| {
             let dom = self.dom();
             let doc = dom.node_document(el);
             let quirks = dom.quirks_mode(doc) == QuirksMode::Quirks;
@@ -659,7 +697,7 @@ impl Engine {
     /// CSSOM View §6 `scrollWidth`, `scrollHeight`.
     pub(crate) fn view_scroll_size(&self, el: NodeId) -> (i32, i32) {
         let own_scroll = self.is_potentially_scrollable_body(el);
-        self.with_layout(el, |r, st| {
+        self.with_layout_unscrolled(el, |r, st| {
             let dom = self.dom();
             let doc = dom.node_document(el);
             let quirks = dom.quirks_mode(doc) == QuirksMode::Quirks;
@@ -749,9 +787,17 @@ impl Engine {
     /// `el.scrollTop` / `el.scrollLeft`.
     pub(crate) fn view_scroll_position(&self, el: NodeId) -> Point {
         match self.scroll_subject(el) {
-            ScrollSubject::Viewport => self
-                .with_node_renderer(el, |_, st| st.scroll)
-                .unwrap_or(Point::ZERO),
+            // (after style and layout, as `window.scrollY` is: see `window_scroll`)
+            ScrollSubject::Viewport => {
+                let p = self
+                    .with_node_renderer(el, |_, st| st.scroll)
+                    .unwrap_or(Point::ZERO);
+                if p == Point::ZERO {
+                    p
+                } else {
+                    self.with_layout(el, |_, st| st.scroll).unwrap_or(p)
+                }
+            }
             ScrollSubject::Element(e) => self
                 .with_node_renderer(e, |_, st| st.element_scroll.get(&e).copied())
                 .flatten()
@@ -1102,6 +1148,7 @@ impl Engine {
             st.scroll = to;
             if top {
                 st.scroll_request = Some(to);
+                st.scroll_adjust = None;
             }
             if !st.pending_scroll.contains(&doc) {
                 st.pending_scroll.push(doc);

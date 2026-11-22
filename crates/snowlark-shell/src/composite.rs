@@ -887,14 +887,18 @@ impl State {
                     // the one the frame was painted for, or one that waited for it, whichever
                     // the page made last. Another document's frame drops one that waited: its
                     // document went.
-                    let mut scroll = data.scroll;
+                    // (both unshown: as one, the later after the earlier, so that a scroll
+                    // anchoring adjustment is not lost to a scroll before it)
+                    let mut scroll = data.scroll.filter(|s| s.serial > layer.page_scroll);
                     if let Some(held) = layer.held.filter(|h| h.shows_with(&data)) {
                         layer.held = None;
-                        let newer = scroll.is_none_or(|s| held.with.serial > s.serial);
-                        if held.with.generation == data.generation && newer {
-                            scroll = Some(snowlark_tab::comp::PageScroll {
-                                to: held.to,
-                                serial: held.with.serial,
+                        if held.with.generation == data.generation
+                            && held.with.serial > layer.page_scroll
+                        {
+                            let h = snowlark_tab::comp::PageScroll::to(held.to, held.with.serial);
+                            scroll = Some(match scroll {
+                                Some(s) => snowlark_tab::comp::PageScroll::merge(s, h),
+                                None => h,
                             });
                         }
                         if self.stats.enabled {
@@ -909,8 +913,18 @@ impl State {
                     }
                     if let Some(scroll) = scroll.filter(|s| s.serial > layer.page_scroll) {
                         layer.page_scroll = scroll.serial;
-                        layer.restore = None;
-                        if layer.scroll.scroll_to(scroll.to, false) {
+                        let moved = match scroll.by {
+                            // A scroll anchoring adjustment moves the view from where it is (the
+                            // user may have scrolled since the page heard); a scroll restoration
+                            // still under way goes on to its place instead.
+                            Some(by) if layer.restore.is_none() => layer.scroll.shift(by),
+                            Some(_) => false,
+                            None => {
+                                layer.restore = None;
+                                layer.scroll.scroll_to(scroll.to, false)
+                            }
+                        };
+                        if moved {
                             self.keep_until = Some(Instant::now() + KEEP_PRESENTING);
                         }
                         // (the tab hears where the viewport is, moved or not: it took it to be
@@ -2397,10 +2411,10 @@ mod tests {
     fn scrolled(number: u64, height: f32, generation: u64, y: f32, serial: u64) -> CompInput {
         let mut data = frame_data(height, generation);
         data.number = number;
-        data.scroll = Some(snowlark_tab::comp::PageScroll {
-            to: Point::new(0.0, y),
+        data.scroll = Some(snowlark_tab::comp::PageScroll::to(
+            Point::new(0.0, y),
             serial,
-        });
+        ));
         CompInput::Frame(3, Box::new(data))
     }
 
@@ -2438,6 +2452,48 @@ mod tests {
         assert!(s.handle(scrolled(5, 3000.0, 5, 2500.0, 2)));
         assert_eq!(s.layers[&3].scroll.position().y, 2540.0);
         assert_eq!(scrolls(&told), [2540.0]);
+    }
+
+    /// A frame painted after scroll anchoring moved the page's content (CSS Scroll Anchoring 1)
+    /// moves the view by as much from where it is: what the wheel scrolled since the page last
+    /// heard is kept, not undone by the page's idea of the place. One that waited for a frame
+    /// before it goes with it.
+    #[test]
+    fn a_scroll_anchoring_adjustment_moves_the_view_from_where_it_is() {
+        let window = snowlark_paint::window::HiddenWindow::new().unwrap();
+        let mut s = state_of(&window);
+        let (tab, told) = snowlark_ipc::channel();
+        assert!(s.handle(CompInput::bind(3, tab)));
+        assert!(s.handle(numbered(1, 5000.0, 5)));
+        assert!(s.handle(
+            CompMsg::ScrollBy {
+                tab: 3,
+                delta: Point::new(0.0, 700.0),
+                smooth: false,
+                input: None,
+            }
+            .into()
+        ));
+        let adjusted = |number: u64, to: f32, by: f32, serial: u64| {
+            let mut data = frame_data(5000.0, 5);
+            data.number = number;
+            data.scroll = Some(snowlark_tab::comp::PageScroll {
+                to: Point::new(0.0, to),
+                serial,
+                by: Some(Point::new(0.0, by)),
+            });
+            CompInput::Frame(3, Box::new(data))
+        };
+        // (the page had heard of 600 only: its own idea of the place is 600 + 200)
+        assert!(s.handle(adjusted(2, 800.0, 200.0, 1)));
+        assert_eq!(s.layers[&3].scroll.position().y, 900.0);
+        // A scroll to a place that waited for frame 4, then frame 4 with an adjustment after it:
+        // the place the page has after both.
+        assert!(s.handle(page_scroll(300.0, 2, 4, 5)));
+        assert_eq!(s.layers[&3].scroll.position().y, 900.0);
+        assert!(s.handle(adjusted(4, 350.0, 50.0, 3)));
+        assert_eq!(s.layers[&3].scroll.position().y, 350.0);
+        let _ = scrolls(&told);
     }
 
     /// The compositor's reports of where the viewport is name the last of the page's scrolls it

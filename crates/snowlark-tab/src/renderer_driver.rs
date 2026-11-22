@@ -631,6 +631,7 @@ impl TabDriver for RendererDriver {
             repaint,
             next: self.refresh.as_ref().map(|r| r.0),
             scroll_to: None,
+            scroll_by: None,
         }
     }
 

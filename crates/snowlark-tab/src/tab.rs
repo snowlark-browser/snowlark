@@ -1258,7 +1258,10 @@ fn run(
         }
         t.after_input();
         if let Some(to) = update.scroll_to {
-            t.page_scrolled(to);
+            t.page_scrolled(to, None);
+        }
+        if let Some(by) = update.scroll_by {
+            t.page_scrolled(Point::ZERO, Some(by));
         }
         t.poll_favicon();
         t.publish();
@@ -1726,7 +1729,10 @@ impl TabRenderer {
                 }
                 t.after_input();
                 if let Some(to) = update.scroll_to {
-                    t.page_scrolled(to);
+                    t.page_scrolled(to, None);
+                }
+                if let Some(by) = update.scroll_by {
+                    t.page_scrolled(Point::ZERO, Some(by));
                 }
                 t.poll_favicon();
                 t.publish();
@@ -1936,11 +1942,24 @@ impl TabRenderer {
     /// fragment): the next frame is painted for that place, and the compositor, which holds the
     /// viewport's position, is told with it ([`TabRenderer::tell_page_scroll`]). Until the
     /// compositor says where the viewport is, the tab takes it to be there.
-    fn page_scrolled(&mut self, to: Point) {
+    ///
+    /// `by`: scroll anchoring moved it by this much (CSS Scroll Anchoring 1), from where the tab
+    /// takes it to be (`to` is ignored); the compositor moves its view by as much from where it is.
+    fn page_scrolled(&mut self, to: Point, by: Option<Point>) {
+        let to = match by {
+            Some(d) => Point::new(self.scroll.x + d.x, self.scroll.y + d.y),
+            None => to,
+        };
         self.page_scrolls += 1;
-        self.page_scroll = Some(crate::comp::PageScroll {
+        let scroll = crate::comp::PageScroll {
             to,
             serial: self.page_scrolls,
+            by,
+        };
+        // (one not told yet goes with it)
+        self.page_scroll = Some(match self.page_scroll {
+            Some(earlier) => crate::comp::PageScroll::merge(earlier, scroll),
+            None => scroll,
         });
         self.unshown_scroll = Some((
             self.driver.info().generation,

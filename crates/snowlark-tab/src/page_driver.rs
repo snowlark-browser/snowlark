@@ -1129,6 +1129,7 @@ impl TabDriver for PageDriver {
             repaint,
             next,
             scroll_to: engine.take_scroll_request(),
+            scroll_by: engine.take_scroll_adjustment(),
         }
     }
 
@@ -1231,6 +1232,7 @@ impl TabDriver for PageDriver {
             repaint,
             next,
             scroll_to: engine.take_scroll_request(),
+            scroll_by: engine.take_scroll_adjustment(),
         }
     }
 

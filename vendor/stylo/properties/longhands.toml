@@ -1618,10 +1618,10 @@ affects = "overflow"
 type = "OverflowAnchor"
 initial = "computed::OverflowAnchor::Auto"
 struct = "box"
-engine = "gecko"
 gecko_pref = "layout.css.scroll-anchoring.enabled"
 spec = "https://drafts.csswg.org/css-scroll-anchoring/#exclusion-api"
 animation_type = "discrete"
+servo_restyle_damage = "repaint"
 affects = ""
 
 [overflow-block]

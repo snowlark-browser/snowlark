@@ -421,6 +421,7 @@ outline-offset
 outline-style
 outline-width
 overflow
+overflow-anchor
 overflow-block
 overflow-clip-margin
 overflow-inline

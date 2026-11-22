@@ -64,7 +64,7 @@ AREAS = ['IndexedDB', 'dom', 'url', 'encoding', 'domparsing', 'custom-elements',
          'css/css-tables', 'css/css-text', 'css/css-backgrounds', 'css/css-transforms', 'css/css-multicol', 'css/css-inline',
          'css/css-pseudo', 'css/css-lists', 'css/css-ui', 'css/css-fonts', 'css/css-nesting', 'css/geometry', 'css/css-properties-values-api', 'workers', 'css/css-conditional', 'user-timing', 'navigation-timing', 'performance-timeline', 'css/css-values', 'css/mediaqueries', 'css/filter-effects', 'css/compositing', 'css/css-writing-modes',
          'pointerevents', 'inert', 'css/cssom-view', 'html/interaction/focus',
-         'editing', 'selection', 'input-events', 'clipboard-apis', 'css/css-shadow']
+         'editing', 'selection', 'input-events', 'clipboard-apis', 'css/css-shadow', 'css/css-scroll-anchoring']
 
 # Thousands of 60-second variants that all need legacy-encoding form submission in iframes: left out
 # unless named directly (python run.py encoding/legacy-mb-japanese).

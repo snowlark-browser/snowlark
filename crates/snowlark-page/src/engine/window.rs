@@ -178,9 +178,17 @@ impl Engine {
         let Some(doc) = self.document_of_window(window) else {
             return (0.0, 0.0);
         };
+        // (after style and layout, as Blink reads it: a scroll anchoring adjustment a change made
+        // is in the position read, CSS Scroll Anchoring 1 §2.2's suppression window; at the
+        // origin there is no anchor, §2.1 step 2, and no layout is needed)
         let p = self
             .with_doc_renderer(doc, |_, st| st.scroll)
             .unwrap_or_default();
+        let p = if p == snowlark_paint::Point::ZERO {
+            p
+        } else {
+            self.with_layout(doc, |_, st| st.scroll).unwrap_or(p)
+        };
         (p.x as f64, p.y as f64)
     }
 

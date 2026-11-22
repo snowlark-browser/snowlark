@@ -51,6 +51,7 @@ mod inline_svg;
 pub mod metrics;
 mod motion;
 pub mod renderer;
+mod scroll_anchor;
 pub mod source;
 pub mod srcset;
 pub mod svg;
