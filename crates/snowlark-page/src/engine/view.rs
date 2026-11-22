@@ -231,6 +231,7 @@ fn leak(mode: &str) -> &'static str {
         "end" => "end",
         "center" => "center",
         "find" => "find",
+        "focus" => "focus",
         _ => "nearest",
     }
 }
@@ -1139,26 +1140,63 @@ impl Engine {
             .max(1e-3);
         let device = |p: Point| Point::new((p.x * dpr).round() / dpr, (p.y * dpr).round() / dpr);
         let containers = self.scroll_containers_around(el);
-        let align = |mode: &str, start: f32, size: f32, view_start: f32, view_size: f32| -> f32 {
+        // `horizontal`: the physical axis, for "focus", whose rule differs by axis.
+        let align = |mode: &str,
+                     horizontal: bool,
+                     start: f32,
+                     size: f32,
+                     view_start: f32,
+                     view_size: f32|
+         -> f32 {
+            let (end, view_end) = (start + size, view_start + view_size);
+            let inside = start >= view_start && end <= view_end;
+            // Both edges outside the scrollport: the box already fills it on this axis.
+            let covers = start <= view_start && end >= view_end;
+            let center = start + size / 2.0 - view_size / 2.0;
+            let visible = end > view_start && start < view_end;
+            // The closer edge (CSSOM View §6.1 step 8): the end edge when the element overflows
+            // past the end and is smaller than the scrollport, or overflows before the start and
+            // is larger; otherwise the start edge (also when the two are the same size, where
+            // the spec's cases end).
+            let closest =
+                if (end > view_end && size < view_size) || (end < view_end && size > view_size) {
+                    end - view_size
+                } else {
+                    start
+                };
             match mode {
                 "start" => start,
-                "end" => start + size - view_size,
-                "center" => start + size / 2.0 - view_size / 2.0,
+                "end" => end - view_size,
+                "center" => center,
+                // The browser's find in page: what is in view (or fills the view) stays,
+                // anything else is centered.
                 "find" => {
-                    if start >= view_start && start + size <= view_start + view_size {
+                    if inside || covers {
                         view_start
                     } else {
-                        start + size / 2.0 - view_size / 2.0
+                        center
                     }
                 }
-                _ => {
-                    // "nearest": no move when it is in view, else the closer edge.
-                    if start >= view_start && start + size <= view_start + view_size {
+                // `focus()` (HTML §6.6.6 leaves the alignment to the user agent): what is in view
+                // or fills the view stays, what is out of view is centered, and one partly in view
+                // is brought to the nearer edge vertically but not moved horizontally (lists and
+                // menus whose items overflow a little sideways would otherwise jump).
+                "focus" => {
+                    if inside || covers || (visible && horizontal) {
                         view_start
-                    } else if start < view_start || size > view_size {
-                        start
+                    } else if !visible {
+                        center
                     } else {
-                        start + size - view_size
+                        closest
+                    }
+                }
+                // "nearest" (CSSOM View §6.1 step 8): no move when it is in view or both its
+                // edges are outside the scrollport's, else the closer edge.
+                _ => {
+                    if inside || covers {
+                        view_start
+                    } else {
+                        closest
                     }
                 }
             }
@@ -1237,8 +1275,8 @@ impl Engine {
                 let (ax, ay) = physical(cs.as_ref());
                 let (x, y) = (b.x - pb.x - inner.x, b.y - pb.y - inner.y);
                 Some(Point::new(
-                    align(ax, x, b.width, cur.x + pl, pb.width - pl - pr) - pl,
-                    align(ay, y, b.height, cur.y + pt, pb.height - pt - pbm) - pt,
+                    align(ax, true, x, b.width, cur.x + pl, pb.width - pl - pr) - pl,
+                    align(ay, false, y, b.height, cur.y + pt, pb.height - pt - pbm) - pt,
                 ))
             });
             if let Some(Some(p)) = pos {
@@ -1266,8 +1304,15 @@ impl Engine {
                     padding(rs.as_ref(), Rect::new(0.0, 0.0, v.width, v.height));
                 let (ax, ay) = physical(rs.as_ref());
                 Some(Point::new(
-                    align(ax, x, b.width, st.scroll.x + pl, v.width - pl - pr) - pl,
-                    align(ay, y, b.height, st.scroll.y + pt, v.height - pt - pbm) - pt,
+                    align(ax, true, x, b.width, st.scroll.x + pl, v.width - pl - pr) - pl,
+                    align(
+                        ay,
+                        false,
+                        y,
+                        b.height,
+                        st.scroll.y + pt,
+                        v.height - pt - pbm,
+                    ) - pt,
                 ))
             })
             .flatten();

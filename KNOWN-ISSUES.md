@@ -82,8 +82,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   the CSS animation's values. Script animations on pseudo-elements do not reach the cascade. A running CSS
   animation keeps the keyframes it started with when script edits, renames or removes its `@keyframes` rule.
   An animation of zero duration never starts: it fills nothing and fires no events. (ref 115, 33, 635, 651)
-- **`getComputedStyle()` on pseudo-elements.** For a `::before` or `::after` that generates a box, `width` and
-  `height` read their computed value (such as `auto`) rather than the used size. (ref 96)
 - **Highlight pseudo-elements.** A `text-decoration` declared on `::selection` is not painted, and a selected
   image or other replaced element that is positioned gets no highlight.
   `::highlight()` and `::search-text` are not parsed. (ref 502)

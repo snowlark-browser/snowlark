@@ -1786,8 +1786,9 @@ impl HTMLOrSVGOrMathMLElementImpl for Engine {
     }
     /// HTML §6.6.6 `focus(options)`: the focusing steps once at a time per element ("locked for
     /// focus"), indicating focus per `focusVisible`, then the focused element scrolled into view
-    /// unless `preventScroll`. It is centered only when not already wholly in view, as browsers do
-    /// (the spec's "center" would move a visible element). Nor is it scrolled when it already had
+    /// unless `preventScroll`. It is moved only when not already wholly in view and not filling
+    /// the view, as browsers do (the spec's "center" would move a visible element, or a map
+    /// canvas larger than its clipping box): see the "focus" alignment. Nor is it scrolled when it already had
     /// the focus before the call, as browsers do: pages that call `focus()` on the focused field
     /// after every re-render would otherwise force a style and layout update each time.
     fn focus(&self, cx: &mut Cx, this: Handle, options: FocusOptions) -> rt::Result<()> {
@@ -1815,7 +1816,7 @@ impl HTMLOrSVGOrMathMLElementImpl for Engine {
                     && dom.is_shadow_including_inclusive_ancestor_of(el, f)
             });
             if let Some(f) = focused {
-                self.view_scroll_into_view(f, "find", "find");
+                self.view_scroll_into_view(f, "focus", "focus");
             }
         }
         Ok(())

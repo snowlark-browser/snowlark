@@ -132,6 +132,38 @@ fn focus_options_scroll_into_view_and_indicate_focus() {
     assert_eq!(r, "false|true");
 }
 
+/// `focus()` scrolls only what needs it: an element that fills its clipping box on an axis (a
+/// map's canvas larger than its `overflow: hidden` frame) is not moved on that axis, one partly
+/// in view is brought to the nearer edge vertically but not moved sideways, one out of view is
+/// centered. `scrollIntoView({block: 'nearest', inline: 'nearest'})` leaves an element whose two
+/// edges are both outside the scrollport where it is (CSSOM View §6.1 step 8).
+#[test]
+fn focus_scrolls_only_what_is_not_in_view_or_filling_it() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut p = page(
+        &net,
+        "<!doctype html><body style='margin:0'>\
+         <div id=frame style='position:absolute;left:0;top:0;width:400px;height:300px;overflow:hidden'>\
+         <div style='width:3000px;height:3000px'></div>\
+         <div id=map tabindex=0 style='position:absolute;left:0;top:0;width:600px;height:500px'></div>\
+         <div id=part tabindex=0 style='position:absolute;left:350px;top:280px;width:100px;height:50px'></div>\
+         <div id=out tabindex=0 style='position:absolute;left:1000px;top:1000px;width:100px;height:100px'></div>\
+         </div>",
+    );
+    let r = eval(
+        &mut p,
+        "const at = () => frame.scrollLeft + ',' + frame.scrollTop; \
+         map.focus(); const a = at(); \
+         part.focus(); const b = at(); \
+         frame.scrollTo(0, 0); out.focus(); const c = at(); \
+         frame.scrollTo(50, 60); map.scrollIntoView({block: 'nearest', inline: 'nearest'}); \
+         [a, b, c, at()].join('|')",
+    );
+    // part: bottom edge 330 brought to 300 (30 down), its overflowing right side left alone;
+    // out: centered, 1050 - 200 and 1050 - 150.
+    assert_eq!(r, "0,0|0,30|850,900|50,60");
+}
+
 /// `focus()` on the element that already has the focus changes nothing: the focusing steps
 /// return at once (HTML §6.6.4 step 3), and browsers do not scroll it into view again either,
 /// also through a shadow host that delegates the focus to it.

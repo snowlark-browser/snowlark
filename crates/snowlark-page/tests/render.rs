@@ -403,6 +403,39 @@ fn inner_text_is_the_rendered_text() {
     assert_eq!(r, "3|x\ny");
 }
 
+/// The resolved value of `width`, `height` and the insets of a `::before` or `::after` that
+/// generates a box is its used value (CSSOM §9), as for an element: an empty `display: table`
+/// clearfix is `0px` wide, a block fills its element, an absolutely positioned one resolves its
+/// percentages against its positioned element. Where `width` does not apply (an inline box) it
+/// stays the computed value.
+#[test]
+fn generated_pseudo_elements_resolve_to_used_sizes() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>\
+         #a, #b { position: relative; width: 300px }\
+         #a::before { content: ''; display: table }\
+         #a::after { content: 'x'; display: block; height: 10px; padding: 2px }\
+         #b::before { content: 'y'; position: absolute; left: 10%; width: 50% }\
+         #b::after { content: 'z' }\
+         </style><body style='margin:0'><div id=a>t</div><div id=b>u</div>\
+         <span id=c>v</span><span id=d style='display:inline-block'>w</span>",
+    );
+    let r = eval(
+        &mut page,
+        "const p = (e, w, k) => getComputedStyle(document.getElementById(e), w)[k];
+         [p('a', '::before', 'width'), p('a', '::before', 'height'), p('a', '::after', 'width'),
+          p('a', '::after', 'height'), p('b', '::before', 'left'), p('b', '::before', 'width'),
+          p('b', '::after', 'width'), p('c', null, 'width'), p('c', null, 'height'),
+          p('d', null, 'height')].join('|')",
+    );
+    assert_eq!(
+        r, "0px|0px|296px|10px|30px|150px|auto|auto|auto|18px",
+        "an inline box (an element or a pseudo-element) resolves width and height to `auto`"
+    );
+}
+
 #[test]
 fn computed_and_inline_style_declarations() {
     let net = NetThread::start(NetConfig::default()).unwrap();

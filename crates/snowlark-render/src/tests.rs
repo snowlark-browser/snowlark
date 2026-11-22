@@ -1018,6 +1018,7 @@ fn used_values_for_resolved_styles() {
         border_box: snowlark_paint::Rect::new(100.0, 0.0, 200.0, 24.0),
         padding_box: snowlark_paint::Rect::new(100.0, 0.0, 200.0, 24.0),
         content_box: snowlark_paint::Rect::new(103.0, 2.0, 194.0, 20.0),
+        inline: false,
     };
     let cb = snowlark_paint::Rect::new(0.0, 0.0, 400.0, 300.0);
     let used = crate::NodeUsedValues::new(values, geometry, cb);

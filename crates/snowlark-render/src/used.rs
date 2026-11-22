@@ -128,6 +128,7 @@ impl NodeUsedValues {
             border_box: Rect::ZERO,
             padding_box: Rect::ZERO,
             content_box: Rect::ZERO,
+            inline: false,
         };
         NodeUsedValues {
             boxless: true,
@@ -260,6 +261,8 @@ impl UsedValues for NodeUsedValues {
         let g = &self.geometry;
         let border_box = self.values.get_position().box_sizing == BoxSizing::BorderBox;
         let v = match property {
+            // (an inline box: they do not apply, and resolve to the computed value)
+            LonghandId::Width | LonghandId::Height if g.inline => return None,
             LonghandId::Width => {
                 if border_box {
                     g.border_box.width

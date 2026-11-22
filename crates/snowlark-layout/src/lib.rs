@@ -510,9 +510,50 @@ impl<S: Style> LayoutTree<S> {
                         border_box: t(f.border_rect()),
                         padding_box: t(f.padding_rect()),
                         content_box: t(f.content_rect()),
+                        inline: f
+                            .as_box()
+                            .is_some_and(|b| b.flags & fragment_flags::INLINE_BOX != 0),
                     }
                 })
         })
+    }
+
+    /// [`LayoutTree::box_rects`] for the first box fragment of the `::before` or `::after` box
+    /// (`pseudo`) that element `el` generated in the last layout. It is looked for in `el`'s own
+    /// fragments first, then (an out-of-flow or inline pseudo-element placed elsewhere) in the
+    /// whole tree.
+    pub fn pseudo_box_rects(&self, el: NodeId, pseudo: style::PseudoElement) -> Option<BoxRects> {
+        let is = |f: &Fragment<S>| {
+            f.as_box()
+                .is_some_and(|b| b.pseudo_of == Some(el) && b.pseudo == Some(pseudo))
+        };
+        let rects = |at: Point, f: &Fragment<S>| {
+            let t = |r: Rect| r.translate(at.x, at.y);
+            BoxRects {
+                border_box: t(f.border_rect()),
+                padding_box: t(f.padding_rect()),
+                content_box: t(f.content_rect()),
+                inline: f
+                    .as_box()
+                    .is_some_and(|b| b.flags & fragment_flags::INLINE_BOX != 0),
+            }
+        };
+        let search = |root: &Fragment<S>, origin: Point| {
+            let mut hit = None;
+            root.walk(&mut |fr, off| {
+                if hit.is_none() && is(fr) {
+                    hit = Some(rects(Point::new(origin.x + off.x, origin.y + off.y), fr));
+                }
+            });
+            hit
+        };
+        let inside = self.with_fragments(el, |found| {
+            found
+                .iter()
+                .filter(|(_, f)| f.as_box().is_some() && !lookup::is_backdrop(f))
+                .find_map(|(at, f)| search(f, *at))
+        });
+        inside.or_else(|| search(self.root.as_ref()?, Point::ZERO))
     }
 
     /// The resizer of `node`'s first box fragment (CSS UI 4 §5.1) in the root fragment's
@@ -1143,6 +1184,9 @@ pub struct BoxRects {
     pub border_box: Rect,
     pub padding_box: Rect,
     pub content_box: Rect,
+    /// The box is an inline box (not an atomic inline): `width` and `height` do not apply
+    /// to it (CSS 2 §10.3.1, §10.6.1).
+    pub inline: bool,
 }
 
 /// A box the user can resize ([`LayoutTree::resizer`]).

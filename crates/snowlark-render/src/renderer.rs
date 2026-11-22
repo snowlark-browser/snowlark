@@ -5060,6 +5060,22 @@ impl Renderer {
             let svg = dom.element(node).is_some_and(|e| e.name().ns == ns!(svg));
             return svg.then(|| NodeUsedValues::boxless(values));
         };
+        let grid = doc.layout.grid_track_lists(node);
+        Some(self.used_values_of(doc, &dom, values, geometry, dom.parent_element(node), grid))
+    }
+
+    /// [`Renderer::used_values`] for a box with style `values` and boxes `geometry` whose
+    /// nearest element ancestor is `parent` (an element's parent, or a pseudo-element's
+    /// originating element).
+    fn used_values_of(
+        &self,
+        doc: &Doc,
+        dom: &Dom,
+        values: ServoArc<ComputedValues>,
+        geometry: snowlark_layout::BoxRects,
+        parent: Option<NodeId>,
+        grid: Option<(String, String)>,
+    ) -> NodeUsedValues {
         // The containing block: the nearest ancestor with a box (for absolutely positioned boxes, the
         // nearest positioned one; for fixed, the viewport).
         let position = values.get_box().position;
@@ -5069,7 +5085,7 @@ impl Renderer {
             .unwrap_or(Size::new(self.config.viewport.0, self.config.viewport.1));
         let icb = snowlark_paint::Rect::new(0.0, 0.0, viewport.width, viewport.height);
         let mut cb = None;
-        let mut a = dom.parent_element(node);
+        let mut a = parent;
         while let Some(p) = a {
             if let Some(g) = doc.layout.box_rects(p) {
                 let positioned = doc
@@ -5095,8 +5111,8 @@ impl Renderer {
         // each axis (css-position-3 §3.4), the viewport's when there is none.
         let sticky_basis = (position == P::Sticky).then(|| {
             let (mut w, mut h) = (None, None);
-            let mut a = dom.parent_element(node);
-            let root = dom.document_element(dom.node_document(node));
+            let mut a = parent;
+            let root = parent.and_then(|p| dom.document_element(dom.node_document(p)));
             while let Some(p) = a {
                 if Some(p) == root || (w.is_some() && h.is_some()) {
                     break;
@@ -5115,10 +5131,9 @@ impl Renderer {
             }
             (w.unwrap_or(viewport.width), h.unwrap_or(viewport.height))
         });
-        let mut used = NodeUsedValues::new(values, geometry, cb.unwrap_or(icb))
-            .with_grid(doc.layout.grid_track_lists(node));
+        let mut used = NodeUsedValues::new(values, geometry, cb.unwrap_or(icb)).with_grid(grid);
         used.sticky_basis = sticky_basis;
-        Some(used)
+        used
     }
 
     /// The computed value of property `name` of `node` (without layout's used values), serialized:
@@ -5217,9 +5232,11 @@ impl Renderer {
     }
 
     /// CSSOM `getComputedStyle(node, pseudo).getPropertyValue(name)` for a pseudo-element
-    /// (`::before`, `::after`, `::marker`...): the computed value (pseudo-elements have no used
-    /// values here), whether or not the pseudo-element generates a box. `None` when the element
-    /// has no style.
+    /// (`::before`, `::after`, `::marker`...), whether or not the pseudo-element generates a box.
+    /// The resolved value of a property that has one (CSSOM §9 "resolved value": `width`, `top`,
+    /// ...) is the used value when a `::before` or `::after` generated a box in the last layout,
+    /// as for an element; otherwise it is the computed value. `None` when the element has no
+    /// style.
     pub fn resolved_pseudo_property(
         &self,
         node: NodeId,
@@ -5232,7 +5249,25 @@ impl Renderer {
         let values = doc
             .engine
             .cssom_pseudo_style(&dom, &doc.data, node, pseudo)?;
-        Some(snowlark_style::computed::computed_property(&values, &id))
+        let generated = crate::source::layout_pseudo(pseudo)
+            .filter(|p| {
+                matches!(
+                    p,
+                    snowlark_layout::style::PseudoElement::Before
+                        | snowlark_layout::style::PseudoElement::After
+                )
+            })
+            .filter(|_| snowlark_style::computed::needs_layout(&id))
+            .and_then(|p| doc.layout.pseudo_box_rects(node, p));
+        let Some(geometry) = generated else {
+            return Some(snowlark_style::computed::computed_property(&values, &id));
+        };
+        let used = self.used_values_of(doc, &dom, values.clone(), geometry, Some(node), None);
+        Some(snowlark_style::computed::resolved_property(
+            &values,
+            &id,
+            Some(&used as &dyn snowlark_style::computed::UsedValues),
+        ))
     }
 
     /// The CSSOM's declaration block for `element`'s `style` attribute, about to be written as

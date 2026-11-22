@@ -300,6 +300,17 @@ impl Engine {
                     .with_layout(el, |r, _| r.resolved_property(el, property))
                     .flatten(),
             },
+            // (a generated `::before` or `::after` resolves some properties to used values)
+            Some(p)
+                if matches!(
+                    p,
+                    snowlark_style::PseudoElement::Before | snowlark_style::PseudoElement::After
+                ) && snowlark_style::computed::property_id(property)
+                    .is_some_and(|id| snowlark_style::computed::needs_layout(&id)) =>
+            {
+                self.with_layout(el, |r, _| r.resolved_pseudo_property(el, &p, property))
+                    .flatten()
+            }
             Some(p) => self
                 .with_style(el, |r| r.resolved_pseudo_property(el, &p, property))
                 .flatten(),
