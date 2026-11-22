@@ -688,6 +688,28 @@ pub enum ScrollbarWidth {
     None,
 }
 
+/// The used value of `resize` (CSS UI 4 §5.1): which of the box's physical sizes the user may
+/// change (the logical `block` and `inline` are resolved against the writing mode).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Resize {
+    #[default]
+    None,
+    Both,
+    Horizontal,
+    Vertical,
+}
+
+impl Resize {
+    /// Whether the user may change the box's width.
+    pub fn horizontal(self) -> bool {
+        matches!(self, Resize::Both | Resize::Horizontal)
+    }
+    /// Whether the user may change the box's height.
+    pub fn vertical(self) -> bool {
+        matches!(self, Resize::Both | Resize::Vertical)
+    }
+}
+
 /// `scrollbar-color: <color> <color>` (CSS Scrollbars 1 §2): the thumb's and the track's colors.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ScrollbarColors {
@@ -2634,6 +2656,10 @@ pub trait Style: Clone {
     /// asked of scroll containers).
     fn custom_scrollbar(&self) -> Option<CustomScrollbar> {
         None
+    }
+    /// The used `resize` (CSS UI 4 §5.1).
+    fn resize(&self) -> Resize {
+        Resize::None
     }
 }
 

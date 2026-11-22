@@ -454,6 +454,9 @@ the source; `git log -p vendor/stylo` shows the diff.
    no longer among the parts patch 77 drops: the engine reads them from a scroll container to draw its scroll
    bars. A user action pseudo-class may follow them; their styles are cascaded without state, so the stylist
    (`stylist.rs` `add_styles`) leaves such rules out.
+79. **`resize` in the servo build** (`properties/longhands.toml`, CSS UI 4 §5.1): upstream builds the
+   longhand only for the `gecko` engine. The computed value (logical `block`/`inline` resolved against the
+   writing mode) is upstream's; snowlark-layout reads it to place the resizer of a scroll container.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

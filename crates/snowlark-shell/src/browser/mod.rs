@@ -253,6 +253,10 @@ pub struct Browser {
     profile: Profile,
     settings: Settings,
     bookmarks: Bookmarks,
+    /// The counts of the settings' and the bookmarks' changes the regular windows shared that
+    /// this one has ([`incognito::Shared`]), and the bookmarks' version it last shared.
+    shared_seen: std::cell::Cell<(u64, u64)>,
+    bookmarks_published: std::cell::Cell<u64>,
     /// Bookmark icons decoded into the image store (`None`: none, or not decodable).
     bookmark_icons: HashMap<BookmarkId, Option<ImageId>>,
     /// The bookmarks bar's item widths for a bookmarks version.
@@ -291,7 +295,8 @@ pub struct Browser {
     hover_suggestion: Option<usize>,
     spinner: f32,
     spinning: bool,
-    closed: Vec<String>,
+    /// The recently closed tabs, newest last (the regular profile's windows share one list).
+    closed: std::rc::Rc<RefCell<Vec<String>>>,
     // The page.
     mouse: Point,
     page_hover: bool,
@@ -439,12 +444,9 @@ impl Browser {
             notice: None,
             bookmarks: Default::default(),
             bookmark_toast: None,
-            // (an Incognito window's files are kept, its list of them only while it is open)
-            downloads: Arc::new(std::sync::Mutex::new(if off_the_record {
-                crate::downloads::DownloadHistory::in_memory()
-            } else {
-                crate::downloads::DownloadHistory::load(&profile.downloads_file())
-            })),
+            // (the regular windows' one list; an Incognito window's files are kept, its list of
+            // them only while it is open)
+            downloads: app.downloads(off_the_record),
             off_the_record,
         }));
         // (content blocking: the windows' one, `App::new`)
@@ -496,6 +498,15 @@ impl Browser {
         };
         window.set_dark_frame(dark || off_the_record);
         let dock = Dock::from_name(&settings.devtools_dock);
+        // (what the regular windows shared before this one opened: it read the profile's files,
+        // which hold it)
+        let shared_seen = app.shared.borrow().seen();
+        let closed = if off_the_record {
+            std::rc::Rc::default()
+        } else {
+            app.closed.clone()
+        };
+        let bookmarks_published = bookmarks.version();
         let mut b = Browser {
             app,
             partition,
@@ -518,6 +529,8 @@ impl Browser {
             profile: profile.clone(),
             settings,
             bookmarks,
+            shared_seen: std::cell::Cell::new(shared_seen),
+            bookmarks_published: std::cell::Cell::new(bookmarks_published),
             bookmark_icons: HashMap::new(),
             bar_widths: RefCell::new(None),
             size: window.client_size(),
@@ -544,7 +557,7 @@ impl Browser {
             hover_suggestion: None,
             spinner: 0.0,
             spinning: false,
-            closed: Vec::new(),
+            closed,
             mouse: Point::ZERO,
             page_hover: false,
             drag_in: None,
@@ -598,7 +611,9 @@ impl Browser {
         };
         b.comp.send(CompMsg::Dark(b.chrome_dark()));
         b.apply_user_agent();
-        if !off_the_record {
+        // (the session file keeps the first regular window's tabs; a window opened beside it
+        // offers no restore)
+        if !off_the_record && b.app.regular_window_count() == 0 {
             b.start_session();
         }
         let url = start.unwrap_or_else(|| b.startup_url());
@@ -1075,7 +1090,7 @@ impl Browser {
                 self.images.remove(f);
             }
             if !e.tab.state.url.is_empty() && e.tab.state.url != START_PAGE {
-                self.closed.push(e.tab.state.url.clone());
+                self.closed.borrow_mut().push(e.tab.state.url.clone());
             }
         }
         if self.tabs.is_empty() {
@@ -2506,12 +2521,13 @@ impl Browser {
             k if ctrl && mods.shift && k == b'O' as u16 => self.open_bookmark_manager(),
             keys::DELETE if ctrl && mods.shift => self.open_clear_browsing_data(),
             k if ctrl && k == b'T' as u16 && mods.shift => {
-                if let Some(url) = self.closed.pop().and_then(|u| Url::parse(&u).ok()) {
+                let last = self.closed.borrow_mut().pop();
+                if let Some(url) = last.and_then(|u| Url::parse(&u).ok()) {
                     self.open_tab(url, Placement::End);
                 }
             }
-            // (Ctrl+N too: the browser has one window, so a new one is a new tab)
-            k if ctrl && (k == b'T' as u16 || (k == b'N' as u16 && !mods.shift)) => self.new_tab(),
+            k if ctrl && k == b'T' as u16 => self.new_tab(),
+            k if ctrl && !mods.shift && k == b'N' as u16 => self.new_window(),
             k if ctrl && mods.shift && k == b'N' as u16 => self.new_incognito_window(),
             k if ctrl && (k == b'W' as u16 || k == keys::F4) => {
                 let i = self.tabs.active_index();
@@ -2950,6 +2966,8 @@ impl WindowHandler for Browser {
                 if self.incognito_count_changed() {
                     self.chrome_dirty = true;
                 }
+                // (another regular window may have changed the settings or the bookmarks)
+                self.take_shared(window);
                 self.drain_tab_events(window);
                 if self.current.is_none() {
                     // (chosen in the tools' window's menus)

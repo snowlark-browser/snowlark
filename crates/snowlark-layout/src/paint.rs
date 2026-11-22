@@ -2485,6 +2485,17 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                         );
                         self.out.pop_transform();
                     }
+                    // (a textarea is not a scroll container in the fragment tree: its resizer
+                    // is painted with it)
+                    if crate::controls::resizer_axes(f).is_some()
+                        && b.flags & fragment_flags::SCROLL_CONTAINER == 0
+                    {
+                        crate::controls::paint_resizer(
+                            self.out,
+                            crate::controls::resizer_rect(f).translate(at.x, at.y),
+                            b.style.color_scheme(),
+                        );
+                    }
                 }
                 return;
             }
@@ -2790,9 +2801,31 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
         if s.visibility() != Visibility::Visible {
             return;
         }
-        let Some(look) = ScrollbarLook::of(s) else {
-            return;
-        };
+        if let Some(look) = ScrollbarLook::of(s) {
+            self.bars(f, at, scroll, device_scale, look);
+        }
+        // (the resizer is over the bars, in the corner where they meet: CSS UI 4 §5.1)
+        if crate::controls::resizer_axes(f).is_some() {
+            crate::controls::paint_resizer(
+                self.out,
+                crate::controls::resizer_rect(f).translate(at.x, at.y),
+                s.color_scheme(),
+            );
+        }
+    }
+}
+
+impl DisplayListSink<'_> {
+    /// A scroll container's scroll bars as `look` draws them.
+    fn bars<S: Style>(
+        &mut self,
+        f: &Fragment<S>,
+        at: Point,
+        scroll: Point,
+        device_scale: f32,
+        look: ScrollbarLook,
+    ) {
+        let s = &f.as_box().expect("a scroll container's box").style;
         let pb = f.padding_rect().translate(at.x, at.y);
         let (range, start) = user_scroll_range(f, s, device_scale);
         let scroll = Point::new(scroll.x - start.x, scroll.y - start.y);

@@ -53,6 +53,7 @@ impl Browser {
                 // (the closed tabs' list forgets the pages the history no longer has)
                 let h = self.history.lock().unwrap_or_else(|e| e.into_inner());
                 self.closed
+                    .borrow_mut()
                     .retain(|u| h.entries().iter().any(|e| e.url == *u));
             }
             if choice.cookies {

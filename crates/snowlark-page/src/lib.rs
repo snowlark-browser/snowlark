@@ -52,6 +52,7 @@ pub mod popup;
 pub mod profile;
 mod refresh;
 pub mod render;
+mod resizer;
 mod script;
 mod speculative;
 mod undo;

@@ -144,6 +144,12 @@ impl Route {
                 (b.app.clone(), b.main_proxy.clone())
             };
             app.add_incognito(Rc::downgrade(&rc), proxy);
+        } else {
+            let (app, proxy) = {
+                let b = rc.borrow();
+                (b.app.clone(), b.main_proxy.clone())
+            };
+            app.add_regular(Rc::downgrade(&rc), proxy);
         }
         Box::new(Route {
             browser: Rc::downgrade(&rc),
@@ -180,10 +186,15 @@ impl WindowHandler for Route {
         };
         let key = matches!(event, Event::KeyDown { .. } | Event::KeyUp { .. });
         let surface = self.surface;
-        let r = self.held.deliver(&b, event, |b, e| match surface {
-            Surface::Main => WindowHandler::event(b, window, e),
-            Surface::Devtools => b.devtools_window_event(window, e),
-            Surface::Popup(id) => b.popup_window_event(id, window, e),
+        let r = self.held.deliver(&b, event, |b, e| {
+            let used = match surface {
+                Surface::Main => WindowHandler::event(b, window, e),
+                Surface::Devtools => b.devtools_window_event(window, e),
+                Surface::Popup(id) => b.popup_window_event(id, window, e),
+            };
+            // (what the event changed in the bookmarks goes to the other windows)
+            b.publish_bookmarks();
+            used
         });
         match r {
             Some(used) => used,

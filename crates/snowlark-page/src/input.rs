@@ -85,6 +85,8 @@ pub struct PointerState {
     /// A press on a draggable element: a drag starts if the pointer moves far enough before the
     /// release (HTML §6.11.5).
     pub may_drag: Option<crate::dnd::PendingDrag>,
+    /// A press on a resizer being dragged (CSS UI 4 §5.1).
+    pub resizing: Option<crate::resizer::Resizing>,
     /// The drag-and-drop operation in progress, which suppresses the pointer events.
     pub drag: Option<Box<crate::dnd::DragSession>>,
     /// A move held for the start of the next rendering update ([`Engine::queue_pointer_move`]).
@@ -664,7 +666,8 @@ impl Engine {
             return self.drag_outcome();
         }
         let may_drag = self.pointer.borrow().may_drag.is_some();
-        if self.pointer.borrow().buttons & 1 != 0 && !may_drag {
+        let resizing = self.resizer_moved(cx, p);
+        if self.pointer.borrow().buttons & 1 != 0 && !may_drag && !resizing {
             self.text_control_dragged(p);
             self.doc_pointer_dragged(p);
         }
@@ -716,7 +719,11 @@ impl Engine {
             }
         }
         self.microtask_checkpoint(cx);
-        self.pointer_outcome(target, hit.is_some_and(|h| h.text))
+        let mut outcome = self.pointer_outcome(target, hit.is_some_and(|h| h.text));
+        if let Some(c) = self.resizer_cursor(hit.map(|h| h.element), p) {
+            outcome.cursor = c.into();
+        }
+        outcome
     }
 
     /// What pointer input finds during a drag: the default cursor (the platform's drag feedback
@@ -1123,11 +1130,15 @@ impl Engine {
                 self.set_element_state(a, ElementState::ACTIVE, true);
             }
             self.pointer.borrow_mut().active = active;
+            // A press on a resizer starts a resize, and nothing else (CSS UI 4 §5.1).
+            let resizing = self.resizer_pressed(t, p, top_point);
             // A focused text control: the caret goes where the press is; elsewhere the document
             // selection does.
             let doc = self.dom().node_document(t);
             let control = self.is_form_control(t);
-            if self.is_text_control(t) && self.focused_element(doc) == Some(t) {
+            if resizing {
+                self.pointer.borrow_mut().doc_drag = None;
+            } else if self.is_text_control(t) && self.focused_element(doc) == Some(t) {
                 self.text_control_pressed(t, top_point, clicks, mods);
             } else if !control {
                 self.doc_pointer_pressed(cx, t, p, clicks, mods);
@@ -1143,7 +1154,8 @@ impl Engine {
                         .is_alive(t)
                         .then(|| self.drag_candidate(t))
                         .flatten()
-                });
+                })
+                .filter(|_| !resizing);
             {
                 if let Some((source, kind)) = candidate {
                     let mut ps = self.pointer.borrow_mut();
@@ -1158,7 +1170,7 @@ impl Engine {
             }
             // A select's list: the drop-down opens; a list box selects the option pressed.
             let select = self.dom().is_html_element_named(t, &local_name!("select"));
-            if select {
+            if select && !resizing {
                 if crate::popup::is_drop_down(&self.dom(), t) {
                     self.open_select_popup(t);
                 } else if let Some(c) = content {
@@ -1281,6 +1293,7 @@ impl Engine {
         if button == 0 {
             self.text_drag_ended();
             self.doc_drag_ended();
+            self.resizer_released();
         }
         for a in std::mem::take(&mut self.pointer.borrow_mut().active) {
             self.set_element_state(a, ElementState::ACTIVE, false);

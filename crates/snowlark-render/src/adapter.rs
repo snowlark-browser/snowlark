@@ -3110,6 +3110,16 @@ impl ls::Style for RenderStyle {
     fn custom_scrollbar(&self) -> Option<ls::CustomScrollbar> {
         self.custom_scrollbar
     }
+
+    fn resize(&self) -> ls::Resize {
+        use style::values::computed::Resize as R;
+        match self.values.get_box().clone_resize() {
+            R::None => ls::Resize::None,
+            R::Both => ls::Resize::Both,
+            R::Horizontal => ls::Resize::Horizontal,
+            R::Vertical => ls::Resize::Vertical,
+        }
+    }
 }
 
 /// The used color scheme of the box with these computed values (CSS Color Adjust 1 §2.3).

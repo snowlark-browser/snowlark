@@ -80,6 +80,7 @@ mod popups;
 mod press_outcome;
 mod query_filter;
 mod render;
+mod resize;
 mod script_animation_frames;
 mod selector_queries;
 mod session_history;

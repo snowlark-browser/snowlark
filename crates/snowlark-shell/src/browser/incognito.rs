@@ -64,11 +64,54 @@ impl Browser {
         self.off_the_record() && self.app.incognito_windows() != self.incognito_shown
     }
 
-    /// Keeps the settings in the profile; an Incognito window's changes stay with it.
+    /// Keeps the settings in the profile, and gives them to the other regular windows; an
+    /// Incognito window's changes stay with it.
     pub(super) fn save_settings(&self) {
         if !self.off_the_record() {
             let _ = self.settings.save(&self.profile.settings_file());
+            let seen = self
+                .app
+                .publish(&self.me, Some(self.settings.clone()), None);
+            self.shared_seen.set(seen);
         }
+    }
+
+    /// After each event: a change this regular window made to the bookmarks (each saves the
+    /// profile's file) goes to the other regular windows.
+    pub(super) fn publish_bookmarks(&self) {
+        if self.off_the_record() || self.bookmarks.version() == self.bookmarks_published.get() {
+            return;
+        }
+        self.bookmarks_published.set(self.bookmarks.version());
+        let seen = self
+            .app
+            .publish(&self.me, None, Some(self.bookmarks.snapshot()));
+        self.shared_seen.set(seen);
+    }
+
+    /// Woken: what another regular window changed since this one last looked (the settings, the
+    /// bookmarks) is taken up and shown.
+    pub(super) fn take_shared(&mut self, window: &window::Window) {
+        if self.off_the_record() {
+            return;
+        }
+        let (settings, bookmarks) = self.app.shared.borrow().since(self.shared_seen.get());
+        if let Some((n, b)) = bookmarks {
+            self.bookmarks.take_tree(&b);
+            self.bookmarks_published.set(self.bookmarks.version());
+            self.shared_seen.set((self.shared_seen.get().0, n));
+            self.bookmarks_changed();
+        }
+        if let Some((n, s)) = settings {
+            self.shared_seen.set((n, self.shared_seen.get().1));
+            self.settings_arrived(window, s);
+        }
+    }
+
+    /// Ctrl+N, the app menu's "New window": a new regular window. In an Incognito window it is a
+    /// regular one too (Ctrl+Shift+N opens another Incognito window).
+    pub(super) fn new_window(&self) {
+        self.app.open_window(None);
     }
 
     /// Ctrl+Shift+N, the app menu's "New Incognito window": a new one, at its new-tab page.
@@ -97,6 +140,73 @@ pub struct App {
     off_the_record: RefCell<Weak<Partition>>,
     /// The Incognito windows' browsers, and their windows to wake when their count changes.
     incognito: RefCell<Vec<(Weak<RefCell<Browser>>, WindowProxy)>>,
+    /// The regular windows' browsers, woken when one of them changes what they share.
+    regular_windows: RefCell<Vec<(Weak<RefCell<Browser>>, WindowProxy)>>,
+    /// The regular profile's settings and bookmarks as its windows last changed them.
+    pub(super) shared: RefCell<Shared>,
+    /// The regular profile's recently closed tabs (one list for its windows, newest last).
+    pub(super) closed: Rc<RefCell<Vec<String>>>,
+    /// The regular profile's downloads, loaded when its first window opens.
+    downloads: RefCell<Option<Arc<std::sync::Mutex<crate::downloads::DownloadHistory>>>>,
+}
+
+/// What the regular profile's windows share besides the partition: each window works on its own
+/// copy of the settings and the bookmarks (and saves them to the profile), publishes every change
+/// here with a count of the changes so far, and the others take the newest up when woken
+/// ([`Browser::take_shared`]). An Incognito window takes no part: it reads the profile's files as
+/// they are when it opens, and writes nothing.
+#[derive(Default)]
+pub(crate) struct Shared {
+    settings: Option<(u64, crate::settings::Settings)>,
+    bookmarks: Option<(u64, crate::bookmarks::Bookmarks)>,
+}
+
+impl Shared {
+    /// The counts of the settings' and the bookmarks' changes so far.
+    pub(crate) fn seen(&self) -> (u64, u64) {
+        (
+            self.settings.as_ref().map_or(0, |(n, _)| *n),
+            self.bookmarks.as_ref().map_or(0, |(n, _)| *n),
+        )
+    }
+
+    /// A window changed the settings or the bookmarks: they are the newest, one change more.
+    /// The counts after it.
+    pub(crate) fn publish(
+        &mut self,
+        settings: Option<crate::settings::Settings>,
+        bookmarks: Option<crate::bookmarks::Bookmarks>,
+    ) -> (u64, u64) {
+        let (s, b) = self.seen();
+        if let Some(v) = settings {
+            self.settings = Some((s + 1, v));
+        }
+        if let Some(v) = bookmarks {
+            self.bookmarks = Some((b + 1, v));
+        }
+        self.seen()
+    }
+
+    /// What changed since a window had the counts `seen`: the settings and the bookmarks (a
+    /// copy that saves nowhere), each with its count.
+    pub(crate) fn since(
+        &self,
+        seen: (u64, u64),
+    ) -> (
+        Option<(u64, crate::settings::Settings)>,
+        Option<(u64, crate::bookmarks::Bookmarks)>,
+    ) {
+        (
+            self.settings
+                .as_ref()
+                .filter(|(n, _)| *n > seen.0)
+                .map(|(n, v)| (*n, v.clone())),
+            self.bookmarks
+                .as_ref()
+                .filter(|(n, _)| *n > seen.1)
+                .map(|(n, v)| (*n, v.snapshot())),
+        )
+    }
 }
 
 impl App {
@@ -122,7 +232,63 @@ impl App {
             gpu_process: gpu_process.map(Rc::new),
             off_the_record: RefCell::default(),
             incognito: RefCell::default(),
+            regular_windows: RefCell::default(),
+            shared: RefCell::default(),
+            closed: Rc::default(),
+            downloads: RefCell::default(),
         })
+    }
+
+    /// The downloads list a new window shows: the regular profile's one, or an Incognito
+    /// window's own, kept only while it is open (its files stay).
+    pub(super) fn downloads(
+        &self,
+        off_the_record: bool,
+    ) -> Arc<std::sync::Mutex<crate::downloads::DownloadHistory>> {
+        if off_the_record {
+            return Arc::new(std::sync::Mutex::new(
+                crate::downloads::DownloadHistory::in_memory(),
+            ));
+        }
+        self.downloads
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                Arc::new(std::sync::Mutex::new(
+                    crate::downloads::DownloadHistory::load(&self.profile.downloads_file()),
+                ))
+            })
+            .clone()
+    }
+
+    /// A regular window's browser was made (`window`: its window).
+    pub(super) fn add_regular(&self, b: Weak<RefCell<Browser>>, window: WindowProxy) {
+        let mut list = self.regular_windows.borrow_mut();
+        list.retain(|(w, _)| w.strong_count() > 0);
+        list.push((b, window));
+    }
+
+    /// How many regular windows are open.
+    pub fn regular_window_count(&self) -> usize {
+        let mut list = self.regular_windows.borrow_mut();
+        list.retain(|(w, _)| w.strong_count() > 0);
+        list.len()
+    }
+
+    /// The window of `from` changed the settings (`settings`) or the bookmarks: the newest copy is
+    /// kept, with the count of changes so far, and every other regular window is woken to take it.
+    pub(super) fn publish(
+        &self,
+        from: &Weak<RefCell<Browser>>,
+        settings: Option<crate::settings::Settings>,
+        bookmarks: Option<crate::bookmarks::Bookmarks>,
+    ) -> (u64, u64) {
+        let seen = self.shared.borrow_mut().publish(settings, bookmarks);
+        for (w, proxy) in self.regular_windows.borrow().iter() {
+            if !w.ptr_eq(from) {
+                proxy.wake();
+            }
+        }
+        seen
     }
 
     /// The off-the-record partition: the open Incognito windows' one, or a new one.
@@ -179,6 +345,25 @@ impl App {
         }
     }
 
+    /// Opens a new regular window, at `url` or the start page: it shares the regular partition,
+    /// the settings, the bookmarks, the downloads and the recently closed tabs with the other
+    /// regular windows; its tabs' renderers come from a spare pool of its own. Called on the
+    /// window thread.
+    pub fn open_window(self: &Rc<App>, url: Option<Url>) {
+        let app = self.clone();
+        let partition = self.regular.clone();
+        let spares = self.spares();
+        let options = WindowOptions {
+            title: "Snowlark".into(),
+            ..WindowOptions::default()
+        };
+        if let Err(e) = window::open_browser_window(options, move |w| {
+            Route::main(Browser::new(w, app, partition, url, spares))
+        }) {
+            eprintln!("[browser] no new window: {e}");
+        }
+    }
+
     /// Opens a new Incognito window, at `url` or its new-tab page. Called on the window thread.
     pub fn open_incognito_window(self: &Rc<App>, url: Option<Url>) {
         let app = self.clone();
@@ -190,5 +375,56 @@ impl App {
         }) {
             eprintln!("[browser] no Incognito window: {e}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Shared;
+    use crate::bookmarks::{Bookmarks, Item, Place};
+    use crate::settings::Settings;
+
+    fn bar(b: &Bookmarks) -> Vec<String> {
+        b.bar().iter().map(|i| i.title.clone()).collect()
+    }
+
+    /// Two regular windows: what one publishes the other takes up once, and only what changed.
+    #[test]
+    fn a_window_takes_up_what_another_shared_once() {
+        let mut shared = Shared::default();
+        let (mut a, mut b) = (shared.seen(), shared.seen());
+        assert_eq!(a, (0, 0));
+        // Window A adds a bookmark (its copy saves the file) and shares the tree.
+        let mut mine = Bookmarks::in_memory();
+        mine.add(
+            Item::page("Alpha", "https://a.example/", None),
+            Place {
+                parent: None,
+                index: 0,
+            },
+        );
+        a = shared.publish(None, Some(mine.snapshot()));
+        assert_eq!(shared.since(a).1.map(|(n, _)| n), None);
+        // Window B is woken: the bookmarks, and no settings.
+        let (settings, bookmarks) = shared.since(b);
+        assert!(settings.is_none());
+        let (n, tree) = bookmarks.unwrap();
+        let mut theirs = Bookmarks::in_memory();
+        let v = theirs.version();
+        theirs.take_tree(&tree);
+        assert_eq!(bar(&theirs), ["Alpha"]);
+        assert!(theirs.version() > v);
+        b = (b.0, n);
+        assert!(shared.since(b).1.is_none());
+        // Window B changes the settings; A takes them, and the bookmarks it has stay its own.
+        let changed = Settings {
+            bookmarks_bar: !Settings::default().bookmarks_bar,
+            ..Settings::default()
+        };
+        b = shared.publish(Some(changed.clone()), None);
+        let (settings, bookmarks) = shared.since(a);
+        assert_eq!(settings.map(|(_, s)| s), Some(changed));
+        assert!(bookmarks.is_none());
+        assert_eq!(b, (1, 1));
     }
 }

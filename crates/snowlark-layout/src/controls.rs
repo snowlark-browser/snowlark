@@ -441,6 +441,56 @@ fn text_control<S: Style>(
     .then_some((c, layout.as_deref(), *clip))
 }
 
+/// The side of a resizer's square (CSS px), as wide as a classic scroll bar.
+pub const RESIZER_SIZE: f32 = 15.0;
+
+/// Which of `f`'s sizes the user may change by dragging its resizer (CSS UI 4 §5.1: `resize`
+/// applies to scroll containers other than the viewport; a textarea, whose lines scroll inside its
+/// box, is one too). `None`: the box has no resizer.
+pub fn resizer_axes<S: Style>(f: &crate::Fragment<S>) -> Option<crate::style::Resize> {
+    use crate::fragment::fragment_flags as ff;
+    let b = f.as_box()?;
+    let axes = b.style.resize();
+    if axes == crate::style::Resize::None {
+        return None;
+    }
+    let viewport = ff::ROOT | ff::VIEWPORT_OVERFLOW | ff::INITIAL_CONTAINING_BLOCK;
+    let scroller = b.flags & ff::SCROLL_CONTAINER != 0 && b.flags & viewport == 0;
+    let textarea =
+        text_control(f).is_some_and(|(c, _, _)| matches!(c.kind, ControlKind::TextArea { .. }));
+    (scroller || textarea).then_some(axes)
+}
+
+/// Where `f`'s resizer is, in the fragment's own coordinates: a square in the bottom right corner
+/// of its padding box, where the scroll bars meet (no larger than the padding box).
+pub fn resizer_rect<S: Style>(f: &crate::Fragment<S>) -> Rect {
+    let pb = f.padding_rect();
+    let (w, h) = (RESIZER_SIZE.min(pb.width), RESIZER_SIZE.min(pb.height));
+    Rect::new(pb.right() - w, pb.bottom() - h, w, h)
+}
+
+/// Paints a resizer (`r`, already placed): two diagonal grip lines towards its bottom right corner,
+/// dark on a light color scheme and light on a dark one.
+pub(crate) fn paint_resizer(out: &mut DisplayListBuilder, r: Rect, scheme: ColorScheme) {
+    let color = match scheme {
+        ColorScheme::Light => Color::rgba(0, 0, 0, 140),
+        ColorScheme::Dark => Color::rgba(255, 255, 255, 150),
+    };
+    let (right, bottom) = (r.right() - 3.0, r.bottom() - 3.0);
+    for len in [9.0f32, 5.0] {
+        let len = len.min(r.width - 4.0).min(r.height - 4.0);
+        if len > 0.0 {
+            stroke(
+                out,
+                Point::new(right, bottom - len),
+                Point::new(right - len, bottom),
+                1.0,
+                color,
+            );
+        }
+    }
+}
+
 /// The height of what a textarea scrolls: its lines and its padding (CSSOM View's scrolling area, for
 /// `scrollHeight`). Its box may be any height, and the text is not in the fragment tree.
 pub fn textarea_scroll_height<S: Style>(f: &crate::Fragment<S>) -> Option<f32> {

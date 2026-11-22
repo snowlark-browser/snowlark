@@ -513,6 +513,25 @@ impl<S: Style> LayoutTree<S> {
         })
     }
 
+    /// The resizer of `node`'s first box fragment (CSS UI 4 §5.1) in the root fragment's
+    /// coordinates, unscrolled: `None` when the user cannot resize its box.
+    pub fn resizer(&self, node: NodeId) -> Option<Resizer> {
+        self.with_fragments(node, |found| {
+            let (at, f) = found
+                .iter()
+                .find(|(_, f)| f.as_box().is_some() && !lookup::is_backdrop(f))?;
+            let axes = controls::resizer_axes(f)?;
+            let t = |r: Rect| r.translate(at.x, at.y);
+            Some(Resizer {
+                axes,
+                corner: t(controls::resizer_rect(f)),
+                border_box: t(f.border_rect()),
+                content_box: t(f.content_rect()),
+                border_box_sizing: f.as_box()?.style.box_sizing() == style::BoxSizing::BorderBox,
+            })
+        })
+    }
+
     /// The geometry of `node`'s first box fragment in the last layout.
     /// Runs `f` with the first box fragment `node` generated in the last layout (not its
     /// `::backdrop`), at the cost of [`LayoutTree::with_fragments`]: what
@@ -1093,6 +1112,19 @@ pub struct BoxRects {
     pub border_box: Rect,
     pub padding_box: Rect,
     pub content_box: Rect,
+}
+
+/// A box the user can resize ([`LayoutTree::resizer`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Resizer {
+    /// The sizes its resizer changes.
+    pub axes: style::Resize,
+    /// The resizer's square.
+    pub corner: Rect,
+    pub border_box: Rect,
+    pub content_box: Rect,
+    /// Whether `width` and `height` size its border box (`box-sizing: border-box`).
+    pub border_box_sizing: bool,
 }
 
 impl BoxGeometry {

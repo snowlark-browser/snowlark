@@ -287,6 +287,32 @@ impl Browser {
         self.overlay_dirty = true;
     }
 
+    /// Another regular window changed the settings (and saved them): this one takes them and
+    /// shows what changed, as if they had been changed here.
+    pub(super) fn settings_arrived(
+        &mut self,
+        window: &Window,
+        settings: crate::settings::Settings,
+    ) {
+        if settings == self.settings {
+            return;
+        }
+        let before = std::mem::replace(&mut self.settings, settings);
+        self.apply_user_agent();
+        if before.bookmarks_bar != self.settings.bookmarks_bar {
+            self.resized();
+        }
+        if before.vertical_tabs != self.settings.vertical_tabs {
+            self.side_layout_changed();
+        }
+        if before.theme != self.settings.theme {
+            self.update_theme(window);
+        }
+        self.refresh_settings_pages();
+        self.chrome_dirty = true;
+        self.overlay_dirty = true;
+    }
+
     /// The theme follows the setting (and the system's, when the setting says so): the chrome,
     /// the window frame and the pages' `prefers-color-scheme`.
     pub(super) fn update_theme(&mut self, window: &Window) {

@@ -407,6 +407,7 @@ position-area
 position-try-fallbacks
 quotes
 r
+resize
 right
 rotate
 row-gap

@@ -265,6 +265,15 @@ impl Bookmarks {
         let _ = self.save();
     }
 
+    /// Takes the tree of `other` (another window's copy, already saved by it), keeping this
+    /// one's file: what shows them redraws, and nothing is written. The undo of a delete goes.
+    pub fn take_tree(&mut self, other: &Bookmarks) {
+        self.items = other.items.clone();
+        self.next_id = self.next_id.max(other.next_id);
+        self.deleted.clear();
+        self.version += 1;
+    }
+
     /// Adds `item` at `place` (at the end of the list when the index is past it). Returns its id,
     /// or `None` when the parent is not a folder.
     pub fn add(&mut self, mut item: Item, place: Place) -> Option<BookmarkId> {

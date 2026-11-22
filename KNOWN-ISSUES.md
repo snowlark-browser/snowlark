@@ -58,8 +58,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `:active` rules do not apply, the buttons and corner are not drawn, and the scrollbar pseudo-classes
   (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
   parse but style nothing. (ref 627)
-- **Properties not built.** `resize`, `scroll-snap-type`, `scroll-snap-align`,
-  `scroll-snap-stop`, `-webkit-text-fill-color`, `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink`
+- **Properties not built.** `scroll-snap-type`, `scroll-snap-align`, `scroll-snap-stop`, `-webkit-text-fill-color`, `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink`
   and `accent-color` do not parse, so their declarations are dropped. (ref 622)
 - **Filters.** `filter` functions and `backdrop-filter` work. Not done: `filter: url()` pointing to an external SVG
   document, `linearRGB` interpolation in SVG filters, `filter` on the root element, `will-change: filter` as a
@@ -209,8 +208,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## Browser UI
 
-- **One regular window.** Ctrl+N opens a new tab rather than a new window; only Incognito windows open alongside
-  the main one. (ref 631)
+- **Several regular windows, one session.** Ctrl+N opens a new regular window, but only the first regular window's
+  tabs are kept for a restore after an unexpected exit, and each window that closes writes its own placement. (ref
+  631)
 
 - **Scroll bar details.** A classic scroll bar is drawn for the page, but frames keep overlay bars (none drawn) and
   `scrollbar-gutter` is not implemented. (ref 8)

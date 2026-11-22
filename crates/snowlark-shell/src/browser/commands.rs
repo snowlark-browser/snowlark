@@ -19,6 +19,8 @@ use crate::tabs::Placement;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     NewTab,
+    /// A new regular window.
+    NewWindow,
     /// A new Incognito window.
     NewIncognitoWindow,
     /// A link, in a new Incognito window.
@@ -144,11 +146,12 @@ impl Browser {
         let zoom = self.tabs.active().map_or(1.0, |e| e.zoom);
         vec![
             Entry::item("New tab", Command::NewTab).shortcut("Ctrl+T"),
+            Entry::item("New window", Command::NewWindow).shortcut("Ctrl+N"),
             Entry::item("New Incognito window", Command::NewIncognitoWindow)
                 .shortcut("Ctrl+Shift+N"),
             Entry::item("Reopen closed tab", Command::ReopenClosedTab)
                 .shortcut("Ctrl+Shift+T")
-                .enabled(!self.closed.is_empty()),
+                .enabled(!self.closed.borrow().is_empty()),
             Entry::Separator,
             Entry::item("Bookmark this page…", Command::BookmarkPage)
                 .shortcut("Ctrl+D")
@@ -264,10 +267,12 @@ impl Browser {
     pub(super) fn run(&mut self, window: &Window, cmd: Command) {
         match cmd {
             Command::NewTab => self.new_tab(),
+            Command::NewWindow => self.new_window(),
             Command::NewIncognitoWindow => self.new_incognito_window(),
             Command::OpenInIncognito(u) => self.open_in_incognito(u),
             Command::ReopenClosedTab => {
-                if let Some(url) = self.closed.pop().and_then(|u| Url::parse(&u).ok()) {
+                let last = self.closed.borrow_mut().pop();
+                if let Some(url) = last.and_then(|u| Url::parse(&u).ok()) {
                     self.open_tab(url, Placement::End);
                 }
             }

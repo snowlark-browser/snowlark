@@ -492,7 +492,7 @@ input:is([type=radio i], [type=checkbox i], [type=reset i], [type=button i],
   box-sizing: border-box;
 }
 
-textarea { white-space: pre-wrap; }
+textarea { white-space: pre-wrap; resize: both; }
 
 input:not([type=file i], [type=range i], [type=checkbox i], [type=radio i]) {
   align-content: unsafe center;

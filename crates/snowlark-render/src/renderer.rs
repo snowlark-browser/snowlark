@@ -4948,6 +4948,12 @@ impl Renderer {
         self.doc.as_ref()?.layout.box_rects(node)
     }
 
+    /// `node`'s resizer in the last layout (CSS UI 4 §5.1), unscrolled; `None` when the user
+    /// cannot resize its box.
+    pub fn resizer(&self, node: NodeId) -> Option<snowlark_layout::Resizer> {
+        self.doc.as_ref()?.layout.resizer(node)
+    }
+
     /// The padding box of `node`'s first box fragment with its and its ancestors' transforms
     /// applied (where its content clip is), unscrolled.
     pub fn transformed_padding_box(&self, node: NodeId) -> Option<snowlark_paint::Rect> {
