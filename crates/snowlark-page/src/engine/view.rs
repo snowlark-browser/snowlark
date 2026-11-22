@@ -14,6 +14,7 @@ use snowlark_layout::style::{
     Display, DisplayOutside, Overflow, Position, Side, Style, WritingMode,
 };
 use snowlark_layout::{fragment_flags, BoxGeometry, PaintOptions};
+use snowlark_paint::scroll_curve::{ScrollCurve, ScrollKind};
 use snowlark_paint::{Point, Rect};
 use snowlark_render::Renderer;
 
@@ -295,20 +296,32 @@ impl Scroller {
 }
 
 /// A smooth scroll in progress (CSSOM View §4 "perform a scroll": the scrolling box's position is
-/// updated over time, in a user-agent-defined way: here an ease-in-out curve over
-/// [`SMOOTH_SCROLL_MS`]).
+/// updated over time, in a user-agent-defined way: here along a [`ScrollCurve`] of its `kind`).
 pub(crate) struct SmoothScroll {
     pub scroller: Scroller,
+    pub kind: ScrollKind,
     pub from: Point,
     pub to: Point,
     /// The page time (ms) of its first frame.
     pub start: Option<f64>,
+    /// Its path, from its first frame on.
+    pub curve: Option<ScrollCurve>,
+    /// Seconds from its start to its latest frame.
+    pub elapsed: f64,
     /// The promises the scroll methods returned, settled when it completes or is interrupted.
     pub promises: Vec<JsPromise>,
 }
 
-/// How long a smooth scroll takes.
-const SMOOTH_SCROLL_MS: f64 = 250.0;
+impl SmoothScroll {
+    /// Aims it at `to` from its latest frame on (a user's wheel notch or key while it runs: it
+    /// keeps its speed).
+    fn retarget(&mut self, to: Point) {
+        self.to = to;
+        if let Some(c) = &mut self.curve {
+            c.update_target(self.elapsed, to);
+        }
+    }
+}
 
 /// What `scrollTop` and friends act on.
 enum ScrollSubject {
@@ -963,9 +976,12 @@ impl Engine {
         self.with_node_renderer(key, |_, st| {
             st.smooth.push(SmoothScroll {
                 scroller: s,
+                kind: ScrollKind::Programmatic,
                 from: cur,
                 to,
                 start: None,
+                curve: None,
+                elapsed: 0.0,
                 promises,
             });
             st.dirty = true;
@@ -1003,8 +1019,9 @@ impl Engine {
     }
 
     /// Moves the smooth scrolls of every rendered document to their positions at page time `now`
-    /// (ms); those that reach their end complete.
-    pub(crate) fn step_smooth_scrolls(&self, cx: &mut Cx, now: f64) {
+    /// (ms); those that reach their end complete. (Each rendering update runs it; tests run it at
+    /// set times.)
+    pub fn step_smooth_scrolls(&self, cx: &mut Cx, now: f64) {
         for doc in self.rendered_documents() {
             let running = self
                 .with_doc_renderer(doc, |_, st| std::mem::take(&mut st.smooth))
@@ -1015,19 +1032,15 @@ impl Engine {
             let mut keep = Vec::new();
             for mut a in running {
                 let start = *a.start.get_or_insert(now);
-                let t = ((now - start) / SMOOTH_SCROLL_MS).clamp(0.0, 1.0) as f32;
-                // (ease-in-out)
-                let e = if t < 0.5 {
-                    4.0 * t * t * t
-                } else {
-                    1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
-                };
-                let p = Point::new(
-                    a.from.x + (a.to.x - a.from.x) * e,
-                    a.from.y + (a.to.y - a.from.y) * e,
-                );
+                let (kind, from, to) = (a.kind, a.from, a.to);
+                let curve = *a
+                    .curve
+                    .get_or_insert_with(|| ScrollCurve::new(kind, from, to));
+                a.elapsed = ((now - start) / 1000.0).max(a.elapsed);
+                let done = curve.is_done(a.elapsed);
+                let p = if done { a.to } else { curve.value(a.elapsed) };
                 self.scroller_set(a.scroller, p);
-                if t >= 1.0 {
+                if done {
                     self.queue_scrollend(a.scroller.key());
                     Self::settle_scroll(cx, std::mem::take(&mut a.promises), false);
                 } else {
@@ -1414,20 +1427,43 @@ impl Engine {
             .map(|&b| (b, self.scroller_position(b)))
             .collect();
         self.view_scroll_into_view(el, block, inline);
-        for (b, from) in old {
-            let to = self.scroller_position(b);
-            if to != from {
-                self.scroller_set(b, from);
-                self.perform_scroll(
-                    cx,
-                    b,
-                    Some(to.x as f64),
-                    Some(to.y as f64),
-                    behavior,
-                    promise,
-                    Some(SnapIntent::End),
-                );
-            }
+        let moves: Vec<(Scroller, Point, Point)> = old
+            .into_iter()
+            .map(|(b, from)| (b, from, self.scroller_position(b)))
+            .filter(|&(_, from, to)| to != from)
+            .collect();
+        // (the promise settles when every box is there: it goes with the smooth scroll that
+        // takes longest, each box's time following its own distance)
+        let last = moves
+            .iter()
+            .enumerate()
+            .filter(|&(_, &(b, _, to))| self.scroll_is_smooth(b, behavior, to == Point::ZERO))
+            .map(|(i, &(_, from, to))| {
+                let d = ScrollCurve::new(ScrollKind::Programmatic, from, to).duration();
+                (i, d)
+            })
+            .fold(None, |best: Option<(usize, f64)>, (i, d)| match best {
+                Some((_, bd)) if bd > d => best,
+                _ => Some((i, d)),
+            })
+            .map(|(i, _)| i);
+        for (i, (b, from, to)) in moves.into_iter().enumerate() {
+            self.scroller_set(b, from);
+            let mut none = None;
+            let p = if last.is_none_or(|l| l == i) {
+                &mut *promise
+            } else {
+                &mut none
+            };
+            self.perform_scroll(
+                cx,
+                b,
+                Some(to.x as f64),
+                Some(to.y as f64),
+                behavior,
+                p,
+                Some(SnapIntent::End),
+            );
         }
     }
 
@@ -2191,6 +2227,31 @@ impl Engine {
             SnapIntent::By
         };
         let target = self.snapped_target(s, from, to, (true, true), intent);
+        let end = self.clamped_target(s, target);
+        let kind = if key {
+            ScrollKind::Keyboard
+        } else {
+            ScrollKind::Wheel
+        };
+        // (a notch or key while the user's last one is still moving the box aims that scroll
+        // further, at the speed it has; a script's smooth scroll is interrupted)
+        let retargeted = self
+            .with_node_renderer(s.key(), |_, st| {
+                let a = st
+                    .smooth
+                    .iter_mut()
+                    .find(|a| a.scroller == s && a.kind != ScrollKind::Programmatic)?;
+                if a.to != end {
+                    a.retarget(end);
+                    st.dirty = true;
+                }
+                Some(())
+            })
+            .flatten()
+            .is_some();
+        if retargeted {
+            return end != before;
+        }
         self.perform_scroll(
             cx,
             s,
@@ -2200,6 +2261,16 @@ impl Engine {
             &mut None,
             None,
         );
-        self.clamped_target(s, target) != before
+        self.with_node_renderer(s.key(), |_, st| {
+            // (the one just started; not one already going there that it joined)
+            if let Some(a) = st
+                .smooth
+                .iter_mut()
+                .find(|a| a.scroller == s && a.curve.is_none())
+            {
+                a.kind = kind;
+            }
+        });
+        end != before
     }
 }

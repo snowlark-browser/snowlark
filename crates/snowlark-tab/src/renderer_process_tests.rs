@@ -15,6 +15,7 @@ use snowlark_idb::{Change, Durability, IdbService, Key, Msg, Record};
 use snowlark_ipc::{connect_to_browser, Bulk, Launch};
 use snowlark_net::Url;
 use snowlark_page::web_storage::{StorageWrite, WebStorage};
+use snowlark_paint::scroll_curve::ScrollKind;
 use snowlark_paint::{Driver, Gpu, Point, Size, VideoId};
 
 use super::*;
@@ -138,7 +139,7 @@ fn forged_tab(port: &RendererPort, role: &str) -> TabUp {
         "forge-scroll-nan" => TabUp::Comp(CompMsg::ScrollBy {
             tab: TAB,
             delta: Point::new(f32::NAN, 0.0),
-            smooth: false,
+            smooth: None,
             input: None,
         }),
         "forge-comp-window" => TabUp::Comp(CompMsg::RemoveTab(TAB)),
@@ -955,7 +956,7 @@ fn the_checks_take_what_a_tab_sends() {
         CompMsg::ScrollBy {
             tab: TAB,
             delta: Point::new(0.0, -10.0),
-            smooth: true,
+            smooth: Some(ScrollKind::Wheel),
             input: None,
         },
         CompMsg::NeedsBeginFrames {

@@ -243,7 +243,8 @@ pub enum CompMsg {
     ScrollBy {
         tab: TabId,
         delta: Point,
-        smooth: bool,
+        /// What the smooth scroll is for (its duration and curve), `None` to scroll at once.
+        smooth: Option<snowlark_paint::scroll_curve::ScrollKind>,
         input: Option<Ticks>,
     },
     /// `with`: the page scrolled its viewport itself, and what it shows there is in the frame named

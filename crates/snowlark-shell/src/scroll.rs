@@ -7,13 +7,13 @@
 
 use std::time::Duration;
 
+use snowlark_paint::scroll_curve::ScrollCurve;
+pub use snowlark_paint::scroll_curve::ScrollKind;
 use snowlark_paint::{Point, Size};
 
 /// Pixels per wheel notch at the default three lines per notch (what Chrome and Edge scroll).
 pub const PIXELS_PER_NOTCH: f32 = 100.0;
 pub use snowlark_tab::driver::{page_step, LINE_STEP};
-/// How long the smooth scroll takes to cover ~63% of the remaining distance.
-const TIME_CONSTANT: f32 = 0.045;
 
 /// Windows' "one screen per notch" wheel setting (SPI_GETWHEELSCROLLLINES = WHEEL_PAGESCROLL).
 pub const WHEEL_PAGE: u32 = u32::MAX;
@@ -34,13 +34,23 @@ pub fn is_precise(delta: i32) -> bool {
     delta % 120 != 0
 }
 
-/// A scroll position moving smoothly towards a target, clamped to `0..=max`. The animation is an
-/// exponential approach (frame-rate independent, retargets without a jolt when more input arrives).
+/// A scroll position moving smoothly towards a target, clamped to `0..=max`, along a
+/// [`ScrollCurve`]: time-based (the same path at any frame rate), and more input while it runs
+/// retargets it at the speed it has.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SmoothScroll {
     pos: Point,
     target: Point,
     max: Point,
+    anim: Option<Animation>,
+}
+
+/// A smooth scroll under way: its curve and how far along it is (seconds).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Animation {
+    curve: ScrollCurve,
+    elapsed: f64,
+    started: bool,
 }
 
 impl SmoothScroll {
@@ -63,36 +73,64 @@ impl SmoothScroll {
             (content.height - viewport.height).max(0.0),
         );
         self.pos = self.clamp(self.pos);
-        self.target = self.clamp(self.target);
+        let target = self.clamp(self.target);
+        if target != self.target {
+            self.target = target;
+            if let Some(a) = &mut self.anim {
+                a.curve.update_target(a.elapsed, target);
+            }
+        }
     }
 
     fn clamp(&self, p: Point) -> Point {
         Point::new(p.x.clamp(0.0, self.max.x), p.y.clamp(0.0, self.max.y))
     }
 
-    /// Scrolls by `delta`, animated or at once. Returns whether anything will move.
-    pub fn scroll_by(&mut self, delta: Point, smooth: bool) -> bool {
+    /// Scrolls by `delta` from where a scroll under way is going, animated as `smooth` says or
+    /// (`None`) at once. Returns whether anything will move.
+    pub fn scroll_by(&mut self, delta: Point, smooth: Option<ScrollKind>) -> bool {
         let to = Point::new(self.target.x + delta.x, self.target.y + delta.y);
         self.scroll_to(to, smooth)
     }
 
-    pub fn scroll_to(&mut self, to: Point, smooth: bool) -> bool {
+    /// Scrolls to `to`: a smooth scroll under way is retargeted there (whatever started it: it
+    /// keeps its speed), else one of `smooth`'s kind starts; `None` jumps.
+    pub fn scroll_to(&mut self, to: Point, smooth: Option<ScrollKind>) -> bool {
         let to = self.clamp(to);
         let before = (self.pos, self.target);
         self.target = to;
-        if !smooth {
-            self.pos = to;
+        match (smooth, &mut self.anim) {
+            (None, _) => {
+                self.pos = to;
+                self.anim = None;
+            }
+            (Some(_), Some(a)) => a.curve.update_target(a.elapsed, to),
+            (Some(kind), None) => {
+                if to != self.pos {
+                    self.anim = Some(Animation {
+                        curve: ScrollCurve::new(kind, self.pos, to),
+                        elapsed: 0.0,
+                        started: false,
+                    });
+                }
+            }
         }
         (self.pos, self.target) != before
     }
 
     /// Moves the position and the target by `delta` together (clamped): the content moved under
     /// the view (scroll anchoring), and a smooth scroll under way goes on as far from it as it
-    /// was. Returns whether anything moved.
+    /// was, its whole path moved. Returns whether anything moved.
     pub fn shift(&mut self, delta: Point) -> bool {
         let before = (self.pos, self.target);
         self.pos = self.clamp(Point::new(self.pos.x + delta.x, self.pos.y + delta.y));
         self.target = self.clamp(Point::new(self.target.x + delta.x, self.target.y + delta.y));
+        if let Some(a) = &mut self.anim {
+            a.curve.adjust(delta);
+            if a.curve.target() != self.target {
+                a.curve.update_target(a.elapsed, self.target);
+            }
+        }
         (self.pos, self.target) != before
     }
 
@@ -106,28 +144,26 @@ impl SmoothScroll {
     }
 
     pub fn is_animating(&self) -> bool {
-        self.pos != self.target
+        self.anim.is_some()
     }
 
-    /// Advances the animation by `dt`. Returns whether the position changed.
-    pub fn tick(&mut self, dt: Duration) -> bool {
-        if !self.is_animating() {
+    /// Advances the animation by `dt`, its first frame by one display refresh `interval` at most (the time since the frame before is long when nothing was moving). Returns
+    /// whether the position changed.
+    pub fn tick(&mut self, dt: Duration, interval: Duration) -> bool {
+        let Some(a) = &mut self.anim else {
             return false;
-        }
-        let k = 1.0 - (-dt.as_secs_f32() / TIME_CONSTANT).exp();
-        let step = |p: f32, t: f32| {
-            let n = p + (t - p) * k;
-            if (t - n).abs() < 0.5 {
-                t
-            } else {
-                n
-            }
         };
+        let dt = if a.started { dt } else { dt.min(interval) };
+        a.started = true;
+        a.elapsed += dt.as_secs_f64();
         let before = self.pos;
-        self.pos = Point::new(
-            step(self.pos.x, self.target.x),
-            step(self.pos.y, self.target.y),
-        );
+        if a.curve.is_done(a.elapsed) {
+            self.pos = self.target;
+            self.anim = None;
+        } else {
+            let p = a.curve.value(a.elapsed);
+            self.pos = self.clamp(p);
+        }
         self.pos != before
     }
 }
@@ -216,14 +252,17 @@ mod tests {
         assert_eq!(page_step(20.0), 40.0);
     }
 
+    const WHEEL: Option<ScrollKind> = Some(ScrollKind::Wheel);
+    const HZ60: Duration = Duration::from_micros(16_667);
+
     #[test]
     fn animates_to_the_target_and_stops() {
         let mut s = page(5000.0);
-        assert!(s.scroll_by(Point::new(0.0, 300.0), true));
+        assert!(s.scroll_by(Point::new(0.0, 300.0), WHEEL));
         assert_eq!(s.position().y, 0.0);
         let mut frames = 0;
         let mut last = 0.0;
-        while s.tick(FRAME) {
+        while s.tick(FRAME, FRAME) {
             frames += 1;
             assert!(s.position().y > last, "monotonic");
             last = s.position().y;
@@ -231,21 +270,87 @@ mod tests {
         }
         assert_eq!(s.position().y, 300.0);
         assert!(!s.is_animating());
-        // ~0.3 s at 180 Hz, most of it in the first 100 ms.
-        assert!((30..80).contains(&frames), "{frames} frames");
+        // (300 px of wheel: 9 frames at 60 Hz, 150 ms, 27 at 180 Hz)
+        assert!((27..=28).contains(&frames), "{frames} frames");
+    }
+
+    /// One notch eases in and out over 12 frames at 60 Hz (200 ms), a new position each frame,
+    /// on the wheel's curve.
+    #[test]
+    fn one_notch_moves_every_frame_on_the_curve() {
+        let mut s = page(5000.0);
+        s.scroll_by(Point::new(0.0, 100.0), WHEEL);
+        let curve = ScrollCurve::new(ScrollKind::Wheel, Point::ZERO, Point::new(0.0, 100.0));
+        let mut ys = Vec::new();
+        while s.tick(HZ60, HZ60) {
+            ys.push(s.position().y);
+        }
+        assert_eq!(ys.len(), 12, "{ys:?}");
+        for (i, y) in ys.iter().enumerate().take(11) {
+            let want = curve.value((i + 1) as f64 * HZ60.as_secs_f64()).y;
+            assert!((y - want).abs() < 1e-3, "frame {i}: {y} against {want}");
+        }
+        // (slow at the start and the end, half way at half time)
+        assert!(ys[0] < 2.0 && ys[0] > 0.0, "{ys:?}");
+        assert!((ys[5] - 50.0).abs() < 0.5, "{ys:?}");
+        assert!(100.0 - ys[10] < 2.0, "{ys:?}");
+        assert_eq!(ys[11], 100.0);
+    }
+
+    /// Notches while a wheel scroll runs keep it going: no frame stands still or goes back, and
+    /// the speed where a notch comes in carries on.
+    #[test]
+    fn notches_during_a_scroll_retarget_it() {
+        let mut s = page(50_000.0);
+        s.scroll_by(Point::new(0.0, 100.0), WHEEL);
+        let mut ys = vec![0.0];
+        for frame in 1..60 {
+            // (a notch every 50 ms for half a second)
+            if frame % 3 == 0 && frame <= 30 {
+                let (a, b) = (ys[ys.len() - 2.min(ys.len())], ys[ys.len() - 1]);
+                s.scroll_by(Point::new(0.0, 100.0), WHEEL);
+                s.tick(HZ60, HZ60);
+                let c = s.position().y;
+                // (the step after the notch is about as long as the one before it at least:
+                // the speed carries on instead of starting again from rest)
+                assert!(c - b >= (b - a) * 0.8, "{a} {b} {c}");
+                ys.push(c);
+                continue;
+            }
+            if !s.tick(HZ60, HZ60) {
+                break;
+            }
+            ys.push(s.position().y);
+        }
+        for w in ys.windows(2) {
+            assert!(w[1] > w[0], "{ys:?}");
+        }
+        assert_eq!(*ys.last().unwrap(), 1100.0);
+    }
+
+    /// The first frame of a scroll after the page sat still moves as far as one refresh, not as
+    /// far as the time since the last frame.
+    #[test]
+    fn the_first_frame_after_idle_is_one_frame() {
+        let mut s = page(5000.0);
+        s.scroll_by(Point::new(0.0, 100.0), WHEEL);
+        s.tick(Duration::from_millis(50), FRAME);
+        let curve = ScrollCurve::new(ScrollKind::Wheel, Point::ZERO, Point::new(0.0, 100.0));
+        let want = curve.value(FRAME.as_secs_f64()).y;
+        assert!((s.position().y - want).abs() < 1e-4);
     }
 
     #[test]
     fn frame_rate_independent() {
         let mut a = page(5000.0);
         let mut b = page(5000.0);
-        a.scroll_by(Point::new(0.0, 500.0), true);
-        b.scroll_by(Point::new(0.0, 500.0), true);
+        a.scroll_by(Point::new(0.0, 500.0), WHEEL);
+        b.scroll_by(Point::new(0.0, 500.0), WHEEL);
         for _ in 0..18 {
-            a.tick(FRAME);
+            a.tick(FRAME, FRAME);
         }
         for _ in 0..6 {
-            b.tick(FRAME * 3);
+            b.tick(FRAME * 3, FRAME * 3);
         }
         assert!((a.position().y - b.position().y).abs() < 1.0);
     }
@@ -253,17 +358,17 @@ mod tests {
     #[test]
     fn input_accumulates_on_the_target_and_clamps() {
         let mut s = page(1000.0);
-        s.scroll_by(Point::new(0.0, 100.0), true);
-        s.tick(FRAME);
-        s.scroll_by(Point::new(0.0, 100.0), true);
+        s.scroll_by(Point::new(0.0, 100.0), WHEEL);
+        s.tick(FRAME, FRAME);
+        s.scroll_by(Point::new(0.0, 100.0), WHEEL);
         assert_eq!(s.target().y, 200.0);
-        s.scroll_by(Point::new(0.0, 1000.0), true);
+        s.scroll_by(Point::new(0.0, 1000.0), WHEEL);
         // (the range is 1000 - 800)
         assert_eq!(s.target().y, 200.0);
         assert_eq!(s.max().y, 200.0);
         assert!(!s.can_scroll(Point::new(0.0, 10.0)));
         assert!(s.can_scroll(Point::new(0.0, -10.0)));
-        s.scroll_to(Point::new(0.0, -50.0), false);
+        s.scroll_to(Point::new(0.0, -50.0), None);
         assert_eq!(s.position().y, 0.0);
         assert!(!s.can_scroll(Point::new(0.0, -10.0)));
         assert!(!s.can_scroll(Point::new(10.0, 0.0)));
@@ -274,13 +379,16 @@ mod tests {
     #[test]
     fn a_shift_keeps_a_smooth_scroll_going() {
         let mut s = page(5000.0);
-        s.scroll_by(Point::new(0.0, 300.0), true);
-        s.tick(FRAME);
+        s.scroll_by(Point::new(0.0, 300.0), WHEEL);
+        s.tick(FRAME, FRAME);
         let (pos, target) = (s.position().y, s.target().y);
         assert!(s.shift(Point::new(0.0, 120.0)));
         assert_eq!(s.position().y, pos + 120.0);
         assert_eq!(s.target().y, target + 120.0);
         assert!(s.is_animating());
+        // (the next frame goes on from the shifted place, not back to where it was)
+        s.tick(FRAME, FRAME);
+        assert!(s.position().y > pos + 120.0 && s.position().y < target + 120.0);
         // (clamped to the range)
         s.shift(Point::new(0.0, 10_000.0));
         assert_eq!(s.position().y, 4200.0);
@@ -289,7 +397,7 @@ mod tests {
     #[test]
     fn shrinking_content_clamps_the_position() {
         let mut s = page(5000.0);
-        s.scroll_to(Point::new(0.0, 4000.0), false);
+        s.scroll_to(Point::new(0.0, 4000.0), None);
         s.set_extent(Size::new(1000.0, 1500.0), Size::new(1000.0, 800.0));
         assert_eq!(s.position().y, 700.0);
         assert!(!s.is_animating());

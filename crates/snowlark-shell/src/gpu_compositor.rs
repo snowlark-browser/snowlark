@@ -1791,7 +1791,7 @@ mod tests {
             CompMsg::ScrollBy {
                 tab: 5,
                 delta: Point::new(0.0, 10.0),
-                smooth: false,
+                smooth: None,
                 input: None,
             },
         );

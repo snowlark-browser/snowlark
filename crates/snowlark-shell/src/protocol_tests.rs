@@ -20,6 +20,7 @@ use snowlark_page::devtools::{
 use snowlark_page::devtools_node::CopyKind;
 use snowlark_page::embedder::ContextTarget;
 use snowlark_page::popup::{PopupItem, SelectPopup};
+use snowlark_paint::scroll_curve::ScrollKind;
 use snowlark_paint::window::{Cursor, ImeEvent, Modifiers, MouseButton};
 use snowlark_paint::{Color, DisplayList, DisplayListBuilder, Point, Rect, Size, Ticks, VideoId};
 
@@ -630,7 +631,7 @@ every_variant!(comp_msg: CompMsg, [
     CompMsg::ScrollBy { .. } => CompMsg::ScrollBy {
         tab: 3,
         delta: point(),
-        smooth: true,
+        smooth: Some(ScrollKind::Wheel),
         input: Some(Ticks::now()),
     },
     CompMsg::ScrollTo { .. } => CompMsg::ScrollTo {

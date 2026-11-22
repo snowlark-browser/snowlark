@@ -56,7 +56,7 @@ use snowlark_tab::watchdog::PassMark;
 
 use crate::begin_frames::{BeginFrameSource, VSyncThread};
 use crate::driver::{ColorScheme, ScrollbarColors};
-use crate::scroll::{Scrollbar, SmoothScroll};
+use crate::scroll::{ScrollKind, Scrollbar, SmoothScroll};
 use crate::tab::{TabCommand, TabId};
 use crate::video::{Picture, VideoQuad};
 use snowlark_paint::compositor::Underlay;
@@ -877,7 +877,7 @@ impl State {
                     );
                     layer.scroll.set_extent(data.content, port);
                     if let Some(r) = layer.restore {
-                        layer.scroll.scroll_to(r, false);
+                        layer.scroll.scroll_to(r, None);
                         let p = layer.scroll.position();
                         if (p.y - r.y).abs() < 1.0 && (p.x - r.x).abs() < 1.0 {
                             layer.restore = None;
@@ -921,7 +921,7 @@ impl State {
                             Some(_) => false,
                             None => {
                                 layer.restore = None;
-                                layer.scroll.scroll_to(scroll.to, false)
+                                layer.scroll.scroll_to(scroll.to, None)
                             }
                         };
                         if moved {
@@ -1274,7 +1274,10 @@ impl State {
         }
         if let Some(layer) = self.layers.get_mut(&tab).filter(|l| l.frame.is_some()) {
             layer.restore = None;
-            if layer.scroll.scroll_to(to, smooth) {
+            if layer
+                .scroll
+                .scroll_to(to, smooth.then_some(ScrollKind::Keyboard))
+            {
                 self.keep_until = Some(Instant::now() + KEEP_PRESENTING);
                 self.dirty = true;
             }
@@ -1502,7 +1505,7 @@ impl State {
                 match a.target {
                     AutoTarget::Viewport => {
                         layer.restore = None;
-                        layer.scroll.scroll_by(step.delta, false);
+                        layer.scroll.scroll_by(step.delta, None);
                     }
                     AutoTarget::Container(node) => {
                         let _ = layer
@@ -1527,9 +1530,14 @@ impl State {
             .min(Duration::from_millis(50));
         self.last_tick = Some(now);
         self.autoscroll(dt);
+        // (the display's refresh interval: a new scroll animation's first frame is one)
+        let interval = self
+            .begin_frames
+            .missed(snowlark_paint::Ticks::now())
+            .interval;
         if let Some(id) = self.active {
             if let Some(layer) = self.layers.get_mut(&id) {
-                if layer.scroll.tick(dt) {
+                if layer.scroll.tick(dt, interval) {
                     self.keep_until = Some(now + KEEP_PRESENTING);
                 }
             }
@@ -1750,13 +1758,19 @@ impl State {
                     self.stats.latencies.push(l);
                 }
             }
+            // (the active tab's scroll position this frame shows)
+            let scroll = self
+                .active
+                .and_then(|id| self.layers.get(&id))
+                .map(|l| l.scroll.position());
             eprintln!(
-                "[gpu] frame {} interval {} wait {:.2} compose {:.2} present {:.2} ms{}{}{}{}",
+                "[gpu] frame {} interval {} wait {:.2} compose {:.2} present {:.2} ms{}{}{}{}{}",
                 self.stats.frames,
                 interval.map_or("-".into(), |i| format!("{i:.2}")),
                 ms(waited),
                 ms(drawn),
                 ms(present),
+                scroll.map_or(String::new(), |p| format!(" scroll {:.1},{:.1}", p.x, p.y)),
                 latency.map_or(String::new(), |l| format!(" input→present {l:.2} ms")),
                 sizes.map_or(String::new(), |((pw, ph), (aw, ah))| format!(
                     " page {pw}x{ph} area {aw}x{ah}"
@@ -2043,7 +2057,7 @@ mod tests {
         comp.send(CompMsg::ScrollBy {
             tab: 5,
             delta: Point::new(0.0, 100.0),
-            smooth: false,
+            smooth: None,
             input: None,
         });
         comp.send(CompMsg::ScrollTo {
@@ -2366,7 +2380,7 @@ mod tests {
             CompMsg::ScrollBy {
                 tab: 3,
                 delta: Point::new(0.0, -100.0),
-                smooth: false,
+                smooth: None,
                 input: None,
             }
             .into()
@@ -2444,7 +2458,7 @@ mod tests {
             CompMsg::ScrollBy {
                 tab: 3,
                 delta: Point::new(0.0, 40.0),
-                smooth: false,
+                smooth: None,
                 input: None,
             }
             .into()
@@ -2469,7 +2483,7 @@ mod tests {
             CompMsg::ScrollBy {
                 tab: 3,
                 delta: Point::new(0.0, 700.0),
-                smooth: false,
+                smooth: None,
                 input: None,
             }
             .into()
@@ -2520,7 +2534,7 @@ mod tests {
                 CompMsg::ScrollBy {
                     tab: 3,
                     delta: Point::new(0.0, 40.0),
-                    smooth: false,
+                    smooth: None,
                     input: None,
                 }
                 .into()
@@ -2597,7 +2611,7 @@ mod tests {
             CompMsg::ScrollBy {
                 tab: 3,
                 delta: Point::new(0.0, 40.0),
-                smooth: false,
+                smooth: None,
                 input: None,
             }
             .into()

@@ -66,7 +66,7 @@ use crate::page_driver::PageDriver;
 use crate::popup::{MenuKey, SelectMenu};
 use crate::profile::Profile;
 use crate::restore::SavedTab;
-use crate::scroll::{is_precise, wheel_pixels};
+use crate::scroll::{is_precise, wheel_pixels, ScrollKind};
 use crate::settings::Settings;
 use crate::tab::{TabCommand, TabContext, TabEvent, TabId, TabState};
 use crate::tab_host::{ProcessModel, RemoteTab, Renderer, TabHost};
@@ -2494,7 +2494,7 @@ impl Browser {
         self.comp.send(CompMsg::ScrollBy {
             tab: id,
             delta,
-            smooth: !precise,
+            smooth: (!precise).then_some(ScrollKind::Wheel),
             input: Some(time),
         });
     }

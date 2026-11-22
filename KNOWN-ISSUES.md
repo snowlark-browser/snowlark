@@ -62,8 +62,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Scroll anchoring inside scrolling boxes.** The page's own scrolling keeps what the reader sees in place
   when content above it grows or shrinks, but a scrollable box inside the page does not yet, and a focused
   text field or the find-in-page match is not preferred as the anchor. (ref 622)
-- **Wheel scrolling.** A mouse wheel scrolls in visible steps rather than one smooth movement, more so with
-  high-resolution or free-spinning wheels. (ref 685)
+- **Wheel scrolling.** A high-resolution or free-spinning wheel, and a touchpad, scroll by each step they send,
+  without the smooth animation a standard wheel's notches have. (ref 686)
 - **Scroll snap.** Script scrolls, mouse wheel notches and the arrow and page keys come to rest on snap positions.
   Not done: a touchpad's scrolls and autoscroll do not snap when they end, Home, End and the scroll bar do not
   snap, a container does not snap again after its layout changes, and the Level 2 snap events are missing.

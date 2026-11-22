@@ -22,6 +22,7 @@ use snowlark_dom::NodeId;
 use snowlark_net::{Client, Destination, FetchEvent, NetClient, Request, ResponseStream, Url};
 use snowlark_paint::image::DecodedImage;
 use snowlark_paint::input::Cursor;
+use snowlark_paint::scroll_curve::ScrollKind;
 use snowlark_paint::{
     DisplayList, Gpu, LayerKind, Matrix, Point, Rect, Size, SplitLayer, TextEngine, Viewport,
 };
@@ -1452,7 +1453,7 @@ impl TabRenderer {
                         KeyScroll::By(delta) => CompMsg::ScrollBy {
                             tab: self.id,
                             delta,
-                            smooth: true,
+                            smooth: Some(ScrollKind::Keyboard),
                             input: None,
                         },
                         KeyScroll::Top => CompMsg::ScrollTo {
@@ -1544,7 +1545,7 @@ impl TabRenderer {
                     self.ctx.surface.compositor(CompMsg::ScrollBy {
                         tab: self.id,
                         delta,
-                        smooth: true,
+                        smooth: Some(ScrollKind::Wheel),
                         input: None,
                     });
                 }

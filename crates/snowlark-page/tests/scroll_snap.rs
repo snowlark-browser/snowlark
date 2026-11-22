@@ -121,3 +121,40 @@ fn wheel_notches_and_keys_take_a_snapping_viewport_to_the_next_snap_position() {
     page.run_until_settled(Duration::from_secs(5));
     assert_eq!(eval(&mut page, "scrollY"), "1200");
 }
+
+#[test]
+fn wheel_notches_during_a_smooth_scroll_carry_it_on() {
+    // A notch while the last one is still moving the box aims that same scroll further, at the
+    // speed it has: no frame stands still or goes back, and it ends at the notches' sum.
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><body style='margin:0'><div style='height:5000px'></div>",
+    );
+    page.with(|e, cx| e.snap_scroll_by(cx, None, Point::new(0.0, 100.0), false));
+    let t0 = 1.0e6;
+    let mut ys = Vec::new();
+    for i in 0..40 {
+        page.with(|e, cx| {
+            if i == 6 || i == 9 {
+                e.snap_scroll_by(cx, None, Point::new(0.0, 100.0), false);
+            }
+            e.step_smooth_scrolls(cx, t0 + i as f64 * 1000.0 / 60.0);
+        });
+        ys.push(eval(&mut page, "scrollY").parse::<f64>().unwrap());
+    }
+    for w in ys.windows(2) {
+        assert!(w[1] >= w[0], "{ys:?}");
+    }
+    for i in 1..14 {
+        assert!(ys[i] > ys[i - 1], "frame {i}: {ys:?}");
+    }
+    // (the frame after each notch moves about as far as the one before it, not from rest)
+    for i in [6, 9] {
+        assert!(
+            ys[i] - ys[i - 1] >= (ys[i - 1] - ys[i - 2]) * 0.8,
+            "frame {i}: {ys:?}"
+        );
+    }
+    assert_eq!(*ys.last().unwrap(), 300.0);
+}

@@ -47,6 +47,7 @@ pub mod pdf;
 pub mod placement;
 pub mod raster;
 pub mod raster_tables;
+pub mod scroll_curve;
 mod soft_blur;
 mod svg_effects;
 pub mod svg_filter;
