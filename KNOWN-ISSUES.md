@@ -62,6 +62,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Scroll anchoring inside scrolling boxes.** The page's own scrolling keeps what the reader sees in place
   when content above it grows or shrinks, but a scrollable box inside the page does not yet, and a focused
   text field or the find-in-page match is not preferred as the anchor. (ref 622)
+- **Wheel scrolling.** A mouse wheel scrolls in visible steps rather than one smooth movement, more so with
+  high-resolution or free-spinning wheels. (ref 685)
 - **Scroll snap.** Script scrolls, mouse wheel notches and the arrow and page keys come to rest on snap positions.
   Not done: a touchpad's scrolls and autoscroll do not snap when they end, Home, End and the scroll bar do not
   snap, a container does not snap again after its layout changes, and the Level 2 snap events are missing.
@@ -145,13 +147,14 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **XPath resolvers from another realm.** When a namespace resolver made in another frame is not callable, the
   `TypeError` is created and reported in the calling frame instead of the resolver's. (ref 661)
 - **No WebGL, `OffscreenCanvas` or WebGPU.** `getContext('webgl')` returns null, and `OffscreenCanvas` and
-  `navigator.gpu` are absent. (ref 117)
+  `navigator.gpu` are absent. Pages fall back to their 2D-canvas drawing where they have one: Google Maps then
+  zooms without its animation, the imagery grey until the new level's tiles arrive, as in Chrome with WebGL
+  off. (ref 117, 682)
 - **Service workers.** `navigator.serviceWorker` and the Cache API are not implemented. Pages that check for service
   workers print a warning. (ref 127)
 - **IndexedDB.** Names with lone surrogates are not supported, there is no storage partitioning by top-level site,
   no quota and no `close` event, a database's contents are read into memory on first use, and transactions,
-  connections and cursors are not garbage collected. Deeply nested array keys (thousands of levels) can overflow a
-  thread's stack, and the page does not yet refuse them with a `DataError`. (ref 49, 89)
+  connections and cursors are not garbage collected. (ref 49, 89)
 - **Web Audio output device change.** An `AudioContext` stops with an `error` event when the default output device
   changes or is removed, instead of moving to the new device. (ref 125)
 

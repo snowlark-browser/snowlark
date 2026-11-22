@@ -40,15 +40,119 @@ fn utf16(scope: &v8::PinScope<'_, '_>, s: v8::Local<v8::String>) -> Vec<u16> {
     buf
 }
 
-/// §7.4 "convert a value to a key". `Err(())`: an exception is pending.
+/// One step of "convert a value to a key": a value that is not an array converts on its own; an
+/// array is opened, and its entries convert after it.
+enum Step<'s> {
+    Done(Conv),
+    Array(v8::Local<'s, v8::Object>, u32),
+}
+
+/// An array being converted: its entries so far.
+struct ArrayFrame<'s> {
+    array: v8::Local<'s, v8::Object>,
+    len: u32,
+    next: u32,
+    keys: Vec<Key>,
+}
+
+/// §7.4 "convert a value to a key". `Err(())`: an exception is pending. `seen` holds the arrays
+/// being converted around `input`. The specification's recursion over nested arrays runs here over
+/// a list on the heap, so a deep key needs no deeper native stack.
 pub(crate) fn value_to_key<'s>(
     scope: &mut v8::PinScope<'s, '_>,
     input: v8::Local<'s, v8::Value>,
     seen: &mut Vec<v8::Local<'s, v8::Value>>,
 ) -> Result<Conv, ()> {
-    if seen.iter().any(|s| s.strict_equals(input)) {
-        return Ok(Conv::InvalidValue);
+    let base = seen.len();
+    let r = convert_nested(scope, input, seen);
+    seen.truncate(base);
+    r
+}
+
+fn convert_nested<'s>(
+    scope: &mut v8::PinScope<'s, '_>,
+    input: v8::Local<'s, v8::Value>,
+    seen: &mut Vec<v8::Local<'s, v8::Value>>,
+) -> Result<Conv, ()> {
+    let mut open: Vec<ArrayFrame<'s>> = Vec::new();
+    let mut step = convert_step(scope, input, seen)?;
+    loop {
+        let mut result = match step {
+            Step::Done(c) => Some(c),
+            Step::Array(array, len) => {
+                seen.push(array.into());
+                open.push(ArrayFrame {
+                    array,
+                    len,
+                    next: 0,
+                    keys: Vec::new(),
+                });
+                None
+            }
+        };
+        // Hand each finished key to the array around it, until an entry is left to convert.
+        step = loop {
+            let Some(top) = open.last_mut() else {
+                // (the outermost value is converted: `result` is set)
+                return Ok(result.unwrap_or(Conv::InvalidValue));
+            };
+            match result.take() {
+                Some(Conv::Key(k)) => top.keys.push(k),
+                Some(_) => return Ok(Conv::InvalidValue),
+                None => {}
+            }
+            if top.next < top.len {
+                let i = top.next;
+                top.next += 1;
+                let array = top.array;
+                let idx = v8::Integer::new_from_unsigned(scope, i);
+                let idx_name = idx.to_string(scope).ok_or(())?;
+                if !array.has_own_property(scope, idx_name.into()).ok_or(())? {
+                    return Ok(Conv::InvalidValue);
+                }
+                let entry = array.get_index(scope, i).ok_or(())?;
+                break convert_step(scope, entry, seen)?;
+            }
+            let keys = open.pop().map(|f| f.keys).unwrap_or_default();
+            seen.pop();
+            result = Some(Conv::Key(Key::Array(keys)));
+        };
     }
+}
+
+/// Converts a value that is not an array, or opens an array (steps 1 to 6 of the array case).
+fn convert_step<'s>(
+    scope: &mut v8::PinScope<'s, '_>,
+    input: v8::Local<'s, v8::Value>,
+    seen: &[v8::Local<'s, v8::Value>],
+) -> Result<Step<'s>, ()> {
+    if seen.iter().any(|s| s.strict_equals(input)) {
+        return Ok(Step::Done(Conv::InvalidValue));
+    }
+    if !input.is_array() {
+        return Ok(Step::Done(leaf_to_key(scope, input)?));
+    }
+    // (an array nested deeper than keys may cross between processes is an invalid value, a
+    // "DataError", rather than a key that overflows a thread's stack: the specification sets no
+    // depth, and engines refuse very deep keys)
+    if seen.len() >= snowlark_idb::wire::WIRE_KEY_DEPTH as usize {
+        return Ok(Step::Done(Conv::InvalidValue));
+    }
+    let arr: v8::Local<v8::Object> = input.try_into().map_err(|_| ())?;
+    let len_key = rt::name(scope, "length");
+    let len = arr.get(scope, len_key.into()).ok_or(())?;
+    let len = len
+        .integer_value(scope)
+        .ok_or(())?
+        .clamp(0, u32::MAX as i64) as u32;
+    Ok(Step::Array(arr, len))
+}
+
+/// "Convert a value to a key" for every value but an array.
+fn leaf_to_key<'s>(
+    scope: &mut v8::PinScope<'s, '_>,
+    input: v8::Local<'s, v8::Value>,
+) -> Result<Conv, ()> {
     if input.is_number() {
         let n = input.number_value(scope).unwrap_or(f64::NAN);
         return Ok(if n.is_nan() {
@@ -100,38 +204,6 @@ pub(crate) fn value_to_key<'s>(
         view.copy_contents(&mut out);
         return Ok(Conv::Key(Key::Binary(out)));
     }
-    if input.is_array() {
-        // (an array nested deeper than keys may cross between processes is an invalid value, a
-        // "DataError", rather than a key that overflows a thread's stack: the specification sets
-        // no depth, and engines refuse very deep keys)
-        if seen.len() >= snowlark_idb::wire::WIRE_KEY_DEPTH as usize {
-            return Ok(Conv::InvalidValue);
-        }
-        let arr: v8::Local<v8::Object> = input.try_into().map_err(|_| ())?;
-        let len_key = rt::name(scope, "length");
-        let len = arr.get(scope, len_key.into()).ok_or(())?;
-        let len = len.integer_value(scope).ok_or(())?.max(0) as u64;
-        seen.push(input);
-        let mut keys = Vec::new();
-        for i in 0..len {
-            let idx = v8::Integer::new_from_unsigned(scope, i as u32);
-            let idx_name = idx.to_string(scope).ok_or(())?;
-            if !arr.has_own_property(scope, idx_name.into()).ok_or(())? {
-                seen.pop();
-                return Ok(Conv::InvalidValue);
-            }
-            let entry = arr.get_index(scope, i as u32).ok_or(())?;
-            match value_to_key(scope, entry, seen)? {
-                Conv::Key(k) => keys.push(k),
-                _ => {
-                    seen.pop();
-                    return Ok(Conv::InvalidValue);
-                }
-            }
-        }
-        seen.pop();
-        return Ok(Conv::Key(Key::Array(keys)));
-    }
     Ok(Conv::InvalidType)
 }
 
@@ -168,29 +240,57 @@ pub(crate) fn value_to_multi_entry_key<'s>(
     Ok(Conv::Key(Key::Array(keys)))
 }
 
-/// §7.3 "convert a key to a value".
+/// §7.3 "convert a key to a value". Nested arrays are converted from a list on the heap, as in
+/// [`value_to_key`].
 pub(crate) fn key_to_value<'s>(
     scope: &v8::PinScope<'s, '_>,
     key: &Key,
 ) -> Option<v8::Local<'s, v8::Value>> {
-    Some(match key {
-        Key::Number(n) => v8::Number::new(scope, *n).into(),
-        Key::Date(ms) => v8::Date::new(scope, *ms)?.into(),
-        Key::String(s) => {
-            v8::String::new_from_two_byte(scope, s, v8::NewStringType::Normal)?.into()
-        }
-        Key::Binary(b) => {
-            let store = v8::ArrayBuffer::new_backing_store_from_vec(b.clone()).make_shared();
-            v8::ArrayBuffer::with_backing_store(scope, &store).into()
-        }
-        Key::Array(items) => {
-            let mut vals = Vec::with_capacity(items.len());
-            for k in items {
-                vals.push(key_to_value(scope, k)?);
+    /// An array key being converted: its keys, the next one to convert, and the values so far.
+    struct Open<'k, 's> {
+        items: &'k [Key],
+        next: usize,
+        values: Vec<v8::Local<'s, v8::Value>>,
+    }
+    let mut open: Vec<Open<'_, 's>> = Vec::new();
+    let mut current = key;
+    loop {
+        let mut value: Option<v8::Local<'s, v8::Value>> = match current {
+            Key::Array(items) => {
+                open.push(Open {
+                    items,
+                    next: 0,
+                    values: Vec::with_capacity(items.len()),
+                });
+                None
             }
-            v8::Array::new_with_elements(scope, &vals).into()
-        }
-    })
+            Key::Number(n) => Some(v8::Number::new(scope, *n).into()),
+            Key::Date(ms) => Some(v8::Date::new(scope, *ms)?.into()),
+            Key::String(s) => {
+                Some(v8::String::new_from_two_byte(scope, s, v8::NewStringType::Normal)?.into())
+            }
+            Key::Binary(b) => {
+                let store = v8::ArrayBuffer::new_backing_store_from_vec(b.clone()).make_shared();
+                Some(v8::ArrayBuffer::with_backing_store(scope, &store).into())
+            }
+        };
+        current = loop {
+            let Some(top) = open.last_mut() else {
+                return value;
+            };
+            if let Some(v) = value.take() {
+                top.values.push(v);
+            }
+            // (the key's own slice, not a borrow of `open`)
+            let items = top.items;
+            if let Some(k) = items.get(top.next) {
+                top.next += 1;
+                break k;
+            }
+            let done = open.pop()?;
+            value = Some(v8::Array::new_with_elements(scope, &done.values).into());
+        };
+    }
 }
 
 impl Engine {

@@ -56,7 +56,8 @@ fn temp(name: &str) -> std::path::PathBuf {
 
 /// "Convert a value to a key": an array key nested deeper than 2,000 levels is refused with a
 /// "DataError" (the specification sets no depth; deeper keys overflowed a thread's stack in the
-/// storage), and one of 2,000 levels is a key.
+/// storage), and one of 2,000 levels is a key, converted both ways without a native frame per level
+/// (a debug build's test thread overflowed its stack here).
 #[test]
 fn array_keys_nested_too_deep_are_a_data_error() {
     let dir = temp("deep-keys");
@@ -66,9 +67,10 @@ fn array_keys_nested_too_deep_are_a_data_error() {
         &mut p,
         "const nest = n => { let k = 0; for (let i = 0; i < n; i++) k = [k]; return k; };
          const cmp = n => { try { return String(indexedDB.cmp(nest(n), 1)); } catch (e) { return e.name; } };
-         [cmp(2000), cmp(2001), cmp(10000)].join()",
+         const depth = k => { let d = 0; while (Array.isArray(k)) { k = k[0]; d++; } return d; };
+         [cmp(2000), cmp(2001), cmp(10000), depth(IDBKeyRange.only(nest(2000)).lower)].join()",
     );
-    assert_eq!(r, "1,DataError,DataError");
+    assert_eq!(r, "1,DataError,DataError,2000");
     drop(p);
     let _ = std::fs::remove_dir_all(dir);
 }
