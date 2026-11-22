@@ -757,6 +757,67 @@ fn a_canvas_first_frame_is_not_waited_for() {
     assert_eq!(pixel(&mut page), snowlark_paint::Color::rgb(0, 0, 255));
 }
 
+/// As the window takes them, the paint of a rendering update whose canvas frame is still on its way
+/// waits for it: the paint shows the canvas's drawing with the rest of that update (a page that
+/// moves its canvas and redraws it showed the old drawing at the new place for a frame), and the
+/// frame's coming asks for no second paint. Without it, the update asked for a paint at once.
+#[test]
+fn a_paint_waits_for_its_updates_canvas_frames() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><body style='margin:0'><canvas id=c width=200 height=100></canvas>\
+         <div id=d style='position:absolute;left:0;top:100px;width:50px;height:50px;background:#f00'></div>",
+    );
+    page.engine().set_canvas_frames_async(true);
+    let pixel = |page: &mut Page, x: u32, y: u32| {
+        page.engine()
+            .with_renderer(|r, _| {
+                r.rasterize(
+                    snowlark_paint::Size::new(200.0, 200.0),
+                    snowlark_paint::Point::ZERO,
+                    1.0,
+                )
+                .unwrap()
+                .pixel(x, y)
+            })
+            .unwrap()
+    };
+    eval(
+        &mut page,
+        "globalThis.g = document.getElementById('c').getContext('2d');
+         g.fillStyle = '#f00'; g.fillRect(0, 0, 200, 100); ''",
+    );
+    page.update_the_rendering();
+    page.run_until_settled(Duration::from_secs(10));
+    page.engine().take_needs_paint();
+    // Much to draw, so that the canvas thread is still at it when the update ends; the box moves in
+    // the same task.
+    eval(
+        &mut page,
+        "g.shadowBlur = 30; g.shadowColor = '#000'; g.fillStyle = '#0f0';
+         for (let i = 0; i < 2000; i++) { g.beginPath(); g.arc(i % 200, i % 100, 40, 0, 7); g.fill(); }
+         g.shadowBlur = 0; g.fillStyle = '#00f'; g.fillRect(0, 0, 200, 100);
+         document.getElementById('d').style.left = '100px'; ''",
+    );
+    page.update_the_rendering();
+    assert!(
+        !page.engine().take_needs_paint(),
+        "the paint waits for the canvas frame"
+    );
+    page.run_until_settled(Duration::from_secs(10));
+    assert!(page.engine().take_needs_paint(), "one paint once it came");
+    assert!(!page.engine().take_needs_paint(), "and only one");
+    assert_eq!(
+        pixel(&mut page, 5, 5),
+        snowlark_paint::Color::rgb(0, 0, 255)
+    );
+    assert_eq!(
+        pixel(&mut page, 120, 120),
+        snowlark_paint::Color::rgb(255, 0, 0)
+    );
+}
+
 // The page runs on the test's thread, and `SNOWLARK_CANVAS` is not set in tests: canvases draw
 // with the graphics card's device on the page thread's canvas thread, which a connected canvas element
 // starts (it makes and warms the device).

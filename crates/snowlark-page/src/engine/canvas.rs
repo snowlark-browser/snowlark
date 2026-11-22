@@ -26,6 +26,10 @@ use snowlark_render::canvas::{
 
 use super::{exception, Engine, Object};
 
+/// How long a rendering update's paint waits for its canvas frames at most (ms): a canvas thread
+/// that falls further behind shows its frames at later paints instead of holding every one back.
+pub(crate) const CANVAS_PAINT_WAIT_MS: f64 = 50.0;
+
 /// A `CanvasRenderingContext2D`: the canvas element and its bitmap.
 pub struct ContextObj {
     pub element: NodeId,
@@ -114,6 +118,9 @@ impl Engine {
                 self.show_canvas_frame(el, frame);
             }
         }
+        if !known.is_empty() && self.canvas_frames_asked_at.get().is_none() {
+            self.canvas_frames_asked_at.set(Some(self.now()));
+        }
         for (el, h) in known {
             let waker = self.waker();
             let wake: snowlark_paint::canvas_thread::Wake = Arc::new(move || waker.wake());
@@ -151,6 +158,27 @@ impl Engine {
         !self.canvas_frames_pending.borrow().is_empty()
     }
 
+    /// Until when the paint of a rendering update waits for the canvas frames it asked for (ms
+    /// since the time origin), when frames are taken asynchronously and some are still on their
+    /// way. HTML's "update the rendering" shows each canvas as script left it with the rest of the
+    /// document: a paint before its frame came would show the document's new state over the
+    /// canvas's old drawing (a map that moves its canvas and redraws it would jump back and forth),
+    /// and the frame's coming would paint the whole page a second time.
+    pub(crate) fn canvas_paint_deadline(&self) -> Option<f64> {
+        if !self.canvas_frames_async.get() || !self.canvas_frames_pending() {
+            return None;
+        }
+        self.canvas_frames_asked_at
+            .get()
+            .map(|at| at + CANVAS_PAINT_WAIT_MS)
+    }
+
+    /// Whether the paint waits for canvas frames now ([`Engine::canvas_paint_deadline`]).
+    pub(crate) fn canvas_paint_held(&self) -> bool {
+        self.canvas_paint_deadline()
+            .is_some_and(|until| self.now() < until)
+    }
+
     /// Frames are taken without waiting for the canvas thread at the rendering update (the window,
     /// and runs timed as it is): a frame read after the update shows at the next one. Otherwise
     /// (`--render`, tests, reftests) every update shows the bitmaps as script left them.
@@ -185,6 +213,9 @@ impl Engine {
             }
         }
         // (frames asked for while these were taken: none, no script runs here)
+        if left.is_empty() {
+            self.canvas_frames_asked_at.set(None);
+        }
         self.canvas_frames_pending.borrow_mut().extend(left);
         any
     }

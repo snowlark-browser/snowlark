@@ -1520,12 +1520,17 @@ impl Engine {
     }
 
     /// Takes the "paint again" flag (of any rendered document: frames paint into the top-level
-    /// document's list).
+    /// document's list). While the canvas frames of the last rendering update are on their way,
+    /// none is taken: the paint shows them with the rest of that update
+    /// ([`Engine::canvas_paint_deadline`]).
     pub fn take_needs_paint(&self) -> bool {
         // (the top-level document shown and its frames: a hosted window's are its view's)
         let Some(top) = self.rendered_top() else {
             return false;
         };
+        if self.canvas_paint_held() {
+            return false;
+        }
         let tree = self.rendered_tree(top);
         let mut any = std::mem::take(&mut self.render.borrow_mut().needs_paint);
         let mut frames = self.frame_renders.borrow_mut();

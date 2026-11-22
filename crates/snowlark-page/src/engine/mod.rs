@@ -534,6 +534,9 @@ pub struct Engine {
     pub(crate) canvas_frames_pending: RefCell<Vec<(NodeId, snowlark_render::canvas::FrameRequest)>>,
     /// [`Engine::set_canvas_frames_async`].
     pub(crate) canvas_frames_async: Cell<bool>,
+    /// When the oldest of `canvas_frames_pending` was asked for (ms since the time origin): the
+    /// paint waits for them until then plus [`canvas::CANVAS_PAINT_WAIT_MS`].
+    pub(crate) canvas_frames_asked_at: Cell<Option<f64>>,
     /// [`Engine::watch_marks`]: the names of the `performance.mark` calls not taken yet.
     pub(crate) watched_marks: RefCell<Option<Vec<String>>>,
     /// Navigations to open in new tabs (URL, in the background), for the embedder.
@@ -719,6 +722,7 @@ impl Engine {
             canvas_dirty: RefCell::new(Vec::new()),
             canvas_frames_pending: RefCell::new(Vec::new()),
             canvas_frames_async: Cell::new(false),
+            canvas_frames_asked_at: Cell::new(None),
             watched_marks: RefCell::new(None),
             open_requests: RefCell::new(Vec::new()),
             view: Cell::new(None),

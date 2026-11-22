@@ -49,6 +49,28 @@ fn constructed_events_keep_or_floor_their_coordinates_by_type() {
     );
 }
 
+/// Pointer Lock 2 §5: a real move's `movementX`/`movementY` are how far `screenX`/`screenY` moved
+/// since the last move, the same for its `pointermove` and `mousemove`; 0 for the first move after
+/// the pointer came over the page. Without it they were 0 for every move.
+#[test]
+fn real_moves_carry_how_far_the_pointer_moved() {
+    let mut page = page_with(
+        "<!doctype html><script>var log = [];\
+         for (const t of ['pointermove', 'mousemove']) document.addEventListener(t, e =>\
+           log.push(t[0] + e.movementX + ',' + e.movementY));</script>",
+    );
+    let none = Modifiers::default();
+    page.pointer_moved(Point::new(10.0, 10.0), none);
+    page.pointer_moved(Point::new(25.0, 13.0), none);
+    page.pointer_moved(Point::new(20.0, 20.0), none);
+    page.pointer_left();
+    page.pointer_moved(Point::new(50.0, 50.0), none);
+    assert_eq!(
+        eval(&mut page, "log.join(' ')"),
+        "p0,0 m0,0 p15,3 m15,3 p-5,7 m-5,7 p0,0 m0,0"
+    );
+}
+
 #[test]
 fn a_real_click_has_page_coordinates_with_the_scroll_and_offsets_in_the_target() {
     let mut page = page_with(

@@ -811,6 +811,10 @@ impl Engine {
             let at = el.idle_not_before;
             next = Some(next.map_or(at, |n| n.min(at)));
         }
+        // (a held paint's end, for canvas frames that do not come)
+        if let Some(at) = self.canvas_paint_deadline() {
+            next = Some(next.map_or(at, |n| n.min(at)));
+        }
         // (a hidden page has no rendering opportunities: no frame to wake for; with begin frames,
         // the next one wakes the loop, and an animation's future frame is only a time to wake at,
         // when the page starts asking for begin frames again)

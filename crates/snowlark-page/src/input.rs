@@ -61,6 +61,9 @@ pub struct PointerState {
     /// The pointer is over the page, at `at` (the top-level viewport's CSS px).
     pub inside: bool,
     pub at: Point,
+    /// Where the last `pointermove` was on the screen (`screenX`, `screenY`), for the next one's
+    /// `movementX` and `movementY`; none since the pointer came over the page.
+    pub move_screen: Option<(f64, f64)>,
     /// The layout and scroll the hover state was last computed against (re-hit-tested at the next
     /// rendering update when they change).
     pub hover_layout: Option<(u64, Point)>,
@@ -333,7 +336,9 @@ impl Engine {
     /// §"Coalesced events"): one per move it stands for (`moves`, where each went and when), or a
     /// copy of itself for a move alone. Each is trusted, does not bubble and cannot be canceled,
     /// has the move's target and no coalesced events of its own, and they are in time order.
-    /// Returns whether it was not canceled.
+    /// Pointer Lock 2 §5: `movementX` and `movementY` are how far `screenX` and `screenY` moved
+    /// since the last move (0 for the first since the pointer came over the page), each coalesced
+    /// event's since the one before it. Returns whether it was not canceled, and its movement.
     fn fire_pointer_move(
         &self,
         cx: &mut Cx,
@@ -342,10 +347,20 @@ impl Engine {
         buttons: u16,
         mods: Modifiers,
         moves: &[(Point, f64)],
-    ) -> bool {
+    ) -> (bool, (f64, f64)) {
         if !self.dom().is_alive(target) {
-            return true;
+            return (true, (0.0, 0.0));
         }
+        let doc = self.dom().node_document(target);
+        let screen = self.screen_of_document(doc);
+        let at_screen = |q: Point| {
+            let (x, y) = screen.to_screen(q.x as f64, q.y as f64);
+            (x as f64, y as f64)
+        };
+        let from = self.pointer.borrow().move_screen;
+        let to = at_screen(p);
+        let movement = from.map_or((0.0, 0.0), |(x, y)| (to.0 - x, to.1 - y));
+        self.pointer.borrow_mut().move_screen = Some(to);
         let pe = InterfaceId::PointerEvent;
         let e = self.pointer_event(
             pe,
@@ -357,13 +372,17 @@ impl Engine {
             mods,
             0,
             None,
-            |_| {},
+            |u| (u.movement_x, u.movement_y) = movement,
         );
         let own = [(p, self.ev(e, |e| e.time_stamp))];
         let moves = if moves.is_empty() { &own[..] } else { moves };
+        let mut last = from;
         let coalesced = moves
             .iter()
             .map(|&(at, time)| {
+                let here = at_screen(at);
+                let moved = last.map_or((0.0, 0.0), |(x, y)| (here.0 - x, here.1 - y));
+                last = Some(here);
                 let c = self.pointer_event(
                     pe,
                     "pointermove",
@@ -374,7 +393,7 @@ impl Engine {
                     mods,
                     0,
                     None,
-                    |_| {},
+                    |u| (u.movement_x, u.movement_y) = moved,
                 );
                 self.ev_mut(c, |c| {
                     c.bubbles = false;
@@ -390,7 +409,7 @@ impl Engine {
                 u.coalesced = coalesced;
             }
         });
-        self.dispatch(cx, e, node_handle(target), false)
+        (self.dispatch(cx, e, node_handle(target), false), movement)
     }
 
     /// The `cursor` and hyperlink at an element (`text`: at text in it).
@@ -695,9 +714,10 @@ impl Engine {
                 .iter()
                 .map(|&(at, time)| (Point::new(at.x + dx, at.y + dy), time))
                 .collect();
-            if self.fire_pointer_move(cx, t, p, buttons, mods, &moves) {
-                self.fire_pointer(
-                    cx,
+            let (not_canceled, movement) = self.fire_pointer_move(cx, t, p, buttons, mods, &moves);
+            if not_canceled && self.dom().is_alive(t) {
+                // (the move's compatibility mouse event moved as far as its pointermove)
+                let e = self.pointer_event(
                     InterfaceId::MouseEvent,
                     "mousemove",
                     t,
@@ -707,7 +727,9 @@ impl Engine {
                     mods,
                     0,
                     None,
+                    |u| (u.movement_x, u.movement_y) = movement,
                 );
+                self.dispatch(cx, e, node_handle(t), false);
             }
         }
         // A press on a draggable element that moved far enough starts a drag, after the move's
@@ -1051,6 +1073,7 @@ impl Engine {
         let (old, buttons, last) = {
             let mut ps = self.pointer.borrow_mut();
             ps.inside = false;
+            ps.move_screen = None;
             (ps.over, ps.buttons, ps.last)
         };
         if old.is_some() {

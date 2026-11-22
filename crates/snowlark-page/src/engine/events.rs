@@ -447,12 +447,16 @@ fn set_invocation_targets(e: &mut EventData, s: &PathEntry, target: Option<Handl
 }
 
 /// DOM §2.9 "invoke" step 7: the legacy prefixed name trusted events of `type_` are also delivered to.
+/// `wheel` has `mousewheel`, the name of the event before UI Events' `wheel`: engines that fired it
+/// deliver a trusted `wheel` to `mousewheel` listeners the same way, and pages that choose the old
+/// name by browser listen for it alone.
 fn legacy_type(type_: &str) -> Option<&'static str> {
     match type_ {
         "animationend" => Some("webkitAnimationEnd"),
         "animationiteration" => Some("webkitAnimationIteration"),
         "animationstart" => Some("webkitAnimationStart"),
         "transitionend" => Some("webkitTransitionEnd"),
+        "wheel" => Some("mousewheel"),
         _ => None,
     }
 }

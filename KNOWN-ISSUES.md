@@ -105,9 +105,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **System-font text is not byte-stable between runs.** The same frames can differ by a few bytes from one run to the
   next. The cause is not established. (ref 87)
 - **Canvas 2D.** `ctx.filter` keeps its value but is not applied. (ref 499)
-- **Redundant paint.** A page that draws into a 2D canvas every animation frame is painted twice per frame: the
-  canvas's new contents arrive after the frame's paint and cause a second display list. The raster is skipped for
-  one of them, but the display list work is wasted. (ref 505)
 - **Pixel snapping inside transforms.** Box edges inside a scale or rotate transform are not snapped to device pixels.
   (ref 34)
 - **Unpainted areas while scrolling fast.** A page whose main thread is busy can show its background where the view
@@ -147,6 +144,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `getBBox()` still see the old instance until the next rendering update. (ref 84)
 - **Missing or partial APIs.** `LargestContentfulPaint`, `performance.eventCounts` and Trusted Types on the
   attribute-node paths are not implemented. Frames share the top-level document's time origin. (ref 33)
+- **No XPath.** `document.evaluate`, `XPathResult`, `XPathExpression` and `XPathEvaluator` are absent, so scripts
+  that look up nodes by XPath throw. (ref 659)
 - **No WebGL, `OffscreenCanvas` or WebGPU.** `getContext('webgl')` returns null, and `OffscreenCanvas` and
   `navigator.gpu` are absent. (ref 117)
 - **Service workers.** `navigator.serviceWorker` and the Cache API are not implemented. Pages that check for service
