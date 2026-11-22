@@ -32,7 +32,7 @@ python tools/layout-diff/tests/test_layout_diff.py        # tests (offline: loca
 
 Both engines get the same conditions:
 - Width, viewport height and device scale 1.
-- Snowlark's user agent string, read from `crates/snowlark-net/src/metadata.rs`. Chrome gets it through
+- Snowlark's user agent string, the build's own `navigator.userAgent` (`--eval`). Chrome gets it through
   `--user-agent` and `Emulation.setUserAgentOverride`, with `Accept-Language: en-US`.
 - `prefers-color-scheme: light`. Snowlark's `--render` reports light; Chrome would otherwise follow the
   Windows theme.

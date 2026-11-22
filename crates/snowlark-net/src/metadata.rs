@@ -10,18 +10,19 @@ use crate::origin::{is_url_potentially_trustworthy, origin_of, same_site};
 use crate::request::{Destination, Mode, ReferrerPolicy, Request, ResponseTainting};
 
 /// The `User-Agent` header and `navigator.userAgent` by default: Snowlark's own identity
-/// ([`crate::ua`]). The string names the engine's layout tokens (`AppleWebKit/537.36 (KHTML, like
-/// Gecko)`) and Snowlark's product token ([`crate::ua::VERSION`]), and no other browser's product
-/// token: not `Safari/` either, which sites read as Safari when no other product token comes with it
-/// and then serve formats only that browser plays (a video site's native-HLS path).
-/// The rest of what a
-/// page reads follows the family the engine answers in ([`crate::ua::Profile`]): HTML's navigator
-/// compatibility mode, `userAgentData` with the family's equivalence brand and Snowlark's, and the client
-/// hints. A string that claims another family reads as spoofed, and one that carries
-/// another browser's product token is held by a common bot check to that browser's full API surface,
-/// which this engine does not have yet.
+/// ([`crate::ua`]), in the shape browsers built on the same engine family send: the family's
+/// string, with the `Chrome/` token of the release the engine's V8 comes from
+/// (`SNOWLARK_CHROMIUM_MAJOR`, see `build.rs`) and the `Safari/` token that always follows it, then
+/// the browser's own product token, `Snowlark/<major>.<minor>` ([`crate::ua::VERSION`]), last.
+/// Sites that pick a build by the string serve the family's current one to it, where the string
+/// without the family's token got their legacy builds (a map site's ES5 bundle, a video site's
+/// transpiled player). The rest of what a page reads follows the same family
+/// ([`crate::ua::Profile`]): HTML's navigator compatibility mode, `userAgentData` with the family's
+/// equivalence brand and Snowlark's, and the client hints.
 pub const USER_AGENT: &str = concat!(
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Snowlark/",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/",
+    env!("SNOWLARK_CHROMIUM_MAJOR"),
+    ".0.0.0 Safari/537.36 Snowlark/",
     env!("CARGO_PKG_VERSION_MAJOR"),
     ".",
     env!("CARGO_PKG_VERSION_MINOR")

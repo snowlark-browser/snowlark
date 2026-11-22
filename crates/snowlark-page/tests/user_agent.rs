@@ -258,8 +258,21 @@ fn every_preset_and_a_custom_string_say_the_same_browser_everywhere() {
 }
 
 #[test]
-fn the_default_is_snowlark_in_its_family_and_names_no_other_browser() {
-    // The family's compatibility tokens and brand, then Snowlark's own.
+fn the_default_is_the_familys_string_with_snowlark_last() {
+    // The family's string with the `Chrome/` token of the release the engine's V8 comes from (V8
+    // X.Y ships in release XY), then Snowlark's own product token; the family's brand and Snowlark's.
+    let v8: Vec<u32> = snowlark_js::v8_version()
+        .split('.')
+        .take(2)
+        .map(|n| n.parse().unwrap())
+        .collect();
+    let chrome = (v8[0] * 10 + v8[1]).to_string();
+    assert_eq!(
+        snowlark_net::ua::COMPAT_VERSION,
+        format!("{chrome}.0.0.0"),
+        "V8 {}",
+        snowlark_js::v8_version()
+    );
     let (base, seen) = serve();
     let net = snowlark_net::NetThread::start(snowlark_net::NetConfig::default()).unwrap();
     // (a client nobody touched: as every headless mode runs)
@@ -273,9 +286,19 @@ fn the_default_is_snowlark_in_its_family_and_names_no_other_browser() {
     assert_eq!(
         eval(
             &mut page,
-            "navigator.userAgentData.brands.map(b => b.brand).join()"
+            "navigator.userAgentData.brands.map(b => b.brand + '/' + b.version).sort().join()"
         ),
-        "Not;A=Brand,Chromium,Snowlark"
+        {
+            let mut b: Vec<String> = UserAgent::default()
+                .profile()
+                .brands(false)
+                .into_iter()
+                .map(|(n, v)| format!("{n}/{v}"))
+                .collect();
+            b.sort();
+            assert!(b.contains(&format!("Chromium/{chrome}")) && b.contains(&"Snowlark/0".into()));
+            b.join(",")
+        }
     );
     assert_eq!(eval(&mut page, "typeof navigator.oscpu"), "undefined");
     assert_eq!(eval(&mut page, "navigator.vendor"), "Google Inc.");
@@ -286,19 +309,34 @@ fn the_default_is_snowlark_in_its_family_and_names_no_other_browser() {
         header(&doc, "user-agent"),
         Some(snowlark_net::metadata::USER_AGENT)
     );
-    assert_eq!(
-        header(&doc, "sec-ch-ua"),
-        Some("\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\", \"Snowlark\";v=\"0\"")
+    let hint = header(&doc, "sec-ch-ua").unwrap().to_owned();
+    assert!(
+        hint.contains(&format!("\"Chromium\";v=\"{chrome}\""))
+            && hint.contains("\"Snowlark\";v=\"0\"")
+            && !hint.contains("Google"),
+        "{hint}"
     );
-    // Snowlark's product token and no other browser's (not `Safari/` either), and `appVersion` is the
-    // same string after `Mozilla/`.
+    assert_eq!(
+        hint,
+        eval(
+            &mut page,
+            "navigator.userAgentData.brands.map(b => '\"' + b.brand + '\";v=\"' + b.version + '\"').join(', ')"
+        )
+    );
+    // `appVersion` is the same string after `Mozilla/`.
     assert_eq!(
         snowlark_net::metadata::USER_AGENT,
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Snowlark/0.1"
+        format!(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) \
+             Chrome/{chrome}.0.0.0 Safari/537.36 Snowlark/0.1"
+        )
     );
     assert_eq!(
         eval(&mut page, "navigator.appVersion"),
-        "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Snowlark/0.1"
+        format!(
+            "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) \
+             Chrome/{chrome}.0.0.0 Safari/537.36 Snowlark/0.1"
+        )
     );
     assert_eq!(
         eval(
@@ -310,10 +348,22 @@ fn the_default_is_snowlark_in_its_family_and_names_no_other_browser() {
         "ok"
     );
     page.run_until_settled(std::time::Duration::from_secs(5));
-    assert_eq!(
-        eval(&mut page, "window.hev"),
-        "Not;A=Brand 8.0.0.0,Chromium 150.0.0.0,Snowlark 0.1 | 150.0.0.0 | Windows"
+    let hev = eval(&mut page, "window.hev");
+    let (list, rest) = hev.split_once(" | ").unwrap();
+    let mut list: Vec<String> = list.split(',').map(str::to_owned).collect();
+    list.sort();
+    let mut expected: Vec<String> = UserAgent::default()
+        .profile()
+        .brands(true)
+        .into_iter()
+        .map(|(n, v)| format!("{n} {v}"))
+        .collect();
+    expected.sort();
+    assert_eq!(list, expected);
+    assert!(
+        list.contains(&format!("Chromium {chrome}.0.0.0")) && list.contains(&"Snowlark 0.1".into())
     );
+    assert_eq!(rest, format!("{chrome}.0.0.0 | Windows"));
 }
 
 #[test]
@@ -375,12 +425,12 @@ fn request_with(page: &mut Page, seen: &Seen, marker: &str) -> Vec<String> {
     }
 }
 
-/// Per-site compatibility strings: with the window's default identity, a listed host
-/// gets the compatibility string in the `User-Agent` of every request to it and in the `navigator`
-/// of its documents, its frames and its workers; another site keeps the default in both, also when
-/// one of them requests the other.
+/// Per-site identities: with the window's default identity, a listed host gets the default string
+/// in the `User-Agent` of every request to it and in the `navigator` of its documents, its frames
+/// and its workers, with brands that leave out Snowlark's; another site keeps the default brands,
+/// also when one of them requests the other.
 #[test]
-fn listed_sites_get_the_compatibility_string_in_requests_and_navigator() {
+fn listed_sites_get_the_default_unbranded_in_requests_and_navigator() {
     let (base, seen) = serve();
     let port = base.rsplit(':').next().unwrap().to_owned();
     let config = snowlark_net::NetConfig {
@@ -392,9 +442,9 @@ fn listed_sites_get_the_compatibility_string_in_requests_and_navigator() {
     let net = snowlark_net::NetThread::start(config).unwrap();
     net.client()
         .set_user_agent(UserAgent::default_with_site_compat());
-    let compat = snowlark_net::ua::compat_value();
+    // The listed sites get the default string; only their brands differ (below).
     let plain = UserAgent::default().value;
-    assert_ne!(compat, plain);
+    let compat = plain.clone();
     let listed = format!("http://mail.google.com:{port}");
     let other = format!("http://other.test:{port}");
 

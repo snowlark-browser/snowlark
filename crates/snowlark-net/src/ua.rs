@@ -8,9 +8,10 @@
 //! `vendor`, `productSub`, `oscpu`, `navigator.userAgentData` and the `Sec-CH-UA` request headers
 //! cannot disagree about which browser this is.
 //!
-//! The default is Snowlark's own identity: the compatibility tokens of the family whose navigator
-//! compatibility mode the engine follows, then `Snowlark/<version>`; its brands are that family's
-//! compatibility brand, `Snowlark` and the grease brand. It names no other browser.
+//! The default is Snowlark's own identity, as the family's other browsers make theirs: the
+//! family's string (whose navigator compatibility mode the engine follows) with its `Chrome/` token,
+//! then `Snowlark/<version>`; its brands are that family's compatibility brand, `Snowlark` and the
+//! grease brand.
 
 use crate::metadata::USER_AGENT as DEFAULT_UA;
 
@@ -27,9 +28,9 @@ pub const VERSION: &str = concat!(
 );
 
 /// The version of the compatibility brand (the family's equivalence brand in `userAgentData` and the
-/// client hints): the release whose web-facing behaviour the engine follows. The default user agent
-/// string carries no token with it.
-pub const COMPAT_VERSION: &str = "150.0.0.0";
+/// client hints) and of the default string's `Chrome/` token: the release the engine's V8 comes from
+/// (`build.rs`), reduced as the family's browsers reduce it.
+pub const COMPAT_VERSION: &str = concat!(env!("SNOWLARK_CHROMIUM_MAJOR"), ".0.0.0");
 
 /// The Chrome preset's value.
 const CHROME_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36";
@@ -100,13 +101,13 @@ pub struct UserAgent {
     /// before 2026-11-09 (`navigator.vendor` empty, `userAgentData` and `oscpu` both present, no client
     /// hint headers), kept only so a value of that shape still means what it did.
     pub strict: bool,
-    /// Whether the sites in [`COMPAT_HOSTS`] get [`compat_value`], and those in [`EDGE_SITES`] the
-    /// Edge preset's string, in place of the default string ([`UserAgent::for_url`]). Only the window
+    /// Whether the sites in [`COMPAT_HOSTS`] get the default string unbranded, and those in
+    /// [`EDGE_SITES`] the Edge preset's string, in place of the default ([`UserAgent::for_url`]). Only the window
     /// turns it on, and only for the default identity: a preset or custom string is sent as chosen,
     /// and the headless modes see no site differently.
     #[serde(default)]
     pub site_compat: bool,
-    /// The compatibility string of a listed site ([`UserAgent::for_url`]): its brands leave out the
+    /// The identity of a site in [`COMPAT_HOSTS`] ([`UserAgent::for_url`]): its brands leave out the
     /// browser's own (`Snowlark`), as an unbranded build of the family lists them.
     #[serde(default)]
     pub unbranded: bool,
@@ -166,7 +167,7 @@ impl UserAgent {
     }
 
     /// The user agent a request to `url`, or a document or worker of its origin, gets: when
-    /// [`UserAgent::site_compat`] is on and this is the default identity, the compatibility string for
+    /// [`UserAgent::site_compat`] is on and this is the default identity, the default unbranded for
     /// a host in [`COMPAT_HOSTS`] and the Edge preset's for a host in [`EDGE_SITES`]; otherwise this
     /// one.
     pub fn for_url(&self, url: &url::Url) -> std::borrow::Cow<'_, UserAgent> {
@@ -184,7 +185,6 @@ impl UserAgent {
         }
         if COMPAT_HOSTS.iter().any(|h| h.eq_ignore_ascii_case(host)) {
             std::borrow::Cow::Owned(UserAgent {
-                value: compat_value(),
                 unbranded: true,
                 ..self.clone()
             })
@@ -216,19 +216,22 @@ fn in_domain(host: &str, domain: &str) -> bool {
 /// identity. Like [`COMPAT_HOSTS`], keep it short and give each entry its evidence.
 pub const EDGE_SITES: [&str; 3] = [
     // HBO Max: its player sends its server the browser a user agent parser reads from
-    // `navigator.userAgent`; the default string (no `Chrome/` token) reads as Safari and is offered
-    // only Apple's DRM, the Edge string is offered PlayReady (2026-11-21, a window trace). The app
-    // and its API are on `hbomax.com`, its licence server on `discomax.com`, its media and older
-    // addresses on `max.com`.
+    // `navigator.userAgent`, and offers PlayReady only to the Edge string (2026-11-21, a window trace:
+    // the default string of then, without a `Chrome/` token, read as Safari and was offered only
+    // Apple's DRM). The app and its API are on `hbomax.com`, its licence server on `discomax.com`,
+    // its media and older addresses on `max.com`.
     "hbomax.com",
     "discomax.com",
     "max.com",
 ];
 
-/// Hosts whose servers refuse the default string and accept the same identity once it carries the
-/// compatibility product token (`Chrome/<major>` of a recent release), as other engines keep a short
-/// list of such sites rather than claim another browser everywhere. Exact host names; each entry
-/// names what it fixes. Keep it short: an entry is for a site that turns the default string away,
+/// Hosts that get the default identity unbranded ([`UserAgent::unbranded`]): its brands and
+/// `Sec-CH-UA` are the grease brand and `Chromium` alone, as an unbranded build of the family lists
+/// them, since the mail app turns away a brand list whose own entry it does not know (`Snowlark` 0;
+/// checked 2026-11-12 in the window: the same string with that entry's place taken by a known one
+/// loads the inbox). Each was listed, with the evidence below, when the default string carried no
+/// `Chrome/` token and these hosts got one in it; they keep the brands they were checked with.
+/// Exact host names. Keep it short: an entry is for a site that turns the default identity away,
 /// shown, or serves it measurably slower code, never for a site that only looks different.
 pub const COMPAT_HOSTS: [&str; 5] = [
     // Writes "This browser version is no longer supported" into every document page for any string
@@ -249,25 +252,6 @@ pub const COMPAT_HOSTS: [&str; 5] = [
     // ran 239-517 ms against 113-153 ms on first visits (2026-11-15, headless).
     "www.youtube.com",
 ];
-
-/// The compatibility string: the default identity with the compatibility product token (and the
-/// `Safari/` token that always follows it in this family) before `Snowlark/`. It derives the same
-/// [`Profile`] as the default (same family, brand, version and compatibility version); a listed site
-/// gets it unbranded ([`UserAgent::unbranded`]): its brands and `Sec-CH-UA` are the grease brand and
-/// `Chromium` alone, since the mail app also turns away a brand list whose own entry it does not
-/// know (`Snowlark` 0; checked 2026-11-12 in the window: the same string with that entry's
-/// place taken by a known one loads the inbox).
-pub fn compat_value() -> String {
-    let own = format!("{PRODUCT}/");
-    match DEFAULT_UA.find(&own) {
-        Some(at) => format!(
-            "{}Chrome/{COMPAT_VERSION} Safari/537.36 {}",
-            &DEFAULT_UA[..at],
-            &DEFAULT_UA[at..]
-        ),
-        None => DEFAULT_UA.to_owned(),
-    }
-}
 
 /// Which engine a user agent claims.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -663,21 +647,11 @@ mod tests {
     }
 
     #[test]
-    fn listed_sites_get_the_compatibility_string_with_the_same_profile() {
+    fn listed_sites_get_the_default_unbranded() {
         let ua = UserAgent::default_with_site_compat();
-        let compat = compat_value();
-        assert_eq!(
-            compat,
-            format!(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{COMPAT_VERSION} Safari/537.36 {PRODUCT}/{VERSION}"
-            )
-        );
-        // Everything else a site reads stays the default's, but for the brands: the browser's own is
-        // left out.
-        assert_eq!(
-            Profile::parse(&compat, true),
-            UserAgent::default().profile()
-        );
+        // The string and everything else a site reads stay the default's, but for the brands: the
+        // browser's own is left out.
+        let compat = DEFAULT_UA;
         let mail = url::Url::parse("https://mail.google.com/").unwrap();
         let listed = ua.for_url(&mail).profile();
         assert!(listed.unbranded);
@@ -697,6 +671,7 @@ mod tests {
         let other = url::Url::parse("https://example.com/").unwrap();
         assert!(!ua.for_url(&other).profile().unbranded);
         let at = |u: &str| ua.for_url(&url::Url::parse(u).unwrap()).value.clone();
+        let unbranded = |u: &str| ua.for_url(&url::Url::parse(u).unwrap()).unbranded;
         for listed in [
             "https://mail.google.com/mail/u/0/",
             "https://chat.google.com/u/0/app",
@@ -708,6 +683,7 @@ mod tests {
             "blob:https://mail.google.com/1234",
         ] {
             assert_eq!(at(listed), compat, "{listed}");
+            assert!(unbranded(listed), "{listed}");
         }
         for other in [
             "https://google.com/",
@@ -721,11 +697,12 @@ mod tests {
             "about:blank",
         ] {
             assert_eq!(at(other), DEFAULT_UA, "{other}");
+            assert!(!unbranded(other), "{other}");
         }
         // Off unless the window turns it on; never for a chosen string.
         let off = UserAgent::default();
         let mail = url::Url::parse("https://mail.google.com/").unwrap();
-        assert_eq!(off.for_url(&mail).value, DEFAULT_UA);
+        assert!(!off.for_url(&mail).unbranded);
         let mut chosen = UserAgent::chosen("Custom/1.0");
         chosen.site_compat = true;
         assert_eq!(chosen.for_url(&mail).value, "Custom/1.0");
@@ -809,35 +786,34 @@ mod tests {
     }
 
     #[test]
-    fn the_default_names_snowlark_and_no_other_browser() {
+    fn the_default_is_the_familys_string_with_snowlark_last() {
         let d = UserAgent::default();
         assert_eq!(d.value, DEFAULT_UA);
         assert!(d.strict);
         assert_eq!(UserAgent::preset("default"), Some(d.clone()));
         assert_ne!(UserAgent::preset("chrome"), Some(d.clone()));
-        // The engine's layout tokens and Snowlark's product token; no other browser's product token
-        // (a bot check holds `Chrome/` to that browser's API surface, and a video site
-        // reads `Safari/` without it as Safari and serves native HLS).
+        // The family's string with its `Chrome/` token, reduced to the major as the family's
+        // browsers send it, and Snowlark's product token last, as Edge adds `Edg/`.
+        let chrome_major = COMPAT_VERSION.split('.').next().unwrap();
+        assert_eq!(COMPAT_VERSION, format!("{chrome_major}.0.0.0"));
+        assert!(
+            chrome_major.parse::<u32>().unwrap() >= 158,
+            "{COMPAT_VERSION}"
+        );
         assert_eq!(
             d.value,
             format!(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) \
-                 {PRODUCT}/{VERSION}"
+                 Chrome/{COMPAT_VERSION} Safari/537.36 {PRODUCT}/{VERSION}"
             )
         );
-        for other in [
-            "Chrome/",
-            "Chromium/",
-            "Edg/",
-            "Firefox/",
-            "Safari/",
-            "Version/",
-        ] {
+        for other in ["Chromium/", "Edg/", "Firefox/", "Version/"] {
             assert!(!d.value.contains(other), "{}", d.value);
         }
         let p = d.profile();
         assert_eq!(p.compat, COMPAT_VERSION);
         assert_eq!(p.family, Family::Chromium);
+        assert!(!p.edge);
         assert_eq!((p.brand.as_str(), p.full.as_str()), (PRODUCT, VERSION));
         assert!(p.has_ua_data() && !p.has_oscpu());
         // HTML's navigator compatibility mode of the family.
@@ -845,35 +821,37 @@ mod tests {
             (p.vendor(), p.nav_platform(), p.product_sub()),
             ("Google Inc.", "Win32", "20030107")
         );
+        // The brands: the grease brand, `Chromium` at the `Chrome/` token's major and Snowlark's own,
+        // never another browser's, in the order the release seeds (UA-CH §5.1).
         let major = VERSION.split('.').next().unwrap().to_owned();
         let brands = p.brands(false);
-        assert_eq!(
-            brands,
-            vec![
-                ("Not;A=Brand".to_owned(), "8".to_owned()),
-                ("Chromium".to_owned(), "150".to_owned()),
-                ("Snowlark".to_owned(), major.clone())
-            ]
-        );
-        assert_eq!(
-            p.brands(true),
-            vec![
-                ("Not;A=Brand".to_owned(), "8.0.0.0".to_owned()),
-                ("Chromium".to_owned(), COMPAT_VERSION.to_owned()),
-                ("Snowlark".to_owned(), VERSION.to_owned())
-            ]
-        );
+        let mut names: Vec<&str> = brands.iter().map(|(b, _)| b.as_str()).collect();
+        names.sort();
+        assert_eq!(names.len(), 3, "{brands:?}");
+        assert_eq!((names[0], names[2]), ("Chromium", PRODUCT), "{brands:?}");
+        assert!(names[1].starts_with("Not") && names[1].ends_with("Brand"));
+        let version_of = |list: &[(String, String)], name: &str| {
+            list.iter().find(|(b, _)| b == name).unwrap().1.clone()
+        };
+        assert_eq!(version_of(&brands, "Chromium"), chrome_major);
+        assert_eq!(version_of(&brands, PRODUCT), major);
+        let full = p.brands(true);
+        assert_eq!(version_of(&full, "Chromium"), COMPAT_VERSION);
+        assert_eq!(version_of(&full, PRODUCT), VERSION);
         assert_eq!(p.ua_full_version(), COMPAT_VERSION);
         let hints = p.client_hint_headers();
+        assert_eq!(hints[0].0, "Sec-CH-UA");
         assert_eq!(
-            hints[0],
-            (
-                "Sec-CH-UA",
-                format!(
-                    "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\", \"Snowlark\";v=\"{major}\""
-                )
-            )
+            hints[0].1,
+            brands
+                .iter()
+                .map(|(b, v)| format!("\"{b}\";v=\"{v}\""))
+                .collect::<Vec<_>>()
+                .join(", ")
         );
+        assert!(hints[0]
+            .1
+            .contains(&format!("\"Chromium\";v=\"{chrome_major}\"")));
         assert!(!hints[0].1.contains("Google"));
         assert_eq!(hints.len(), 3);
         // Firefox stays a preset, with Firefox's shape (no userAgentData, oscpu present).
@@ -907,6 +885,11 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["Chromium", "Not A(Brand"]
         );
+        // The default of release 158, with its own brand: the seed is the `Chrome/` token's major.
+        assert_eq!(
+            header("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36 Snowlark/0.1"),
+            "\"Chromium\";v=\"158\", \"Not.A/Brand\";v=\"24\", \"Snowlark\";v=\"0\""
+        );
     }
 
     #[test]
@@ -928,14 +911,11 @@ mod tests {
             (p.family, p.brand.as_str(), p.vendor()),
             (Family::Chromium, "Snowlark", "Google Inc.")
         );
-        assert_eq!(
-            p.brands(false),
-            vec![
-                ("Not;A=Brand".to_owned(), "8".to_owned()),
-                ("Chromium".to_owned(), "150".to_owned()),
-                ("Snowlark".to_owned(), "0".to_owned())
-            ]
-        );
+        assert_eq!(p.compat, COMPAT_VERSION);
+        assert!(p
+            .brands(false)
+            .iter()
+            .any(|(b, v)| b == "Snowlark" && v == "0"));
         let p = UserAgent::chosen("MyBot/1.0").profile();
         assert_eq!(p.family, Family::Other);
         assert!(!p.has_ua_data() && !p.has_oscpu());

@@ -59,8 +59,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `:active` rules do not apply, the buttons and corner are not drawn, and the scrollbar pseudo-classes
   (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
   parse but style nothing. (ref 627)
-- **Properties not built.** `overflow-anchor`, `text-decoration-skip-ink` and `accent-color` do not parse, so
-  their declarations are dropped. (ref 622)
+- **No scroll anchoring.** `overflow-anchor` does not parse, and content that grows or shrinks above what the
+  reader looks at (an image or ad loading higher up the page) moves it, where other browsers keep it in place
+  by scrolling. (ref 622)
 - **Scroll snap.** Script scrolls, mouse wheel notches and the arrow and page keys come to rest on snap positions.
   Not done: a touchpad's scrolls and autoscroll do not snap when they end, Home, End and the scroll bar do not
   snap, a container does not snap again after its layout changes, and the Level 2 snap events are missing.

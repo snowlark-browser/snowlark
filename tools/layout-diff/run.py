@@ -76,7 +76,7 @@ def run_one(url, outdir, args, chrome=None):
     """Captures, compares and reports one URL into `outdir`. Returns the result dict."""
     os.makedirs(outdir, exist_ok=True)
     started = time.time()
-    ua = capture.snowlark_user_agent()
+    ua = capture.snowlark_user_agent(args.snowlark)
     own = chrome is None
     if own:
         chrome = Chrome(args.width, capture.VIEWPORT_HEIGHT, ua, chrome=args.chrome)

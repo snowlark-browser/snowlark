@@ -21,17 +21,21 @@ VIEWPORT_HEIGHT = 800  # Snowlark's --render viewport height
 MAX_IMAGE_HEIGHT = 4000  # Snowlark's --render image height cap
 BEGIN, END = "@@LAYOUT-DIFF-BEGIN@@", "@@LAYOUT-DIFF-END@@"
 
-# Firefox's format, as snowlark-net sends it; read from the source when this runs in a checkout.
-FALLBACK_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:150.0) Gecko/20100101 Firefox/150.0"
+# The default string's shape, for when the build cannot be asked.
+FALLBACK_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+               "Chrome/158.0.0.0 Safari/537.36 Snowlark/0.1")
 
 
-def snowlark_user_agent():
+def snowlark_user_agent(exe=None):
+    """The default user agent of the Snowlark build `exe` (its `navigator.userAgent`)."""
+    exe = exe or default_snowlark()
     try:
-        with open(os.path.join(REPO, "crates", "snowlark-net", "src", "metadata.rs"), encoding="utf-8") as f:
-            m = re.search(r'pub const USER_AGENT: &str =\s*"([^"]+)"', f.read())
-            if m:
-                return m.group(1)
-    except OSError:
+        proc = subprocess.run([exe, "--eval", "navigator.userAgent"], capture_output=True, text=True,
+                              timeout=60, env={**os.environ, "SNOWLARK_NO_ACTIVATE": "1"})
+        lines = [l.strip() for l in proc.stdout.splitlines() if l.strip().startswith("Mozilla/")]
+        if proc.returncode == 0 and lines:
+            return lines[-1]
+    except (OSError, subprocess.TimeoutExpired):
         pass
     return FALLBACK_UA
 
