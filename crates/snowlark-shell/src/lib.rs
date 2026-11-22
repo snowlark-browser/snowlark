@@ -69,6 +69,8 @@ pub mod tabs;
 pub mod task_manager;
 pub mod text_area;
 pub mod tooltip;
+pub mod update;
+pub mod update_bubble;
 pub mod view_source;
 pub mod widgets;
 pub mod window_state;
@@ -108,6 +110,12 @@ pub fn run(start: Option<&str>, model: ProcessModel, flags: WindowFlags) -> i32 
     let profile = profile::Profile::default_location();
     // Every panic, caught or not, goes to the profile's crash log first.
     crash::install_panic_hook(profile.dir.join("crash.log"));
+    // A new version downloaded in an earlier run is moved in, and started in this one's stead (not in
+    // a run of an Incognito window only, which never checks).
+    if !incognito && update::apply::at_window_start(&profile.dir) == update::apply::Applied::Started
+    {
+        return 0;
+    }
     // Where the last run of this profile left the window (the window checks it against the monitors).
     // (an Incognito window opens there too, as a regular one would; it keeps no placement)
     let placement = window_state::load(&profile.window_file());
@@ -138,8 +146,15 @@ pub fn run(start: Option<&str>, model: ProcessModel, flags: WindowFlags) -> i32 
         };
         browser::Route::main(browser::Browser::new(w, first, partition, url, spares))
     });
+    let restart = app.updates.restart.get();
     // (the regular partition's last writes reach the profile)
     drop(app);
+    // "Restart" into a downloaded update: a new process moves it in and opens the tabs again.
+    if restart {
+        if let Ok(exe) = std::env::current_exe() {
+            let _ = std::process::Command::new(exe).spawn();
+        }
+    }
     match result {
         Ok(()) => 0,
         Err(e) => {

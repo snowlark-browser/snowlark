@@ -35,6 +35,7 @@ mod site_data;
 mod tab_audio;
 mod tab_card_ui;
 mod task_manager_ui;
+mod update_ui;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -374,6 +375,8 @@ pub struct Browser {
     /// The session of an unexpected exit, offered by `restore_bubble`.
     offer: Option<crate::restore::SessionFile>,
     restore_bubble: Option<crate::restore_bubble::RestoreBubble>,
+    /// The updates' prompt (`update_ui`).
+    update_bubble: Option<crate::update_bubble::UpdateBubble>,
     /// The browser's own fullscreen (F11) and a page's.
     fullscreen: fullscreen::FullscreenUi,
     /// What the browser's own pages show (shared with the tabs' threads).
@@ -600,6 +603,7 @@ impl Browser {
             placed: None,
             offer: None,
             restore_bubble: None,
+            update_bubble: None,
             fullscreen: Default::default(),
             internal,
             settings_notice: None,
@@ -619,6 +623,10 @@ impl Browser {
         }
         let url = start.unwrap_or_else(|| b.startup_url());
         b.open_tab(url, Placement::End);
+        // (after a restart into an update, its tabs come back beside the one just opened)
+        if !off_the_record {
+            b.reopen_after_restart();
+        }
         if b.active_url() == START_PAGE {
             b.focus_address();
         }
@@ -1284,6 +1292,9 @@ impl Browser {
         if let Some(b) = &mut self.restore_bubble {
             b.place(area);
         }
+        if let Some(b) = &mut self.update_bubble {
+            b.place(area, &self.fonts);
+        }
         if let Some((m, _)) = &mut self.task_manager {
             m.place(area);
         }
@@ -1797,6 +1808,7 @@ impl Browser {
             m.paint(&mut b, &self.fonts, &theme);
         }
         self.paint_restore_bubble(&mut b, &theme);
+        self.paint_update_bubble(&mut b, &theme);
         self.paint_fullscreen_bubble(&mut b);
         if let Some(c) = &self.tab_card {
             c.paint(&mut b, &self.fonts, &theme);
@@ -1888,6 +1900,7 @@ impl Browser {
             || self.site_info_move(p)
             || self.blocker_panel_move(p)
             || self.restore_bubble_move(p)
+            || self.update_bubble_move(p)
             || self.task_manager_move(p)
         {
             self.set_cursor(window, Cursor::Arrow);
@@ -2101,6 +2114,9 @@ impl Browser {
             return;
         }
         if self.restore_bubble_press(cp) {
+            return;
+        }
+        if self.update_bubble_press(window, cp) {
             return;
         }
         if self
@@ -2968,6 +2984,7 @@ impl WindowHandler for Browser {
                 // (the placement first: the session file keeps it too)
                 self.save_window(window, false);
                 self.save_session();
+                self.update_tick();
             }
             Event::Timer(TIMER_HANG) => self.hang_timer(window),
             Event::Timer(TIMER_TASKS) => self.refresh_task_manager(window),
@@ -2975,6 +2992,9 @@ impl WindowHandler for Browser {
             Event::Timer(downloads_ui::TIMER_DOWNLOADS) => self.downloads_tick(window),
             Event::Timer(_) => {}
             Event::Wake => {
+                if self.closing_for_restart(window) {
+                    return true;
+                }
                 if self.incognito_count_changed() {
                     self.chrome_dirty = true;
                 }

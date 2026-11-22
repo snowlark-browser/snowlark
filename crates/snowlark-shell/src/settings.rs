@@ -174,6 +174,9 @@ pub struct Settings {
     pub clear_cookies: bool,
     #[serde(default = "yes")]
     pub clear_cache: bool,
+    /// Check for new versions of the browser (`crate::update`): unset until the user answers the
+    /// question the window asks on its first start, and off until then.
+    pub update_check: Option<bool>,
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,
 }
@@ -199,6 +202,7 @@ impl Default for Settings {
             clear_history: true,
             clear_cookies: true,
             clear_cache: true,
+            update_check: None,
             other: Default::default(),
         }
     }
@@ -334,6 +338,7 @@ impl Settings {
                 "bookmarksBar" => self.bookmarks_bar = v == "1",
                 "warnOnClose" => self.warn_on_close = v == "1",
                 "verticalTabs" => self.vertical_tabs = v == "1",
+                "updateCheck" => self.update_check = Some(v == "1"),
                 _ => {}
             }
         }
@@ -486,7 +491,7 @@ fn ago(secs: u64) -> String {
     }
 }
 
-fn checked(b: bool) -> &'static str {
+pub(crate) fn checked(b: bool) -> &'static str {
     if b {
         " checked"
     } else {
@@ -503,7 +508,7 @@ fn selected(b: bool) -> &'static str {
 }
 
 /// The start of a category's form: it submits to the settings and comes back to the category.
-fn form(at: Category) -> String {
+pub(crate) fn form(at: Category) -> String {
     format!(
         "<form action='{SETTINGS_APPLY}' method=get><input type=hidden name=at value={}>",
         at.path()
@@ -511,7 +516,7 @@ fn form(at: Category) -> String {
 }
 
 /// A row of a card: a label and a line of explanation, the control at the end.
-fn setting(label: &str, sub: &str, control: &str) -> String {
+pub(crate) fn setting(label: &str, sub: &str, control: &str) -> String {
     let sub = if sub.is_empty() {
         String::new()
     } else {

@@ -338,6 +338,19 @@ fn lock_of(dir: &Path, pid: u32) -> PathBuf {
     dir.join(format!("session-{pid}.lock"))
 }
 
+/// The windows of a browser that restarted into an update ([`Store::close_for_restart`]).
+pub fn restart_file(dir: &Path) -> PathBuf {
+    dir.join("session-restart.json")
+}
+
+/// The windows a restart left for this start, taken (the file goes: they are opened once).
+pub fn take_restart(dir: &Path) -> Option<SessionFile> {
+    let path = restart_file(dir);
+    let text = fs::read_to_string(&path).ok()?;
+    let _ = fs::remove_file(&path);
+    SessionFile::parse(&text)
+}
+
 /// The offer's file.
 pub fn offer_file(dir: &Path) -> PathBuf {
     dir.join("session-offer.json")
@@ -525,6 +538,20 @@ impl Store {
         if self.windows.len() != before {
             self.write();
         }
+    }
+
+    /// The browser restarts (into an update): every window it has now is kept in the restart file
+    /// ([`take_restart`]), which the next process opens without asking, and the file is closed as
+    /// on a normal close. Later updates and closes change nothing.
+    pub fn close_for_restart(&mut self) {
+        if !self.is_open() {
+            return;
+        }
+        let _ = write_atomic(
+            &restart_file(&self.dir),
+            self.snapshot().to_json().as_bytes(),
+        );
+        self.close_clean();
     }
 
     /// The browser is closing normally (its last regular window, or Windows ends the session):
@@ -959,6 +986,29 @@ mod tests {
         store.update(5, a);
         let again = SessionFile::parse(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(again.windows, s.windows);
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_restart_keeps_every_window_for_the_next_start_once() {
+        let d = dir("restart");
+        let (mut store, _) = Store::open(&d);
+        let a = SavedWindow::new(vec![tab(&["https://a.example/"], 0)], 0);
+        let b = SavedWindow::new(vec![tab(&["https://b.example/"], 0)], 0);
+        for (id, w) in [(1, &a), (2, &b)] {
+            store.register(id);
+            store.update(id, w.clone());
+        }
+        store.close_for_restart();
+        assert!(!store.is_open());
+        // The windows closing afterwards change nothing; the file is clean, so nothing is offered.
+        store.window_closed(1);
+        store.window_closed(2);
+        drop(store);
+        assert!(find_offer(&d, 0).is_none());
+        let s = take_restart(&d).unwrap();
+        assert_eq!(s.windows, [a, b]);
+        assert!(take_restart(&d).is_none());
         let _ = fs::remove_dir_all(&d);
     }
 

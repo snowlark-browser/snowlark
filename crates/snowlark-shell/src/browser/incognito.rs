@@ -160,6 +160,11 @@ pub struct App {
     session: RefCell<Option<Store>>,
     /// The id the next regular window has in the session file.
     next_window: Cell<u64>,
+    /// The windows a restart into an update left (`restore::take_restart`), taken when the session
+    /// file is opened; the first regular window opens them.
+    pub(super) restart_session: RefCell<Option<SessionFile>>,
+    /// The updates: the check, its outcome, the restart (`crate::update`).
+    pub updates: crate::update::Updates,
 }
 
 /// What the regular profile's windows share besides the partition: each window works on its own
@@ -250,6 +255,8 @@ impl App {
             downloads: RefCell::default(),
             session: RefCell::default(),
             next_window: Cell::new(1),
+            restart_session: RefCell::default(),
+            updates: Default::default(),
         })
     }
 
@@ -266,6 +273,7 @@ impl App {
             let (store, o) = Store::open(&self.profile.dir);
             *session = Some(store);
             offer = o;
+            *self.restart_session.borrow_mut() = crate::restore::take_restart(&self.profile.dir);
         }
         if let Some(s) = session.as_mut() {
             s.register(id);
@@ -292,6 +300,32 @@ impl App {
     pub(super) fn end_session(&self) {
         if let Some(s) = self.session.borrow_mut().as_mut() {
             s.close_clean();
+        }
+    }
+
+    /// The user chose to restart into an update, in the window of `from`: every regular window's
+    /// tabs go to the restart file (`Store::close_for_restart`), and every window is woken to close
+    /// (`Browser::closing_for_restart`). The process starts the new version once the last one has
+    /// closed (`crate::run`).
+    pub(super) fn restart_into_update(&self, from: &Weak<RefCell<Browser>>) {
+        for (w, _) in self.regular_windows.borrow().iter() {
+            if w.ptr_eq(from) {
+                continue;
+            }
+            if let Some(b) = w.upgrade() {
+                if let Ok(mut b) = b.try_borrow_mut() {
+                    b.save_session();
+                }
+            }
+        }
+        if let Some(s) = self.session.borrow_mut().as_mut() {
+            s.close_for_restart();
+        }
+        self.updates.restart.set(true);
+        let regular = self.regular_windows.borrow();
+        let incognito = self.incognito.borrow();
+        for (_, proxy) in regular.iter().chain(incognito.iter()) {
+            proxy.wake();
         }
     }
 

@@ -62,10 +62,33 @@ pub fn about_card(settings: &Settings) -> String {
     rows += &row("JavaScript", &format!("V8 {}", snowlark_js::v8_version()));
     rows += &row("User agent", &settings.user_agent_setting().header_value());
     format!(
-        "<div class=card><div class=about-head>{icon}<div><h2>Snowlark</h2><p id=version>{version}</p></div></div><table class=about>{rows}</table><p class=links><a href='{credits_page}'>Credits</a></p></div>",
+        "<div class=card><div class=about-head>{icon}<div><h2>Snowlark</h2><p id=version>{version}</p></div></div><table class=about>{rows}</table><p class=links><a href='{credits_page}'>Credits</a></p></div>{updates}",
         icon = ICON.trim(),
         version = escape_html(&version_line()),
         credits_page = crate::credits::CREDITS_PAGE,
+        updates = updates_card(settings, crate::update::Updates::available()),
+    )
+}
+
+/// The updates switch (`updateCheck`), in a build that updates (`releases`); a line saying so in
+/// one that does not.
+fn updates_card(settings: &Settings, releases: bool) -> String {
+    use crate::settings::{checked, form, setting, Category};
+    if !releases {
+        return "<div class=card id=updates><h2>Updates</h2><p class=hint>This build is not a release, so it does not check for new versions.</p></div>".to_owned();
+    }
+    format!(
+        "<div class=card id=updates><h2>Updates</h2>{at}<input type=hidden name=updateCheck value=0>{switch}</form>\
+<p class=hint>Once a day, Snowlark asks github.com for the list of its releases (nothing else is sent) and downloads a newer one, checked against its published checksum and signature. It is used the next time Snowlark starts.</p></div>",
+        at = form(Category::About),
+        switch = setting(
+            "Check for new versions",
+            "",
+            &format!(
+                "<input type=checkbox name=updateCheck value=1{} onchange='this.form.submit()'>",
+                checked(settings.update_check == Some(true))
+            )
+        ),
     )
 }
 
@@ -92,6 +115,24 @@ mod tests {
         assert!(line.starts_with(&format!("Version {VERSION}")), "{line}");
         assert!(line.ends_with(&format!("({}-bit)", usize::BITS)), "{line}");
         assert!(line.contains(COMMIT), "{line}");
+    }
+
+    #[test]
+    fn a_release_shows_the_updates_switch_as_the_setting_is() {
+        let mut s = Settings::default();
+        let off = updates_card(&s, true);
+        assert!(off.contains("name=updateCheck value=1 onchange"), "{off}");
+        s.update_check = Some(true);
+        assert!(updates_card(&s, true).contains("name=updateCheck value=1 checked"));
+        // (the switch submits to the settings and comes back here)
+        assert!(off.contains("name=at value=help"));
+        let dev = updates_card(&s, false);
+        assert!(!dev.contains("<input") && dev.contains("not a release"));
+        // The form's answer is the setting.
+        assert!(s.apply_query("at=help&updateCheck=0"));
+        assert_eq!(s.update_check, Some(false));
+        assert!(s.apply_query("at=help&updateCheck=0&updateCheck=1"));
+        assert_eq!(s.update_check, Some(true));
     }
 
     #[test]

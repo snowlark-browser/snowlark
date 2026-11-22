@@ -10,10 +10,14 @@
 #     snowlark.exe               target\release\snowlark.exe (no PDB, no snowlark-cli)
 #     THIRD-PARTY-NOTICES.txt    tools\release\notices.py
 #     README.txt                 tools\release\README.txt with the build's date and revision
-# into <OutDir>\snowlark-preview-<date>-<sha>.zip and prints its size and SHA-256.
+# into <OutDir>\snowlark-preview-<date>-<sha>.zip, writes its SHA-256 beside it in
+# snowlark-preview-<date>-<sha>.zip.sha256 (published with the zip: the browser's update check
+# reads it), and prints its size and SHA-256. The build carries its release name
+# (SNOWLARK_RELEASE): the update check compares it with the published releases.
 #
 # -SkipBuild packs the release build that is already there (it must be of this revision: the
-# script reads the revision the executable was built from and stops on another one).
+# script reads the revision the executable was built from and stops on another one), under the
+# release name built into it.
 # -AllowOther packs a checkout that is not the newest origin/main, or not clean (for trying the
 # script out; never for a zip that is published).
 #
@@ -41,6 +45,7 @@ if (-not $AllowOther) {
 }
 $sha = $head.Substring(0, 8)
 $date = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')
+$name = "snowlark-preview-$date-$sha"
 
 if (-not $SkipBuild) {
     $drive = ([IO.Path]::GetPathRoot([IO.Path]::GetFullPath($OutDir))).TrimEnd('\', ':')
@@ -49,8 +54,11 @@ if (-not $SkipBuild) {
     # (cargo writes its progress to stderr, which Windows PowerShell turns into errors when the output is
     # redirected: they must not stop the script)
     $ErrorActionPreference = 'Continue'
+    # (the release this build is: the browser's update check offers only releases published after it)
+    $env:SNOWLARK_RELEASE = $name
     & "$root\dev.ps1" build --release
     $code = $LASTEXITCODE
+    Remove-Item Env:SNOWLARK_RELEASE
     $ErrorActionPreference = 'Stop'
     if ($code -ne 0) { throw "the release build failed ($code)" }
 }
@@ -65,9 +73,16 @@ $short = $head.Substring(0, 7)
 if (-not $text.Contains($short) -and -not $AllowOther) {
     throw "$exe was not built from $short (rebuild without -SkipBuild)"
 }
+# ... and the release name it was built for (a build without one never checks for updates)
+$built = [regex]::Match($text, "snowlark-preview-\d{4}-\d\d-\d\d-$sha").Value
+if ($built) {
+    $name = $built
+    $date = $name.Substring(17, 10)
+} elseif (-not $AllowOther) {
+    throw "$exe has no release name (rebuild without -SkipBuild)"
+}
 $bytes = $null; $text = $null
 
-$name = "snowlark-preview-$date-$sha"
 $stage = Join-Path $OutDir $name
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
@@ -113,7 +128,11 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $size = (Get-Item $zip).Length
 $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+# (sha256sum's format: the hash, two spaces, the file's name)
+$sums = "$zip.sha256"
+[IO.File]::WriteAllText($sums, "$hash  $name.zip`n", (New-Object Text.UTF8Encoding $false))
 "zip:     $zip"
 "files:   $((Get-ChildItem $stage | ForEach-Object { '{0} ({1:N0} bytes)' -f $_.Name, $_.Length }) -join ', ')"
 "size:    $size bytes ($([math]::Round($size / 1MB, 1)) MB)"
 "sha256:  $hash"
+"sums:    $sums (publish it with the zip)"

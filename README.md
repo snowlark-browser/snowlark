@@ -21,7 +21,8 @@ Speedometer 3.1 and a suite of micro benchmarks ([docs/benchmarks.md](docs/bench
 
 Preview builds for Windows 10 and 11 (64-bit) are on the
 [releases page](https://github.com/snowlark-browser/snowlark/releases). Unzip and run `snowlark.exe`;
-there is no installer. The builds are not signed yet, so Windows SmartScreen may warn on first start:
+there is no installer. On first start Snowlark asks whether it should check for new versions; if you say yes, it asks
+GitHub for the list of releases once a day and downloads a newer one, used after a restart. The builds are not signed yet, so Windows SmartScreen may warn on first start:
 choose "More info", then "Run anyway".
 
 ## Building

@@ -10,6 +10,8 @@ pub mod handle;
 pub(crate) mod io;
 pub mod launch;
 pub(crate) mod pipe;
+pub mod processes;
+pub mod signing;
 
 use windows::core::HSTRING;
 use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;

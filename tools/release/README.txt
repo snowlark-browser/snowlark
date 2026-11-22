@@ -36,6 +36,10 @@ Content blocking is on by default. On first start Snowlark downloads its filter 
 EasyPrivacy, uBlock Origin's filters and others) from their publishers, and refreshes them from
 time to time. You can change this in snowlark://settings.
 
+Updates: on first start Snowlark asks whether it should check for new versions. Only if you say
+yes does it ask github.com, once a day, for the list of Snowlark's releases, download a newer one
+and use it the next time it starts. You can change this in snowlark://settings/help.
+
 
 Licences and source code
 ------------------------

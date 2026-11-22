@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! Records which build this is, for the About page: the commit's short hash and date (empty outside a
-//! git checkout, such as a source archive) and when the build was made.
+//! git checkout, such as a source archive), when the build was made, and the release it is made for
+//! (`SNOWLARK_RELEASE`, empty for any other build).
 //!
 //! The build time is that of the last build that had something to compile: this script runs again
 //! when a source file changes or a commit is made, not on a build with nothing to do.
@@ -59,4 +60,8 @@ fn main() {
     println!("cargo:rustc-env=SNOWLARK_GIT_COMMIT={commit}");
     println!("cargo:rustc-env=SNOWLARK_GIT_DATE={date}");
     println!("cargo:rustc-env=SNOWLARK_BUILD_TIME={}", utc_text(now));
+    // The release this build is made for (the release script sets it): which updates are newer.
+    println!("cargo:rerun-if-env-changed=SNOWLARK_RELEASE");
+    let release = std::env::var("SNOWLARK_RELEASE").unwrap_or_default();
+    println!("cargo:rustc-env=SNOWLARK_RELEASE={release}");
 }

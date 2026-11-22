@@ -3012,6 +3012,7 @@ dependencies = [
  "postcard",
  "serde",
  "serde_json",
+ "sha2",
  "snowlark-blocker",
  "snowlark-dom",
  "snowlark-idb",
