@@ -22,6 +22,25 @@ use crate::rt::{self, Cx, DomStr, Handle, JsObject, JsPromise, JsValue, Record, 
 /// operation overload, in IDL order. Reflected attributes are not here: they go through `rt::Reflect`.
 #[allow(clippy::too_many_arguments)]
 pub trait XPathEvaluatorBaseImpl {
+    /// [NewObject] XPathExpression createExpression(DOMString expression, optional XPathNSResolver? resolver = null);
+    #[cfg(not(feature = "stubs"))]
+    fn create_expression(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        expression: &str,
+        resolver: Option<XPathNSResolver>,
+    ) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn create_expression(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        expression: &str,
+        resolver: Option<XPathNSResolver>,
+    ) -> Result<Handle> {
+        rt::stub("XPathEvaluatorBase.create_expression")
+    }
     /// Node createNSResolver(Node nodeResolver);
     #[cfg(not(feature = "stubs"))]
     fn create_ns_resolver(
@@ -39,6 +58,78 @@ pub trait XPathEvaluatorBaseImpl {
     ) -> Result<Handle> {
         rt::stub("XPathEvaluatorBase.create_ns_resolver")
     }
+    /// XPathResult evaluate(DOMString expression, Node contextNode, optional XPathNSResolver? resolver = null, optional unsigned short type = 0, optional XPathResult? result = null);
+    #[cfg(not(feature = "stubs"))]
+    fn evaluate(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        expression: &str,
+        context_node: Handle,
+        resolver: Option<XPathNSResolver>,
+        type_: u16,
+        result: Option<Handle>,
+    ) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn evaluate(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        expression: &str,
+        context_node: Handle,
+        resolver: Option<XPathNSResolver>,
+        type_: u16,
+        result: Option<Handle>,
+    ) -> Result<Handle> {
+        rt::stub("XPathEvaluatorBase.evaluate")
+    }
+}
+
+/// `XPathEvaluatorBase.createExpression`: `[NewObject] XPathExpression createExpression(DOMString expression, optional XPathNSResolver? resolver = null);`
+pub(crate) fn op_create_expression<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
+    let _prof = call.prof("XPathEvaluatorBase.createExpression");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { call.receiver() };
+    let argc = call.length();
+    if argc < 1 {
+        return call.not_enough_arguments("XPathEvaluatorBase.createExpression", 1);
+    }
+    let dom = call.state().engine::<D>();
+    let v = call.with_scope(|scope, mut rv| {
+        let mut a0_buf = [std::mem::MaybeUninit::<u8>::uninit(); 64];
+        let a0 = {
+            let v = call.arg(0);
+            rt::to_dom_str(scope, v, &mut a0_buf)
+        }?;
+        let a1 = {
+            let v = call.arg(1);
+            if argc > 1 && !v.is_undefined() {
+                {
+                    if v.is_null_or_undefined() {
+                        Some(None)
+                    } else {
+                        (rt::to_callback_interface(
+                            scope,
+                            v,
+                            "Failed to execute 'createExpression': parameter 2",
+                        )
+                        .map(XPathNSResolver))
+                        .map(Some)
+                    }
+                }?
+            } else {
+                None
+            }
+        };
+        let r = {
+            let mut cx = Cx::new(scope);
+            <D as XPathEvaluatorBaseImpl>::create_expression(dom, &mut cx, this, &a0, a1)
+        };
+        let v = rt::check(scope, r)?;
+        Some(v)
+    });
+    let Some(v) = v else { return };
+    call.return_handle(Some(v));
 }
 
 /// `XPathEvaluatorBase.createNSResolver`: `Node createNSResolver(Node nodeResolver);`
@@ -66,6 +157,94 @@ pub(crate) fn op_create_ns_resolver<D: Dom, const LO: u16, const HI: u16>(call: 
         let r = {
             let mut cx = Cx::new(scope);
             <D as XPathEvaluatorBaseImpl>::create_ns_resolver(dom, &mut cx, this, a0)
+        };
+        let v = rt::check(scope, r)?;
+        Some(v)
+    });
+    let Some(v) = v else { return };
+    call.return_handle(Some(v));
+}
+
+/// `XPathEvaluatorBase.evaluate`: `XPathResult evaluate(DOMString expression, Node contextNode, optional XPathNSResolver? resolver = null, optional unsigned short type = 0, optional XPathResult? result = null);`
+pub(crate) fn op_evaluate<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
+    let _prof = call.prof("XPathEvaluatorBase.evaluate");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { call.receiver() };
+    let argc = call.length();
+    if argc < 2 {
+        return call.not_enough_arguments("XPathEvaluatorBase.evaluate", 2);
+    }
+    let dom = call.state().engine::<D>();
+    let v = call.with_scope(|scope, mut rv| {
+        let mut a0_buf = [std::mem::MaybeUninit::<u8>::uninit(); 64];
+        let a0 = {
+            let v = call.arg(0);
+            rt::to_dom_str(scope, v, &mut a0_buf)
+        }?;
+        let a1 = {
+            let v = call.arg(1);
+            rt::to_interface(
+                scope,
+                v,
+                ids::NODE,
+                ids::NODE_END,
+                "Failed to execute 'evaluate': parameter 2",
+                "Node",
+            )
+        }?;
+        let a2 = {
+            let v = call.arg(2);
+            if argc > 2 && !v.is_undefined() {
+                {
+                    if v.is_null_or_undefined() {
+                        Some(None)
+                    } else {
+                        (rt::to_callback_interface(
+                            scope,
+                            v,
+                            "Failed to execute 'evaluate': parameter 3",
+                        )
+                        .map(XPathNSResolver))
+                        .map(Some)
+                    }
+                }?
+            } else {
+                None
+            }
+        };
+        let a3 = {
+            let v = call.arg(3);
+            if argc > 3 && !v.is_undefined() {
+                rt::to_unsigned_short(scope, v, rt::IntMode::Wrap)?
+            } else {
+                0
+            }
+        };
+        let a4 = {
+            let v = call.arg(4);
+            if argc > 4 && !v.is_undefined() {
+                {
+                    if v.is_null_or_undefined() {
+                        Some(None)
+                    } else {
+                        (rt::to_interface(
+                            scope,
+                            v,
+                            ids::X_PATH_RESULT,
+                            ids::X_PATH_RESULT_END,
+                            "Failed to execute 'evaluate': parameter 5",
+                            "XPathResult",
+                        ))
+                        .map(Some)
+                    }
+                }?
+            } else {
+                None
+            }
+        };
+        let r = {
+            let mut cx = Cx::new(scope);
+            <D as XPathEvaluatorBaseImpl>::evaluate(dom, &mut cx, this, &a0, a1, a2, a3, a4)
         };
         let v = rt::check(scope, r)?;
         Some(v)

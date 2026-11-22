@@ -85,6 +85,9 @@ fn class(o: &Object) -> Class {
         | Object::StaticRange(_)
         | Object::TreeWalker(_)
         | Object::NodeIterator(_)
+        | Object::XPathEvaluator
+        | Object::XPathExpression(_)
+        | Object::XPathResult(_)
         | Object::DomRect(_)
         | Object::DomRectList(_)
         | Object::Touch(_)
@@ -225,6 +228,7 @@ fn refs(o: &Object, r: &mut Refs) {
             r.nodes.push(i.root);
             r.nodes.push(i.reference);
         }
+        Object::XPathResult(x) => x.gc_nodes(&mut r.nodes),
         Object::DomRectList(rects) | Object::FileList(rects) | Object::TouchList(rects) => {
             r.objects.extend(rects)
         }

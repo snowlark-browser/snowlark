@@ -7791,12 +7791,32 @@ pub(crate) fn template<'s, D: Dom>(
     {
         let f = rt::method(
             scope,
+            rt::light_builder(super::x_path_evaluator_base::op_create_expression::<D, LO, HI>),
+            "createExpression",
+            1,
+            Some(sig),
+        );
+        rt::operation(scope, &proto, "createExpression", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
             rt::light_builder(super::x_path_evaluator_base::op_create_ns_resolver::<D, LO, HI>),
             "createNSResolver",
             1,
             Some(sig),
         );
         rt::operation(scope, &proto, "createNSResolver", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::light_builder(super::x_path_evaluator_base::op_evaluate::<D, LO, HI>),
+            "evaluate",
+            2,
+            Some(sig),
+        );
+        rt::operation(scope, &proto, "evaluate", f, false);
     }
     {
         let f = rt::method(

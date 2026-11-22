@@ -104,8 +104,6 @@ CSSStyleRule.styleMap: interface StylePropertyMap is not generated
 DataTransferItem.getAsFileSystemHandle(): interface FileSystemHandle is not generated
 DataTransferItem.webkitGetAsEntry(): interface FileSystemEntry is not generated
 Document.caretPositionFromPoint(x, y, options): interface CaretPosition is not generated
-Document.createExpression(expression, resolver): interface XPathExpression is not generated
-Document.evaluate(expression, contextNode, resolver, type, result): interface XPathResult is not generated
 Document.fragmentDirective: interface FragmentDirective is not generated
 Document.measureElement(element): interface FontMetrics is not generated
 Document.measureText(text, styleMap): interface FontMetrics is not generated

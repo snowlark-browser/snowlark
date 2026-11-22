@@ -103,6 +103,7 @@ mod user_agent;
 mod web_audio;
 mod web_storage;
 mod wheel_legacy;
+mod xpath;
 
 /// `autotests = false` means a file in `tests/` that is not a module above would never run.
 #[test]

@@ -57622,3 +57622,59 @@ impl ToJs for NodeFilter {
         self.0.to_js(scope)
     }
 }
+
+/// `callback interface XPathNSResolver` (dom.idl).
+#[derive(Clone)]
+pub struct XPathNSResolver(pub JsObject);
+
+impl XPathNSResolver {
+    /// Calls the user object's `lookupNamespaceURI` operation (Web IDL §3.11 "call a user object's operation"):
+    /// the object itself when callable (with `this_arg` as `this`), else its `lookupNamespaceURI` method.
+    pub fn lookup_namespace_uri(
+        &self,
+        cx: &mut Cx,
+        this_arg: Option<&dyn ToJs>,
+        prefix: Option<&str>,
+    ) -> Result<Option<String>> {
+        rt::in_callback_realm(cx, &self.0, None, |cx| {
+            self.lookup_namespace_uri_in_realm(cx, this_arg, prefix)
+        })
+    }
+
+    /// [`Self::lookup_namespace_uri`] for a caller already in [`rt::in_callback_realm`].
+    pub fn lookup_namespace_uri_in_realm(
+        &self,
+        cx: &mut Cx,
+        this_arg: Option<&dyn ToJs>,
+        prefix: Option<&str>,
+    ) -> Result<Option<String>> {
+        let scope: &v8::PinScope = cx.scope;
+        let obj = v8::Local::new(scope, &self.0 .0);
+        let (f, recv) = rt::callback_interface_method(
+            scope,
+            obj,
+            {
+                static K: rt::Name = rt::Name::new("lookupNamespaceURI");
+                &K
+            },
+            this_arg,
+        )?;
+        let argv: [v8::Local<v8::Value>; 1] = [prefix.to_js(scope).ok_or(rt::Error::Pending)?];
+        let r = f.call(scope, recv, &argv).ok_or(rt::Error::Pending)?;
+        ({
+            let v = r;
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_dom_string(scope, v)).map(Some)
+            }
+        })
+        .ok_or(rt::Error::Pending)
+    }
+}
+
+impl ToJs for XPathNSResolver {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.0.to_js(scope)
+    }
+}

@@ -40,6 +40,7 @@ pub mod text;
 mod tree;
 pub mod xml;
 mod xml_serialize;
+pub mod xpath;
 
 pub use dom::Dom;
 pub use error::{DomError, DomResult};

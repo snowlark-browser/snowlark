@@ -95,6 +95,7 @@ pub(crate) mod view_transition;
 pub(crate) mod websocket;
 pub mod window;
 pub(crate) mod xhr;
+mod xpath;
 
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
@@ -272,6 +273,9 @@ pub enum Object {
     StaticRange(ranges::BoundaryPair),
     TreeWalker(traversal::WalkerData),
     NodeIterator(traversal::IteratorData),
+    XPathEvaluator,
+    XPathExpression(std::rc::Rc<snowlark_dom::xpath::Expression>),
+    XPathResult(xpath::ResultData),
     /// A `DOMParser`, with the Window of the realm it was made in (its relevant global object, whose
     /// document's URL its documents take).
     DomParser {
@@ -1124,6 +1128,9 @@ impl Engine {
             Object::StaticRange(_) => InterfaceId::StaticRange,
             Object::TreeWalker(_) => InterfaceId::TreeWalker,
             Object::NodeIterator(_) => InterfaceId::NodeIterator,
+            Object::XPathEvaluator => InterfaceId::XPathEvaluator,
+            Object::XPathExpression(_) => InterfaceId::XPathExpression,
+            Object::XPathResult(_) => InterfaceId::XPathResult,
             Object::DomParser { .. } => InterfaceId::DOMParser,
             Object::XmlSerializer => InterfaceId::XMLSerializer,
             Object::Sanitizer(_) => InterfaceId::Sanitizer,

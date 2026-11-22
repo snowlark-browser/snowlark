@@ -28,7 +28,6 @@ use snowlark_bindings::generated::{
     HyperlinkElementUtilsImpl, PermissionState, PopoverTargetAttributesImpl,
     PowerfulFeatureObserverImpl, RegionImpl, ShowPopoverOptions, TogglePopoverOptionsOrBoolean,
     TrustedScriptOrNullEmptyString, TrustedScriptOrString, TrustedScriptURLOrString,
-    XPathEvaluatorBaseImpl,
 };
 use snowlark_bindings::rt::{self, Cx, DomStr, ExceptionName, Handle};
 use snowlark_bindings::InterfaceId;
@@ -2080,18 +2079,6 @@ impl RegionImpl for Engine {
         _this: Handle,
     ) -> rt::Result<Option<Vec<Handle>>> {
         Ok(None)
-    }
-}
-
-impl XPathEvaluatorBaseImpl for Engine {
-    /// `createNSResolver(nodeResolver)` returns its argument (DOM §8.3).
-    fn create_ns_resolver(
-        &self,
-        _cx: &mut Cx,
-        _this: Handle,
-        node_resolver: Handle,
-    ) -> rt::Result<Handle> {
-        Ok(node_resolver)
     }
 }
 

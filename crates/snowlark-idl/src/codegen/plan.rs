@@ -203,6 +203,9 @@ pub const SCOPE: &[&str] = &[
     "Selection",
     "TreeWalker",
     "NodeIterator",
+    "XPathResult",
+    "XPathExpression",
+    "XPathEvaluator",
     "DOMImplementation",
     "XMLDocument",
     "HTMLDocument",
@@ -722,6 +725,12 @@ const THROWING_GETTERS: &[(&str, &str)] = &[
     // HTML §7.2.5: a "SecurityError" when the associated Document is not fully active.
     ("History", "length"),
     ("History", "scrollRestoration"),
+    // DOM §8.4: a TypeError when the result is not of the getter's type.
+    ("XPathResult", "numberValue"),
+    ("XPathResult", "stringValue"),
+    ("XPathResult", "booleanValue"),
+    ("XPathResult", "singleNodeValue"),
+    ("XPathResult", "snapshotLength"),
 ];
 
 #[derive(Clone, Debug)]

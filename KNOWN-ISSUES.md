@@ -144,8 +144,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `getBBox()` still see the old instance until the next rendering update. (ref 84)
 - **Missing or partial APIs.** `LargestContentfulPaint`, `performance.eventCounts` and Trusted Types on the
   attribute-node paths are not implemented. Frames share the top-level document's time origin. (ref 33)
-- **No XPath.** `document.evaluate`, `XPathResult`, `XPathExpression` and `XPathEvaluator` are absent, so scripts
-  that look up nodes by XPath throw. (ref 659)
+- **XPath resolvers from another realm.** When a namespace resolver made in another frame is not callable, the
+  `TypeError` is created and reported in the calling frame instead of the resolver's. (ref 661)
 - **No WebGL, `OffscreenCanvas` or WebGPU.** `getContext('webgl')` returns null, and `OffscreenCanvas` and
   `navigator.gpu` are absent. (ref 117)
 - **Service workers.** `navigator.serviceWorker` and the Cache API are not implemented. Pages that check for service

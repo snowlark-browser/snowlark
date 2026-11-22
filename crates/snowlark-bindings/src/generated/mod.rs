@@ -1133,8 +1133,14 @@ pub mod xml_http_request_upload;
 pub use xml_http_request_upload::XMLHttpRequestUploadImpl;
 pub mod xml_serializer;
 pub use xml_serializer::XMLSerializerImpl;
+pub mod x_path_evaluator;
+pub use x_path_evaluator::XPathEvaluatorImpl;
 pub mod x_path_evaluator_base;
 pub use x_path_evaluator_base::XPathEvaluatorBaseImpl;
+pub mod x_path_expression;
+pub use x_path_expression::XPathExpressionImpl;
+pub mod x_path_result;
+pub use x_path_result::XPathResultImpl;
 pub mod console;
 pub use console::ConsoleImpl;
 
@@ -2111,8 +2117,14 @@ pub mod ids {
     pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 485;
     pub const XML_SERIALIZER: u16 = 485;
     pub const XML_SERIALIZER_END: u16 = 486;
+    pub const X_PATH_EVALUATOR: u16 = 486;
+    pub const X_PATH_EVALUATOR_END: u16 = 487;
+    pub const X_PATH_EXPRESSION: u16 = 487;
+    pub const X_PATH_EXPRESSION_END: u16 = 488;
+    pub const X_PATH_RESULT: u16 = 488;
+    pub const X_PATH_RESULT_END: u16 = 489;
     /// The number of generated interfaces.
-    pub const COUNT: usize = 485;
+    pub const COUNT: usize = 488;
 }
 
 /// The generated interfaces; the engine names an object's most derived one in `Host::interface_of`.
@@ -2604,6 +2616,9 @@ pub enum InterfaceId {
     WritableStreamDefaultController = 483,
     WritableStreamDefaultWriter = 484,
     XMLSerializer = 485,
+    XPathEvaluator = 486,
+    XPathExpression = 487,
+    XPathResult = 488,
 }
 
 impl InterfaceId {
@@ -3096,6 +3111,9 @@ impl InterfaceId {
             InterfaceId::WritableStreamDefaultController => "WritableStreamDefaultController",
             InterfaceId::WritableStreamDefaultWriter => "WritableStreamDefaultWriter",
             InterfaceId::XMLSerializer => "XMLSerializer",
+            InterfaceId::XPathEvaluator => "XPathEvaluator",
+            InterfaceId::XPathExpression => "XPathExpression",
+            InterfaceId::XPathResult => "XPathResult",
         }
     }
 }
@@ -3667,7 +3685,10 @@ pub trait Dom:
     + XMLHttpRequestEventTargetImpl
     + XMLHttpRequestUploadImpl
     + XMLSerializerImpl
+    + XPathEvaluatorImpl
     + XPathEvaluatorBaseImpl
+    + XPathExpressionImpl
+    + XPathResultImpl
     + ConsoleImpl
 {
 }
@@ -4237,7 +4258,10 @@ impl<T> Dom for T where
         + XMLHttpRequestEventTargetImpl
         + XMLHttpRequestUploadImpl
         + XMLSerializerImpl
+        + XPathEvaluatorImpl
         + XPathEvaluatorBaseImpl
+        + XPathExpressionImpl
+        + XPathResultImpl
         + ConsoleImpl
 {
 }
@@ -4806,7 +4830,10 @@ macro_rules! for_each_trait {
         $m!(XMLHttpRequestEventTargetImpl);
         $m!(XMLHttpRequestUploadImpl);
         $m!(XMLSerializerImpl);
+        $m!(XPathEvaluatorImpl);
         $m!(XPathEvaluatorBaseImpl);
+        $m!(XPathExpressionImpl);
+        $m!(XPathResultImpl);
         $m!(ConsoleImpl);
     };
 }
@@ -6414,6 +6441,12 @@ pub fn init_isolate<D: Dom>(
     );
     let t_xml_serializer = xml_serializer::template::<D>(scope, None, &options);
     st.set_template(ids::XML_SERIALIZER, scope, t_xml_serializer);
+    let t_x_path_evaluator = x_path_evaluator::template::<D>(scope, None, &options);
+    st.set_template(ids::X_PATH_EVALUATOR, scope, t_x_path_evaluator);
+    let t_x_path_expression = x_path_expression::template::<D>(scope, None, &options);
+    st.set_template(ids::X_PATH_EXPRESSION, scope, t_x_path_expression);
+    let t_x_path_result = x_path_result::template::<D>(scope, None, &options);
+    st.set_template(ids::X_PATH_RESULT, scope, t_x_path_result);
     st
 }
 
@@ -10193,6 +10226,24 @@ pub fn install_context_for<D: Dom>(
         .get_function(scope)?;
     if kind.exposes(&["Window"]) {
         rt::expose(scope, global, "XMLSerializer", f_xml_serializer)?;
+    }
+    let f_x_path_evaluator = st
+        .template(scope, ids::X_PATH_EVALUATOR)?
+        .get_function(scope)?;
+    if kind.exposes(&["Window"]) {
+        rt::expose(scope, global, "XPathEvaluator", f_x_path_evaluator)?;
+    }
+    let f_x_path_expression = st
+        .template(scope, ids::X_PATH_EXPRESSION)?
+        .get_function(scope)?;
+    if kind.exposes(&["Window"]) {
+        rt::expose(scope, global, "XPathExpression", f_x_path_expression)?;
+    }
+    let f_x_path_result = st
+        .template(scope, ids::X_PATH_RESULT)?
+        .get_function(scope)?;
+    if kind.exposes(&["Window"]) {
+        rt::expose(scope, global, "XPathResult", f_x_path_result)?;
     }
     if kind == GlobalKind::Window {
         rt::expose(scope, global, "SVGMatrix", f_dom_matrix)?;
