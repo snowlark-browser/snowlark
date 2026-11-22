@@ -75,6 +75,9 @@ Speedometer benchmarks for anything that can move performance. The browser itsel
 
 Open an [issue](https://github.com/snowlark-browser/snowlark/issues) with the page address, what you
 expected, what you saw, and the build (the release name or the zip's file name, or the commit you built).
+Report security problems privately instead, as [SECURITY.md](SECURITY.md) says.
+
+Everyone taking part in the project is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Licences
 

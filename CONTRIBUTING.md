@@ -1,7 +1,8 @@
 # Contributing to Snowlark
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) first: the crates, the dependency direction and the main decisions.
-This file is how to build, test and measure, and the rules the code follows.
+This file is how to build, test and measure, and the rules the code follows. Taking part means following the
+[code of conduct](CODE_OF_CONDUCT.md); security problems are reported privately as [SECURITY.md](SECURITY.md) says.
 
 ## Prerequisites
 
