@@ -1446,14 +1446,9 @@ impl TabDriver for PageDriver {
     }
 
     fn snap_scroll(&mut self, node: Option<NodeId>, delta: Point, key: bool) -> bool {
-        // (a box that does not snap scrolls by the notch at once, as without snapping)
-        if let Some(n) = node {
-            if !self.page.engine().scroll_snaps(n) {
-                return self.scroll_container(n, delta);
-            }
-        }
-        // (the box goes there smoothly over the next rendering updates, which report the
-        // scrollers' positions again)
+        // (the box, snapping or not, goes there smoothly on the wheel's (or the key's) curve over
+        // the next rendering updates, which report the scrollers' positions again; a notch while
+        // it moves carries the same scroll on)
         self.page
             .with(|e, cx| e.snap_scroll_by(cx, node, delta, key))
     }
@@ -1715,7 +1710,7 @@ mod tests {
         }
     }
 
-    fn settle(d: &mut PageDriver, until: impl Fn(&PageDriver) -> bool) {
+    fn settle(d: &mut PageDriver, mut until: impl FnMut(&PageDriver) -> bool) {
         let start = Instant::now();
         while start.elapsed() < Duration::from_secs(10) {
             d.update();
@@ -1802,6 +1797,50 @@ mod tests {
 
     fn data_url(html: &str) -> Url {
         Url::parse(&format!("data:text/html,{}", html.replace('#', "%23"))).unwrap()
+    }
+
+    /// A wheel notch over a scroll container that does not snap moves it smoothly over the next
+    /// rendering updates, as the viewport's notches do, and a notch while it moves adds to it.
+    #[test]
+    fn wheel_notches_scroll_a_box_smoothly() {
+        let net = NetThread::start(NetConfig::default()).unwrap();
+        let mut d = driver(&net);
+        d.navigate(data_url(
+            "<title>Box</title><body style='margin:0'>\
+             <div style='width:300px;height:300px;overflow:auto'><div style='height:3000px'></div></div>",
+        ));
+        settle(&mut d, |d| {
+            !d.info().loading && !d.info().scrollers.is_empty()
+        });
+        let node = d.info().scrollers[0].node;
+        let y = |d: &PageDriver| d.info().scrollers[0].scroll.y;
+        assert!(d.snap_scroll(Some(node), Point::new(0.0, 100.0), false));
+        // (not there at once)
+        d.update();
+        assert!(y(&d) < 100.0, "{}", y(&d));
+        let mut seen = Vec::new();
+        settle(&mut d, |d| {
+            let v = d.info().scrollers[0].scroll.y;
+            if seen.last() != Some(&v) {
+                seen.push(v);
+            }
+            v > 30.0
+        });
+        assert!(d.snap_scroll(Some(node), Point::new(0.0, 100.0), false));
+        settle(&mut d, |d| {
+            let v = d.info().scrollers[0].scroll.y;
+            if seen.last() != Some(&v) {
+                seen.push(v);
+            }
+            v == 200.0
+        });
+        assert_eq!(y(&d), 200.0, "{seen:?}");
+        // (it went through positions between, never back)
+        assert!(
+            seen.iter().filter(|&&v| v > 0.0 && v < 100.0).count() >= 2,
+            "{seen:?}"
+        );
+        assert!(seen.windows(2).all(|w| w[1] >= w[0]), "{seen:?}");
     }
 
     #[test]
