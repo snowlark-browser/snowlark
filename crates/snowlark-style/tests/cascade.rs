@@ -10,6 +10,34 @@ mod common;
 use common::Page;
 
 #[test]
+fn form_control_frames_compute_as_the_rendering_section_expects() {
+    // Text fields: `padding: 1px 2px; border: 2px inset`, buttons `padding: 1px 6px; border: 2px
+    // outset`, no rounded corners (the widget's own frame is painted while the page leaves border and
+    // background alone); a page that restyles only the border keeps the padding.
+    let p = Page::new(
+        "<!DOCTYPE html><input id=t><input id=s type=submit><button id=b></button><textarea></textarea>\
+         <select id=sel></select><input id=c type=color><input id=x type=checkbox>\
+         <input id=styled style='border: 1px solid #ccc'>",
+    );
+    for (sel, padding, border, style) in [
+        ("#t", ("1px", "2px"), "2px", "inset"),
+        ("#s", ("1px", "6px"), "2px", "outset"),
+        ("#b", ("1px", "6px"), "2px", "outset"),
+        ("textarea", ("2px", "2px"), "1px", "solid"),
+        ("#sel", ("1px", "0px"), "1px", "solid"),
+        ("#c", ("1px", "2px"), "1px", "solid"),
+        ("#x", ("0px", "0px"), "0px", "none"),
+        ("#styled", ("1px", "2px"), "1px", "solid"),
+    ] {
+        assert_eq!(p.get(sel, "padding-top"), padding.0, "{sel}");
+        assert_eq!(p.get(sel, "padding-left"), padding.1, "{sel}");
+        assert_eq!(p.get(sel, "border-top-width"), border, "{sel}");
+        assert_eq!(p.get(sel, "border-top-style"), style, "{sel}");
+        assert_eq!(p.get(sel, "border-top-left-radius"), "0px", "{sel}");
+    }
+}
+
+#[test]
 fn ua_sheet_defaults() {
     let p = Page::new(
         "<!DOCTYPE html><html><head><title>t</title></head><body><div id=d></div><span id=s></span>\

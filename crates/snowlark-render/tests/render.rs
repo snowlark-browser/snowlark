@@ -434,7 +434,9 @@ fn form_controls_render_with_the_native_look() {
         <div class=row style='top: 160px'><input id=dis disabled value=No></div>
         <div class=row style='top: 190px'><input id=none type=checkbox checked style='appearance: none'></div>
         <div class=row style='top: 220px; width: 300px'><fieldset id=fs><legend id=lg>Legend</legend>x</fieldset></div>
-        <div class=row style='top: 300px'><textarea id=ta rows=3 cols=10>a</textarea><button id=btn>Go</button></div>";
+        <div class=row style='top: 300px'><textarea id=ta rows=3 cols=10>a</textarea><button id=btn>Go</button></div>
+        <div class=row style='top: 360px'><input id=bg value=y style='background: white'><input id=bd
+          value=z style='border-color: rgb(200, 0, 0)'></div>";
     write(&dir, "page.html", html.as_bytes());
     let url = Url::from_file_path(dir.join("page.html")).unwrap();
     let net = NetThread::start(NetConfig::default()).unwrap();
@@ -444,14 +446,15 @@ fn form_controls_render_with_the_native_look() {
     let viewport = Size::new(400.0, 400.0);
     r.layout(viewport).unwrap();
     let rect = |r: &Renderer, id| r.geometry(by_id(r, id)).unwrap().border_box;
-    // A text field: `size` 20 of 13.33px Arial's "0", 1px borders and 2px/3px padding around a
+    // A text field: `size` 20 of 13.33px Arial's "0", 2px borders and 1px/2px padding around a
     // normal line: about 21px tall like Chrome's (whose line height rounds Arial's 15.33px to 15).
     let text = rect(&r, "text");
     assert!((21.0..21.5).contains(&text.height), "{text:?}");
     assert!((150.0..175.0).contains(&text.width), "{text:?}");
     let on = rect(&r, "on");
     assert_eq!((on.x, on.width, on.height), (4.0, 13.0, 13.0));
-    assert_eq!(rect(&r, "styled").width, 100.0 + 2.0 * 3.0 + 2.0 * 3.0);
+    // (its own 3px border and the UA sheet's 2px inline padding)
+    assert_eq!(rect(&r, "styled").width, 100.0 + 2.0 * 3.0 + 2.0 * 2.0);
     // progress: 10em x 1em (it keeps the inherited 16px font).
     let prog = rect(&r, "prog");
     assert_eq!((prog.width, prog.height), (160.0, 16.0));
@@ -473,9 +476,18 @@ fn form_controls_render_with_the_native_look() {
     let at = |x: f32, y: f32| px.pixel(x as u32, y as u32);
     let grey = Color::rgb(0x76, 0x76, 0x76);
     let accent = Color::rgb(0x00, 0x75, 0xff);
-    // The field: grey border, white inside, dark text.
+    // The field: its own 1px grey frame, white inside, dark text.
     assert_eq!(at(text.x, text.y + 10.0), grey);
+    assert_eq!(at(text.x + 1.0, text.y + 10.0), Color::WHITE);
     assert_eq!(at(text.x + 2.0, text.y + 10.0), Color::WHITE);
+    // A page that sets only the background or a border color drops the native frame (CSS UI 4
+    // §6.2.1): the UA sheet's 2px inset border shows, the same size as the frame and its spacing.
+    let (bg, bd) = (rect(&r, "bg"), rect(&r, "bd"));
+    assert_eq!((bg.width, bg.height), (text.width, text.height));
+    assert_ne!(at(bg.x + 1.0, bg.y + 10.0), Color::WHITE);
+    assert_eq!(at(bg.x + 2.0, bg.y + 10.0), Color::WHITE);
+    let inner = at(bd.x + 1.0, bd.y + 10.0);
+    assert!(inner.r > inner.g + 40 && inner != Color::WHITE, "{inner:?}");
     let dark = (0..40)
         .flat_map(|dx| (0..21).map(move |dy| (dx, dy)))
         .filter(|&(dx, dy)| at(text.x + 4.0 + dx as f32, text.y + dy as f32).r < 100)

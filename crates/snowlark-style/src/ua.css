@@ -714,30 +714,41 @@ textarea { font-family: monospace; }
 
 ::placeholder { color: #757575; }
 
+/* While the page leaves a widget's border and background alone (CSS UI 4 §6.2.1, devolvable widgets),
+ * layout paints the widget's own frame over its border box: a 1px border of the border color with 2px
+ * corners. The CSS border below (2px inset on text fields, 2px outset on buttons, the same width as that
+ * frame and its spacing) shows only once the page restyles the background or another part of the border. */
+
 input, textarea, select {
   background-color: Field;
   border: 1px solid light-dark(#767676, #858585);
-  border-radius: 2px;
 }
 
-input { padding-block: 2px; padding-inline: 3px; }
+input {
+  border: 2px inset light-dark(#767676, #858585);
+  padding-block: 1px;
+  padding-inline: 2px;
+}
 textarea { padding: 2px; }
 select { padding-block: 1px; padding-inline: 0; }
 
-button, input:is([type=submit i], [type=reset i], [type=button i], [type=color i]) {
+button, input:is([type=submit i], [type=reset i], [type=button i]) {
   background-color: light-dark(#efefef, #6b6b6b);
-  border: 1px solid light-dark(#767676, #858585);
-  border-radius: 2px;
-  padding-block: 2px;
-  padding-inline: 7px;
+  border: 2px outset light-dark(#767676, #858585);
+  padding-block: 1px;
+  padding-inline: 6px;
 }
 
-input[type=color i] { padding-block: 1px; padding-inline: 2px; }
+input[type=color i] {
+  background-color: light-dark(#efefef, #6b6b6b);
+  border: 1px solid light-dark(#767676, #858585);
+  padding-block: 1px;
+  padding-inline: 2px;
+}
 
 input:is([type=checkbox i], [type=radio i], [type=range i], [type=file i], [type=image i]) {
   background-color: transparent;
   border: none;
-  border-radius: 0;
   padding: 0;
 }
 

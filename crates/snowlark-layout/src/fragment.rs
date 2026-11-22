@@ -138,6 +138,10 @@ pub mod fragment_flags {
     pub const SPANNER: u32 = 33554432;
     /// A box of a multi-column container's flow with a spanner inside.
     pub const HAS_SPANNER: u32 = 67108864;
+    /// A form control drawn as a native widget whose frame the page has not restyled (CSS UI 4
+    /// §6.2.1, devolvable widgets): its background and border are the widget's own, a 1px border
+    /// with rounded corners over its border box, instead of the CSS ones.
+    pub const THEMED: u32 = 134217728;
     /// A line-clamp container whose content was clamped (CSS Overflow 4 §4.2): what remains of
     /// its floats past its block-end content edge is clipped there (and is not scrollable
     /// overflow).

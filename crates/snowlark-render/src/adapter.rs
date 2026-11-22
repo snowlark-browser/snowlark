@@ -3059,6 +3059,18 @@ impl ls::Style for RenderStyle {
         })
     }
 
+    fn native_appearance(&self) -> bool {
+        use style::values::specified::box_::Appearance;
+        self.values.get_box().clone_appearance() != Appearance::None
+    }
+
+    fn author_border_background(&self) -> bool {
+        use style::computed_value_flags::ComputedValueFlags;
+        self.values
+            .flags
+            .contains(ComputedValueFlags::HAS_AUTHOR_SPECIFIED_BORDER_BACKGROUND)
+    }
+
     fn box_shadow_count(&self) -> usize {
         self.values.get_effects().box_shadow.0.len()
     }

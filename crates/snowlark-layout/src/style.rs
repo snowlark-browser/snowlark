@@ -2520,6 +2520,15 @@ pub trait Style: Clone {
     fn border_image(&self) -> Option<BorderImage> {
         None
     }
+    /// `appearance` is not `none` (CSS UI 4 §6.2): a form control may be drawn as a native widget.
+    fn native_appearance(&self) -> bool {
+        false
+    }
+    /// The page (author origin) sets a border or background property, which makes a devolvable
+    /// widget drop its native frame (CSS UI 4 §6.2.1).
+    fn author_border_background(&self) -> bool {
+        false
+    }
     fn box_shadow_count(&self) -> usize {
         0
     }

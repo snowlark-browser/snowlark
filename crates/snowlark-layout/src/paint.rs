@@ -2107,6 +2107,23 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                     });
                 }
             }
+            if b.flags & fragment_flags::THEMED != 0 {
+                // The widget's own frame in place of the CSS background and border: its background
+                // color over the border box with 2px corners, under a 1px border of the border
+                // color (the UA sheet's, as the page has set neither).
+                let radii = Radii::uniform(THEMED_RADIUS).fitted(&border_box);
+                self.out
+                    .fill_rounded_rect(border_box, radii, s.background_color());
+                let color = s.border_color(Side::Top);
+                self.out.border(Border {
+                    rect: border_box,
+                    radii,
+                    widths: Sides::all(1.0),
+                    colors: [color; 4],
+                    styles: [BorderStyle::Solid; 4],
+                });
+                return;
+            }
             let padding_box = border_box.deflate(&b.border);
             let geo = self.layer_area(f, b, border_box, radii, at, scroll);
             // The color is painted under the bottom layer, clipped as it is (§3.10); a layer
@@ -3847,6 +3864,9 @@ fn radial_size(g: &RadialGradient, r: Rect, cx: f32, cy: f32) -> (f32, f32) {
 /// length (`calc(infinity * 1px)`, CSS Values 4 §10.9) is clamped to it rather than painted as
 /// infinity.
 const MAX_LENGTH: f32 = 33_554_428.0;
+
+/// The corner radius of a themed control's frame ([`fragment_flags::THEMED`]).
+const THEMED_RADIUS: f32 = 2.0;
 
 fn finite_length(v: f32) -> f32 {
     if v.is_nan() {

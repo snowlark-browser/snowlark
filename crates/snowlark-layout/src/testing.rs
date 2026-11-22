@@ -134,6 +134,10 @@ pub struct TestStyle {
     /// `backdrop-filter`'s functions.
     pub backdrop_filters: Vec<FilterOp>,
     pub box_shadows: Vec<Shadow>,
+    /// `appearance` is not `none`.
+    pub native_appearance: bool,
+    /// The page sets a border or background property.
+    pub author_border_background: bool,
     pub text_shadows: Vec<Shadow>,
     pub outline_width: f32,
     pub outline_style: BorderStyle,
@@ -283,6 +287,8 @@ impl Default for TestStyle {
             filters: Vec::new(),
             backdrop_filters: Vec::new(),
             box_shadows: Vec::new(),
+            native_appearance: false,
+            author_border_background: false,
             text_shadows: Vec::new(),
             outline_width: 0.0,
             outline_style: BorderStyle::None,
@@ -829,6 +835,12 @@ impl Style for Arc<TestStyle> {
     }
     fn background_layer(&self, index: usize) -> BackgroundLayer {
         self.background_layers[index].clone()
+    }
+    fn native_appearance(&self) -> bool {
+        self.native_appearance
+    }
+    fn author_border_background(&self) -> bool {
+        self.author_border_background
     }
     fn box_shadow_count(&self) -> usize {
         self.box_shadows.len()

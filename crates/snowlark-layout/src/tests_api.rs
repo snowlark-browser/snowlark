@@ -1564,6 +1564,51 @@ fn flex_containers_paint_their_borders() {
 }
 
 #[test]
+fn a_native_button_paints_its_own_frame_until_the_page_restyles_it() {
+    // CSS UI 4 §6.2.1: a devolvable widget keeps its native look (a 1px border with 2px corners
+    // over the border box) while the page sets none of its border or background properties; then
+    // its CSS border (the UA sheet's 2px outset) and background paint.
+    let mut t = T::new();
+    let r0 = t.root();
+    let button = |t: &mut T, native: bool, author: bool| {
+        t.doc.element(r0, "button", |s| {
+            s.display = Display::BLOCK;
+            s.width = SizeValue::px(50.0);
+            s.height = SizeValue::px(20.0);
+            s.border_width = [2.0; 4];
+            s.border_style = [BorderStyle::Outset; 4];
+            s.native_appearance = native;
+            s.author_border_background = author;
+        })
+    };
+    button(&mut t, true, false);
+    button(&mut t, true, true);
+    button(&mut t, false, false);
+    let f = t.run(200.0, 200.0);
+    let mut b = DisplayListBuilder::new();
+    paint(&f, &t.text, Size::new(200.0, 200.0), &mut b);
+    let borders: Vec<_> = b
+        .build()
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            Item::Border(b) => Some((b.widths.top, b.styles[0], b.radii.top_left.width)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        borders,
+        [
+            (1.0, BorderStyle::Solid, 2.0),
+            (2.0, BorderStyle::Outset, 0.0),
+            (2.0, BorderStyle::Outset, 0.0),
+        ],
+        "{}",
+        f.dump()
+    );
+}
+
+#[test]
 fn an_empty_box_casts_its_spread_shadow() {
     // CSS Backgrounds 3 §7.1: a 0x0 box with a 50px spread casts a 100x100 shadow.
     let mut t = T::new();

@@ -8,7 +8,8 @@
 //! `%LOCALAPPDATA%\Osmium\rust\`: the first start that finds that folder and no new one moves it
 //! ([`adopt_old_profile`]), so bookmarks, history, settings, cookies and filter lists carry over.
 //! `%LOCALAPPDATA%\Osmium\` itself is the C# engine's folder (its `cookies.json` and `hsts.json` are in
-//! another format); its history and bookmarks are imported once, since their format is the same.
+//! another format); its history and bookmarks are imported once into the user's own profile, since
+//! their format is the same, never into one named by `SNOWLARK_PROFILE_DIR`.
 
 use std::path::{Path, PathBuf};
 
@@ -17,6 +18,10 @@ pub use crate::settings::Settings;
 #[derive(Clone, Debug)]
 pub struct Profile {
     pub dir: PathBuf,
+    /// Whether this is the user's own profile, the only one the C# engine's history and bookmarks
+    /// belong to. A profile named by `SNOWLARK_PROFILE_DIR` or opened with [`Profile::at`] is someone
+    /// else's (a test's, a tool's) and imports nothing.
+    imports_legacy: bool,
 }
 
 fn local_app_data() -> PathBuf {
@@ -126,16 +131,19 @@ fn in_use(new: PathBuf, old: PathBuf) -> PathBuf {
 
 impl Profile {
     pub fn default_location() -> Profile {
-        let dir = match std::env::var_os("SNOWLARK_PROFILE_DIR") {
-            Some(d) if !d.is_empty() => PathBuf::from(d),
-            _ => in_use(new_location(), old_location()),
-        };
-        Profile { dir }
+        match std::env::var_os("SNOWLARK_PROFILE_DIR") {
+            Some(d) if !d.is_empty() => Profile::at(Path::new(&d)),
+            _ => Profile {
+                dir: in_use(new_location(), old_location()),
+                imports_legacy: true,
+            },
+        }
     }
 
     pub fn at(dir: &Path) -> Profile {
         Profile {
             dir: dir.to_owned(),
+            imports_legacy: false,
         }
     }
 
@@ -143,10 +151,10 @@ impl Profile {
         self.dir.join("history.json")
     }
 
-    /// The C# engine's history, imported when this profile has none yet.
+    /// The C# engine's history, imported when the user's own profile has none yet.
     pub fn legacy_history(&self) -> Option<PathBuf> {
         let p = local_app_data().join("Osmium").join("history.json");
-        (p != self.history_file()).then_some(p)
+        (self.imports_legacy && p != self.history_file()).then_some(p)
     }
 
     pub fn settings_file(&self) -> PathBuf {
@@ -177,10 +185,10 @@ impl Profile {
         self.dir.join("bookmarks.json")
     }
 
-    /// The C# engine's bookmarks (the same format), imported when this profile has none yet.
+    /// The C# engine's bookmarks (the same format), imported when the user's own profile has none yet.
     pub fn legacy_bookmarks(&self) -> Option<PathBuf> {
         let p = local_app_data().join("Osmium").join("bookmarks.json");
-        (p != self.bookmarks_file()).then_some(p)
+        (self.imports_legacy && p != self.bookmarks_file()).then_some(p)
     }
 
     /// `localStorage`: a file per origin ([`crate::local_storage`]).
@@ -216,6 +224,22 @@ mod tests {
         assert_eq!(p.bookmarks_file(), dir.join("bookmarks.json"));
         assert_eq!(p.downloads_file(), dir.join("downloads.json"));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A profile opened at a folder of its own (a test's, or `SNOWLARK_PROFILE_DIR`) never takes the
+    /// C# engine's history or bookmarks: they are the user's.
+    #[test]
+    fn a_profile_of_its_own_imports_nothing() {
+        let dir = std::env::temp_dir().join(format!("snowlark-profile-own-{}", std::process::id()));
+        let p = Profile::at(&dir);
+        assert_eq!(p.legacy_history(), None);
+        assert_eq!(p.legacy_bookmarks(), None);
+        let own = Profile {
+            dir: dir.clone(),
+            imports_legacy: true,
+        };
+        assert!(own.legacy_history().is_some());
+        assert!(own.legacy_bookmarks().is_some());
     }
 
     /// A folder to play the two profile places in, with an old profile of three files in it.

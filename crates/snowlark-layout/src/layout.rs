@@ -697,6 +697,32 @@ impl<'a, S: Style> Cx<'a, S> {
     }
 }
 
+/// Whether `b` is a widget with a native frame (text fields, textareas, drop-down and list boxes,
+/// buttons, color wells) that keeps it: its `appearance` is not `none` and the page sets none of its border or
+/// background properties, nor, on a field, a box shadow (CSS UI 4 §6.2.1, devolvable widgets). The
+/// UA style sheet gives such controls a 2px inset (fields) or outset (buttons) border, which only
+/// shows once the page restyles the frame.
+fn themed_frame<S: Style>(b: &LayoutBox<S>) -> bool {
+    let s = &b.style;
+    if s.author_border_background() {
+        return false;
+    }
+    match &b.data {
+        BoxData::Replaced(content) => content.control.as_deref().is_some_and(|c| {
+            c.native
+                && match c.kind {
+                    ControlKind::TextField { .. }
+                    | ControlKind::DateTime { .. }
+                    | ControlKind::TextArea { .. }
+                    | ControlKind::Select { .. } => s.box_shadow_count() == 0,
+                    ControlKind::Button { .. } | ControlKind::Color(_) => true,
+                    _ => false,
+                }
+        }),
+        _ => b.has(flags::BUTTON) && s.native_appearance(),
+    }
+}
+
 /// Fragment flags common to box fragments of `b`.
 pub(crate) fn box_flags<S: Style>(b: &LayoutBox<S>) -> u32 {
     let s = &b.style;
@@ -727,6 +753,9 @@ pub(crate) fn box_flags<S: Style>(b: &LayoutBox<S>) -> u32 {
     }
     if b.has(flags::TOP_LAYER) {
         f |= fragment_flags::TOP_LAYER;
+    }
+    if themed_frame(b) {
+        f |= fragment_flags::THEMED;
     }
     // Overflow applies to block containers, flex/grid containers and replaced elements; not to
     // inline boxes or table-internal boxes other than cells.

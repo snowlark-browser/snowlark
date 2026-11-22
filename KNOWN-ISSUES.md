@@ -59,9 +59,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `:active` rules do not apply, the buttons and corner are not drawn, and the scrollbar pseudo-classes
   (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
   parse but style nothing. (ref 627)
-- **Form control defaults.** A text input's default padding is `2px 3px` with a 1px border, where other engines
-  compute `1px 2px` with a 2px inset border and draw the native look over it; a page that restyles only the border
-  gets an input 2px taller. The fields' 2px corner radius is also a computed value here. (ref 646)
 - **Properties not built.** `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink` and `accent-color`
   do not parse, so their declarations are dropped. (ref 622)
 - **Scroll snap.** Script scrolls, mouse wheel notches and the arrow and page keys come to rest on snap positions.
@@ -183,6 +180,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   error D7701-1003. Protected video plays through Media Source Extensions only, with temporary sessions only, and stays
   black with the GPU process (`--gpu-process`). Clear Key decrypts `cenc` and `cbcs` MP4 through Media Source
   Extensions only (not a `src` file or WebM). (ref 548)
+- **Spotify does not play.** Its web player asks only for Widevine's robustness levels, which PlayReady does not
+  recognize, so its player reports that no key system is supported. With the Default user agent Spotify also serves
+  its phone layout; the Chrome preset gets the desktop player, which then shows "Playback of protected content is not
+  enabled". (ref 665)
 - **HBO Max reads the browser from its user agent string.** It offers PlayReady only to a browser it reads as Edge,
   so with the Default user agent its domains get the Edge preset's string (`EDGE_SITES` in
   `crates/snowlark-net/src/ua.rs`). HBO Max keeps the browser it read in the page's local storage for up to 7 days:
@@ -229,6 +230,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   (ref 542)
 - **Incognito windows are not finished.** They keep nothing on disk, but open the settings, history and bookmark
   pages in themselves rather than in a regular window, and lose bookmarks added in them when they close. (ref 540)
+  An Incognito window opens at the default place on the primary monitor, not where windows were last placed.
+  (ref 669)
+- **Task manager.** While it is open, an idle tab and the browser process use a steady share of the CPU. (ref 668)
+- **Closing a window can take several seconds** when it has several tabs, or is an Incognito window. (ref 670)
 
 ## Tooling
 
