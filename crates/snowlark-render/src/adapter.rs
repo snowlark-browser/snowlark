@@ -3356,10 +3356,12 @@ pub(crate) fn custom_scrollbar(
     let bar = part(P::WebkitScrollbar)?;
     let thumb = part(P::WebkitScrollbarThumb);
     let track = part(P::WebkitScrollbarTrack);
+    let corner = part(P::WebkitScrollbarCorner);
     Some(ls::CustomScrollbar::from_parts(
         &bar,
         thumb.as_ref(),
         track.as_ref(),
+        corner.as_ref(),
     ))
 }
 

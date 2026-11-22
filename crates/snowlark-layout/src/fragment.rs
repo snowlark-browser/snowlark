@@ -163,6 +163,10 @@ pub struct BoxFragment<S: Style> {
     /// for cells in the collapsing model).
     pub border: Sides,
     pub padding: Sides,
+    /// The space its scroll bars take between its border and its padding (CSS Overflow 3 §3):
+    /// custom bars only, the automatic ones are overlay bars (`crate::gutter`). The padding box
+    /// ([`Fragment::padding_rect`]) is inside it.
+    pub scrollbar: Sides,
     pub flags: u32,
     /// Pre-order position of the generating box in the box tree.
     pub order: u32,
@@ -457,12 +461,44 @@ impl<S: Style> Fragment<S> {
         Rect::new(0.0, 0.0, self.size.width, self.size.height)
     }
 
-    /// The padding box in its own coordinates.
+    /// The padding box in its own coordinates (a scroll container's scrollport: inside the space
+    /// its scroll bars take, [`BoxFragment::scrollbar`]).
     pub fn padding_rect(&self) -> Rect {
         match &self.kind {
+            FragmentKind::Box(b) if !b.scrollbar.is_zero() => {
+                self.border_rect().deflate(&b.border).deflate(&b.scrollbar)
+            }
             FragmentKind::Box(b) => self.border_rect().deflate(&b.border),
             _ => self.border_rect(),
         }
+    }
+
+    /// The space inside the border that a scroll container's vertical bar takes (`vertical`) or its
+    /// horizontal bar, in its own coordinates; `None` when it has no such bar taking space.
+    pub fn scrollbar_rect(&self, vertical: bool) -> Option<Rect> {
+        let b = self.as_box()?;
+        let inner = self.border_rect().deflate(&b.border);
+        let g = &b.scrollbar;
+        let r = if vertical && g.right > 0.0 {
+            Rect::new(
+                inner.right() - g.right,
+                inner.y,
+                g.right,
+                inner.height - g.bottom,
+            )
+        } else if vertical && g.left > 0.0 {
+            Rect::new(inner.x, inner.y, g.left, inner.height - g.bottom)
+        } else if !vertical && g.bottom > 0.0 {
+            Rect::new(
+                inner.x + g.left,
+                inner.bottom() - g.bottom,
+                inner.width - g.left - g.right,
+                g.bottom,
+            )
+        } else {
+            return None;
+        };
+        Some(Rect::new(r.x, r.y, r.width.max(0.0), r.height.max(0.0)))
     }
 
     /// The scrollable overflow rectangle of the box as a scroll container (CSS Overflow 3 §2.2):
@@ -597,7 +633,7 @@ impl<S: Style> Fragment<S> {
     /// The content box in its own coordinates.
     pub fn content_rect(&self) -> Rect {
         match &self.kind {
-            FragmentKind::Box(b) => self.border_rect().deflate(&b.border).deflate(&b.padding),
+            FragmentKind::Box(b) => self.padding_rect().deflate(&b.padding),
             _ => self.border_rect(),
         }
     }

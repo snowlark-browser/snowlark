@@ -610,3 +610,158 @@ L3",
         .collect();
     assert_eq!(clips, vec![20.0]);
 }
+
+/// Custom scroll bars (`::-webkit-scrollbar`) `w` px thick, with a red thumb and a blue track.
+fn custom_bars(w: f32) -> Option<CustomScrollbar> {
+    Some(CustomScrollbar {
+        vertical: Some(w),
+        horizontal: Some(w),
+        thumb: Some(CustomScrollbarThumb {
+            color: snowlark_paint::Color::rgb(255, 0, 0),
+            radius: (0.0, 0.0),
+            inset: 0.0,
+            min_length: [None, None],
+        }),
+        track: Some(snowlark_paint::Color::rgb(0, 0, 255)),
+        corner: None,
+    })
+}
+
+#[test]
+fn custom_scroll_bars_take_space_from_the_content_box() {
+    // CSS Overflow 3 §3: a scroll bar sits between the border and the padding and its space comes
+    // out of the content box; custom bars are not overlay bars, so they take it. 100px square
+    // boxes, 8px bars.
+    let mut t = T::new();
+    let r0 = t.root();
+    // `scroll` on both axes: both bars, overflow or not; `width` stays the border box's.
+    let a = scroller(&mut t, r0, |s| s.custom_scrollbar = custom_bars(8.0));
+    let a1 = t.doc.block(a, |s| s.height = SizeValue::px(20.0));
+    // `auto`, overflowing in the block axis: a vertical bar only.
+    let b = scroller(&mut t, r0, |s| {
+        s.overflow_x = Overflow::Auto;
+        s.overflow_y = Overflow::Auto;
+        s.custom_scrollbar = custom_bars(8.0);
+    });
+    let b1 = t.doc.block(b, |s| s.height = SizeValue::px(300.0));
+    // `auto`, not overflowing: no bar.
+    let c = scroller(&mut t, r0, |s| {
+        s.overflow_x = Overflow::Auto;
+        s.overflow_y = Overflow::Auto;
+        s.custom_scrollbar = custom_bars(8.0);
+    });
+    let c1 = t.doc.block(c, |s| s.height = SizeValue::px(50.0));
+    // Right to left: the vertical bar is at the left.
+    let d = scroller(&mut t, r0, |s| {
+        s.direction = Direction::Rtl;
+        s.overflow_x = Overflow::Hidden;
+        s.custom_scrollbar = custom_bars(8.0);
+    });
+    let d1 = t.doc.block(d, |s| s.height = SizeValue::px(20.0));
+    // `scrollbar-width` wins over the parts: overlay bars, no space.
+    let e = scroller(&mut t, r0, |s| {
+        s.scrollbar_width = ScrollbarWidth::Thin;
+        s.custom_scrollbar = custom_bars(8.0);
+    });
+    let e1 = t.doc.block(e, |s| s.height = SizeValue::px(20.0));
+    t.run(800.0, 600.0);
+
+    let ga = geometry(&t, a);
+    assert_eq!(ga.border_box.width, 100.0);
+    assert_eq!((ga.padding_box.width, ga.padding_box.height), (92.0, 92.0));
+    assert_eq!(geometry(&t, a1).border_box.width, 92.0);
+    assert_eq!(scroll_size(&t, a), (92.0, 92.0));
+
+    let gb = geometry(&t, b);
+    assert_eq!((gb.padding_box.width, gb.padding_box.height), (92.0, 100.0));
+    assert_eq!(geometry(&t, b1).border_box.width, 92.0);
+    assert_eq!(scroll_size(&t, b), (92.0, 300.0));
+
+    assert_eq!(geometry(&t, c).padding_box.width, 100.0);
+    assert_eq!(geometry(&t, c1).border_box.width, 100.0);
+
+    let gd = geometry(&t, d);
+    assert_eq!(gd.padding_box.x - gd.border_box.x, 8.0);
+    assert_eq!(geometry(&t, d1).border_box.x - gd.border_box.x, 8.0);
+    assert_eq!(geometry(&t, d1).border_box.width, 92.0);
+
+    assert_eq!(geometry(&t, e1).border_box.width, 100.0);
+}
+
+#[test]
+fn custom_scroll_bars_add_to_shrink_to_fit_and_flex_content_boxes() {
+    // A float sized by its content grows by its vertical bar (its intrinsic sizes include it); a
+    // flex container's items stretch in what the bars leave.
+    let mut t = T::new();
+    let r0 = t.root();
+    let a = t.doc.block(r0, |s| {
+        s.float = Float::Left;
+        s.height = SizeValue::px(50.0);
+        s.overflow_y = Overflow::Scroll;
+        s.overflow_x = Overflow::Hidden;
+        s.custom_scrollbar = custom_bars(10.0);
+    });
+    let a1 = t.doc.block(a, |s| {
+        s.width = SizeValue::px(60.0);
+        s.height = SizeValue::px(10.0);
+    });
+    let f = t.doc.block(r0, |s| {
+        s.display = Display::FLEX;
+        s.clear = Clear::Both;
+        s.width = SizeValue::px(100.0);
+        s.height = SizeValue::px(100.0);
+        s.overflow_x = Overflow::Scroll;
+        s.overflow_y = Overflow::Scroll;
+        s.custom_scrollbar = custom_bars(10.0);
+    });
+    let f1 = t.doc.block(f, |s| s.flex_grow = 1.0);
+    t.run(800.0, 600.0);
+    assert_eq!(geometry(&t, a).border_box.width, 70.0);
+    assert_eq!(geometry(&t, a1).border_box.width, 60.0);
+    let gf = geometry(&t, f);
+    assert_eq!((gf.padding_box.width, gf.padding_box.height), (90.0, 90.0));
+    let g1 = geometry(&t, f1);
+    assert_eq!((g1.border_box.width, g1.border_box.height), (90.0, 90.0));
+}
+
+#[test]
+fn custom_scroll_bars_are_drawn_in_their_space() {
+    // The track fills the space a bar takes (with nothing to scroll too, under `overflow:
+    // scroll`); the thumb is drawn only where there is something to scroll, no shorter than the
+    // thumb part's `min-height` (40px; the proportional length is 25px).
+    use snowlark_paint::Color;
+    let mut t = T::new();
+    let r0 = t.root();
+    let a = scroller(&mut t, r0, |s| {
+        s.overflow_x = Overflow::Hidden;
+        s.custom_scrollbar = custom_bars(8.0);
+        if let Some(CustomScrollbar {
+            thumb: Some(thumb), ..
+        }) = &mut s.custom_scrollbar
+        {
+            thumb.min_length[0] = Some(40.0);
+        }
+    });
+    t.doc.block(a, |s| s.height = SizeValue::px(400.0));
+    let f = t.run(800.0, 600.0);
+    let mut b = DisplayListBuilder::new();
+    paint(&f, &t.text, t.viewport, &mut b);
+    let list = b.build();
+    let track = list.items.iter().find_map(|i| match i {
+        Item::FillRect { rect, color } if *color == Color::rgb(0, 0, 255) => Some(*rect),
+        _ => None,
+    });
+    assert_eq!(
+        track,
+        Some(snowlark_paint::Rect::new(92.0, 0.0, 8.0, 100.0))
+    );
+    let thumb = list.items.iter().find_map(|i| match i {
+        Item::FillRoundedRect { rect, color, .. } | Item::FillRect { rect, color }
+            if *color == Color::rgb(255, 0, 0) =>
+        {
+            Some(*rect)
+        }
+        _ => None,
+    });
+    assert_eq!(thumb, Some(snowlark_paint::Rect::new(92.0, 0.0, 8.0, 40.0)));
+}

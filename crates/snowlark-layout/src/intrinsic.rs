@@ -22,7 +22,16 @@ pub(crate) fn compute_content_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> 
         let w = contained.intrinsic_width.unwrap_or(0.0);
         return ContentSizes { min: w, max: w };
     }
-    match b.kind {
+    // (a block container's custom scroll bars take space beside its content, CSS Overflow 3 §3;
+    // taffy counts a flex or grid container's)
+    let gutter = match b.kind {
+        BoxKind::Block | BoxKind::TableCell | BoxKind::TableCaption => {
+            let g = crate::gutter::gutter(b);
+            g.left + g.right
+        }
+        _ => 0.0,
+    };
+    let sizes = match b.kind {
         BoxKind::Block if b.style.is_multicol() && b.is_independent() => {
             let style = b.style.clone();
             let mut spanners = ContentSizes::ZERO;
@@ -47,7 +56,8 @@ pub(crate) fn compute_content_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> 
             ContentSizes { min: w, max: w }
         }
         _ => ContentSizes::ZERO,
-    }
+    };
+    sizes.add(gutter)
 }
 
 /// Block children: the widest contribution; floats side by side add up until something clears them.

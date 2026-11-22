@@ -139,6 +139,7 @@ fn map_fragment_inner<S: Style>(f: &Fragment<S>, m: Flip, view: Flip, line: bool
                 pseudo_of: b.pseudo_of,
                 border: m.sides(b.border),
                 padding: m.sides(b.padding),
+                scrollbar: m.sides(b.scrollbar),
                 flags,
                 order: b.order,
                 subtree_end: b.subtree_end,

@@ -123,6 +123,11 @@ pub(crate) mod flags {
     /// A `button` element's principal box: it uses button layout (HTML §15.5.3), so an `auto`
     /// inline size is used as the fit-content inline size.
     pub const BUTTON: u32 = 65536;
+    /// The box's custom vertical scroll bar showed in its last layout, for an `overflow-y: auto`
+    /// that overflowed ([`crate::gutter`]).
+    pub const VERTICAL_BAR: u32 = 131072;
+    /// … its horizontal bar, for `overflow-x: auto`.
+    pub const HORIZONTAL_BAR: u32 = 262144;
 }
 
 /// A text decoration propagated to a box's text (CSS Text Decoration 3 §2).

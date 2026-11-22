@@ -2255,6 +2255,7 @@ fn piece<S: Style>(
             pseudo_of: b.pseudo_of,
             border,
             padding,
+            scrollbar: b.scrollbar,
             flags: b.flags,
             order: b.order,
             subtree_end: b.subtree_end,

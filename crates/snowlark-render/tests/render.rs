@@ -703,6 +703,43 @@ fn a_classic_scroll_bar_narrows_the_layout_viewport_when_shown() {
     assert!(!r.vertical_scrollbar());
 }
 
+/// Custom scroll bars take layout space (CSS Overflow 3 §3: out of the content box), as the
+/// automatic overlay bars do not: an 8 px `::-webkit-scrollbar` leaves `overflow: scroll` and an
+/// overflowing `overflow: auto` box 8 px less for their content, and none less to an `auto` box
+/// that fits or one without parts.
+#[test]
+fn webkit_scrollbar_parts_take_layout_space() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let url = Url::parse("http://example.test/").unwrap();
+    let mut r = renderer(&net, 400.0, 600.0);
+    r.load_html(
+        b"<!doctype html><style>\
+          .s, .a, .f, .n { width: 200px; height: 100px }\
+          .s { overflow: scroll } .a, .f, .n { overflow: auto }\
+          .s::-webkit-scrollbar, .a::-webkit-scrollbar, .f::-webkit-scrollbar { width: 8px; height: 8px }\
+          </style><body style='margin:0'>\
+          <div class=s><div id=s></div></div>\
+          <div class=a><div id=a style='height:300px'></div></div>\
+          <div class=f><div id=f style='height:30px'></div></div>\
+          <div class=n><div id=n style='height:300px'></div></div>",
+        &url,
+        None,
+    );
+    r.layout(Size::new(400.0, 600.0)).unwrap();
+    let dom = r.dom().unwrap();
+    let width = |id: &str| {
+        let n = dom
+            .descendants(r.document().unwrap())
+            .find(|&n| dom.is_element(n) && dom.get_attribute(n, "id") == Some(id))
+            .unwrap();
+        r.geometry(n).unwrap().border_box.width
+    };
+    assert_eq!(
+        [width("s"), width("a"), width("f"), width("n")],
+        [192.0, 192.0, 200.0, 200.0]
+    );
+}
+
 /// A scroll container's `::-webkit-scrollbar` parts style its scroll bars when it sets neither
 /// `scrollbar-width` nor `scrollbar-color`: `display: none` hides them, the part's `width` is the
 /// bar's, the thumb and track are drawn in their backgrounds, and a state pseudo-class after a part

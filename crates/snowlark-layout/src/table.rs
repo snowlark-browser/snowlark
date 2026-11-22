@@ -1492,6 +1492,7 @@ fn adjust_cell<S: Style>(
             pseudo_of: b.pseudo_of,
             border: collapsed.unwrap_or(b.border),
             padding: b.padding,
+            scrollbar: b.scrollbar,
             flags: b.flags
                 | extra_flags
                 | if collapsed.is_some() {

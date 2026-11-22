@@ -309,6 +309,7 @@ impl<S: Style> Refresh<'_, S> {
                     pseudo_of: b.pseudo_of,
                     border: b.border,
                     padding: b.padding,
+                    scrollbar: b.scrollbar,
                     flags: b.flags,
                     order: b.order,
                     subtree_end: b.subtree_end,

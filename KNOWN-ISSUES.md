@@ -55,8 +55,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 ## CSS and style
 
 - **Custom scroll bars.** `::-webkit-scrollbar` and its thumb and track style a box's scroll bars (hidden, thinner,
-  colored), but a box's custom bars are drawn over its content rather than taking layout space, their `:hover` and
-  `:active` rules do not apply, the buttons and corner are not drawn, and the scrollbar pseudo-classes
+  colored) and take layout space beside the content, but their `:hover` and `:active` rules do not apply, the
+  buttons are not drawn, and the scrollbar pseudo-classes
   (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
   parse but style nothing. (ref 627)
 - **No scroll anchoring.** `overflow-anchor` does not parse, and content that grows or shrinks above what the

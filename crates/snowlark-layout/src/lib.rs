@@ -30,6 +30,7 @@ mod flex_grid;
 mod floats;
 mod flow;
 mod fragment;
+mod gutter;
 mod incremental;
 mod inline;
 mod intrinsic;
@@ -408,6 +409,7 @@ impl<S: Style> LayoutTree<S> {
                 pseudo_of: None,
                 border: Default::default(),
                 padding: Default::default(),
+                scrollbar: Default::default(),
                 flags: fragment_flags::INITIAL_CONTAINING_BLOCK,
                 order: 0,
                 subtree_end: u32::MAX,

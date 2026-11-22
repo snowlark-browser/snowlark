@@ -383,6 +383,46 @@ fn placement(l: GridLine) -> taffy::GridPlacement<Arc<str>> {
     }
 }
 
+/// The space a flex or grid container's custom scroll bars take ([`crate::gutter`]), for taffy,
+/// which subtracts a scroll bar's thickness from the content box on an axis that is `scroll` (at
+/// the inline end, the left in `rtl`, and the bottom). (A leaf item's own layout takes its bars'
+/// space, so it is not given any here.)
+fn scrollbar_gutter<S: Style>(t: &mut TStyle, b: &LayoutBox<S>) {
+    if !matches!(b.kind, BoxKind::Flex | BoxKind::Grid) {
+        return;
+    }
+    let g = crate::gutter::gutter(b);
+    let (vertical, horizontal) = (g.left + g.right, g.bottom);
+    let scroll = |on: bool, o: taffy::Overflow| match (on, o) {
+        (true, _) => taffy::Overflow::Scroll,
+        (false, taffy::Overflow::Scroll) => taffy::Overflow::Hidden,
+        (false, o) => o,
+    };
+    if crate::gutter::custom_bars(b).is_some() {
+        t.overflow = taffy::Point {
+            x: scroll(horizontal > 0.0, t.overflow.x),
+            y: scroll(vertical > 0.0, t.overflow.y),
+        };
+        // (taffy has one thickness for both bars; they differ only when the parts say so)
+        t.scrollbar_width = vertical.max(horizontal);
+    }
+}
+
+/// A flex or grid container's custom scroll bars changed ([`crate::gutter::set_bars`]): its
+/// taffy style takes their new space.
+pub(crate) fn scrollbars_changed<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) {
+    let b = cx.tree.b(id);
+    if !matches!(b.kind, BoxKind::Flex | BoxKind::Grid) || b.cache.taffy.is_none() {
+        return;
+    }
+    let mut style = cx.tree.b(id).cache.taffy.as_ref().unwrap().style.clone();
+    scrollbar_gutter(&mut style, cx.tree.b(id));
+    let node = cx.tree.b_mut(id).cache.taffy.as_mut().unwrap();
+    node.style = style;
+    node.cache.clear();
+    node.built = None;
+}
+
 /// Converts a box's style for taffy.
 fn taffy_style<S: Style>(b: &LayoutBox<S>, s: &S, calcs: &mut Vec<LengthPercentage>) -> TStyle {
     let overflow = |o: Overflow| match o {
@@ -527,6 +567,7 @@ fn taffy_style<S: Style>(b: &LayoutBox<S>, s: &S, calcs: &mut Vec<LengthPercenta
     };
     t.margin = sides_lpa(&|side| s.margin(side), calcs);
     t.inset = sides_lpa(&|side| s.inset(side), calcs);
+    scrollbar_gutter(&mut t, b);
     if b.kind == BoxKind::Grid {
         let (cols, col_names) = template(&s.grid_template_columns(), calcs);
         let (rows, row_names) = template(&s.grid_template_rows(), calcs);
@@ -2204,12 +2245,15 @@ fn build_fragment<S: Style>(
         let o = cx.oof_candidate(c, sp(cand.static_position.x), sp(cand.static_position.y));
         oof.push(o);
     }
+    // (taffy took the space of the container's custom scroll bars out of its content box)
+    let gutter = crate::gutter::gutter(cx.tree.b(id));
     if oof.iter().any(|o| o.cb == Some(id)) {
+        // (the padding box, inside the scroll bars)
         let pad = Rect::new(
-            border.left,
+            border.left + gutter.left,
             border.top,
-            (size.width - border.left - border.right).max(0.0),
-            (size.height - border.top - border.bottom).max(0.0),
+            (size.width - border.left - border.right - gutter.left - gutter.right).max(0.0),
+            (size.height - border.top - border.bottom - gutter.bottom).max(0.0),
         );
         if grid {
             oof = place_grid_oofs(cx, id, pad, oof, &mut children);
@@ -2224,20 +2268,23 @@ fn build_fragment<S: Style>(
             inflow = Some(inflow.map_or(tracks, |a| unite(a, tracks)));
         }
     }
-    let fragment = with_inflow(
-        box_fragment(
-            cx,
-            id,
-            size,
-            border,
-            padding,
-            children,
-            baseline,
-            last_line_baseline,
-            BoxContent::None,
-            0,
+    let fragment = with_scrollbar(
+        with_inflow(
+            box_fragment(
+                cx,
+                id,
+                size,
+                border,
+                padding,
+                children,
+                baseline,
+                last_line_baseline,
+                BoxContent::None,
+                0,
+            ),
+            inflow,
         ),
-        inflow,
+        gutter,
     );
     (fragment, oof)
 }

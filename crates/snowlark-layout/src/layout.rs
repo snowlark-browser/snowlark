@@ -477,11 +477,36 @@ impl<'a, S: Style> Cx<'a, S> {
         if outer_flow && !crate::multicol::passes_spanners(b) {
             self.column_flow = false;
         }
+        let mut bfc = bfc;
         let result = if b.style.view() != self.frame {
             // A box in another writing mode (CSS Writing Modes 4 §3.2): laid out in its own frame.
             self.layout_across(id, kind, space)
         } else {
-            self.dispatch(id, kind, space, bfc, at)
+            let mut r = self.dispatch(id, kind, space, bfc.as_deref_mut(), at);
+            // An `auto` custom scroll bar that appears or goes changes the space the content has:
+            // the box is laid out again with it (`crate::gutter`). The second time a bar can only
+            // be added (the one that went would come back).
+            for again in [false, true] {
+                let Some(mut bars) = crate::gutter::changed_bars(self.tree.b(id), &r.fragment)
+                else {
+                    break;
+                };
+                if again {
+                    let b = self.tree.b(id);
+                    bars.0 |= b.has(flags::VERTICAL_BAR);
+                    bars.1 |= b.has(flags::HORIZONTAL_BAR);
+                    if bars == (b.has(flags::VERTICAL_BAR), b.has(flags::HORIZONTAL_BAR)) {
+                        break;
+                    }
+                }
+                let b = self.tree.b_mut(id);
+                crate::gutter::set_bars(b, bars);
+                b.cache.intrinsic = None;
+                crate::flex_grid::scrollbars_changed(self, id);
+                self.stats.relaid += 1;
+                r = self.dispatch(id, kind, space, bfc.as_deref_mut(), at);
+            }
+            r
         };
         if independent {
             self.clamp = outer_clamp;
@@ -805,6 +830,20 @@ pub(crate) fn with_inflow<S: Style>(
     f
 }
 
+/// `f` (just made, not shared yet) with the space its custom scroll bars take
+/// ([`BoxFragment::scrollbar`]; its padding is inside it).
+pub(crate) fn with_scrollbar<S: Style>(mut f: Arc<Fragment<S>>, gutter: Sides) -> Arc<Fragment<S>> {
+    if gutter.is_zero() {
+        return f;
+    }
+    if let Some(FragmentKind::Box(b)) = Arc::get_mut(&mut f).map(|m| &mut m.kind) {
+        b.scrollbar = gutter;
+    } else {
+        debug_assert!(false, "with_scrollbar on a shared fragment");
+    }
+    f
+}
+
 /// A box fragment for `id` with the given geometry and children; computes overflow.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn box_fragment<S: Style>(
@@ -854,6 +893,7 @@ pub(crate) fn box_fragment<S: Style>(
             pseudo_of: b.pseudo_of,
             border,
             padding,
+            scrollbar: Sides::default(),
             flags: box_flags(b) | extra_flags,
             order: b.order,
             subtree_end: cx.tree.subtree_end(id),

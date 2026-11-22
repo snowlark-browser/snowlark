@@ -32,6 +32,9 @@ pub(crate) struct BlockSizes {
     pub height: Option<f32>,
     pub min_height: Option<f32>,
     pub max_height: Option<f32>,
+    /// The space the box's custom scroll bars take ([`crate::gutter`]): between its border and
+    /// padding, out of its content box.
+    pub gutter: Sides,
 }
 
 /// The value a box's `width` is used as: a button's `auto` inline size is the fit-content inline
@@ -177,6 +180,7 @@ pub(crate) fn block_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId, space: &Space
         height,
         min_height,
         max_height,
+        gutter: crate::gutter::gutter(cx.tree.b(id)),
     }
 }
 
@@ -411,7 +415,15 @@ pub(crate) fn layout_block_container_box<S: Style>(
     let style = b.style.clone();
     let independent = b.is_independent() || parent_bfc.is_none();
     let inline_content = b.has_inline_content();
-    let edges = sizes.edges;
+    // (the space custom scroll bars take is padding to the content's layout: CSS Overflow 3 §3)
+    let gutter = sizes.gutter;
+    let mut edges = sizes.edges;
+    edges.padding = Sides::new(
+        edges.padding.top + gutter.top,
+        edges.padding.right + gutter.right,
+        edges.padding.bottom + gutter.bottom,
+        edges.padding.left + gutter.left,
+    );
     let border = edges.border;
     let padding = edges.padding;
     // (inside a line-clamp container, a clamp point in this box must leave room for its block-end
@@ -748,11 +760,12 @@ pub(crate) fn layout_block_container_box<S: Style>(
     // Table cells and captions paint their own borders; anything else as computed.
     frag_border.top = border.top;
     if oof.iter().any(|o| o.cb == Some(id)) {
+        // (the padding box, inside the scroll bars)
         let pad = Rect::new(
-            border.left,
+            border.left + gutter.left,
             border.top,
-            (size.width - border.left - border.right).max(0.0),
-            (size.height - border.top - border.bottom).max(0.0),
+            (size.width - border.left - border.right - gutter.left - gutter.right).max(0.0),
+            (size.height - border.top - border.bottom - gutter.bottom).max(0.0),
         );
         oof = cx.place_oofs(id, pad, oof, &mut children);
     }
@@ -768,20 +781,23 @@ pub(crate) fn layout_block_container_box<S: Style>(
     if let Some(c) = cx.clamp.as_mut() {
         c.end_bp -= clamp_bp;
     }
-    let fragment = with_inflow(
-        box_fragment(
-            cx,
-            id,
-            size,
-            frag_border,
-            padding,
-            children,
-            baseline,
-            last_baseline,
-            BoxContent::None,
-            extra,
+    let fragment = with_scrollbar(
+        with_inflow(
+            box_fragment(
+                cx,
+                id,
+                size,
+                frag_border,
+                sizes.edges.padding,
+                children,
+                baseline,
+                last_baseline,
+                BoxContent::None,
+                extra,
+            ),
+            inflow,
         ),
-        inflow,
+        gutter,
     );
     LayoutResult {
         fragment,
