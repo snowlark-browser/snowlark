@@ -5235,6 +5235,25 @@ impl Renderer {
         }
     }
 
+    /// CSS Properties and Values API 1 §2.4 `registerProperty()` for the attached document (see
+    /// [`StyleEngine::register_property`]); the document restyles at the next update. Without a
+    /// document there is nothing to style, and nothing is registered.
+    pub fn register_property(
+        &mut self,
+        name: &str,
+        syntax: &str,
+        inherits: bool,
+        initial_value: Option<&str>,
+    ) -> Result<(), snowlark_style::RegisterPropertyError> {
+        let Some(doc) = self.doc.as_deref_mut() else {
+            return Ok(());
+        };
+        doc.engine
+            .register_property(name, syntax, inherits, initial_value)?;
+        doc.needs_restyle = true;
+        Ok(())
+    }
+
     /// Whether the media query list `query` matches the device (`matchMedia`).
     pub fn evaluate_media(&self, query: &str) -> bool {
         let Some(doc) = self.doc.as_deref() else {

@@ -2132,6 +2132,117 @@ fn legacy_webkit_box_properties() {
     );
 }
 
+/// The legacy `-webkit-` names of logical, multi-column and fragmentation properties are aliases
+/// of their standard names (Compat: what pages rely on), and `-webkit-min-content`,
+/// `-webkit-max-content` and `-webkit-fit-content` are the sizing keywords without the prefix
+/// (CSS Sizing 3 §3.2). The declarations apply, so the boxes move and size.
+#[test]
+fn legacy_webkit_logical_and_column_aliases() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0 } div { height: 10px }</style>\
+         <div style='width: 300px; display: flow-root'><div id=m style='-webkit-margin-start: 20px; -webkit-margin-end: 30px;\
+           -webkit-margin-before: 5px; -webkit-padding-start: 7px'></div></div>\
+         <div style='width: 300px; direction: rtl'><div id=r style='-webkit-margin-start: 20px'></div></div>\
+         <div id=b style='width: 100px; -webkit-border-start: 4px solid red; -webkit-border-after-width: 3px;\
+           -webkit-border-after-style: solid'></div>\
+         <div id=c style='width: 210px; -webkit-columns: 2; -webkit-column-gap: 10px'></div>\
+         <div id=w style='width: -webkit-fit-content; min-width: -webkit-min-content; max-width: -webkit-max-content'>\
+           <span style='display: inline-block; width: 40px'></span></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const b = id => document.getElementById(id).getBoundingClientRect();
+         const cs = id => getComputedStyle(document.getElementById(id));
+         [b('m').left, b('m').width, b('m').top - document.getElementById('m').parentElement.getBoundingClientRect().top,
+          cs('m').paddingLeft, b('r').right, cs('b').borderLeftWidth, cs('b').borderBottomWidth,
+          cs('c').columnCount, cs('c').columnGap, b('w').width,
+          document.getElementById('m').style.webkitMarginStart,
+          CSS.supports('-webkit-box-decoration-break', 'clone'), CSS.supports('-webkit-writing-mode', 'vertical-rl'),
+          CSS.supports('-webkit-column-rule', '1px solid'), CSS.supports('-webkit-column-span', 'all'),
+          CSS.supports('height', '-webkit-fit-content')].join('|')",
+    );
+    assert_eq!(
+        r,
+        "20|250|5|7px|280|4px|3px|2|10px|40|20px|true|true|true|true|true"
+    );
+}
+
+/// Compat: `outline-color` takes `-webkit-focus-ring-color` (the platform's focus ring colour, a
+/// lighter one in a dark scheme), which other colour properties refuse outside quirks mode.
+/// `-webkit-tap-highlight-color` (inherited, 18% black at first) and `-webkit-font-smoothing` are
+/// properties, and so is CSS Size Adjust 1's `text-size-adjust` (`auto | none | <percentage>`,
+/// inherited) with its `-webkit-` alias.
+#[test]
+fn focus_ring_color_tap_highlight_font_smoothing_and_text_size_adjust() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><div id=a style='outline: -webkit-focus-ring-color auto 1px;\
+           -webkit-tap-highlight-color: red; -webkit-font-smoothing: antialiased;\
+           -webkit-text-size-adjust: 120%'><i id=i></i></div>\
+         <div id=d style='color-scheme: dark; outline-color: -webkit-focus-ring-color'></div>\
+         <div id=n style='color: -webkit-focus-ring-color'></div><p id=p></p>",
+    );
+    let r = eval(
+        &mut page,
+        "const cs = id => getComputedStyle(document.getElementById(id));
+         const s = document.getElementById('a').style;
+         [cs('a').outlineColor, cs('a').outlineStyle, cs('d').outlineColor, cs('n').color,
+          cs('a').webkitTapHighlightColor, cs('i').webkitTapHighlightColor, cs('p').webkitTapHighlightColor,
+          cs('i').webkitFontSmoothing, cs('p').webkitFontSmoothing,
+          cs('i').textSizeAdjust, cs('a').webkitTextSizeAdjust, cs('p').textSizeAdjust, s.cssText,
+          CSS.supports('color', '-webkit-focus-ring-color'), CSS.supports('outline-color', '-webkit-focus-ring-color'),
+          CSS.supports('text-size-adjust', 'none'), CSS.supports('text-size-adjust', '-1%'),
+          CSS.supports('-webkit-font-smoothing', 'subpixel-antialiased'),
+          CSS.supports('-webkit-font-smoothing', 'grayscale')].join('|')",
+    );
+    assert_eq!(
+        r,
+        "rgb(16, 16, 16)|auto|rgb(238, 238, 238)|rgb(0, 0, 0)|rgb(255, 0, 0)|rgb(255, 0, 0)|rgba(0, 0, 0, 0.18)|\
+         antialiased|auto|120%|120%|auto|outline: -webkit-focus-ring-color auto 1px; \
+         -webkit-tap-highlight-color: red; -webkit-font-smoothing: antialiased; text-size-adjust: 120%;|\
+         false|true|true|false|true|false"
+    );
+}
+
+/// CSS Properties and Values API 1: an `@property` rule registers its custom property (§3: the
+/// initial value applies, a non-inheriting one does not inherit, a value computes by its syntax),
+/// the CSSOM shows it as a `CSSPropertyRule` (§5.1), and `CSS.registerProperty()` (§2.4)
+/// registers one from script, throwing `InvalidModificationError` for a name already registered
+/// and `SyntaxError` for an invalid syntax or initial value.
+#[test]
+fn property_rules_and_register_property() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>@property --w { syntax: '<length>'; inherits: false; initial-value: 7px }\
+         @property --bad { syntax: '<length>'; inherits: false }\
+         #a { width: var(--w); height: 10px } #b { --w: calc(2px + 3px); --bad: 3px }</style>\
+         <div id=a><div id=b></div><div id=c></div></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const cs = id => getComputedStyle(document.getElementById(id));
+         const rules = document.styleSheets[0].cssRules, p = rules[0];
+         const err = f => { try { f(); return 'ok'; } catch (e) { return e.name; } };
+         const reg = err(() => CSS.registerProperty({ name: '--c', syntax: '<color>', inherits: true, initialValue: 'red' }));
+         [String(p), p.name, p.syntax, p.inherits, p.initialValue, rules.length, String(rules[1]),
+          cs('a').getPropertyValue('--w'), cs('a').width, cs('b').getPropertyValue('--w'),
+          cs('c').getPropertyValue('--w'), reg, cs('c').getPropertyValue('--c'),
+          err(() => CSS.registerProperty({ name: '--c', syntax: '*' })),
+          err(() => CSS.registerProperty({ name: '--d', syntax: '<length' })),
+          err(() => CSS.registerProperty({ name: '--d', syntax: '<length>' })),
+          err(() => CSS.registerProperty({ name: 'd', syntax: '*' }))].join('|')",
+    );
+    assert_eq!(
+        r,
+        "[object CSSPropertyRule]|--w|<length>|false|7px|3|[object CSSStyleRule]|7px|7px|5px|7px|ok|\
+         rgb(255, 0, 0)|InvalidModificationError|SyntaxError|SyntaxError|SyntaxError"
+    );
+}
+
 /// CSS Overflow 4 §5.2 legacy line clamping: `display: -webkit-box;
 /// -webkit-box-orient: vertical; -webkit-line-clamp: N` computes to `flow-root` (as in Chrome and
 /// Gecko) and keeps N lines; `-webkit-box` without a clamp is a flex container in its orient's

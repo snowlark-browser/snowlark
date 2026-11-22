@@ -86,6 +86,16 @@ pub enum MediaKind {
     Print,
 }
 
+/// Why [`StyleEngine::register_property`] refused a registration (CSS Properties and Values API 1
+/// §2.4: `InvalidModificationError` and `SyntaxError`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RegisterPropertyError {
+    /// The name is registered already.
+    AlreadyRegistered,
+    /// The name, the syntax or the initial value is invalid.
+    Invalid,
+}
+
 /// Whether restyles use stylo's thread pool.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Parallelism {
@@ -1312,6 +1322,38 @@ impl StyleEngine {
         // outside any layer last).
         out.sort_by(|a, b| a.0.cmp(&b.0));
         out.into_iter().map(|(_, f)| f).collect()
+    }
+
+    /// CSS Properties and Values API 1 §2.4 `registerProperty()`: registers `name` with its
+    /// syntax, inheritance and initial value (resolved against the document's URL) in the
+    /// document's set of registered properties, and restyles the document, whose custom property
+    /// values now compute by the registration.
+    pub fn register_property(
+        &mut self,
+        name: &str,
+        syntax: &str,
+        inherits: bool,
+        initial_value: Option<&str>,
+    ) -> Result<(), RegisterPropertyError> {
+        use style::stylist::RegisterCustomPropertyResult as R;
+        match self.stylist.register_custom_property(
+            &self.url,
+            name,
+            syntax,
+            inherits,
+            initial_value,
+        ) {
+            R::SuccessfullyRegistered => {
+                self.restyle_all = true;
+                Ok(())
+            }
+            R::AlreadyRegistered => Err(RegisterPropertyError::AlreadyRegistered),
+            R::InvalidName
+            | R::InvalidSyntax
+            | R::NoInitialValue
+            | R::InvalidInitialValue
+            | R::InitialValueNotComputationallyIndependent => Err(RegisterPropertyError::Invalid),
+        }
     }
 
     /// Parses `css` as a user-origin sheet and adds it (an embedder's: the content blocker's

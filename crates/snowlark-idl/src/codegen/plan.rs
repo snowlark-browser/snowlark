@@ -306,6 +306,7 @@ pub const SCOPE: &[&str] = &[
     "CSSNamespaceRule",
     "CSSLayerBlockRule",
     "CSSLayerStatementRule",
+    "CSSPropertyRule",
     "MediaQueryList",
     "MediaQueryListEvent",
     // Session history.

@@ -467,6 +467,32 @@ the source; `git log -p vendor/stylo` shows the diff.
    in the box struct, as `-webkit-box-orient` is (patch 11). An element whose layout parent is a `-webkit-box`
    gets the flag `IS_WEBKIT_BOX_ITEM`, so snowlark-render can give it the legacy box's item rules (its flex
    from `-webkit-box-flex`, its order from `-webkit-box-ordinal-group`) without changing computed values.
+82. **The legacy `-webkit-` names of logical, multi-column and fragmentation properties**
+   (`properties/longhands.toml`, `properties/shorthands.toml`, `properties/counted_unknown_properties.py`,
+   `values/specified/length.rs`): upstream has none
+   of them. They are aliases, as the web relies on: `-webkit-margin-`/`-padding-`/`-border-` `start`/`end`/
+   `before`/`after` (and the borders' `-color`/`-style`/`-width`) of the inline and block start and end
+   properties, `-webkit-column-count`/`-gap`/`-width`/`-span`/`-rule` (and its longhands)/`-webkit-columns`,
+   `-webkit-box-decoration-break` and `-webkit-writing-mode`. Sizes take `-webkit-min-content`,
+   `-webkit-max-content` and `-webkit-fit-content` as the keywords without the prefix (as `-moz-` ones).
+83. **`-webkit-focus-ring-color`, `-webkit-tap-highlight-color`, `-webkit-font-smoothing` and
+   `text-size-adjust`** (`values/specified/color.rs`, `device/servo.rs`, `properties/longhands.toml`,
+   `properties/shorthands.rs`, `properties/counted_unknown_properties.py`, `values/*/text.rs`, Compat and CSS
+   Size Adjust 1): the servo `SystemColor` gets `-webkit-focus-ring-color` (rgb(16, 16, 16), or
+   rgb(238, 238, 238) in a dark scheme), which `outline-color` and `outline` take (`Color::parse_outline_color`)
+   and any colour takes in a UA sheet or in quirks mode. `-webkit-tap-highlight-color` (inherited colour,
+   initially 18% black) and `-webkit-font-smoothing` (`auto | none | antialiased | subpixel-antialiased`) are
+   inherited servo longhands that nothing reads yet; `text-size-adjust` (`auto | none | <percentage [0,∞]>`,
+   alias `-webkit-text-size-adjust`, `GenericTextSizeAdjust`) is one too: text autosizing is for small
+   screens, so no desktop layout changes with it.
+84. **`-webkit-user-drag` in the servo build** (`properties/longhands.toml`,
+   `properties/counted_unknown_properties.py`, Compat): a servo longhand of the box struct, `auto | none |
+   element`, not inherited. snowlark-page reads it to choose what a press drags: `element` makes a box a drag
+   source, `none` keeps an image, a link or a `draggable` element from being one.
+85. **Scroll snap properties in the servo build** (`properties/longhands.toml`, `values/specified/box.rs`, CSS
+   Scroll Snap 1): `scroll-snap-type`, `scroll-snap-align` and `scroll-snap-stop` lose their gecko-only engine
+   line, and `ScrollSnapType` (`axis`, `strictness`) and `ScrollSnapAlign` (`block`, `inline`) get public
+   getters. snowlark-page snaps scrolls with them; `scroll-margin` and `scroll-padding` were already there.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

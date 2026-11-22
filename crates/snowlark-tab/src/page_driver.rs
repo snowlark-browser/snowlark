@@ -594,6 +594,7 @@ impl PageDriver {
             });
             (root, body)
         };
+        self.info.snap_viewport = doc.is_some_and(|d| engine.scroll_snaps(d));
         // (`overflow: hidden` containers and sub-pixel overflow are not user-scrollable)
         self.info.scrollers = engine
             .user_scroll_containers()
@@ -1440,6 +1441,19 @@ impl TabDriver for PageDriver {
             }
         }
         moved
+    }
+
+    fn snap_scroll(&mut self, node: Option<NodeId>, delta: Point, key: bool) -> bool {
+        // (a box that does not snap scrolls by the notch at once, as without snapping)
+        if let Some(n) = node {
+            if !self.page.engine().scroll_snaps(n) {
+                return self.scroll_container(n, delta);
+            }
+        }
+        // (the box goes there smoothly over the next rendering updates, which report the
+        // scrollers' positions again)
+        self.page
+            .with(|e, cx| e.snap_scroll_by(cx, node, delta, key))
     }
 
     fn info(&self) -> &DocumentInfo {

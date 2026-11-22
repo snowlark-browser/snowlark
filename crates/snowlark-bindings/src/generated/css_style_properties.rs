@@ -2718,6 +2718,1254 @@ pub(crate) fn attr_prop_dash__webkit_background_size_set<D: Dom, const LO: u16, 
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after] attribute CSSOMString WebkitBorderAfter;`.
+pub(crate) fn attr_prop_upper_webkit_border_after_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after] attribute CSSOMString WebkitBorderAfter;`.
+pub(crate) fn attr_prop_upper_webkit_border_after_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after] attribute CSSOMString webkitBorderAfter;`.
+pub(crate) fn attr_prop_webkit_border_after_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after] attribute CSSOMString webkitBorderAfter;`.
+pub(crate) fn attr_prop_webkit_border_after_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after] attribute CSSOMString -webkit-border-after;`.
+pub(crate) fn attr_prop_dash__webkit_border_after_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-after");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after] attribute CSSOMString -webkit-border-after;`.
+pub(crate) fn attr_prop_dash__webkit_border_after_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-after");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-color] attribute CSSOMString WebkitBorderAfterColor;`.
+pub(crate) fn attr_prop_upper_webkit_border_after_color_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderAfterColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-color] attribute CSSOMString WebkitBorderAfterColor;`.
+pub(crate) fn attr_prop_upper_webkit_border_after_color_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderAfterColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-color] attribute CSSOMString webkitBorderAfterColor;`.
+pub(crate) fn attr_prop_webkit_border_after_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderAfterColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-color] attribute CSSOMString webkitBorderAfterColor;`.
+pub(crate) fn attr_prop_webkit_border_after_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderAfterColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-color] attribute CSSOMString -webkit-border-after-color;`.
+pub(crate) fn attr_prop_dash__webkit_border_after_color_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-after-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-color] attribute CSSOMString -webkit-border-after-color;`.
+pub(crate) fn attr_prop_dash__webkit_border_after_color_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-after-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-style] attribute CSSOMString WebkitBorderAfterStyle;`.
+pub(crate) fn attr_prop_upper_webkit_border_after_style_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderAfterStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-style] attribute CSSOMString WebkitBorderAfterStyle;`.
+pub(crate) fn attr_prop_upper_webkit_border_after_style_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderAfterStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-style] attribute CSSOMString webkitBorderAfterStyle;`.
+pub(crate) fn attr_prop_webkit_border_after_style_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderAfterStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-style] attribute CSSOMString webkitBorderAfterStyle;`.
+pub(crate) fn attr_prop_webkit_border_after_style_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderAfterStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-style] attribute CSSOMString -webkit-border-after-style;`.
+pub(crate) fn attr_prop_dash__webkit_border_after_style_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-after-style");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-style] attribute CSSOMString -webkit-border-after-style;`.
+pub(crate) fn attr_prop_dash__webkit_border_after_style_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-after-style");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-width] attribute CSSOMString WebkitBorderAfterWidth;`.
+pub(crate) fn attr_prop_upper_webkit_border_after_width_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderAfterWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-width] attribute CSSOMString WebkitBorderAfterWidth;`.
+pub(crate) fn attr_prop_upper_webkit_border_after_width_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderAfterWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-width] attribute CSSOMString webkitBorderAfterWidth;`.
+pub(crate) fn attr_prop_webkit_border_after_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderAfterWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-width] attribute CSSOMString webkitBorderAfterWidth;`.
+pub(crate) fn attr_prop_webkit_border_after_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderAfterWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-width] attribute CSSOMString -webkit-border-after-width;`.
+pub(crate) fn attr_prop_dash__webkit_border_after_width_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-after-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-after-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-after-width] attribute CSSOMString -webkit-border-after-width;`.
+pub(crate) fn attr_prop_dash__webkit_border_after_width_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-after-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-after-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before] attribute CSSOMString WebkitBorderBefore;`.
+pub(crate) fn attr_prop_upper_webkit_border_before_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before] attribute CSSOMString WebkitBorderBefore;`.
+pub(crate) fn attr_prop_upper_webkit_border_before_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before] attribute CSSOMString webkitBorderBefore;`.
+pub(crate) fn attr_prop_webkit_border_before_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before] attribute CSSOMString webkitBorderBefore;`.
+pub(crate) fn attr_prop_webkit_border_before_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before] attribute CSSOMString -webkit-border-before;`.
+pub(crate) fn attr_prop_dash__webkit_border_before_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-before");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before] attribute CSSOMString -webkit-border-before;`.
+pub(crate) fn attr_prop_dash__webkit_border_before_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-before");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-color] attribute CSSOMString WebkitBorderBeforeColor;`.
+pub(crate) fn attr_prop_upper_webkit_border_before_color_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderBeforeColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-color] attribute CSSOMString WebkitBorderBeforeColor;`.
+pub(crate) fn attr_prop_upper_webkit_border_before_color_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderBeforeColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-color] attribute CSSOMString webkitBorderBeforeColor;`.
+pub(crate) fn attr_prop_webkit_border_before_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderBeforeColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-color] attribute CSSOMString webkitBorderBeforeColor;`.
+pub(crate) fn attr_prop_webkit_border_before_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderBeforeColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-color] attribute CSSOMString -webkit-border-before-color;`.
+pub(crate) fn attr_prop_dash__webkit_border_before_color_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-before-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-color] attribute CSSOMString -webkit-border-before-color;`.
+pub(crate) fn attr_prop_dash__webkit_border_before_color_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-before-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-style] attribute CSSOMString WebkitBorderBeforeStyle;`.
+pub(crate) fn attr_prop_upper_webkit_border_before_style_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderBeforeStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-style] attribute CSSOMString WebkitBorderBeforeStyle;`.
+pub(crate) fn attr_prop_upper_webkit_border_before_style_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderBeforeStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-style] attribute CSSOMString webkitBorderBeforeStyle;`.
+pub(crate) fn attr_prop_webkit_border_before_style_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderBeforeStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-style] attribute CSSOMString webkitBorderBeforeStyle;`.
+pub(crate) fn attr_prop_webkit_border_before_style_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderBeforeStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-style] attribute CSSOMString -webkit-border-before-style;`.
+pub(crate) fn attr_prop_dash__webkit_border_before_style_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-before-style");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-style] attribute CSSOMString -webkit-border-before-style;`.
+pub(crate) fn attr_prop_dash__webkit_border_before_style_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-before-style");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-width] attribute CSSOMString WebkitBorderBeforeWidth;`.
+pub(crate) fn attr_prop_upper_webkit_border_before_width_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderBeforeWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-width] attribute CSSOMString WebkitBorderBeforeWidth;`.
+pub(crate) fn attr_prop_upper_webkit_border_before_width_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderBeforeWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-width] attribute CSSOMString webkitBorderBeforeWidth;`.
+pub(crate) fn attr_prop_webkit_border_before_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderBeforeWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-width] attribute CSSOMString webkitBorderBeforeWidth;`.
+pub(crate) fn attr_prop_webkit_border_before_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderBeforeWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-width] attribute CSSOMString -webkit-border-before-width;`.
+pub(crate) fn attr_prop_dash__webkit_border_before_width_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-before-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-before-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-before-width] attribute CSSOMString -webkit-border-before-width;`.
+pub(crate) fn attr_prop_dash__webkit_border_before_width_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-before-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-before-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-bottom-left-radius] attribute CSSOMString WebkitBorderBottomLeftRadius;`.
 pub(crate) fn attr_prop_upper_webkit_border_bottom_left_radius_get<
     D: Dom,
@@ -3093,6 +4341,582 @@ pub(crate) fn attr_prop_dash__webkit_border_bottom_right_radius_set<
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end] attribute CSSOMString WebkitBorderEnd;`.
+pub(crate) fn attr_prop_upper_webkit_border_end_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end] attribute CSSOMString WebkitBorderEnd;`.
+pub(crate) fn attr_prop_upper_webkit_border_end_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end] attribute CSSOMString webkitBorderEnd;`.
+pub(crate) fn attr_prop_webkit_border_end_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end] attribute CSSOMString webkitBorderEnd;`.
+pub(crate) fn attr_prop_webkit_border_end_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end] attribute CSSOMString -webkit-border-end;`.
+pub(crate) fn attr_prop_dash__webkit_border_end_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-end");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end] attribute CSSOMString -webkit-border-end;`.
+pub(crate) fn attr_prop_dash__webkit_border_end_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-end");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-color] attribute CSSOMString WebkitBorderEndColor;`.
+pub(crate) fn attr_prop_upper_webkit_border_end_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderEndColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-color] attribute CSSOMString WebkitBorderEndColor;`.
+pub(crate) fn attr_prop_upper_webkit_border_end_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderEndColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-color] attribute CSSOMString webkitBorderEndColor;`.
+pub(crate) fn attr_prop_webkit_border_end_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderEndColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-color] attribute CSSOMString webkitBorderEndColor;`.
+pub(crate) fn attr_prop_webkit_border_end_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderEndColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-color] attribute CSSOMString -webkit-border-end-color;`.
+pub(crate) fn attr_prop_dash__webkit_border_end_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-end-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-color] attribute CSSOMString -webkit-border-end-color;`.
+pub(crate) fn attr_prop_dash__webkit_border_end_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-end-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-style] attribute CSSOMString WebkitBorderEndStyle;`.
+pub(crate) fn attr_prop_upper_webkit_border_end_style_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderEndStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-style] attribute CSSOMString WebkitBorderEndStyle;`.
+pub(crate) fn attr_prop_upper_webkit_border_end_style_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderEndStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-style] attribute CSSOMString webkitBorderEndStyle;`.
+pub(crate) fn attr_prop_webkit_border_end_style_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderEndStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-style] attribute CSSOMString webkitBorderEndStyle;`.
+pub(crate) fn attr_prop_webkit_border_end_style_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderEndStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-style] attribute CSSOMString -webkit-border-end-style;`.
+pub(crate) fn attr_prop_dash__webkit_border_end_style_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-end-style");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-style] attribute CSSOMString -webkit-border-end-style;`.
+pub(crate) fn attr_prop_dash__webkit_border_end_style_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-end-style");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-width] attribute CSSOMString WebkitBorderEndWidth;`.
+pub(crate) fn attr_prop_upper_webkit_border_end_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderEndWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-width] attribute CSSOMString WebkitBorderEndWidth;`.
+pub(crate) fn attr_prop_upper_webkit_border_end_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderEndWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-width] attribute CSSOMString webkitBorderEndWidth;`.
+pub(crate) fn attr_prop_webkit_border_end_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderEndWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-width] attribute CSSOMString webkitBorderEndWidth;`.
+pub(crate) fn attr_prop_webkit_border_end_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderEndWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-width] attribute CSSOMString -webkit-border-end-width;`.
+pub(crate) fn attr_prop_dash__webkit_border_end_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-end-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-end-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-end-width] attribute CSSOMString -webkit-border-end-width;`.
+pub(crate) fn attr_prop_dash__webkit_border_end_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-end-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-end-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-image] attribute CSSOMString WebkitBorderImage;`.
 pub(crate) fn attr_prop_upper_webkit_border_image_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -3371,6 +5195,630 @@ pub(crate) fn attr_prop_dash__webkit_border_radius_set<D: Dom, const LO: u16, co
             &mut cx,
             this,
             "-webkit-border-radius",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start] attribute CSSOMString WebkitBorderStart;`.
+pub(crate) fn attr_prop_upper_webkit_border_start_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start] attribute CSSOMString WebkitBorderStart;`.
+pub(crate) fn attr_prop_upper_webkit_border_start_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start] attribute CSSOMString webkitBorderStart;`.
+pub(crate) fn attr_prop_webkit_border_start_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start] attribute CSSOMString webkitBorderStart;`.
+pub(crate) fn attr_prop_webkit_border_start_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start] attribute CSSOMString -webkit-border-start;`.
+pub(crate) fn attr_prop_dash__webkit_border_start_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-start");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start] attribute CSSOMString -webkit-border-start;`.
+pub(crate) fn attr_prop_dash__webkit_border_start_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-start");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-color] attribute CSSOMString WebkitBorderStartColor;`.
+pub(crate) fn attr_prop_upper_webkit_border_start_color_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderStartColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-color] attribute CSSOMString WebkitBorderStartColor;`.
+pub(crate) fn attr_prop_upper_webkit_border_start_color_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderStartColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-color] attribute CSSOMString webkitBorderStartColor;`.
+pub(crate) fn attr_prop_webkit_border_start_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderStartColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-color] attribute CSSOMString webkitBorderStartColor;`.
+pub(crate) fn attr_prop_webkit_border_start_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderStartColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-color] attribute CSSOMString -webkit-border-start-color;`.
+pub(crate) fn attr_prop_dash__webkit_border_start_color_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-start-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-color] attribute CSSOMString -webkit-border-start-color;`.
+pub(crate) fn attr_prop_dash__webkit_border_start_color_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-start-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-style] attribute CSSOMString WebkitBorderStartStyle;`.
+pub(crate) fn attr_prop_upper_webkit_border_start_style_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderStartStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-style] attribute CSSOMString WebkitBorderStartStyle;`.
+pub(crate) fn attr_prop_upper_webkit_border_start_style_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderStartStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-style] attribute CSSOMString webkitBorderStartStyle;`.
+pub(crate) fn attr_prop_webkit_border_start_style_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderStartStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-style] attribute CSSOMString webkitBorderStartStyle;`.
+pub(crate) fn attr_prop_webkit_border_start_style_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderStartStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-style] attribute CSSOMString -webkit-border-start-style;`.
+pub(crate) fn attr_prop_dash__webkit_border_start_style_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-start-style");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-style] attribute CSSOMString -webkit-border-start-style;`.
+pub(crate) fn attr_prop_dash__webkit_border_start_style_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-start-style");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-width] attribute CSSOMString WebkitBorderStartWidth;`.
+pub(crate) fn attr_prop_upper_webkit_border_start_width_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBorderStartWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-width] attribute CSSOMString WebkitBorderStartWidth;`.
+pub(crate) fn attr_prop_upper_webkit_border_start_width_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBorderStartWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-width] attribute CSSOMString webkitBorderStartWidth;`.
+pub(crate) fn attr_prop_webkit_border_start_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBorderStartWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-width] attribute CSSOMString webkitBorderStartWidth;`.
+pub(crate) fn attr_prop_webkit_border_start_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBorderStartWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-width] attribute CSSOMString -webkit-border-start-width;`.
+pub(crate) fn attr_prop_dash__webkit_border_start_width_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-border-start-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-border-start-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-border-start-width] attribute CSSOMString -webkit-border-start-width;`.
+pub(crate) fn attr_prop_dash__webkit_border_start_width_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-border-start-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-border-start-width",
             &value,
         )
     };
@@ -3853,6 +6301,166 @@ pub(crate) fn attr_prop_dash__webkit_box_align_set<D: Dom, const LO: u16, const 
             &mut cx,
             this,
             "-webkit-box-align",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-box-decoration-break] attribute CSSOMString WebkitBoxDecorationBreak;`.
+pub(crate) fn attr_prop_upper_webkit_box_decoration_break_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitBoxDecorationBreak");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-box-decoration-break");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-box-decoration-break] attribute CSSOMString WebkitBoxDecorationBreak;`.
+pub(crate) fn attr_prop_upper_webkit_box_decoration_break_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitBoxDecorationBreak");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-box-decoration-break",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-box-decoration-break] attribute CSSOMString webkitBoxDecorationBreak;`.
+pub(crate) fn attr_prop_webkit_box_decoration_break_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitBoxDecorationBreak");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-box-decoration-break");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-box-decoration-break] attribute CSSOMString webkitBoxDecorationBreak;`.
+pub(crate) fn attr_prop_webkit_box_decoration_break_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitBoxDecorationBreak");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-box-decoration-break",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-box-decoration-break] attribute CSSOMString -webkit-box-decoration-break;`.
+pub(crate) fn attr_prop_dash__webkit_box_decoration_break_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-box-decoration-break");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-box-decoration-break");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-box-decoration-break] attribute CSSOMString -webkit-box-decoration-break;`.
+pub(crate) fn attr_prop_dash__webkit_box_decoration_break_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-box-decoration-break");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-box-decoration-break",
             &value,
         )
     };
@@ -5005,6 +7613,1302 @@ pub(crate) fn attr_prop_dash__webkit_clip_path_set<D: Dom, const LO: u16, const 
             &mut cx,
             this,
             "-webkit-clip-path",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-count] attribute CSSOMString WebkitColumnCount;`.
+pub(crate) fn attr_prop_upper_webkit_column_count_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitColumnCount");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-count");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-count] attribute CSSOMString WebkitColumnCount;`.
+pub(crate) fn attr_prop_upper_webkit_column_count_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitColumnCount");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-count",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-count] attribute CSSOMString webkitColumnCount;`.
+pub(crate) fn attr_prop_webkit_column_count_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitColumnCount");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-count");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-count] attribute CSSOMString webkitColumnCount;`.
+pub(crate) fn attr_prop_webkit_column_count_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitColumnCount");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-count",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-count] attribute CSSOMString -webkit-column-count;`.
+pub(crate) fn attr_prop_dash__webkit_column_count_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-column-count");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-count");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-count] attribute CSSOMString -webkit-column-count;`.
+pub(crate) fn attr_prop_dash__webkit_column_count_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-column-count");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-count",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-gap] attribute CSSOMString WebkitColumnGap;`.
+pub(crate) fn attr_prop_upper_webkit_column_gap_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitColumnGap");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-gap");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-gap] attribute CSSOMString WebkitColumnGap;`.
+pub(crate) fn attr_prop_upper_webkit_column_gap_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitColumnGap");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-gap",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-gap] attribute CSSOMString webkitColumnGap;`.
+pub(crate) fn attr_prop_webkit_column_gap_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitColumnGap");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-gap");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-gap] attribute CSSOMString webkitColumnGap;`.
+pub(crate) fn attr_prop_webkit_column_gap_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitColumnGap");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-gap",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-gap] attribute CSSOMString -webkit-column-gap;`.
+pub(crate) fn attr_prop_dash__webkit_column_gap_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-column-gap");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-gap");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-gap] attribute CSSOMString -webkit-column-gap;`.
+pub(crate) fn attr_prop_dash__webkit_column_gap_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-column-gap");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-gap",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule] attribute CSSOMString WebkitColumnRule;`.
+pub(crate) fn attr_prop_upper_webkit_column_rule_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitColumnRule");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule] attribute CSSOMString WebkitColumnRule;`.
+pub(crate) fn attr_prop_upper_webkit_column_rule_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitColumnRule");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule] attribute CSSOMString webkitColumnRule;`.
+pub(crate) fn attr_prop_webkit_column_rule_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitColumnRule");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule] attribute CSSOMString webkitColumnRule;`.
+pub(crate) fn attr_prop_webkit_column_rule_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitColumnRule");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule] attribute CSSOMString -webkit-column-rule;`.
+pub(crate) fn attr_prop_dash__webkit_column_rule_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-column-rule");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule] attribute CSSOMString -webkit-column-rule;`.
+pub(crate) fn attr_prop_dash__webkit_column_rule_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-column-rule");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-color] attribute CSSOMString WebkitColumnRuleColor;`.
+pub(crate) fn attr_prop_upper_webkit_column_rule_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitColumnRuleColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-color] attribute CSSOMString WebkitColumnRuleColor;`.
+pub(crate) fn attr_prop_upper_webkit_column_rule_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitColumnRuleColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-color] attribute CSSOMString webkitColumnRuleColor;`.
+pub(crate) fn attr_prop_webkit_column_rule_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitColumnRuleColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-color] attribute CSSOMString webkitColumnRuleColor;`.
+pub(crate) fn attr_prop_webkit_column_rule_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitColumnRuleColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-color] attribute CSSOMString -webkit-column-rule-color;`.
+pub(crate) fn attr_prop_dash__webkit_column_rule_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-column-rule-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-color] attribute CSSOMString -webkit-column-rule-color;`.
+pub(crate) fn attr_prop_dash__webkit_column_rule_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-column-rule-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-style] attribute CSSOMString WebkitColumnRuleStyle;`.
+pub(crate) fn attr_prop_upper_webkit_column_rule_style_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitColumnRuleStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-style] attribute CSSOMString WebkitColumnRuleStyle;`.
+pub(crate) fn attr_prop_upper_webkit_column_rule_style_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitColumnRuleStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-style] attribute CSSOMString webkitColumnRuleStyle;`.
+pub(crate) fn attr_prop_webkit_column_rule_style_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitColumnRuleStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-style] attribute CSSOMString webkitColumnRuleStyle;`.
+pub(crate) fn attr_prop_webkit_column_rule_style_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitColumnRuleStyle");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-style] attribute CSSOMString -webkit-column-rule-style;`.
+pub(crate) fn attr_prop_dash__webkit_column_rule_style_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-column-rule-style");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule-style");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-style] attribute CSSOMString -webkit-column-rule-style;`.
+pub(crate) fn attr_prop_dash__webkit_column_rule_style_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-column-rule-style");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule-style",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-width] attribute CSSOMString WebkitColumnRuleWidth;`.
+pub(crate) fn attr_prop_upper_webkit_column_rule_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitColumnRuleWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-width] attribute CSSOMString WebkitColumnRuleWidth;`.
+pub(crate) fn attr_prop_upper_webkit_column_rule_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitColumnRuleWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-width] attribute CSSOMString webkitColumnRuleWidth;`.
+pub(crate) fn attr_prop_webkit_column_rule_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitColumnRuleWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-width] attribute CSSOMString webkitColumnRuleWidth;`.
+pub(crate) fn attr_prop_webkit_column_rule_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitColumnRuleWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-width] attribute CSSOMString -webkit-column-rule-width;`.
+pub(crate) fn attr_prop_dash__webkit_column_rule_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-column-rule-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-rule-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-rule-width] attribute CSSOMString -webkit-column-rule-width;`.
+pub(crate) fn attr_prop_dash__webkit_column_rule_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-column-rule-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-rule-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-span] attribute CSSOMString WebkitColumnSpan;`.
+pub(crate) fn attr_prop_upper_webkit_column_span_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitColumnSpan");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-span");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-span] attribute CSSOMString WebkitColumnSpan;`.
+pub(crate) fn attr_prop_upper_webkit_column_span_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitColumnSpan");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-span",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-span] attribute CSSOMString webkitColumnSpan;`.
+pub(crate) fn attr_prop_webkit_column_span_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitColumnSpan");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-span");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-span] attribute CSSOMString webkitColumnSpan;`.
+pub(crate) fn attr_prop_webkit_column_span_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitColumnSpan");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-span",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-span] attribute CSSOMString -webkit-column-span;`.
+pub(crate) fn attr_prop_dash__webkit_column_span_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-column-span");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-span");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-span] attribute CSSOMString -webkit-column-span;`.
+pub(crate) fn attr_prop_dash__webkit_column_span_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-column-span");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-span",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-width] attribute CSSOMString WebkitColumnWidth;`.
+pub(crate) fn attr_prop_upper_webkit_column_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitColumnWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-width] attribute CSSOMString WebkitColumnWidth;`.
+pub(crate) fn attr_prop_upper_webkit_column_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitColumnWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-width] attribute CSSOMString webkitColumnWidth;`.
+pub(crate) fn attr_prop_webkit_column_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitColumnWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-width] attribute CSSOMString webkitColumnWidth;`.
+pub(crate) fn attr_prop_webkit_column_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitColumnWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-column-width] attribute CSSOMString -webkit-column-width;`.
+pub(crate) fn attr_prop_dash__webkit_column_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-column-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-column-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-column-width] attribute CSSOMString -webkit-column-width;`.
+pub(crate) fn attr_prop_dash__webkit_column_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-column-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-column-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-columns] attribute CSSOMString WebkitColumns;`.
+pub(crate) fn attr_prop_upper_webkit_columns_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitColumns");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-columns");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-columns] attribute CSSOMString WebkitColumns;`.
+pub(crate) fn attr_prop_upper_webkit_columns_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitColumns");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-columns",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-columns] attribute CSSOMString webkitColumns;`.
+pub(crate) fn attr_prop_webkit_columns_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitColumns");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-columns");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-columns] attribute CSSOMString webkitColumns;`.
+pub(crate) fn attr_prop_webkit_columns_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitColumns");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-columns",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-columns] attribute CSSOMString -webkit-columns;`.
+pub(crate) fn attr_prop_dash__webkit_columns_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-columns");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-columns");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-columns] attribute CSSOMString -webkit-columns;`.
+pub(crate) fn attr_prop_dash__webkit_columns_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-columns");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-columns",
             &value,
         )
     };
@@ -6315,6 +10219,150 @@ pub(crate) fn attr_prop_dash__webkit_font_feature_settings_set<
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-font-smoothing] attribute CSSOMString WebkitFontSmoothing;`.
+pub(crate) fn attr_prop_upper_webkit_font_smoothing_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitFontSmoothing");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-font-smoothing");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-font-smoothing] attribute CSSOMString WebkitFontSmoothing;`.
+pub(crate) fn attr_prop_upper_webkit_font_smoothing_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitFontSmoothing");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-font-smoothing",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-font-smoothing] attribute CSSOMString webkitFontSmoothing;`.
+pub(crate) fn attr_prop_webkit_font_smoothing_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitFontSmoothing");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-font-smoothing");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-font-smoothing] attribute CSSOMString webkitFontSmoothing;`.
+pub(crate) fn attr_prop_webkit_font_smoothing_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitFontSmoothing");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-font-smoothing",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-font-smoothing] attribute CSSOMString -webkit-font-smoothing;`.
+pub(crate) fn attr_prop_dash__webkit_font_smoothing_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-font-smoothing");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-font-smoothing");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-font-smoothing] attribute CSSOMString -webkit-font-smoothing;`.
+pub(crate) fn attr_prop_dash__webkit_font_smoothing_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-font-smoothing");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-font-smoothing",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-justify-content] attribute CSSOMString WebkitJustifyContent;`.
 pub(crate) fn attr_prop_upper_webkit_justify_content_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -6593,6 +10641,582 @@ pub(crate) fn attr_prop_dash__webkit_line_clamp_set<D: Dom, const LO: u16, const
             &mut cx,
             this,
             "-webkit-line-clamp",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-after] attribute CSSOMString WebkitMarginAfter;`.
+pub(crate) fn attr_prop_upper_webkit_margin_after_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitMarginAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-after");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-after] attribute CSSOMString WebkitMarginAfter;`.
+pub(crate) fn attr_prop_upper_webkit_margin_after_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitMarginAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-after",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-after] attribute CSSOMString webkitMarginAfter;`.
+pub(crate) fn attr_prop_webkit_margin_after_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitMarginAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-after");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-after] attribute CSSOMString webkitMarginAfter;`.
+pub(crate) fn attr_prop_webkit_margin_after_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitMarginAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-after",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-after] attribute CSSOMString -webkit-margin-after;`.
+pub(crate) fn attr_prop_dash__webkit_margin_after_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-margin-after");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-after");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-after] attribute CSSOMString -webkit-margin-after;`.
+pub(crate) fn attr_prop_dash__webkit_margin_after_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-margin-after");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-after",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-before] attribute CSSOMString WebkitMarginBefore;`.
+pub(crate) fn attr_prop_upper_webkit_margin_before_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitMarginBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-before");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-before] attribute CSSOMString WebkitMarginBefore;`.
+pub(crate) fn attr_prop_upper_webkit_margin_before_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitMarginBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-before",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-before] attribute CSSOMString webkitMarginBefore;`.
+pub(crate) fn attr_prop_webkit_margin_before_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitMarginBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-before");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-before] attribute CSSOMString webkitMarginBefore;`.
+pub(crate) fn attr_prop_webkit_margin_before_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitMarginBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-before",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-before] attribute CSSOMString -webkit-margin-before;`.
+pub(crate) fn attr_prop_dash__webkit_margin_before_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-margin-before");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-before");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-before] attribute CSSOMString -webkit-margin-before;`.
+pub(crate) fn attr_prop_dash__webkit_margin_before_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-margin-before");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-before",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-end] attribute CSSOMString WebkitMarginEnd;`.
+pub(crate) fn attr_prop_upper_webkit_margin_end_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitMarginEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-end");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-end] attribute CSSOMString WebkitMarginEnd;`.
+pub(crate) fn attr_prop_upper_webkit_margin_end_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitMarginEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-end",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-end] attribute CSSOMString webkitMarginEnd;`.
+pub(crate) fn attr_prop_webkit_margin_end_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitMarginEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-end");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-end] attribute CSSOMString webkitMarginEnd;`.
+pub(crate) fn attr_prop_webkit_margin_end_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitMarginEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-end",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-end] attribute CSSOMString -webkit-margin-end;`.
+pub(crate) fn attr_prop_dash__webkit_margin_end_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-margin-end");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-end");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-end] attribute CSSOMString -webkit-margin-end;`.
+pub(crate) fn attr_prop_dash__webkit_margin_end_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-margin-end");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-end",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-start] attribute CSSOMString WebkitMarginStart;`.
+pub(crate) fn attr_prop_upper_webkit_margin_start_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitMarginStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-start");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-start] attribute CSSOMString WebkitMarginStart;`.
+pub(crate) fn attr_prop_upper_webkit_margin_start_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitMarginStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-start",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-start] attribute CSSOMString webkitMarginStart;`.
+pub(crate) fn attr_prop_webkit_margin_start_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitMarginStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-start");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-start] attribute CSSOMString webkitMarginStart;`.
+pub(crate) fn attr_prop_webkit_margin_start_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitMarginStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-start",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-start] attribute CSSOMString -webkit-margin-start;`.
+pub(crate) fn attr_prop_dash__webkit_margin_start_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-margin-start");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-margin-start");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-margin-start] attribute CSSOMString -webkit-margin-start;`.
+pub(crate) fn attr_prop_dash__webkit_margin_start_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-margin-start");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-margin-start",
             &value,
         )
     };
@@ -8151,6 +12775,582 @@ pub(crate) fn attr_prop_dash__webkit_order_set<D: Dom, const LO: u16, const HI: 
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-after] attribute CSSOMString WebkitPaddingAfter;`.
+pub(crate) fn attr_prop_upper_webkit_padding_after_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitPaddingAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-after");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-after] attribute CSSOMString WebkitPaddingAfter;`.
+pub(crate) fn attr_prop_upper_webkit_padding_after_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitPaddingAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-after",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-after] attribute CSSOMString webkitPaddingAfter;`.
+pub(crate) fn attr_prop_webkit_padding_after_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitPaddingAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-after");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-after] attribute CSSOMString webkitPaddingAfter;`.
+pub(crate) fn attr_prop_webkit_padding_after_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitPaddingAfter");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-after",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-after] attribute CSSOMString -webkit-padding-after;`.
+pub(crate) fn attr_prop_dash__webkit_padding_after_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-padding-after");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-after");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-after] attribute CSSOMString -webkit-padding-after;`.
+pub(crate) fn attr_prop_dash__webkit_padding_after_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-padding-after");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-after",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-before] attribute CSSOMString WebkitPaddingBefore;`.
+pub(crate) fn attr_prop_upper_webkit_padding_before_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitPaddingBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-before");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-before] attribute CSSOMString WebkitPaddingBefore;`.
+pub(crate) fn attr_prop_upper_webkit_padding_before_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitPaddingBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-before",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-before] attribute CSSOMString webkitPaddingBefore;`.
+pub(crate) fn attr_prop_webkit_padding_before_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitPaddingBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-before");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-before] attribute CSSOMString webkitPaddingBefore;`.
+pub(crate) fn attr_prop_webkit_padding_before_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitPaddingBefore");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-before",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-before] attribute CSSOMString -webkit-padding-before;`.
+pub(crate) fn attr_prop_dash__webkit_padding_before_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-padding-before");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-before");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-before] attribute CSSOMString -webkit-padding-before;`.
+pub(crate) fn attr_prop_dash__webkit_padding_before_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-padding-before");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-before",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-end] attribute CSSOMString WebkitPaddingEnd;`.
+pub(crate) fn attr_prop_upper_webkit_padding_end_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitPaddingEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-end");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-end] attribute CSSOMString WebkitPaddingEnd;`.
+pub(crate) fn attr_prop_upper_webkit_padding_end_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitPaddingEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-end",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-end] attribute CSSOMString webkitPaddingEnd;`.
+pub(crate) fn attr_prop_webkit_padding_end_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitPaddingEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-end");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-end] attribute CSSOMString webkitPaddingEnd;`.
+pub(crate) fn attr_prop_webkit_padding_end_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitPaddingEnd");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-end",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-end] attribute CSSOMString -webkit-padding-end;`.
+pub(crate) fn attr_prop_dash__webkit_padding_end_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-padding-end");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-end");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-end] attribute CSSOMString -webkit-padding-end;`.
+pub(crate) fn attr_prop_dash__webkit_padding_end_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-padding-end");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-end",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-start] attribute CSSOMString WebkitPaddingStart;`.
+pub(crate) fn attr_prop_upper_webkit_padding_start_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitPaddingStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-start");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-start] attribute CSSOMString WebkitPaddingStart;`.
+pub(crate) fn attr_prop_upper_webkit_padding_start_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitPaddingStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-start",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-start] attribute CSSOMString webkitPaddingStart;`.
+pub(crate) fn attr_prop_webkit_padding_start_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitPaddingStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-start");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-start] attribute CSSOMString webkitPaddingStart;`.
+pub(crate) fn attr_prop_webkit_padding_start_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitPaddingStart");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-start",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-start] attribute CSSOMString -webkit-padding-start;`.
+pub(crate) fn attr_prop_dash__webkit_padding_start_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-padding-start");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-padding-start");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-padding-start] attribute CSSOMString -webkit-padding-start;`.
+pub(crate) fn attr_prop_dash__webkit_padding_start_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-padding-start");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-padding-start",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-perspective] attribute CSSOMString WebkitPerspective;`.
 pub(crate) fn attr_prop_upper_webkit_perspective_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -8455,6 +13655,166 @@ pub(crate) fn attr_prop_dash__webkit_perspective_origin_set<
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-tap-highlight-color] attribute CSSOMString WebkitTapHighlightColor;`.
+pub(crate) fn attr_prop_upper_webkit_tap_highlight_color_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitTapHighlightColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-tap-highlight-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-tap-highlight-color] attribute CSSOMString WebkitTapHighlightColor;`.
+pub(crate) fn attr_prop_upper_webkit_tap_highlight_color_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitTapHighlightColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-tap-highlight-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-tap-highlight-color] attribute CSSOMString webkitTapHighlightColor;`.
+pub(crate) fn attr_prop_webkit_tap_highlight_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitTapHighlightColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-tap-highlight-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-tap-highlight-color] attribute CSSOMString webkitTapHighlightColor;`.
+pub(crate) fn attr_prop_webkit_tap_highlight_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitTapHighlightColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-tap-highlight-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-tap-highlight-color] attribute CSSOMString -webkit-tap-highlight-color;`.
+pub(crate) fn attr_prop_dash__webkit_tap_highlight_color_get<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-tap-highlight-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-tap-highlight-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-tap-highlight-color] attribute CSSOMString -webkit-tap-highlight-color;`.
+pub(crate) fn attr_prop_dash__webkit_tap_highlight_color_set<
+    D: Dom,
+    const LO: u16,
+    const HI: u16,
+>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-tap-highlight-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-tap-highlight-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-fill-color] attribute CSSOMString WebkitTextFillColor;`.
 pub(crate) fn attr_prop_upper_webkit_text_fill_color_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -8733,6 +14093,150 @@ pub(crate) fn attr_prop_dash__webkit_text_security_set<D: Dom, const LO: u16, co
             &mut cx,
             this,
             "-webkit-text-security",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-size-adjust] attribute CSSOMString WebkitTextSizeAdjust;`.
+pub(crate) fn attr_prop_upper_webkit_text_size_adjust_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitTextSizeAdjust");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-size-adjust");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-size-adjust] attribute CSSOMString WebkitTextSizeAdjust;`.
+pub(crate) fn attr_prop_upper_webkit_text_size_adjust_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitTextSizeAdjust");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-size-adjust",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-size-adjust] attribute CSSOMString webkitTextSizeAdjust;`.
+pub(crate) fn attr_prop_webkit_text_size_adjust_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitTextSizeAdjust");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-size-adjust");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-size-adjust] attribute CSSOMString webkitTextSizeAdjust;`.
+pub(crate) fn attr_prop_webkit_text_size_adjust_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitTextSizeAdjust");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-size-adjust",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-size-adjust] attribute CSSOMString -webkit-text-size-adjust;`.
+pub(crate) fn attr_prop_dash__webkit_text_size_adjust_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-text-size-adjust");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-size-adjust");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-size-adjust] attribute CSSOMString -webkit-text-size-adjust;`.
+pub(crate) fn attr_prop_dash__webkit_text_size_adjust_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-text-size-adjust");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-size-adjust",
             &value,
         )
     };
@@ -9981,6 +15485,150 @@ pub(crate) fn attr_prop_dash__webkit_transition_timing_function_set<
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-user-drag] attribute CSSOMString WebkitUserDrag;`.
+pub(crate) fn attr_prop_upper_webkit_user_drag_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitUserDrag");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-user-drag");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-user-drag] attribute CSSOMString WebkitUserDrag;`.
+pub(crate) fn attr_prop_upper_webkit_user_drag_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitUserDrag");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-user-drag",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-user-drag] attribute CSSOMString webkitUserDrag;`.
+pub(crate) fn attr_prop_webkit_user_drag_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitUserDrag");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-user-drag");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-user-drag] attribute CSSOMString webkitUserDrag;`.
+pub(crate) fn attr_prop_webkit_user_drag_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitUserDrag");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-user-drag",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-user-drag] attribute CSSOMString -webkit-user-drag;`.
+pub(crate) fn attr_prop_dash__webkit_user_drag_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-user-drag");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-user-drag");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-user-drag] attribute CSSOMString -webkit-user-drag;`.
+pub(crate) fn attr_prop_dash__webkit_user_drag_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-user-drag");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-user-drag",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-user-select] attribute CSSOMString WebkitUserSelect;`.
 pub(crate) fn attr_prop_upper_webkit_user_select_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -10115,6 +15763,150 @@ pub(crate) fn attr_prop_dash__webkit_user_select_set<D: Dom, const LO: u16, cons
             &mut cx,
             this,
             "-webkit-user-select",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-writing-mode] attribute CSSOMString WebkitWritingMode;`.
+pub(crate) fn attr_prop_upper_webkit_writing_mode_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitWritingMode");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-writing-mode");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-writing-mode] attribute CSSOMString WebkitWritingMode;`.
+pub(crate) fn attr_prop_upper_webkit_writing_mode_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitWritingMode");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-writing-mode",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-writing-mode] attribute CSSOMString webkitWritingMode;`.
+pub(crate) fn attr_prop_webkit_writing_mode_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitWritingMode");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-writing-mode");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-writing-mode] attribute CSSOMString webkitWritingMode;`.
+pub(crate) fn attr_prop_webkit_writing_mode_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitWritingMode");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-writing-mode",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-writing-mode] attribute CSSOMString -webkit-writing-mode;`.
+pub(crate) fn attr_prop_dash__webkit_writing_mode_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-writing-mode");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-writing-mode");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-writing-mode] attribute CSSOMString -webkit-writing-mode;`.
+pub(crate) fn attr_prop_dash__webkit_writing_mode_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-writing-mode");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-writing-mode",
             &value,
         )
     };
@@ -42337,6 +48129,294 @@ pub(crate) fn attr_prop_dash_scroll_padding_top_set<D: Dom, const LO: u16, const
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=scroll-snap-align] attribute CSSOMString scrollSnapAlign;`.
+pub(crate) fn attr_prop_scroll_snap_align_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.scrollSnapAlign");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "scroll-snap-align");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=scroll-snap-align] attribute CSSOMString scrollSnapAlign;`.
+pub(crate) fn attr_prop_scroll_snap_align_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.scrollSnapAlign");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "scroll-snap-align",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=scroll-snap-align] attribute CSSOMString scroll-snap-align;`.
+pub(crate) fn attr_prop_dash_scroll_snap_align_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.scroll-snap-align");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "scroll-snap-align");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=scroll-snap-align] attribute CSSOMString scroll-snap-align;`.
+pub(crate) fn attr_prop_dash_scroll_snap_align_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.scroll-snap-align");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "scroll-snap-align",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=scroll-snap-stop] attribute CSSOMString scrollSnapStop;`.
+pub(crate) fn attr_prop_scroll_snap_stop_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.scrollSnapStop");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "scroll-snap-stop");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=scroll-snap-stop] attribute CSSOMString scrollSnapStop;`.
+pub(crate) fn attr_prop_scroll_snap_stop_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.scrollSnapStop");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "scroll-snap-stop",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=scroll-snap-stop] attribute CSSOMString scroll-snap-stop;`.
+pub(crate) fn attr_prop_dash_scroll_snap_stop_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.scroll-snap-stop");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "scroll-snap-stop");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=scroll-snap-stop] attribute CSSOMString scroll-snap-stop;`.
+pub(crate) fn attr_prop_dash_scroll_snap_stop_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.scroll-snap-stop");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "scroll-snap-stop",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=scroll-snap-type] attribute CSSOMString scrollSnapType;`.
+pub(crate) fn attr_prop_scroll_snap_type_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.scrollSnapType");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "scroll-snap-type");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=scroll-snap-type] attribute CSSOMString scrollSnapType;`.
+pub(crate) fn attr_prop_scroll_snap_type_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.scrollSnapType");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "scroll-snap-type",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=scroll-snap-type] attribute CSSOMString scroll-snap-type;`.
+pub(crate) fn attr_prop_dash_scroll_snap_type_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.scroll-snap-type");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "scroll-snap-type");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=scroll-snap-type] attribute CSSOMString scroll-snap-type;`.
+pub(crate) fn attr_prop_dash_scroll_snap_type_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.scroll-snap-type");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "scroll-snap-type",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=scrollbar-color] attribute CSSOMString scrollbarColor;`.
 pub(crate) fn attr_prop_scrollbar_color_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -45467,6 +51547,102 @@ pub(crate) fn attr_prop_dash_text_shadow_set<D: Dom, const LO: u16, const HI: u1
     let r = {
         let mut cx = Cx::new(scope);
         <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "text-shadow", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=text-size-adjust] attribute CSSOMString textSizeAdjust;`.
+pub(crate) fn attr_prop_text_size_adjust_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.textSizeAdjust");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "text-size-adjust");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=text-size-adjust] attribute CSSOMString textSizeAdjust;`.
+pub(crate) fn attr_prop_text_size_adjust_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.textSizeAdjust");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "text-size-adjust",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=text-size-adjust] attribute CSSOMString text-size-adjust;`.
+pub(crate) fn attr_prop_dash_text_size_adjust_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.text-size-adjust");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "text-size-adjust");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=text-size-adjust] attribute CSSOMString text-size-adjust;`.
+pub(crate) fn attr_prop_dash_text_size_adjust_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.text-size-adjust");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "text-size-adjust",
+            &value,
+        )
     };
     {
         let mut cx = Cx::new(scope);
@@ -49881,6 +56057,606 @@ pub(crate) fn template<'s, D: Dom>(
         let g = rt::getter(
             scope,
             rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_after_get::<D, LO, HI>,
+            ),
+            "WebkitBorderAfter",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_after_set::<D, LO, HI>,
+            ),
+            "WebkitBorderAfter",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderAfter", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_after_get::<D, LO, HI>,
+            ),
+            "webkitBorderAfter",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_after_set::<D, LO, HI>,
+            ),
+            "webkitBorderAfter",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderAfter", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_after_get::<D, LO, HI>,
+            ),
+            "-webkit-border-after",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_after_set::<D, LO, HI>,
+            ),
+            "-webkit-border-after",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-after", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_after_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderAfterColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_after_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderAfterColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderAfterColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_after_color_get::<D, LO, HI>,
+            ),
+            "webkitBorderAfterColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_after_color_set::<D, LO, HI>,
+            ),
+            "webkitBorderAfterColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderAfterColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_after_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-after-color",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_after_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-after-color",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-after-color", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_after_style_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderAfterStyle",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_after_style_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderAfterStyle",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderAfterStyle", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_after_style_get::<D, LO, HI>,
+            ),
+            "webkitBorderAfterStyle",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_after_style_set::<D, LO, HI>,
+            ),
+            "webkitBorderAfterStyle",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderAfterStyle", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_after_style_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-after-style",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_after_style_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-after-style",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-after-style", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_after_width_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderAfterWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_after_width_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderAfterWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderAfterWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_after_width_get::<D, LO, HI>,
+            ),
+            "webkitBorderAfterWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_after_width_set::<D, LO, HI>,
+            ),
+            "webkitBorderAfterWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderAfterWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_after_width_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-after-width",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_after_width_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-after-width",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-after-width", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_before_get::<D, LO, HI>,
+            ),
+            "WebkitBorderBefore",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_before_set::<D, LO, HI>,
+            ),
+            "WebkitBorderBefore",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderBefore", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_before_get::<D, LO, HI>,
+            ),
+            "webkitBorderBefore",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_before_set::<D, LO, HI>,
+            ),
+            "webkitBorderBefore",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderBefore", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_before_get::<D, LO, HI>,
+            ),
+            "-webkit-border-before",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_before_set::<D, LO, HI>,
+            ),
+            "-webkit-border-before",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-before", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_before_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderBeforeColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_before_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderBeforeColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderBeforeColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_before_color_get::<D, LO, HI>,
+            ),
+            "webkitBorderBeforeColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_before_color_set::<D, LO, HI>,
+            ),
+            "webkitBorderBeforeColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderBeforeColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_before_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-before-color",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_before_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-before-color",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-before-color", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_before_style_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderBeforeStyle",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_before_style_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderBeforeStyle",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderBeforeStyle", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_before_style_get::<D, LO, HI>,
+            ),
+            "webkitBorderBeforeStyle",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_before_style_set::<D, LO, HI>,
+            ),
+            "webkitBorderBeforeStyle",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderBeforeStyle", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_before_style_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-before-style",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_before_style_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-before-style",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-before-style", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_before_width_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderBeforeWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_before_width_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderBeforeWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderBeforeWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_before_width_get::<D, LO, HI>,
+            ),
+            "webkitBorderBeforeWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_before_width_set::<D, LO, HI>,
+            ),
+            "webkitBorderBeforeWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderBeforeWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_before_width_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-before-width",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_before_width_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-before-width",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-before-width", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
                 super::css_style_properties::attr_prop_upper_webkit_border_bottom_left_radius_get::<
                     D,
                     LO,
@@ -50069,6 +56845,254 @@ pub(crate) fn template<'s, D: Dom>(
         let g = rt::getter(
             scope,
             rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_end_get::<D, LO, HI>,
+            ),
+            "WebkitBorderEnd",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_end_set::<D, LO, HI>,
+            ),
+            "WebkitBorderEnd",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderEnd", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_border_end_get::<D, LO, HI>),
+            "webkitBorderEnd",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_border_end_set::<D, LO, HI>),
+            "webkitBorderEnd",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderEnd", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_end_get::<D, LO, HI>,
+            ),
+            "-webkit-border-end",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_end_set::<D, LO, HI>,
+            ),
+            "-webkit-border-end",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-end", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_end_color_get::<D, LO, HI>,
+            ),
+            "WebkitBorderEndColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_end_color_set::<D, LO, HI>,
+            ),
+            "WebkitBorderEndColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderEndColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_end_color_get::<D, LO, HI>,
+            ),
+            "webkitBorderEndColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_end_color_set::<D, LO, HI>,
+            ),
+            "webkitBorderEndColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderEndColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_end_color_get::<D, LO, HI>,
+            ),
+            "-webkit-border-end-color",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_end_color_set::<D, LO, HI>,
+            ),
+            "-webkit-border-end-color",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-end-color", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_end_style_get::<D, LO, HI>,
+            ),
+            "WebkitBorderEndStyle",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_end_style_set::<D, LO, HI>,
+            ),
+            "WebkitBorderEndStyle",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderEndStyle", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_end_style_get::<D, LO, HI>,
+            ),
+            "webkitBorderEndStyle",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_end_style_set::<D, LO, HI>,
+            ),
+            "webkitBorderEndStyle",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderEndStyle", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_end_style_get::<D, LO, HI>,
+            ),
+            "-webkit-border-end-style",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_end_style_set::<D, LO, HI>,
+            ),
+            "-webkit-border-end-style",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-end-style", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_end_width_get::<D, LO, HI>,
+            ),
+            "WebkitBorderEndWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_end_width_set::<D, LO, HI>,
+            ),
+            "WebkitBorderEndWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderEndWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_end_width_get::<D, LO, HI>,
+            ),
+            "webkitBorderEndWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_end_width_set::<D, LO, HI>,
+            ),
+            "webkitBorderEndWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderEndWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_end_width_get::<D, LO, HI>,
+            ),
+            "-webkit-border-end-width",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_end_width_set::<D, LO, HI>,
+            ),
+            "-webkit-border-end-width",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-end-width", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
                 super::css_style_properties::attr_prop_upper_webkit_border_image_get::<D, LO, HI>,
             ),
             "WebkitBorderImage",
@@ -50190,6 +57214,306 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "-webkit-border-radius", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_start_get::<D, LO, HI>,
+            ),
+            "WebkitBorderStart",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_start_set::<D, LO, HI>,
+            ),
+            "WebkitBorderStart",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderStart", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_start_get::<D, LO, HI>,
+            ),
+            "webkitBorderStart",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_start_set::<D, LO, HI>,
+            ),
+            "webkitBorderStart",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderStart", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_start_get::<D, LO, HI>,
+            ),
+            "-webkit-border-start",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_start_set::<D, LO, HI>,
+            ),
+            "-webkit-border-start",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-start", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_start_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderStartColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_start_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderStartColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderStartColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_start_color_get::<D, LO, HI>,
+            ),
+            "webkitBorderStartColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_start_color_set::<D, LO, HI>,
+            ),
+            "webkitBorderStartColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderStartColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_start_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-start-color",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_start_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-start-color",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-start-color", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_start_style_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderStartStyle",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_start_style_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderStartStyle",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderStartStyle", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_start_style_get::<D, LO, HI>,
+            ),
+            "webkitBorderStartStyle",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_start_style_set::<D, LO, HI>,
+            ),
+            "webkitBorderStartStyle",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderStartStyle", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_start_style_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-start-style",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_start_style_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-start-style",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-start-style", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_start_width_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderStartWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_border_start_width_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBorderStartWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBorderStartWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_start_width_get::<D, LO, HI>,
+            ),
+            "webkitBorderStartWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_border_start_width_set::<D, LO, HI>,
+            ),
+            "webkitBorderStartWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBorderStartWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_start_width_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-start-width",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_border_start_width_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-border-start-width",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-border-start-width", g, s, false);
     }
     {
         let g = rt::getter(
@@ -50415,6 +57739,85 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "-webkit-box-align", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_box_decoration_break_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBoxDecorationBreak",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_box_decoration_break_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitBoxDecorationBreak",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitBoxDecorationBreak", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_box_decoration_break_get::<D, LO, HI>,
+            ),
+            "webkitBoxDecorationBreak",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_box_decoration_break_set::<D, LO, HI>,
+            ),
+            "webkitBoxDecorationBreak",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitBoxDecorationBreak", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_box_decoration_break_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-box-decoration-break",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_box_decoration_break_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-box-decoration-break",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-box-decoration-break", g, s, false);
     }
     {
         let g = rt::getter(
@@ -50911,6 +58314,605 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "-webkit-clip-path", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_count_get::<D, LO, HI>,
+            ),
+            "WebkitColumnCount",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_count_set::<D, LO, HI>,
+            ),
+            "WebkitColumnCount",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitColumnCount", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_column_count_get::<D, LO, HI>,
+            ),
+            "webkitColumnCount",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_column_count_set::<D, LO, HI>,
+            ),
+            "webkitColumnCount",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitColumnCount", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_count_get::<D, LO, HI>,
+            ),
+            "-webkit-column-count",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_count_set::<D, LO, HI>,
+            ),
+            "-webkit-column-count",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-column-count", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_gap_get::<D, LO, HI>,
+            ),
+            "WebkitColumnGap",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_gap_set::<D, LO, HI>,
+            ),
+            "WebkitColumnGap",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitColumnGap", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_column_gap_get::<D, LO, HI>),
+            "webkitColumnGap",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_column_gap_set::<D, LO, HI>),
+            "webkitColumnGap",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitColumnGap", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_gap_get::<D, LO, HI>,
+            ),
+            "-webkit-column-gap",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_gap_set::<D, LO, HI>,
+            ),
+            "-webkit-column-gap",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-column-gap", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_rule_get::<D, LO, HI>,
+            ),
+            "WebkitColumnRule",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_rule_set::<D, LO, HI>,
+            ),
+            "WebkitColumnRule",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitColumnRule", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_column_rule_get::<D, LO, HI>),
+            "webkitColumnRule",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_column_rule_set::<D, LO, HI>),
+            "webkitColumnRule",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitColumnRule", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_rule_get::<D, LO, HI>,
+            ),
+            "-webkit-column-rule",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_rule_set::<D, LO, HI>,
+            ),
+            "-webkit-column-rule",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-column-rule", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_rule_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitColumnRuleColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_rule_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitColumnRuleColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitColumnRuleColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_column_rule_color_get::<D, LO, HI>,
+            ),
+            "webkitColumnRuleColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_column_rule_color_set::<D, LO, HI>,
+            ),
+            "webkitColumnRuleColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitColumnRuleColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_rule_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-column-rule-color",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_rule_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-column-rule-color",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-column-rule-color", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_rule_style_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitColumnRuleStyle",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_rule_style_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitColumnRuleStyle",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitColumnRuleStyle", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_column_rule_style_get::<D, LO, HI>,
+            ),
+            "webkitColumnRuleStyle",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_column_rule_style_set::<D, LO, HI>,
+            ),
+            "webkitColumnRuleStyle",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitColumnRuleStyle", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_rule_style_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-column-rule-style",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_rule_style_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-column-rule-style",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-column-rule-style", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_rule_width_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitColumnRuleWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_rule_width_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitColumnRuleWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitColumnRuleWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_column_rule_width_get::<D, LO, HI>,
+            ),
+            "webkitColumnRuleWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_column_rule_width_set::<D, LO, HI>,
+            ),
+            "webkitColumnRuleWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitColumnRuleWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_rule_width_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-column-rule-width",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_rule_width_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-column-rule-width",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-column-rule-width", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_span_get::<D, LO, HI>,
+            ),
+            "WebkitColumnSpan",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_span_set::<D, LO, HI>,
+            ),
+            "WebkitColumnSpan",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitColumnSpan", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_column_span_get::<D, LO, HI>),
+            "webkitColumnSpan",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_column_span_set::<D, LO, HI>),
+            "webkitColumnSpan",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitColumnSpan", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_span_get::<D, LO, HI>,
+            ),
+            "-webkit-column-span",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_span_set::<D, LO, HI>,
+            ),
+            "-webkit-column-span",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-column-span", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_width_get::<D, LO, HI>,
+            ),
+            "WebkitColumnWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_column_width_set::<D, LO, HI>,
+            ),
+            "WebkitColumnWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitColumnWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_column_width_get::<D, LO, HI>,
+            ),
+            "webkitColumnWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_column_width_set::<D, LO, HI>,
+            ),
+            "webkitColumnWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitColumnWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_width_get::<D, LO, HI>,
+            ),
+            "-webkit-column-width",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_column_width_set::<D, LO, HI>,
+            ),
+            "-webkit-column-width",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-column-width", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_columns_get::<D, LO, HI>,
+            ),
+            "WebkitColumns",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_columns_set::<D, LO, HI>,
+            ),
+            "WebkitColumns",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitColumns", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_columns_get::<D, LO, HI>),
+            "webkitColumns",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_columns_set::<D, LO, HI>),
+            "webkitColumns",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitColumns", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_columns_get::<D, LO, HI>,
+            ),
+            "-webkit-columns",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_columns_set::<D, LO, HI>,
+            ),
+            "-webkit-columns",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-columns", g, s, false);
     }
     {
         let g = rt::getter(
@@ -51463,6 +59465,69 @@ pub(crate) fn template<'s, D: Dom>(
         let g = rt::getter(
             scope,
             rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_font_smoothing_get::<D, LO, HI>,
+            ),
+            "WebkitFontSmoothing",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_font_smoothing_set::<D, LO, HI>,
+            ),
+            "WebkitFontSmoothing",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitFontSmoothing", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_font_smoothing_get::<D, LO, HI>,
+            ),
+            "webkitFontSmoothing",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_font_smoothing_set::<D, LO, HI>,
+            ),
+            "webkitFontSmoothing",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitFontSmoothing", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_font_smoothing_get::<D, LO, HI>,
+            ),
+            "-webkit-font-smoothing",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_font_smoothing_set::<D, LO, HI>,
+            ),
+            "-webkit-font-smoothing",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-font-smoothing", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
                 super::css_style_properties::attr_prop_upper_webkit_justify_content_get::<D, LO, HI>,
             ),
             "WebkitJustifyContent",
@@ -51580,6 +59645,254 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "-webkit-line-clamp", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_margin_after_get::<D, LO, HI>,
+            ),
+            "WebkitMarginAfter",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_margin_after_set::<D, LO, HI>,
+            ),
+            "WebkitMarginAfter",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitMarginAfter", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_margin_after_get::<D, LO, HI>,
+            ),
+            "webkitMarginAfter",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_margin_after_set::<D, LO, HI>,
+            ),
+            "webkitMarginAfter",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitMarginAfter", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_margin_after_get::<D, LO, HI>,
+            ),
+            "-webkit-margin-after",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_margin_after_set::<D, LO, HI>,
+            ),
+            "-webkit-margin-after",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-margin-after", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_margin_before_get::<D, LO, HI>,
+            ),
+            "WebkitMarginBefore",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_margin_before_set::<D, LO, HI>,
+            ),
+            "WebkitMarginBefore",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitMarginBefore", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_margin_before_get::<D, LO, HI>,
+            ),
+            "webkitMarginBefore",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_margin_before_set::<D, LO, HI>,
+            ),
+            "webkitMarginBefore",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitMarginBefore", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_margin_before_get::<D, LO, HI>,
+            ),
+            "-webkit-margin-before",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_margin_before_set::<D, LO, HI>,
+            ),
+            "-webkit-margin-before",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-margin-before", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_margin_end_get::<D, LO, HI>,
+            ),
+            "WebkitMarginEnd",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_margin_end_set::<D, LO, HI>,
+            ),
+            "WebkitMarginEnd",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitMarginEnd", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_margin_end_get::<D, LO, HI>),
+            "webkitMarginEnd",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_margin_end_set::<D, LO, HI>),
+            "webkitMarginEnd",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitMarginEnd", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_margin_end_get::<D, LO, HI>,
+            ),
+            "-webkit-margin-end",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_margin_end_set::<D, LO, HI>,
+            ),
+            "-webkit-margin-end",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-margin-end", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_margin_start_get::<D, LO, HI>,
+            ),
+            "WebkitMarginStart",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_margin_start_set::<D, LO, HI>,
+            ),
+            "WebkitMarginStart",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitMarginStart", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_margin_start_get::<D, LO, HI>,
+            ),
+            "webkitMarginStart",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_margin_start_set::<D, LO, HI>,
+            ),
+            "webkitMarginStart",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitMarginStart", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_margin_start_get::<D, LO, HI>,
+            ),
+            "-webkit-margin-start",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_margin_start_set::<D, LO, HI>,
+            ),
+            "-webkit-margin-start",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-margin-start", g, s, false);
     }
     {
         let g = rt::getter(
@@ -52234,6 +60547,254 @@ pub(crate) fn template<'s, D: Dom>(
         let g = rt::getter(
             scope,
             rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_padding_after_get::<D, LO, HI>,
+            ),
+            "WebkitPaddingAfter",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_padding_after_set::<D, LO, HI>,
+            ),
+            "WebkitPaddingAfter",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitPaddingAfter", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_padding_after_get::<D, LO, HI>,
+            ),
+            "webkitPaddingAfter",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_padding_after_set::<D, LO, HI>,
+            ),
+            "webkitPaddingAfter",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitPaddingAfter", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_padding_after_get::<D, LO, HI>,
+            ),
+            "-webkit-padding-after",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_padding_after_set::<D, LO, HI>,
+            ),
+            "-webkit-padding-after",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-padding-after", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_padding_before_get::<D, LO, HI>,
+            ),
+            "WebkitPaddingBefore",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_padding_before_set::<D, LO, HI>,
+            ),
+            "WebkitPaddingBefore",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitPaddingBefore", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_padding_before_get::<D, LO, HI>,
+            ),
+            "webkitPaddingBefore",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_padding_before_set::<D, LO, HI>,
+            ),
+            "webkitPaddingBefore",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitPaddingBefore", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_padding_before_get::<D, LO, HI>,
+            ),
+            "-webkit-padding-before",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_padding_before_set::<D, LO, HI>,
+            ),
+            "-webkit-padding-before",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-padding-before", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_padding_end_get::<D, LO, HI>,
+            ),
+            "WebkitPaddingEnd",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_padding_end_set::<D, LO, HI>,
+            ),
+            "WebkitPaddingEnd",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitPaddingEnd", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_padding_end_get::<D, LO, HI>),
+            "webkitPaddingEnd",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_padding_end_set::<D, LO, HI>),
+            "webkitPaddingEnd",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitPaddingEnd", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_padding_end_get::<D, LO, HI>,
+            ),
+            "-webkit-padding-end",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_padding_end_set::<D, LO, HI>,
+            ),
+            "-webkit-padding-end",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-padding-end", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_padding_start_get::<D, LO, HI>,
+            ),
+            "WebkitPaddingStart",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_padding_start_set::<D, LO, HI>,
+            ),
+            "WebkitPaddingStart",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitPaddingStart", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_padding_start_get::<D, LO, HI>,
+            ),
+            "webkitPaddingStart",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_padding_start_set::<D, LO, HI>,
+            ),
+            "webkitPaddingStart",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitPaddingStart", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_padding_start_get::<D, LO, HI>,
+            ),
+            "-webkit-padding-start",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_padding_start_set::<D, LO, HI>,
+            ),
+            "-webkit-padding-start",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-padding-start", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
                 super::css_style_properties::attr_prop_upper_webkit_perspective_get::<D, LO, HI>,
             ),
             "WebkitPerspective",
@@ -52372,6 +60933,85 @@ pub(crate) fn template<'s, D: Dom>(
         let g = rt::getter(
             scope,
             rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_tap_highlight_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitTapHighlightColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_tap_highlight_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitTapHighlightColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitTapHighlightColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_tap_highlight_color_get::<D, LO, HI>,
+            ),
+            "webkitTapHighlightColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_tap_highlight_color_set::<D, LO, HI>,
+            ),
+            "webkitTapHighlightColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitTapHighlightColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_tap_highlight_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-tap-highlight-color",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_tap_highlight_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-tap-highlight-color",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-tap-highlight-color", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
                 super::css_style_properties::attr_prop_upper_webkit_text_fill_color_get::<D, LO, HI>,
             ),
             "WebkitTextFillColor",
@@ -52493,6 +61133,69 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "-webkit-text-security", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_text_size_adjust_get::<D, LO, HI>,
+            ),
+            "WebkitTextSizeAdjust",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_text_size_adjust_set::<D, LO, HI>,
+            ),
+            "WebkitTextSizeAdjust",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitTextSizeAdjust", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_text_size_adjust_get::<D, LO, HI>,
+            ),
+            "webkitTextSizeAdjust",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_text_size_adjust_set::<D, LO, HI>,
+            ),
+            "webkitTextSizeAdjust",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitTextSizeAdjust", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_text_size_adjust_get::<D, LO, HI>,
+            ),
+            "-webkit-text-size-adjust",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_text_size_adjust_set::<D, LO, HI>,
+            ),
+            "-webkit-text-size-adjust",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-text-size-adjust", g, s, false);
     }
     {
         let g = rt::getter(
@@ -53057,6 +61760,65 @@ pub(crate) fn template<'s, D: Dom>(
         let g = rt::getter(
             scope,
             rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_user_drag_get::<D, LO, HI>,
+            ),
+            "WebkitUserDrag",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_user_drag_set::<D, LO, HI>,
+            ),
+            "WebkitUserDrag",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitUserDrag", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_user_drag_get::<D, LO, HI>),
+            "webkitUserDrag",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_user_drag_set::<D, LO, HI>),
+            "webkitUserDrag",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitUserDrag", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_user_drag_get::<D, LO, HI>,
+            ),
+            "-webkit-user-drag",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_user_drag_set::<D, LO, HI>,
+            ),
+            "-webkit-user-drag",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-user-drag", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
                 super::css_style_properties::attr_prop_upper_webkit_user_select_get::<D, LO, HI>,
             ),
             "WebkitUserSelect",
@@ -53111,6 +61873,69 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "-webkit-user-select", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_writing_mode_get::<D, LO, HI>,
+            ),
+            "WebkitWritingMode",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_writing_mode_set::<D, LO, HI>,
+            ),
+            "WebkitWritingMode",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitWritingMode", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_writing_mode_get::<D, LO, HI>,
+            ),
+            "webkitWritingMode",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_writing_mode_set::<D, LO, HI>,
+            ),
+            "webkitWritingMode",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitWritingMode", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_writing_mode_get::<D, LO, HI>,
+            ),
+            "-webkit-writing-mode",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_writing_mode_set::<D, LO, HI>,
+            ),
+            "-webkit-writing-mode",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-writing-mode", g, s, false);
     }
     {
         let g = rt::getter(
@@ -66556,6 +75381,120 @@ pub(crate) fn template<'s, D: Dom>(
     {
         let g = rt::getter(
             scope,
+            rt::builder(super::css_style_properties::attr_prop_scroll_snap_align_get::<D, LO, HI>),
+            "scrollSnapAlign",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_scroll_snap_align_set::<D, LO, HI>),
+            "scrollSnapAlign",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "scrollSnapAlign", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_scroll_snap_align_get::<D, LO, HI>,
+            ),
+            "scroll-snap-align",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_scroll_snap_align_set::<D, LO, HI>,
+            ),
+            "scroll-snap-align",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "scroll-snap-align", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_scroll_snap_stop_get::<D, LO, HI>),
+            "scrollSnapStop",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_scroll_snap_stop_set::<D, LO, HI>),
+            "scrollSnapStop",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "scrollSnapStop", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_scroll_snap_stop_get::<D, LO, HI>,
+            ),
+            "scroll-snap-stop",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_scroll_snap_stop_set::<D, LO, HI>,
+            ),
+            "scroll-snap-stop",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "scroll-snap-stop", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_scroll_snap_type_get::<D, LO, HI>),
+            "scrollSnapType",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_scroll_snap_type_set::<D, LO, HI>),
+            "scrollSnapType",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "scrollSnapType", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_scroll_snap_type_get::<D, LO, HI>,
+            ),
+            "scroll-snap-type",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_scroll_snap_type_set::<D, LO, HI>,
+            ),
+            "scroll-snap-type",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "scroll-snap-type", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
             rt::builder(super::css_style_properties::attr_prop_scrollbar_color_get::<D, LO, HI>),
             "scrollbarColor",
             Some(sig),
@@ -67837,6 +76776,44 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "text-shadow", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_text_size_adjust_get::<D, LO, HI>),
+            "textSizeAdjust",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_text_size_adjust_set::<D, LO, HI>),
+            "textSizeAdjust",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "textSizeAdjust", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_text_size_adjust_get::<D, LO, HI>,
+            ),
+            "text-size-adjust",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_text_size_adjust_set::<D, LO, HI>,
+            ),
+            "text-size-adjust",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "text-size-adjust", g, s, false);
     }
     {
         let g = rt::getter(

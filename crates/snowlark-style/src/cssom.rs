@@ -98,6 +98,18 @@ pub struct FontPaletteValues {
     pub override_colors: String,
 }
 
+/// The attributes of a `CSSPropertyRule` (CSS Properties and Values API 1 §5.1).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PropertyRuleValues {
+    /// The custom property name, with its `--`, serialized as an identifier.
+    pub name: String,
+    /// The `syntax` descriptor's string as written (the universal syntax as `*`).
+    pub syntax: String,
+    pub inherits: bool,
+    /// The `initial-value` descriptor's tokens, `None` when it has none.
+    pub initial_value: Option<String>,
+}
+
 /// The address of a shared value (an identity).
 fn ptr<T>(a: &Arc<T>) -> usize {
     &**a as *const T as usize
@@ -378,6 +390,38 @@ impl Rule {
             } else {
                 css(&r.override_colors)
             },
+        })
+    }
+
+    /// `CSSPropertyRule`'s attributes (CSS Properties and Values API 1 §5.1). A rule that is
+    /// in a sheet is valid, so its `syntax` and `inherits` descriptors are present.
+    pub fn property_rule(&self) -> Option<PropertyRuleValues> {
+        let CssRule::Property(r) = &self.rule else {
+            return None;
+        };
+        let mut name = String::new();
+        let _ = style_traits::ToCss::to_css(&r.name, &mut style_traits::CssWriter::new(&mut name));
+        let syntax = match &r.descriptors.syntax {
+            Some(s) => match s.specified_string() {
+                Some(text) => text.to_owned(),
+                None => {
+                    let mut out = String::new();
+                    let _ =
+                        style_traits::ToCss::to_css(s, &mut style_traits::CssWriter::new(&mut out));
+                    out
+                }
+            },
+            None => "*".to_owned(),
+        };
+        Some(PropertyRuleValues {
+            name,
+            syntax,
+            inherits: r.descriptors.inherits(),
+            initial_value: r
+                .descriptors
+                .initial_value
+                .as_ref()
+                .map(|v| v.css_text().to_owned()),
         })
     }
 

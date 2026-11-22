@@ -77,6 +77,57 @@ pub(crate) fn svg_reference_box(values: &ComputedValues) -> SvgReferenceBox {
 }
 
 impl RenderStyle {
+    /// `scroll-snap-type` (CSS Scroll Snap 1 §5.1.1): `None` for `none`.
+    pub fn scroll_snap_type(
+        &self,
+    ) -> Option<(
+        snowlark_layout::scroll_snap::TypeAxis,
+        snowlark_layout::scroll_snap::Strictness,
+    )> {
+        use snowlark_layout::scroll_snap::{Strictness, TypeAxis};
+        use style::values::specified::box_::{ScrollSnapAxis as A, ScrollSnapStrictness as S};
+        let t = self.values.get_box().scroll_snap_type;
+        let strictness = match t.strictness() {
+            S::None => return None,
+            S::Mandatory => Strictness::Mandatory,
+            S::Proximity => Strictness::Proximity,
+        };
+        let axis = match t.axis() {
+            A::X => TypeAxis::X,
+            A::Y => TypeAxis::Y,
+            A::Block => TypeAxis::Block,
+            A::Inline => TypeAxis::Inline,
+            A::Both => TypeAxis::Both,
+        };
+        Some((axis, strictness))
+    }
+
+    /// `scroll-snap-align` (CSS Scroll Snap 1 §5.2.2): the (block, inline) alignments, in the snap
+    /// container's axes.
+    pub fn scroll_snap_align(
+        &self,
+    ) -> (
+        snowlark_layout::scroll_snap::Align,
+        snowlark_layout::scroll_snap::Align,
+    ) {
+        use snowlark_layout::scroll_snap::Align;
+        use style::values::specified::box_::ScrollSnapAlignKeyword as K;
+        let a = self.values.get_box().scroll_snap_align;
+        let k = |k: K| match k {
+            K::None => Align::None,
+            K::Start => Align::Start,
+            K::End => Align::End,
+            K::Center => Align::Center,
+        };
+        (k(a.block()), k(a.inline()))
+    }
+
+    /// `scroll-snap-stop: always` (CSS Scroll Snap 1 §5.2.3).
+    pub fn scroll_snap_stop_always(&self) -> bool {
+        self.values.get_box().scroll_snap_stop
+            == style::values::specified::box_::ScrollSnapStop::Always
+    }
+
     /// Whether this is a legacy `display: -webkit-box` (Compat), laid out as a single-line flex
     /// container whose direction, packing and alignment come from the `-webkit-box-*` properties.
     fn is_webkit_box(&self) -> bool {

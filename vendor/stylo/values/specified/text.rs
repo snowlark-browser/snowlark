@@ -1585,3 +1585,7 @@ impl TextBoxTrim {
         TextBoxTrim::NONE
     }
 }
+
+/// Snowlark patch (SNOWLARK-PATCHES.md 83): the specified value of `text-size-adjust`.
+pub type TextSizeAdjust =
+    crate::values::generics::text::GenericTextSizeAdjust<crate::values::specified::NonNegativePercentage>;

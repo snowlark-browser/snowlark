@@ -82,6 +82,7 @@ mod query_filter;
 mod render;
 mod resize;
 mod script_animation_frames;
+mod scroll_snap;
 mod selector_queries;
 mod session_history;
 mod shadow_dom;

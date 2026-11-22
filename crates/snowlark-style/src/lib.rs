@@ -33,7 +33,7 @@ pub use declarations::{
 };
 pub use engine::{
     highlight_colors_declared, is_style_element, ColorScheme, DeclaredColor, DeviceConfig,
-    MediaKind, Parallelism, StyleAttributeCheck, StyleEngine,
+    MediaKind, Parallelism, RegisterPropertyError, StyleAttributeCheck, StyleEngine,
 };
 pub use handle::flat_parent;
 pub use hints::{svg_presentation_declaration, svg_presentation_property};

@@ -166,7 +166,8 @@ pub(crate) fn is_draggable(dom: &snowlark_dom::Dom, el: NodeId) -> bool {
 
 impl Engine {
     /// §6.11.5 "determine what is being dragged" for a press on `target`: the first inclusive
-    /// ancestor (flat tree) whose `draggable` is true. A press in a text control, a select or
+    /// ancestor (flat tree) whose `draggable` is true, or whose `-webkit-user-drag` is `element`
+    /// (one whose `-webkit-user-drag` is `none` is skipped). A press in a text control, a select or
     /// editable content is for selecting there, never a drag.
     pub(crate) fn drag_candidate(&self, target: NodeId) -> Option<(NodeId, DragKind)> {
         let mut n = Some(target);
@@ -176,7 +177,18 @@ impl Engine {
                 if self.is_text_control(id) || select || self.is_editable(id) {
                     return None;
                 }
-                if is_draggable(&self.dom(), id) {
+                // `-webkit-user-drag` (Compat): `element` makes the box a drag source, `none`
+                // keeps it from being one (its ancestors may still be), `auto` leaves it to
+                // `draggable`.
+                let user_drag = self
+                    .with_style(id, |r| r.resolved_property(id, "-webkit-user-drag"))
+                    .flatten();
+                let source = match user_drag.as_deref() {
+                    Some("element") => true,
+                    Some("none") => false,
+                    _ => is_draggable(&self.dom(), id),
+                };
+                if source {
                     let link = {
                         let dom = self.dom();
                         dom.is_html_element_named(id, &local_name!("a"))

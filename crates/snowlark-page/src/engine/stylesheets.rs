@@ -12,9 +12,9 @@ use snowlark_bindings::generated::{
     self as g, CSSConditionRuleImpl, CSSContainerRuleImpl, CSSFontFaceRuleImpl,
     CSSFontFeatureValuesRuleImpl, CSSFontPaletteValuesRuleImpl, CSSGroupingRuleImpl,
     CSSImportRuleImpl, CSSKeyframeRuleImpl, CSSKeyframesRuleImpl, CSSLayerBlockRuleImpl,
-    CSSLayerStatementRuleImpl, CSSMediaRuleImpl, CSSNamespaceRuleImpl, CSSRuleImpl,
-    CSSRuleListImpl, CSSStyleRuleImpl, CSSStyleSheetImpl, CSSSupportsRuleImpl, LinkStyleImpl,
-    MediaListImpl, StyleSheetImpl, StyleSheetListImpl,
+    CSSLayerStatementRuleImpl, CSSMediaRuleImpl, CSSNamespaceRuleImpl, CSSPropertyRuleImpl,
+    CSSRuleImpl, CSSRuleListImpl, CSSStyleRuleImpl, CSSStyleSheetImpl, CSSSupportsRuleImpl,
+    LinkStyleImpl, MediaListImpl, StyleSheetImpl, StyleSheetListImpl,
 };
 use snowlark_bindings::rt::{self, Cx, DomStr, ExceptionName, Handle, JsPromise};
 use snowlark_bindings::InterfaceId;
@@ -257,6 +257,7 @@ impl Engine {
             RuleKind::Container => InterfaceId::CSSContainerRule,
             RuleKind::FontFeatureValues => InterfaceId::CSSFontFeatureValuesRule,
             RuleKind::FontPaletteValues => InterfaceId::CSSFontPaletteValuesRule,
+            RuleKind::Property => InterfaceId::CSSPropertyRule,
             _ => InterfaceId::CSSRule,
         }
     }
@@ -911,6 +912,27 @@ impl CSSFontPaletteValuesRuleImpl for Engine {
     fn override_colors(&self, this: Handle) -> DomStr<'_> {
         let values = self.rule_of(this).font_palette_values();
         DomStr::Owned(values.map(|v| v.override_colors).unwrap_or_default())
+    }
+}
+
+/// CSS Properties and Values API 1 §5.1: the rule's name and descriptors, read only.
+impl CSSPropertyRuleImpl for Engine {
+    fn name(&self, this: Handle) -> DomStr<'_> {
+        let values = self.rule_of(this).property_rule();
+        DomStr::Owned(values.map(|v| v.name).unwrap_or_default())
+    }
+    fn syntax(&self, this: Handle) -> DomStr<'_> {
+        let values = self.rule_of(this).property_rule();
+        DomStr::Owned(values.map(|v| v.syntax).unwrap_or_default())
+    }
+    fn inherits(&self, this: Handle) -> bool {
+        self.rule_of(this)
+            .property_rule()
+            .is_some_and(|v| v.inherits)
+    }
+    fn initial_value(&self, this: Handle) -> Option<DomStr<'_>> {
+        let values = self.rule_of(this).property_rule()?;
+        values.initial_value.map(DomStr::Owned)
     }
 }
 

@@ -475,6 +475,7 @@ every_variant!(tab_command: TabCommand, [
     }),
     TabCommand::Key(_) => TabCommand::Key(key(KeyKind::Down { repeat: false })),
     TabCommand::ScrollContainer(..) => TabCommand::ScrollContainer(node(4), point()),
+    TabCommand::SnapScroll(..) => TabCommand::SnapScroll(Some(node(4)), point()),
     TabCommand::SelectChosen(..) => TabCommand::SelectChosen(node(4), 2),
     TabCommand::Ime(_) => TabCommand::Ime(ImeEvent::Commit("text".into())),
     TabCommand::Devtools(_) => TabCommand::Devtools(DevtoolsCommand::Pick(true)),
@@ -519,6 +520,7 @@ fn state() -> TabState {
             scroll: point(),
             max: Point::new(100.0, 2000.0),
         }],
+        snap_viewport: true,
         error_page: false,
         navigations: 4,
     }

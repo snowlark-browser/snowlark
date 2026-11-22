@@ -865,15 +865,28 @@ impl CSSImpl for Engine {
             "CSS.parseCommaValueList is not supported",
         ))
     }
-    fn register_property(
-        &self,
-        _cx: &mut Cx,
-        _definition: g::PropertyDefinition,
-    ) -> rt::Result<()> {
-        Err(exception(
-            ExceptionName::NotSupportedError,
-            "CSS.registerProperty is not supported",
-        ))
+    /// CSS Properties and Values API 1 §2.4: registers the property in the document's set of
+    /// registered properties.
+    fn register_property(&self, _cx: &mut Cx, definition: g::PropertyDefinition) -> rt::Result<()> {
+        let result = self.with_renderer(|r, _| {
+            r.register_property(
+                &definition.name,
+                &definition.syntax,
+                definition.inherits,
+                definition.initial_value.as_deref(),
+            )
+        });
+        match result {
+            Some(Err(snowlark_style::RegisterPropertyError::AlreadyRegistered)) => Err(exception(
+                ExceptionName::InvalidModificationError,
+                "the property is registered already",
+            )),
+            Some(Err(snowlark_style::RegisterPropertyError::Invalid)) => Err(exception(
+                ExceptionName::SyntaxError,
+                "invalid property name, syntax or initial value",
+            )),
+            Some(Ok(())) | None => Ok(()),
+        }
     }
 }
 

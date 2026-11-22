@@ -761,7 +761,8 @@ impl Engine {
 
     /// Scrolls `el`'s subject (CSSOM View §6 "scroll an element") with `behavior`; `promise`, when
     /// given, is taken by a smooth scroll that starts (and settled when it ends), else left for
-    /// the caller to resolve.
+    /// the caller to resolve. `snap`: what the scroll means for a box that snaps.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn view_scroll_element_with(
         &self,
         cx: &mut Cx,
@@ -770,13 +771,14 @@ impl Engine {
         y: Option<f64>,
         behavior: ScrollBehavior,
         promise: &mut Option<JsPromise>,
+        snap: SnapIntent,
     ) {
         let scroller = match self.scroll_subject(el) {
             ScrollSubject::Viewport => Scroller::Viewport(self.dom().node_document(el)),
             ScrollSubject::Element(e) => Scroller::Element(e),
             ScrollSubject::Nothing => return,
         };
-        self.perform_scroll(cx, scroller, x, y, behavior, promise);
+        self.perform_scroll(cx, scroller, x, y, behavior, promise, Some(snap));
     }
 
     /// The scroll position of a scroller.
@@ -842,7 +844,9 @@ impl Engine {
     /// CSSOM View §4 "perform a scroll" of `s` to (`x`, `y`) (`None`: the axis keeps its
     /// position): a smooth scroll in progress on the box is interrupted; a smooth one starts an
     /// animation stepped at each rendering update, an instant one moves at once. A scroll that
-    /// changed the position completes with a `scrollend` event.
+    /// changed the position completes with a `scrollend` event. `snap`: what the scroll means, for a
+    /// box that snaps (CSS Scroll Snap 1 §6.2); `None` for a position already snapped.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn perform_scroll(
         &self,
         cx: &mut Cx,
@@ -851,6 +855,7 @@ impl Engine {
         y: Option<f64>,
         behavior: ScrollBehavior,
         promise: &mut Option<JsPromise>,
+        snap: Option<SnapIntent>,
     ) {
         let key = s.key();
         // A smooth scroll to where one in progress is already going does not interrupt it (it
@@ -889,10 +894,13 @@ impl Engine {
             Self::settle_scroll(cx, a.promises, true);
         }
         let cur = self.scroller_position(s);
-        let target = Point::new(
+        let mut target = Point::new(
             x.map_or(cur.x, |v| finite32(v as f32)),
             y.map_or(cur.y, |v| finite32(v as f32)),
         );
+        if let Some(intent) = snap {
+            target = self.snapped_target(s, cur, target, (x.is_some(), y.is_some()), intent);
+        }
         if !self.scroll_is_smooth(s, behavior, target == Point::ZERO) {
             if self.scroller_set(s, target) {
                 self.queue_scrollend(key);
@@ -1325,6 +1333,7 @@ impl Engine {
                     Some(to.y as f64),
                     behavior,
                     promise,
+                    Some(SnapIntent::End),
                 );
             }
         }
@@ -1848,4 +1857,257 @@ fn is_replaced_element(dom: &Dom, el: NodeId) -> bool {
                 | local_name!("select")
                 | local_name!("audio")
         )
+}
+
+// ----- CSS Scroll Snap 1 -------------------------------------------------------------------------
+
+/// How a scroll means to end, for snapping (CSS Scroll Snap 1 §6.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SnapIntent {
+    /// An intended end position (`scrollTo()`, `scrollTop`, `scrollIntoView()`).
+    End,
+    /// A direction and a distance from where the box is (`scrollBy()`, a wheel notch).
+    By,
+    /// A direction only (an arrow key, Page Down).
+    Direction,
+}
+
+/// The snap container's axes as its writing mode lays them out.
+fn snap_axes(s: &snowlark_render::RenderStyle) -> snowlark_layout::scroll_snap::Axes {
+    use snowlark_layout::scroll_snap::Axes;
+    use snowlark_layout::style::Direction;
+    let rtl = s.direction() == Direction::Rtl;
+    let (horizontal, block_reversed, inline_reversed) = match s.writing_mode() {
+        WritingMode::HorizontalTb => (true, false, rtl),
+        WritingMode::VerticalRl | WritingMode::SidewaysRl => (false, true, rtl),
+        WritingMode::VerticalLr => (false, false, rtl),
+        WritingMode::SidewaysLr => (false, false, !rtl),
+    };
+    Axes {
+        horizontal,
+        block_reversed,
+        inline_reversed,
+    }
+}
+
+impl Engine {
+    /// The snap container `s` is, with its snap areas (CSS Scroll Snap 1 §5), when its
+    /// `scroll-snap-type` is not `none` (the root element's is the viewport's).
+    fn snap_container(&self, s: Scroller) -> Option<snowlark_layout::scroll_snap::SnapContainer> {
+        use snowlark_layout::scroll_snap::{Align, SnapArea, SnapContainer};
+        let (doc, c) = match s {
+            Scroller::Viewport(doc) => (doc, self.dom().document_element(doc)?),
+            Scroller::Element(e) => (self.dom().node_document(e), e),
+        };
+        self.with_layout(c, |r, st| {
+            let cs = r.element_style(c)?;
+            let (axis, strictness) = cs.scroll_snap_type()?;
+            let axes = snap_axes(&cs);
+            let dom = self.dom();
+            // (the scrollport, where the container's content coordinates start, its scroll range)
+            let (port, origin, (min, max)) = match s {
+                Scroller::Viewport(_) => {
+                    let v = r.layout_viewport(st.viewport);
+                    (
+                        Rect::new(0.0, 0.0, v.width, v.height),
+                        Point::ZERO,
+                        viewport_range(r, st),
+                    )
+                }
+                Scroller::Element(e) => {
+                    let g = r.geometry(e)?;
+                    let pb = g.padding_box;
+                    let range = element_range_at(r, &dom, e, &g)?;
+                    (
+                        Rect::new(0.0, 0.0, pb.width, pb.height),
+                        Point::new(pb.x, pb.y),
+                        range,
+                    )
+                }
+            };
+            // (§5.1.3: the snapport is the scrollport inset by `scroll-padding`)
+            let pad = |side: Side, len: f32| cs.scroll_padding(side).resolve(len);
+            let snapport = Rect::from_ltrb(
+                pad(Side::Left, port.width),
+                pad(Side::Top, port.height),
+                port.width - pad(Side::Right, port.width),
+                port.height - pad(Side::Bottom, port.height),
+            );
+            let container = match s {
+                Scroller::Element(e) => Some(e),
+                Scroller::Viewport(_) => None,
+            };
+            let root = dom.document_element(doc);
+            let mut areas = Vec::new();
+            for el in dom.shadow_including_descendants(doc) {
+                if !dom.is_element(el) {
+                    continue;
+                }
+                let Some(es) = r.element_style(el) else {
+                    continue;
+                };
+                let (block, inline) = es.scroll_snap_align();
+                if block == Align::None && inline == Align::None {
+                    continue;
+                }
+                // (§5.2: a box's snap container is its nearest scroll container ancestor)
+                let mut a = r.flat_parent(&dom, el);
+                let nearest = loop {
+                    match a {
+                        None => break None,
+                        Some(p) if Some(p) == root => break None,
+                        Some(p) if element_range(r, &dom, p).is_some() => break Some(p),
+                        Some(p) => a = r.flat_parent(&dom, p),
+                    }
+                };
+                if nearest != container {
+                    continue;
+                }
+                let Some(g) = r.geometry(el) else {
+                    continue;
+                };
+                // (a fixed box does not move with the viewport it would snap)
+                if container.is_none() && fixed_position_chain(r, &dom, el) {
+                    continue;
+                }
+                // (§5.2.1: the snap area is the border box outset by `scroll-margin`)
+                let b = g.border_box;
+                let rect = Rect::from_ltrb(
+                    b.x - es.scroll_margin(Side::Left) - origin.x,
+                    b.y - es.scroll_margin(Side::Top) - origin.y,
+                    b.right() + es.scroll_margin(Side::Right) - origin.x,
+                    b.bottom() + es.scroll_margin(Side::Bottom) - origin.y,
+                );
+                let (align_x, align_y) = Align::physical(block, inline, axes);
+                areas.push(SnapArea {
+                    rect,
+                    align_x,
+                    align_y,
+                    stop_always: es.scroll_snap_stop_always(),
+                });
+            }
+            Some(SnapContainer {
+                axis: axis.physical(axes),
+                strictness,
+                snapport,
+                min,
+                max,
+                areas,
+            })
+        })
+        .flatten()
+    }
+
+    /// Where a scroll of `s` from `from` toward `to` comes to rest (CSS Scroll Snap 1 §6.2): `to`
+    /// unless `s` is a snap container. `(x, y)`: the axes an end position names.
+    pub(crate) fn snapped_target(
+        &self,
+        s: Scroller,
+        from: Point,
+        to: Point,
+        (x, y): (bool, bool),
+        intent: SnapIntent,
+    ) -> Point {
+        use snowlark_layout::scroll_snap::Intent;
+        // (style alone says whether the box snaps: a box that does not needs no layout here)
+        let el = match s {
+            Scroller::Viewport(doc) => self.dom().document_element(doc),
+            Scroller::Element(e) => Some(e),
+        };
+        if !el.is_some_and(|e| self.has_snap_type(e)) {
+            return to;
+        }
+        let Some(c) = self.snap_container(s) else {
+            return to;
+        };
+        let d = Point::new(to.x - from.x, to.y - from.y);
+        let (sx, sy) = c.snap(match intent {
+            SnapIntent::End => Intent::End { to, x, y },
+            SnapIntent::By => Intent::Displacement { from, delta: d },
+            SnapIntent::Direction => Intent::Direction { from, step: d },
+        });
+        Point::new(sx.unwrap_or(to.x), sy.unwrap_or(to.y))
+    }
+
+    /// The scroller a user scroll of `node` moves: a frame element's document's viewport, a
+    /// document's viewport, else the scroll container.
+    fn user_scroller(&self, node: NodeId) -> Scroller {
+        if self.dom().is_document(node) {
+            return Scroller::Viewport(node);
+        }
+        let doc = self.dom().node_document(node);
+        match self
+            .rendered_frames_of(doc)
+            .into_iter()
+            .find(|(c, _)| *c == node)
+        {
+            Some((_, d)) => Scroller::Viewport(d),
+            None => Scroller::Element(node),
+        }
+    }
+
+    /// Whether `node`'s scrolling snaps (`scroll-snap-type` is not `none`): a scroll container's,
+    /// or, for a frame element or a document, its document's viewport's.
+    pub fn scroll_snaps(&self, node: NodeId) -> bool {
+        let el = match self.user_scroller(node) {
+            Scroller::Viewport(doc) => self.dom().document_element(doc),
+            Scroller::Element(e) => Some(e),
+        };
+        el.is_some_and(|e| self.has_snap_type(e))
+    }
+
+    /// Whether `el`'s `scroll-snap-type` is not `none` (style only: no layout).
+    fn has_snap_type(&self, el: NodeId) -> bool {
+        self.with_style(el, |r| {
+            r.element_style(el)
+                .is_some_and(|s| s.scroll_snap_type().is_some())
+        })
+        .unwrap_or(false)
+    }
+
+    /// The user turned the mouse wheel by a notch (`key`: pressed an arrow or page key) to scroll
+    /// `node` (a scroll container, a frame element or a document for its viewport, `None` for the
+    /// top-level viewport) by `delta`: the box goes smoothly to the snap position the scroll
+    /// chooses (CSS Scroll Snap 1 §6.2), or by `delta` when it does not snap. A notch while the
+    /// box is still going to a snap position counts from that position. Returns whether it moves.
+    pub fn snap_scroll_by(
+        &self,
+        cx: &mut Cx,
+        node: Option<NodeId>,
+        delta: Point,
+        key: bool,
+    ) -> bool {
+        let s = match node {
+            None => match self.rendered_top() {
+                Some(doc) => Scroller::Viewport(doc),
+                None => return false,
+            },
+            Some(n) if !self.dom().is_alive(n) => return false,
+            Some(n) => self.user_scroller(n),
+        };
+        let going = self
+            .with_node_renderer(s.key(), |_, st| {
+                st.smooth.iter().find(|a| a.scroller == s).map(|a| a.to)
+            })
+            .flatten();
+        let before = self.scroller_position(s);
+        let from = going.unwrap_or(before);
+        let to = Point::new(from.x + delta.x, from.y + delta.y);
+        let intent = if key {
+            SnapIntent::Direction
+        } else {
+            SnapIntent::By
+        };
+        let target = self.snapped_target(s, from, to, (true, true), intent);
+        self.perform_scroll(
+            cx,
+            s,
+            Some(target.x as f64),
+            Some(target.y as f64),
+            ScrollBehavior::Smooth,
+            &mut None,
+            None,
+        );
+        self.clamped_target(s, target) != before
+    }
 }

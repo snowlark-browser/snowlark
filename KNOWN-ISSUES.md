@@ -58,8 +58,12 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `:active` rules do not apply, the buttons and corner are not drawn, and the scrollbar pseudo-classes
   (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
   parse but style nothing. (ref 627)
-- **Properties not built.** `scroll-snap-type`, `scroll-snap-align`, `scroll-snap-stop`, `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink`
-  and `accent-color` do not parse, so their declarations are dropped. (ref 622)
+- **Properties not built.** `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink` and `accent-color`
+  do not parse, so their declarations are dropped. (ref 622)
+- **Scroll snap.** Script scrolls, mouse wheel notches and the arrow and page keys come to rest on snap positions.
+  Not done: a touchpad's scrolls and autoscroll do not snap when they end, Home, End and the scroll bar do not
+  snap, a container does not snap again after its layout changes, and the Level 2 snap events are missing.
+  (ref 640)
 - **Filters.** `filter` functions and `backdrop-filter` work. Not done: `filter: url()` pointing to an external SVG
   document, `linearRGB` interpolation in SVG filters, `filter` on the root element, `will-change: filter` as a
   compositing reason, and running filter animations on the compositor. (ref 40)
@@ -158,6 +162,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Inline SVG painting.** Inline SVG is still drawn through a serialize-and-rasterize path. `foreignObject`,
   `vector-effect`, text beyond what the rasterizer supports (`inline-size`, `shape-inside`, `textLength` on lists),
   percentage dashes and `context-fill` corners are not supported. (ref 67)
+- **Animated inline SVG with patterns.** An inline `svg` that fills with a `<pattern>` is rasterized whole again
+  each time it changes, on the page's thread: a large one that animates every frame slows the whole page and
+  its scrolling. (ref 643)
 - **SVG DOM details.** `:target` inside a resource document, SMIL animation of `d` where path arithmetic differs,
   focus inside hidden SVG containers, `getScreenCTM()` through CSS transforms of HTML ancestors,
   `attributeStyleMap` on SVG elements, and listeners added to an original that should reach its `<use>` instances are

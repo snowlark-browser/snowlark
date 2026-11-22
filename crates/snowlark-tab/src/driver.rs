@@ -436,6 +436,9 @@ pub struct DocumentInfo {
     /// position instead of being moved by the compositor).
     pub fixed: bool,
     pub scrollers: Vec<Scroller>,
+    /// The viewport snaps (the root element's `scroll-snap-type` is not `none`): the page, not the
+    /// compositor, chooses where the wheel and the scrolling keys take it.
+    pub snap_viewport: bool,
     /// Bumped for each new document (the compositor resets the scroll position then).
     pub generation: u64,
     /// The document is an error page for `url` (never shown as secure).
@@ -457,6 +460,7 @@ impl Default for DocumentInfo {
             page_background: Color::WHITE,
             fixed: false,
             scrollers: Vec::new(),
+            snap_viewport: false,
             generation: 0,
             error_page: false,
         }
@@ -659,6 +663,14 @@ pub trait TabDriver {
 
     /// Scrolls a scroll container by `delta`; whether it moved.
     fn scroll_container(&mut self, node: NodeId, delta: Point) -> bool;
+
+    /// A mouse wheel notch (`key`: an arrow or page key) scrolls a scroll container (`None`: the
+    /// viewport) by `delta`, to the snap position it chooses when the box snaps (CSS Scroll Snap 1
+    /// §6.2). Whether it moved; a driver that does not snap scrolls a container by `delta` and
+    /// leaves the viewport to the compositor (false).
+    fn snap_scroll(&mut self, node: Option<NodeId>, delta: Point, _key: bool) -> bool {
+        node.is_some_and(|n| self.scroll_container(n, delta))
+    }
 
     /// A drop-down select's list the document asked to show (the window draws it).
     fn take_select_popup(&mut self) -> Option<snowlark_page::popup::SelectPopup> {

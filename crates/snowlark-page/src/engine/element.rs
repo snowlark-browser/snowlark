@@ -5,7 +5,7 @@
 //! `Element` (DOM §4.9) and the parts of it other specifications add (DOM Parsing, CSSOM View, Pointer
 //! Events). Geometry members answer through the layout hook, which returns zeros until layout exists.
 
-use super::view::{finite, logical};
+use super::view::{finite, logical, SnapIntent};
 use snowlark_bindings::generated::{
     BooleanOrScrollIntoViewOptions, CheckVisibilityOptions, ElementImpl, FocusableAreasOption,
     GetHTMLOptions, PointerLockOptions, ScrollBehavior, ScrollResult, ScrollToOptions,
@@ -44,10 +44,11 @@ fn element_scroll(
     x: Option<f64>,
     y: Option<f64>,
     behavior: ScrollBehavior,
+    snap: SnapIntent,
 ) -> rt::Result<JsPromise> {
     let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
     let mut pending = Some(p.clone());
-    e.view_scroll_element_with(cx, el, x, y, behavior, &mut pending);
+    e.view_scroll_element_with(cx, el, x, y, behavior, &mut pending, snap);
     Ok(scroll_promise(cx, p, pending))
 }
 
@@ -270,6 +271,7 @@ impl ElementImpl for Engine {
             Some(finite(value)),
             ScrollBehavior::Auto,
             &mut None,
+            SnapIntent::End,
         );
         Ok(())
     }
@@ -284,6 +286,7 @@ impl ElementImpl for Engine {
             None,
             ScrollBehavior::Auto,
             &mut None,
+            SnapIntent::End,
         );
         Ok(())
     }
@@ -750,6 +753,7 @@ impl ElementImpl for Engine {
             options.left.map(finite),
             options.top.map(finite),
             options.behavior,
+            SnapIntent::End,
         )
     }
 
@@ -762,6 +766,7 @@ impl ElementImpl for Engine {
             Some(finite(x)),
             Some(finite(y)),
             ScrollBehavior::Auto,
+            SnapIntent::End,
         )
     }
 
@@ -793,6 +798,7 @@ impl ElementImpl for Engine {
             Some(at.x as f64 + options.left.map_or(0.0, finite)),
             Some(at.y as f64 + options.top.map_or(0.0, finite)),
             options.behavior,
+            SnapIntent::By,
         )
     }
 
@@ -806,6 +812,7 @@ impl ElementImpl for Engine {
             Some(at.x as f64 + finite(x)),
             Some(at.y as f64 + finite(y)),
             ScrollBehavior::Auto,
+            SnapIntent::By,
         )
     }
 

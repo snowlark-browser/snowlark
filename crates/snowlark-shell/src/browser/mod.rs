@@ -2476,8 +2476,18 @@ impl Browser {
         self.send_active(TabCommand::Pointer(Pointer::Wheel(p, delta, mods)));
         let doc = Point::new(p.x + view.scroll.x, p.y + view.scroll.y);
         if let Some(e) = self.tabs.active() {
+            // (a mouse wheel's notches go to the page, which knows where a box that snaps rests:
+            // CSS Scroll Snap 1 §6.2; a precise device's scrolls move the box as they come)
             if let Some(s) = scroller_at(&e.tab.state.scrollers, doc, delta) {
-                e.tab.send(TabCommand::ScrollContainer(s.node, delta));
+                e.tab.send(if precise {
+                    TabCommand::ScrollContainer(s.node, delta)
+                } else {
+                    TabCommand::SnapScroll(Some(s.node), delta)
+                });
+                return;
+            }
+            if e.tab.state.snap_viewport && !precise {
+                e.tab.send(TabCommand::SnapScroll(None, delta));
                 return;
             }
         }

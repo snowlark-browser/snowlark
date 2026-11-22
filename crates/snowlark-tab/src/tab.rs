@@ -73,6 +73,10 @@ pub enum TabCommand {
     Drag(DragInput),
     Key(KeyInput),
     ScrollContainer(NodeId, Point),
+    /// A mouse wheel notch over a scroll container (`None`: over the viewport, sent when
+    /// [`TabState::snap_viewport`] says it snaps): the page scrolls the box to the snap position the
+    /// notch chooses (CSS Scroll Snap 1 §6.2), or by the delta when the box does not snap.
+    SnapScroll(Option<NodeId>, Point),
     /// The user chose an option in a select's list: (select, option index).
     SelectChosen(NodeId, usize),
     /// Input method composition.
@@ -177,6 +181,9 @@ pub struct TabState {
     pub title: String,
     pub loading: bool,
     pub scrollers: Vec<Scroller>,
+    /// The viewport snaps: the window sends its wheel notches to the page
+    /// ([`TabCommand::SnapScroll`]) instead of scrolling it itself.
+    pub snap_viewport: bool,
     /// An error page shows (the address bar never shows it as secure).
     pub error_page: bool,
     /// The latest [`TabCommand::Navigate`] the tab has heard of: each one changes the state, so the
@@ -568,6 +575,11 @@ pub(crate) fn spawn_assigned(
 /// a viewport behind the view and a viewport and a half ahead of it, and a viewport each side before
 /// the view has moved. Pages whose content only shows right when painted for the scroll position
 /// (`pinned`) get exactly the viewport (they are repainted for each scroll position).
+///
+/// `skew` (CSS px, from [`ScrollHistory::skew`]) reaches further ahead: where the view will be
+/// soon at the speed it scrolls, so a fast scroll does not outrun the band before the next one is
+/// painted. A wheel notch moves the same CSS px at every display scale, while a viewport holds
+/// fewer CSS px the larger the scale, so a band of viewports alone lasts less of a scroll there.
 pub fn band(
     scroll: Point,
     viewport: Size,
@@ -575,6 +587,7 @@ pub fn band(
     scale: f32,
     pinned: bool,
     direction: f32,
+    skew: f32,
 ) -> (f32, f32) {
     let snap = |y: f32| (y * scale).floor() / scale;
     if pinned {
@@ -588,27 +601,35 @@ pub fn band(
     } else {
         1.0
     };
-    let top = snap((scroll.y - above * viewport.height).max(0.0));
-    let bottom =
-        (scroll.y + (3.0 - above) * viewport.height).min(content.height.max(viewport.height));
+    let (skew_up, skew_down) = if direction > 0.0 {
+        (0.0, skew)
+    } else if direction < 0.0 {
+        (skew, 0.0)
+    } else {
+        (0.0, 0.0)
+    };
+    let top = snap((scroll.y - above * viewport.height - skew_up).max(0.0));
+    let bottom = (scroll.y + (3.0 - above) * viewport.height + skew_down)
+        .min(content.height.max(viewport.height));
     (top, (bottom - top).max(viewport.height))
 }
 
 /// Whether a band still serves a viewport scrolled to `scroll`: the view lies inside it with a
 /// quarter viewport to spare behind it and three quarters ahead of it in the way it scrolls
-/// (`direction`, as for [`band`]), so the next band is painted while that much is left to show
-/// (except at the document's ends).
+/// (`direction`, as for [`band`]), plus where the view will be soon (`skew`, as for [`band`]), so
+/// the next band is painted while that much is left to show (except at the document's ends).
 pub fn band_serves(
     band: (f32, f32),
     scroll: Point,
     viewport: Size,
     content: Size,
     direction: f32,
+    skew: f32,
 ) -> bool {
     let (top, height) = band;
     let bottom = top + height;
     let behind = viewport.height / 4.0;
-    let ahead = viewport.height * 0.75;
+    let ahead = viewport.height * 0.75 + skew;
     let (margin_top, margin) = if direction > 0.0 {
         (behind, ahead)
     } else if direction < 0.0 {
@@ -628,6 +649,62 @@ pub fn band_serves(
         scroll.y + viewport.height <= bottom - margin
     };
     need_top && need_bottom
+}
+
+/// How far ahead of the view a band reaches for the speed it scrolls: the distance covered in this
+/// long at that speed (the time to paint and raster the next band, with room to spare).
+const SKEW_TIME: f32 = 0.2;
+/// The most a band reaches ahead for the speed, in device pixels.
+const SKEW_LIMIT: f32 = 2000.0;
+/// How far back [`ScrollHistory`] measures the speed.
+const SKEW_HISTORY: std::time::Duration = std::time::Duration::from_millis(100);
+/// After this long with no new place heard the view is taken to have stopped. Longer than the
+/// history: the paint after a rendering update (which can run long) keeps the reach of the paint
+/// the scroll asked for just before it.
+const SKEW_STOPPED: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// Where the compositor said the viewport was, lately: the speed the view scrolls at, for how far
+/// ahead of it a band reaches ([`band`]).
+#[derive(Default)]
+pub struct ScrollHistory {
+    /// When each place was heard and its y, oldest first: one older than [`SKEW_HISTORY`] at most.
+    at: std::collections::VecDeque<(Instant, f32)>,
+}
+
+impl ScrollHistory {
+    /// The viewport was heard to be at `y` at `now`.
+    pub fn push(&mut self, now: Instant, y: f32) {
+        self.at.push_back((now, y));
+        // (the oldest is kept while the next is still within the history: a speed measured over a
+        // tab that was busy spans the time it was)
+        while self.at.len() > 2 && now.saturating_duration_since(self.at[1].0) >= SKEW_HISTORY {
+            self.at.pop_front();
+        }
+    }
+
+    /// A jump (a new document, the page's own scroll): no speed until the view moves again.
+    pub fn clear(&mut self) {
+        self.at.clear();
+    }
+
+    /// How far ahead of the view, the way it scrolls (`direction`, as for [`band`]), it will be
+    /// [`SKEW_TIME`] from `now` at the speed it moved lately, at most [`SKEW_LIMIT`] device pixels
+    /// at `scale`: CSS px, `0.0` when it is not moving that way.
+    pub fn skew(&self, now: Instant, direction: f32, scale: f32) -> f32 {
+        let (Some(&(t0, y0)), Some(&(t1, y1))) = (self.at.front(), self.at.back()) else {
+            return 0.0;
+        };
+        // (nothing heard lately: the view stopped)
+        if now.saturating_duration_since(t1) >= SKEW_STOPPED {
+            return 0.0;
+        }
+        let dt = t1.saturating_duration_since(t0).as_secs_f32();
+        if dt <= 0.0 || direction == 0.0 {
+            return 0.0;
+        }
+        let ahead = (y1 - y0) * direction / dt * SKEW_TIME;
+        ahead.clamp(0.0, SKEW_LIMIT / scale.max(0.01))
+    }
 }
 
 /// The way a view scrolls (`1.0` down, `-1.0` up, `0.0` not known yet) once it moved to `y`, and the
@@ -767,6 +844,8 @@ struct TabRenderer {
     /// The way the view scrolls and the furthest point that way ([`scroll_direction`]).
     scroll_dir: f32,
     dir_anchor: f32,
+    /// Where the compositor said the viewport was, lately (the speed it scrolls).
+    scroll_history: ScrollHistory,
     /// The view scrolled out of the band: paint before the page runs again.
     scroll_paint: bool,
     /// The page scrolled its viewport there and the compositor has not been told: the scroll goes
@@ -836,6 +915,7 @@ struct ViewFields {
     shown: bool,
     scroll_dir: f32,
     dir_anchor: f32,
+    scroll_history: ScrollHistory,
     scroll_paint: bool,
     page_scroll: Option<crate::comp::PageScroll>,
     page_scrolls: u64,
@@ -867,6 +947,7 @@ impl ViewFields {
             shown: true,
             scroll_dir: 0.0,
             dir_anchor: 0.0,
+            scroll_history: ScrollHistory::default(),
             scroll_paint: false,
             page_scroll: None,
             page_scrolls: 0,
@@ -898,6 +979,7 @@ impl ViewFields {
         swap(&mut self.shown, &mut t.shown);
         swap(&mut self.scroll_dir, &mut t.scroll_dir);
         swap(&mut self.dir_anchor, &mut t.dir_anchor);
+        swap(&mut self.scroll_history, &mut t.scroll_history);
         swap(&mut self.scroll_paint, &mut t.scroll_paint);
         swap(&mut self.page_scroll, &mut t.page_scroll);
         swap(&mut self.page_scrolls, &mut t.page_scrolls);
@@ -923,6 +1005,7 @@ pub fn is_input(c: &TabCommand) -> bool {
             | TabCommand::Drag(_)
             | TabCommand::Key(_)
             | TabCommand::ScrollContainer(..)
+            | TabCommand::SnapScroll(..)
             | TabCommand::SelectChosen(..)
             | TabCommand::Ime(_)
     )
@@ -1073,6 +1156,7 @@ fn run(
         shown: true,
         scroll_dir: 0.0,
         dir_anchor: 0.0,
+        scroll_history: ScrollHistory::default(),
         scroll_paint: false,
         page_scroll: None,
         page_scrolls: 0,
@@ -1318,15 +1402,21 @@ impl TabRenderer {
                     p.y,
                     self.device.viewport.height / 8.0,
                 );
+                let now = Instant::now();
+                self.scroll_history.push(now, p.y);
                 let info = self.driver.info();
                 match self.band {
                     Some((top, height, _)) => {
+                        let skew =
+                            self.scroll_history
+                                .skew(now, self.scroll_dir, self.device.scale);
                         let serves = band_serves(
                             (top, height),
                             p,
                             self.device.viewport,
                             info.content,
                             self.scroll_dir,
+                            skew,
                         );
                         let pinned_moved =
                             self.pinned && (top - p.y).abs() >= 0.5 / self.device.scale;
@@ -1344,6 +1434,16 @@ impl TabRenderer {
                     self.needs_paint = true;
                 }
                 if let Some(s) = r.scroll {
+                    // (a viewport that snaps goes where the key's direction chooses: CSS Scroll
+                    // Snap 1 §6.2)
+                    if let KeyScroll::By(delta) = s {
+                        if self.driver.info().snap_viewport {
+                            if self.driver.snap_scroll(None, delta, true) {
+                                self.needs_paint = true;
+                            }
+                            return true;
+                        }
+                    }
                     let info = self.driver.info();
                     let msg = match s {
                         KeyScroll::By(delta) => CompMsg::ScrollBy {
@@ -1431,6 +1531,19 @@ impl TabRenderer {
             TabCommand::ScrollContainer(node, delta) => {
                 if self.driver.scroll_container(node, delta) {
                     self.needs_paint = true;
+                }
+            }
+            TabCommand::SnapScroll(node, delta) => {
+                if self.driver.snap_scroll(node, delta, false) {
+                    self.needs_paint = true;
+                } else if node.is_none() && !self.driver.info().snap_viewport {
+                    // (the page stopped snapping since the window asked: the compositor scrolls)
+                    self.ctx.surface.compositor(CompMsg::ScrollBy {
+                        tab: self.id,
+                        delta,
+                        smooth: true,
+                        input: None,
+                    });
                 }
             }
             TabCommand::Wake => {}
@@ -1749,6 +1862,7 @@ impl TabRenderer {
             title: info.title.clone(),
             loading: info.loading,
             scrollers: info.scrollers.clone(),
+            snap_viewport: info.snap_viewport,
             error_page: info.error_page,
             navigations: self.navigations,
         };
@@ -1842,6 +1956,8 @@ impl TabRenderer {
             );
             self.scroll = to;
         }
+        // (a jump, not a speed)
+        self.scroll_history.clear();
         // (the band follows the viewport)
         self.needs_paint = true;
     }
@@ -1900,14 +2016,26 @@ impl TabRenderer {
             // (a new document has not been scrolled yet)
             self.scroll_dir = 0.0;
             self.dir_anchor = scroll.y;
+            self.scroll_history.clear();
         }
+        let skew = self
+            .scroll_history
+            .skew(Instant::now(), self.scroll_dir, self.device.scale);
         let scale = self.device.scale;
         let viewport = self.device.viewport;
         // (a list found to be pinned is painted again for exactly the viewport, and back)
         let mut attempt = 0;
         let (top, height, origin, split, list_hash, animations) = loop {
             let pinned = self.pinned;
-            let (top, height) = band(scroll, viewport, content, scale, pinned, self.scroll_dir);
+            let (top, height) = band(
+                scroll,
+                viewport,
+                content,
+                scale,
+                pinned,
+                self.scroll_dir,
+                skew,
+            );
             let origin = Point::new(if pinned { scroll.x } else { 0.0 }, top);
             let mut list = self.driver.paint(origin)?;
             // (what crosses to the raster side stays within a pipe frame: boxes whose animations
@@ -2114,6 +2242,118 @@ pub(crate) fn layer_region(
 mod tests {
     use super::*;
     const VIEW: Size = Size::new(1000.0, 800.0);
+
+    /// [`super::band`] of a view that is not moving fast (no skew).
+    fn band(
+        scroll: Point,
+        viewport: Size,
+        content: Size,
+        scale: f32,
+        pinned: bool,
+        direction: f32,
+    ) -> (f32, f32) {
+        super::band(scroll, viewport, content, scale, pinned, direction, 0.0)
+    }
+
+    /// [`super::band_serves`] of a view that is not moving fast (no skew).
+    fn band_serves(
+        band: (f32, f32),
+        scroll: Point,
+        viewport: Size,
+        content: Size,
+        direction: f32,
+    ) -> bool {
+        super::band_serves(band, scroll, viewport, content, direction, 0.0)
+    }
+
+    /// Chrome's skewport: a band reaches ahead by where the view will be soon at its speed.
+    #[test]
+    fn scroll_history_measures_the_speed_ahead() {
+        let t = Instant::now();
+        let ms = |n: u64| t + std::time::Duration::from_millis(n);
+        let mut h = ScrollHistory::default();
+        assert_eq!(h.skew(t, 1.0, 1.0), 0.0);
+        // 3000 px/s down: 600 px in 0.2 s.
+        for i in 0..=10u64 {
+            h.push(ms(i * 10), i as f32 * 30.0);
+        }
+        let skew = h.skew(ms(100), 1.0, 1.0);
+        assert!((skew - 600.0).abs() < 1.0, "{skew}");
+        // Only ahead: none the other way.
+        assert_eq!(h.skew(ms(100), -1.0, 1.0), 0.0);
+        assert_eq!(h.skew(ms(100), 0.0, 1.0), 0.0);
+        // At most 2000 device pixels.
+        let mut fast = ScrollHistory::default();
+        fast.push(t, 0.0);
+        fast.push(ms(10), 1000.0);
+        assert_eq!(fast.skew(ms(10), 1.0, 1.5), 2000.0 / 1.5);
+        // Still the speed after a long rendering update; a view that stopped has none.
+        assert!((h.skew(ms(300), 1.0, 1.0) - 600.0).abs() < 1.0);
+        assert_eq!(h.skew(ms(700), 1.0, 1.0), 0.0);
+        // A tab busy for 300 ms then hearing a batch: the speed spans the wait.
+        let mut busy = ScrollHistory::default();
+        busy.push(t, 0.0);
+        for y in [890.0, 895.0, 900.0] {
+            busy.push(ms(300), y);
+        }
+        let skew = busy.skew(ms(300), 1.0, 1.0);
+        assert!((skew - 600.0).abs() < 1.0, "{skew}");
+        // A jump is no speed.
+        busy.clear();
+        assert_eq!(busy.skew(ms(300), 1.0, 1.0), 0.0);
+    }
+
+    /// A fast scroll gets a band reaching further ahead, asked for earlier: at 150% a viewport is
+    /// two thirds of the CSS px it is at 100%, and the wheel moves the same CSS px.
+    #[test]
+    fn fast_scrolls_reach_further_ahead() {
+        let content = Size::new(1000.0, 10_000.0);
+        let at = Point::new(0.0, 3000.0);
+        assert_eq!(
+            super::band(at, VIEW, content, 1.5, false, 1.0, 600.0),
+            (2600.0, 3000.0)
+        );
+        assert_eq!(
+            super::band(at, VIEW, content, 1.5, false, -1.0, 600.0),
+            (1200.0, 3000.0)
+        );
+        // Not past the document.
+        assert_eq!(
+            super::band(
+                Point::new(0.0, 9000.0),
+                VIEW,
+                content,
+                1.0,
+                false,
+                1.0,
+                600.0
+            ),
+            (8600.0, 1400.0)
+        );
+        // A band made for no speed is replaced sooner at speed: 600 px of view left ahead is
+        // under the 600 px the view covers before the next band shows, plus the usual margin.
+        let b = band(at, VIEW, content, 1.0, false, 1.0);
+        assert!(band_serves(b, Point::new(0.0, 3500.0), VIEW, content, 1.0));
+        assert!(!super::band_serves(
+            b,
+            Point::new(0.0, 3500.0),
+            VIEW,
+            content,
+            1.0,
+            600.0
+        ));
+        // A band made at speed serves the view it was made for, at that speed.
+        let b = super::band(at, VIEW, content, 1.0, false, 1.0, 600.0);
+        assert!(super::band_serves(b, at, VIEW, content, 1.0, 600.0));
+        assert!(super::band_serves(
+            b,
+            Point::new(0.0, 3600.0),
+            VIEW,
+            content,
+            1.0,
+            600.0
+        ));
+    }
 
     #[test]
     fn icons_in_bitmap_and_svg_formats() {

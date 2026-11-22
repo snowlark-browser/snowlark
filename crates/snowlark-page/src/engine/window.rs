@@ -194,6 +194,7 @@ impl Engine {
         x: Option<f64>,
         y: Option<f64>,
         behavior: ScrollBehavior,
+        snap: super::view::SnapIntent,
     ) -> rt::Result<JsPromise> {
         let p = JsPromise::new(cx).ok_or(rt::Error::Pending)?;
         let mut pending = Some(p.clone());
@@ -205,6 +206,7 @@ impl Engine {
                 y,
                 behavior,
                 &mut pending,
+                Some(snap),
             );
         }
         Ok(super::element::scroll_promise(cx, p, pending))
@@ -1263,6 +1265,7 @@ impl WindowImpl for Engine {
             options.left.map(finite),
             options.top.map(finite),
             options.behavior,
+            super::view::SnapIntent::End,
         )
     }
     fn scroll_x_y(&self, cx: &mut Cx, this: Handle, x: f64, y: f64) -> rt::Result<JsPromise> {
@@ -1272,6 +1275,7 @@ impl WindowImpl for Engine {
             Some(finite(x)),
             Some(finite(y)),
             ScrollBehavior::Auto,
+            super::view::SnapIntent::End,
         )
     }
     fn scroll_to_options(
@@ -1299,6 +1303,7 @@ impl WindowImpl for Engine {
             Some(sx + options.left.map_or(0.0, finite)),
             Some(sy + options.top.map_or(0.0, finite)),
             options.behavior,
+            super::view::SnapIntent::By,
         )
     }
     fn scroll_by_x_y(&self, cx: &mut Cx, this: Handle, x: f64, y: f64) -> rt::Result<JsPromise> {
@@ -1309,6 +1314,7 @@ impl WindowImpl for Engine {
             Some(sx + finite(x)),
             Some(sy + finite(y)),
             ScrollBehavior::Auto,
+            super::view::SnapIntent::By,
         )
     }
     fn capture_events(&self, _cx: &mut Cx, _this: Handle) -> rt::Result<()> {

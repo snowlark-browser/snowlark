@@ -201,6 +201,35 @@ fn draggable_image_buttons_and_moved_press_targets_drag() {
     assert_eq!(eval(&mut page, "starts.join()"), "e,im");
 }
 
+/// Compat `-webkit-user-drag`: `none` keeps an image or link from being dragged (a press on it
+/// drags its draggable ancestor instead, if any), `element` makes any box a drag source, and the
+/// property is not inherited.
+#[test]
+fn webkit_user_drag_chooses_the_drag_source() {
+    let mut page = page_with(
+        "<!doctype html><style>body{margin:0}a,div{display:block;width:100px;height:30px}</style>\
+         <a id=n href='/x' style='-webkit-user-drag: none'>no</a>\
+         <div id=p draggable=true><a id=c href='/y' style='-webkit-user-drag: none'>child</a></div>\
+         <div id=e style='-webkit-user-drag: element'><span id=s>text</span></div>\
+         <div id=f draggable=false style='-webkit-user-drag: element'></div>\
+         <script>var starts = []; document.addEventListener('dragstart', e => { starts.push(e.target.id); e.preventDefault() });</script>",
+    );
+    let none = Modifiers::default();
+    // n at y 0..30, p (with c inside) 30..60, e 60..90, f 90..120.
+    for y in [15.0, 45.0, 75.0, 105.0] {
+        page.pointer_pressed(Point::new(20.0, y), 0, none, 1);
+        page.pointer_moved(Point::new(60.0, y + 8.0), none);
+        page.pointer_released(Point::new(60.0, y + 8.0), 0, none, 1);
+    }
+    assert_eq!(
+        eval(
+            &mut page,
+            "starts.join() + '|' + getComputedStyle(s).webkitUserDrag + '|' + getComputedStyle(n).webkitUserDrag"
+        ),
+        "p,e,f|auto|none"
+    );
+}
+
 #[test]
 fn a_link_drag_carries_its_url() {
     let mut page = page_with(
