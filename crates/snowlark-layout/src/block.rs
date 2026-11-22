@@ -680,7 +680,7 @@ pub(crate) fn layout_block_container_box<S: Style>(
     };
     // CSS Box Alignment 3 §5.4: `align-content` on a block container aligns its content as a
     // whole in its content box (here for boxes that establish an independent formatting context,
-    // as buttons do: HTML §15.3.10's `button { align-content: center }`); `normal` is `start`,
+    // as buttons do); `normal` is `start` (a button's: centered, below),
     // distribution values take their fallback, and content that does not fit stays at the start
     // (the default overflow alignment keeps it out of the unscrollable start side).
     let mut baseline = baseline;
@@ -704,7 +704,11 @@ pub(crate) fn layout_block_container_box<S: Style>(
                 _ => 0.0,
             }
         } else {
+            // (a button's content box is centered in the block axis when it fits, HTML §15.5.3
+            // button layout; `align-content` keeps its computed `normal`)
+            let button = cx.tree.b(id).has(flags::BUTTON);
             match style.align_content() {
+                Align::Normal if button => free / 2.0,
                 Align::Center | Align::SpaceAround | Align::SpaceEvenly => free / 2.0,
                 Align::End | Align::FlexEnd => free,
                 _ => 0.0,

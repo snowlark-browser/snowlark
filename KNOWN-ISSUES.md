@@ -20,7 +20,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   looks under vertical `appearance: none`. (ref 37)
 - **Positioned layout.** Anchor positioning is not implemented. Also missing: bidi reordering of absolutely positioned
   placeholders, single-axis scroll containers (`overflow-x` and `overflow-y` computed to different values),
-  sticky positioning inside a split inline, and 3D transforms in client rects. (ref 48)
+  sticky positioning inside a split inline, and 3D transforms in client rects. A sticky box with room to move inside
+  another sticky box is painted again at each scroll position instead of being moved by the compositor. (ref 48, 645)
 - **Multi-column layout.** Columns, balancing, spanners, column rules, intrinsic sizes, `break-*` properties, orphans
   and widows work. Open: a spanner inside a nested multi-column container, `display: flow-root` blocks breaking across
   columns (they stay whole), and tables with collapsed borders across columns. (ref 217)
@@ -58,6 +59,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `:active` rules do not apply, the buttons and corner are not drawn, and the scrollbar pseudo-classes
   (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
   parse but style nothing. (ref 627)
+- **Form control defaults.** A text input's default padding is `2px 3px` with a 1px border, where other engines
+  compute `1px 2px` with a 2px inset border and draw the native look over it; a page that restyles only the border
+  gets an input 2px taller. The fields' 2px corner radius is also a computed value here. (ref 646)
 - **Properties not built.** `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink` and `accent-color`
   do not parse, so their declarations are dropped. (ref 622)
 - **Scroll snap.** Script scrolls, mouse wheel notches and the arrow and page keys come to rest on snap positions.

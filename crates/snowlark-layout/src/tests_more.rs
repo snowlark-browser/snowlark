@@ -1028,3 +1028,35 @@ fn buttons_shrink_to_fit_as_flow_root_or_inline_block() {
     // Any other element fills the line.
     assert_eq!(size(div), (800.0, 20.0));
 }
+
+/// HTML §15.5.3 button layout: a button's content is centered in the block axis when it fits,
+/// with `align-content` at its computed `normal` (html/rendering/non-replaced-elements/
+/// form-controls `resets.html` expects `normal`); an author's value applies, and content taller
+/// than the button stays at its start. Other block containers keep `normal` as `start`.
+#[test]
+fn a_buttons_content_is_centered_in_the_block_axis() {
+    let mut t = T::new();
+    let r0 = t.root();
+    let make = |t: &mut T, tag: &str, height: f32, align: Align| {
+        let b = t.doc.element(r0, tag, |s| {
+            s.display = Display::BLOCK;
+            s.height = SizeValue::px(50.0);
+            s.align_content = align;
+        });
+        let c = t.doc.block(b, |s| {
+            s.width = SizeValue::px(30.0);
+            s.height = SizeValue::px(height);
+        });
+        (b, c)
+    };
+    let centered = make(&mut t, "button", 10.0, Align::Normal);
+    let start = make(&mut t, "button", 10.0, Align::Start);
+    let tall = make(&mut t, "button", 80.0, Align::Normal);
+    let div = make(&mut t, "div", 10.0, Align::Normal);
+    let f = t.run(800.0, 600.0);
+    let top = |(b, c): (NodeId, NodeId)| rect(&f, c).y - rect(&f, b).y;
+    assert_eq!(top(centered), 20.0);
+    assert_eq!(top(start), 0.0);
+    assert_eq!(top(tall), 0.0);
+    assert_eq!(top(div), 0.0);
+}

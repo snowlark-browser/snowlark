@@ -1276,7 +1276,10 @@ impl<K> Painter<'_, K> {
                 };
                 if let Some(cb) = cf.as_box() {
                     let view = port.unwrap_or(self.viewport);
-                    let constraint = sticky_constraint(cf, cb, cat, self.sticky_cb.get(), view);
+                    // (one that fills its containing block is never shifted: it moves as what
+                    // holds it does, as any other box there, and needs no layer)
+                    let constraint = sticky_constraint(cf, cb, cat, self.sticky_cb.get(), view)
+                        .filter(StickyConstraint::moves);
                     let cat = match &constraint {
                         Some(c) => {
                             let shift = c.offset(view);

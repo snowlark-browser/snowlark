@@ -455,6 +455,19 @@ impl LayerKind {
 }
 
 impl StickyConstraint {
+    /// Whether the box can be shifted at all: each side with an inset needs room between the box
+    /// and its container's edge on the far side ([`StickyConstraint::offset`] never shifts a box
+    /// out of its container). One that fills its container is never shifted, at any scroll
+    /// position.
+    pub fn moves(&self) -> bool {
+        let (r, c) = (self.rect, self.container);
+        let [top, right, bottom, left] = self.insets;
+        (top.is_some() && c.y + c.height > r.y + r.height)
+            || (bottom.is_some() && r.y > c.y)
+            || (left.is_some() && c.x + c.width > r.x + r.width)
+            || (right.is_some() && r.x > c.x)
+    }
+
     /// How far the box is shifted when the scrollport is `view` (list coordinates): each side with
     /// an inset keeps the box's edge that far inside the scrollport's edge, without moving the box
     /// out of its container; `top` wins over `bottom` and `left` over `right`.
@@ -5148,6 +5161,36 @@ mod tests {
         let mut b = DisplayListBuilder::new();
         b.append(&bad);
         assert!(b.build().is_empty());
+    }
+
+    #[test]
+    fn a_sticky_box_moves_only_with_room_in_its_container() {
+        let fills = StickyConstraint {
+            rect: Rect::new(0.0, 0.0, 200.0, 64.0),
+            container: Rect::new(0.0, 0.0, 200.0, 64.0),
+            insets: [Some(0.0), Some(0.0), Some(0.0), Some(0.0)],
+        };
+        assert!(!fills.moves());
+        for y in [-1000.0, 0.0, 30.0, 1000.0] {
+            assert_eq!(fills.offset(Rect::new(0.0, y, 100.0, 50.0)), Point::ZERO);
+        }
+        // Room below it: `top` can move it down, `bottom` cannot move it up.
+        let below = StickyConstraint {
+            container: Rect::new(0.0, 0.0, 200.0, 100.0),
+            ..fills
+        };
+        assert!(below.moves());
+        let bottom_only = StickyConstraint {
+            insets: [None, None, Some(0.0), None],
+            ..below
+        };
+        assert!(!bottom_only.moves());
+        let left_only = StickyConstraint {
+            insets: [None, None, None, Some(0.0)],
+            container: Rect::new(0.0, 0.0, 300.0, 64.0),
+            ..fills
+        };
+        assert!(left_only.moves());
     }
 
     #[test]

@@ -288,6 +288,59 @@ fn sticky_boxes_in_groups_pin_the_list() {
 }
 
 #[test]
+fn a_sticky_box_that_fills_its_containing_block_never_moves() {
+    // css-position-3 §3.4: a sticky box is shifted only as far as it stays inside its containing
+    // block. One that fills it (a sticky bar in a sticky header of its own height) is never
+    // shifted against it: it moves with what holds it, and does not pin the list.
+    use snowlark_paint::{Color, LayerKind};
+    let mut t = T::new();
+    let r0 = t.root();
+    let header = t.doc.block(r0, |s| {
+        s.position = Position::Sticky;
+        s.inset[0] = LengthPercentageAuto::px(0.0);
+        s.z_index = Some(100);
+        s.height = SizeValue::px(64.0);
+    });
+    let bar = t.doc.block(header, |s| {
+        s.position = Position::Sticky;
+        s.inset[0] = LengthPercentageAuto::px(0.0);
+        s.z_index = Some(100);
+        s.height = SizeValue::px(64.0);
+        s.background_color = Color::BLACK;
+    });
+    t.doc.block(r0, |s| s.height = SizeValue::px(2000.0));
+    let paint = |t: &mut T| {
+        let f = t.run(200.0, 200.0);
+        let opts = PaintOptions {
+            viewport: Size::new(200.0, 200.0),
+            viewport_scroll: Point::new(0.0, 500.0),
+            layers: true,
+            ..Default::default()
+        };
+        let mut b = DisplayListBuilder::new();
+        paint_with(&f, &t.text, &opts, &mut b);
+        b.build().split_layers()
+    };
+    let split = paint(&mut t);
+    assert!(!split.pinned);
+    // The bar is painted in the header's layer, stuck at the viewport's top with it.
+    let black = split.layers.iter().find_map(|p| {
+        p.list.items.iter().find_map(|i| match i {
+            Item::FillRect { rect, color } if *color == Color::BLACK => Some((p.kind, rect.y)),
+            _ => None,
+        })
+    });
+    assert!(
+        matches!(black, Some((Some(LayerKind::Sticky(_)), y)) if y == 0.0),
+        "{black:?}"
+    );
+    // With room to move in the header, the bar's own shift depends on the scroll position in a
+    // way the header's layer does not describe: still pinned.
+    t.doc.restyle(bar, |s| s.height = SizeValue::px(54.0));
+    assert!(paint(&mut t).pinned);
+}
+
+#[test]
 fn the_viewport_is_the_scrollport_under_a_root_or_body_with_overflow() {
     // CSS Overflow 3 §3.3: the root's overflow (`html { overflow-x: hidden }`), and with a visible
     // root the body's, apply to the viewport: a sticky box under them sticks to the viewport and
