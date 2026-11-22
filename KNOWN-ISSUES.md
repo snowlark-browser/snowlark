@@ -59,8 +59,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `:active` rules do not apply, the buttons and corner are not drawn, and the scrollbar pseudo-classes
   (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
   parse but style nothing. (ref 627)
-- **Properties not built.** `-webkit-text-stroke`, `overflow-anchor`, `text-decoration-skip-ink` and `accent-color`
-  do not parse, so their declarations are dropped. (ref 622)
+- **Properties not built.** `overflow-anchor`, `text-decoration-skip-ink` and `accent-color` do not parse, so
+  their declarations are dropped. (ref 622)
 - **Scroll snap.** Script scrolls, mouse wheel notches and the arrow and page keys come to rest on snap positions.
   Not done: a touchpad's scrolls and autoscroll do not snap when they end, Home, End and the scroll bar do not
   snap, a container does not snap again after its layout changes, and the Level 2 snap events are missing.
@@ -81,7 +81,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Animations.** Replacing the effect of a CSS animation (`animation.effect = ...`) does nothing: the element keeps
   the CSS animation's values. Script animations on pseudo-elements do not reach the cascade. A running CSS
   animation keeps the keyframes it started with when script edits, renames or removes its `@keyframes` rule.
-  (ref 115, 33, 635)
+  An animation of zero duration never starts: it fills nothing and fires no events. (ref 115, 33, 635, 651)
 - **`getComputedStyle()` on pseudo-elements.** For a `::before` or `::after` that generates a box, `width` and
   `height` read their computed value (such as `auto`) rather than the used size. (ref 96)
 - **Highlight pseudo-elements.** A `text-decoration` declared on `::selection` is not painted, and a selected
@@ -183,7 +183,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Spotify does not play.** Its web player asks only for Widevine's robustness levels, which PlayReady does not
   recognize, so its player reports that no key system is supported. With the Default user agent Spotify also serves
   its phone layout; the Chrome preset gets the desktop player, which then shows "Playback of protected content is not
-  enabled". (ref 665)
+  enabled". Answering PlayReady for those levels does not help: Spotify's licence service gives no PlayReady licence
+  for its music. (ref 665, 666)
 - **HBO Max reads the browser from its user agent string.** It offers PlayReady only to a browser it reads as Edge,
   so with the Default user agent its domains get the Edge preset's string (`EDGE_SITES` in
   `crates/snowlark-net/src/ua.rs`). HBO Max keeps the browser it read in the page's local storage for up to 7 days:

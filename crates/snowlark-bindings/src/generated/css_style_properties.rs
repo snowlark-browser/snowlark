@@ -14247,6 +14247,438 @@ pub(crate) fn attr_prop_dash__webkit_text_size_adjust_set<D: Dom, const LO: u16,
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke] attribute CSSOMString WebkitTextStroke;`.
+pub(crate) fn attr_prop_upper_webkit_text_stroke_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitTextStroke");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-stroke");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke] attribute CSSOMString WebkitTextStroke;`.
+pub(crate) fn attr_prop_upper_webkit_text_stroke_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitTextStroke");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-stroke",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke] attribute CSSOMString webkitTextStroke;`.
+pub(crate) fn attr_prop_webkit_text_stroke_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitTextStroke");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-stroke");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke] attribute CSSOMString webkitTextStroke;`.
+pub(crate) fn attr_prop_webkit_text_stroke_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitTextStroke");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-stroke",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke] attribute CSSOMString -webkit-text-stroke;`.
+pub(crate) fn attr_prop_dash__webkit_text_stroke_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-text-stroke");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-stroke");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke] attribute CSSOMString -webkit-text-stroke;`.
+pub(crate) fn attr_prop_dash__webkit_text_stroke_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-text-stroke");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-stroke",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-color] attribute CSSOMString WebkitTextStrokeColor;`.
+pub(crate) fn attr_prop_upper_webkit_text_stroke_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitTextStrokeColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-stroke-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-color] attribute CSSOMString WebkitTextStrokeColor;`.
+pub(crate) fn attr_prop_upper_webkit_text_stroke_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitTextStrokeColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-stroke-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-color] attribute CSSOMString webkitTextStrokeColor;`.
+pub(crate) fn attr_prop_webkit_text_stroke_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitTextStrokeColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-stroke-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-color] attribute CSSOMString webkitTextStrokeColor;`.
+pub(crate) fn attr_prop_webkit_text_stroke_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitTextStrokeColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-stroke-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-color] attribute CSSOMString -webkit-text-stroke-color;`.
+pub(crate) fn attr_prop_dash__webkit_text_stroke_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-text-stroke-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-stroke-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-color] attribute CSSOMString -webkit-text-stroke-color;`.
+pub(crate) fn attr_prop_dash__webkit_text_stroke_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-text-stroke-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-stroke-color",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-width] attribute CSSOMString WebkitTextStrokeWidth;`.
+pub(crate) fn attr_prop_upper_webkit_text_stroke_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.WebkitTextStrokeWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-stroke-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-width] attribute CSSOMString WebkitTextStrokeWidth;`.
+pub(crate) fn attr_prop_upper_webkit_text_stroke_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.WebkitTextStrokeWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-stroke-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-width] attribute CSSOMString webkitTextStrokeWidth;`.
+pub(crate) fn attr_prop_webkit_text_stroke_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.webkitTextStrokeWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-stroke-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-width] attribute CSSOMString webkitTextStrokeWidth;`.
+pub(crate) fn attr_prop_webkit_text_stroke_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.webkitTextStrokeWidth");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-stroke-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-width] attribute CSSOMString -webkit-text-stroke-width;`.
+pub(crate) fn attr_prop_dash__webkit_text_stroke_width_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-webkit-text-stroke-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-webkit-text-stroke-width");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=-webkit-text-stroke-width] attribute CSSOMString -webkit-text-stroke-width;`.
+pub(crate) fn attr_prop_dash__webkit_text_stroke_width_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-webkit-text-stroke-width");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "-webkit-text-stroke-width",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=-webkit-transform] attribute CSSOMString WebkitTransform;`.
 pub(crate) fn attr_prop_upper_webkit_transform_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -61196,6 +61628,223 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "-webkit-text-size-adjust", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_text_stroke_get::<D, LO, HI>,
+            ),
+            "WebkitTextStroke",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_text_stroke_set::<D, LO, HI>,
+            ),
+            "WebkitTextStroke",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitTextStroke", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_text_stroke_get::<D, LO, HI>),
+            "webkitTextStroke",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_webkit_text_stroke_set::<D, LO, HI>),
+            "webkitTextStroke",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitTextStroke", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_text_stroke_get::<D, LO, HI>,
+            ),
+            "-webkit-text-stroke",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_text_stroke_set::<D, LO, HI>,
+            ),
+            "-webkit-text-stroke",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-text-stroke", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_text_stroke_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitTextStrokeColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_text_stroke_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitTextStrokeColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitTextStrokeColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_text_stroke_color_get::<D, LO, HI>,
+            ),
+            "webkitTextStrokeColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_text_stroke_color_set::<D, LO, HI>,
+            ),
+            "webkitTextStrokeColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitTextStrokeColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_text_stroke_color_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-text-stroke-color",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_text_stroke_color_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-text-stroke-color",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-text-stroke-color", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_text_stroke_width_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitTextStrokeWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_upper_webkit_text_stroke_width_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "WebkitTextStrokeWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "WebkitTextStrokeWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_text_stroke_width_get::<D, LO, HI>,
+            ),
+            "webkitTextStrokeWidth",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_webkit_text_stroke_width_set::<D, LO, HI>,
+            ),
+            "webkitTextStrokeWidth",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "webkitTextStrokeWidth", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_text_stroke_width_get::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-text-stroke-width",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash__webkit_text_stroke_width_set::<
+                    D,
+                    LO,
+                    HI,
+                >,
+            ),
+            "-webkit-text-stroke-width",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "-webkit-text-stroke-width", g, s, false);
     }
     {
         let g = rt::getter(

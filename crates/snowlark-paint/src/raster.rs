@@ -580,13 +580,63 @@ impl<'a> Painter<'a> {
         luminance: bool,
         cull: Option<(&[Rect], Rect)>,
     ) -> Result<()> {
-        let cmd = self.record(list, range, cull)?;
-        let image: ID2D1Image = if luminance {
-            let effect = self.ctx.CreateEffect(&CLSID_D2D1LuminanceToAlpha)?;
-            effect.SetInput(0, &cmd, true);
-            effect.GetOutput()?
-        } else {
-            cmd.cast()?
+        // The mask's layers ([`Item::MaskLayer`] between them, outside their own groups), each
+        // recorded on its own and composited onto those below it.
+        let mut layers = Vec::new();
+        let mut start = range.start;
+        let mut layer = (MaskComposite::SourceOver, luminance);
+        let mut depth = 0usize;
+        for i in range.clone() {
+            match list.items[i] {
+                Item::MaskLayer {
+                    composite,
+                    luminance,
+                } if depth == 0 => {
+                    layers.push((start..i, layer));
+                    layer = (composite, luminance);
+                    start = i + 1;
+                }
+                Item::PushMask { .. } => depth += 1,
+                Item::PopMask => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+        }
+        layers.push((start..range.end, layer));
+        let mut image: Option<ID2D1Image> = None;
+        for (items, (composite, luminance)) in layers {
+            let empty = items.start..items.start;
+            let source = self.mask_layer_image(list, items, luminance, cull)?;
+            image = Some(match (image, composite) {
+                (None, _) | (Some(_), MaskComposite::Copy) => source,
+                (Some(_), MaskComposite::Clear) => self.record(list, empty, cull)?.cast()?,
+                (Some(below), op) => {
+                    let effect = self.ctx.CreateEffect(&CLSID_D2D1Composite)?;
+                    effect.SetInput(0, &below, true);
+                    effect.SetInput(1, &source, true);
+                    let mode = match op {
+                        MaskComposite::SourceIn => D2D1_COMPOSITE_MODE_SOURCE_IN,
+                        MaskComposite::SourceOut => D2D1_COMPOSITE_MODE_SOURCE_OUT,
+                        MaskComposite::SourceAtop => D2D1_COMPOSITE_MODE_SOURCE_ATOP,
+                        MaskComposite::DestinationOver => D2D1_COMPOSITE_MODE_DESTINATION_OVER,
+                        MaskComposite::DestinationIn => D2D1_COMPOSITE_MODE_DESTINATION_IN,
+                        MaskComposite::DestinationOut => D2D1_COMPOSITE_MODE_DESTINATION_OUT,
+                        MaskComposite::DestinationAtop => D2D1_COMPOSITE_MODE_DESTINATION_ATOP,
+                        MaskComposite::Xor => D2D1_COMPOSITE_MODE_XOR,
+                        MaskComposite::Plus => D2D1_COMPOSITE_MODE_PLUS,
+                        _ => D2D1_COMPOSITE_MODE_SOURCE_OVER,
+                    };
+                    effect.SetValue(
+                        D2D1_COMPOSITE_PROP_MODE.0 as u32,
+                        D2D1_PROPERTY_TYPE_ENUM,
+                        &(mode.0 as u32).to_le_bytes(),
+                    )?;
+                    effect.GetOutput()?
+                }
+            });
+        }
+        // (there is always one layer)
+        let Some(image) = image else {
+            return Err(E_INVALIDARG.into());
         };
         // (the mask was recorded in device pixels: the layer is pushed there too, and the brush,
         // which starts its source rectangle at its origin, is moved back to where it was drawn)
@@ -620,6 +670,26 @@ impl<'a> Painter<'a> {
         drop(ManuallyDrop::into_inner(params.opacityBrush));
         self.layer_opened();
         Ok(())
+    }
+
+    /// One mask layer's items (`range` of `list`) recorded as an image of its coverage: its alpha,
+    /// or with `luminance` its luminance as alpha.
+    // SAFETY contract: as `record`.
+    unsafe fn mask_layer_image(
+        &mut self,
+        list: &DisplayList,
+        range: std::ops::Range<usize>,
+        luminance: bool,
+        cull: Option<(&[Rect], Rect)>,
+    ) -> Result<ID2D1Image> {
+        let cmd = self.record(list, range, cull)?;
+        if luminance {
+            let effect = self.ctx.CreateEffect(&CLSID_D2D1LuminanceToAlpha)?;
+            effect.SetInput(0, &cmd, true);
+            effect.GetOutput()
+        } else {
+            cmd.cast()
+        }
     }
 
     /// Paints `range` of `list` into a command list (device pixels, under the painter's transform
@@ -1218,6 +1288,7 @@ impl<'a> Painter<'a> {
                 // (a mask's items are painted when its push is met, as a filter group's: see
                 // `paint_items`)
                 Item::PushMask { .. }
+                | Item::MaskLayer { .. }
                 | Item::MaskContent
                 | Item::PushFilter { .. }
                 | Item::PopFilter
@@ -2055,6 +2126,31 @@ impl<'a> Painter<'a> {
             isSideways: run.sideways.into(),
             bidiLevel: run.bidi_level as u32,
         };
+        if run.stroke > 0.0 {
+            // (the outline of the glyphs as DirectWrite places them, from the run's origin: a
+            // right-to-left run's from its right end)
+            let path = self.res.factory.CreatePathGeometry()?;
+            let sink = path.Open()?;
+            face.GetGlyphRunOutline(
+                run.size,
+                ids.as_ptr(),
+                Some(advances.as_ptr()),
+                Some(offsets.as_ptr().cast()),
+                ids.len() as u32,
+                run.sideways,
+                run.bidi_level % 2 == 1,
+                &sink,
+            )?;
+            sink.Close()?;
+            let outer = self.transform;
+            self.ctx.SetTransform(&matrix_3x2(
+                &Matrix::translation(origin.X, origin.Y).then(&outer),
+            ));
+            let brush = self.brush(run.color).clone();
+            self.ctx.DrawGeometry(&path, &brush, run.stroke, None);
+            self.ctx.SetTransform(&matrix_3x2(&outer));
+            return Ok(());
+        }
         if color_font && self.color_glyphs(&glyph_run, origin, run.color)? {
             return Ok(());
         }

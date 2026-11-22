@@ -1602,12 +1602,13 @@ pub struct BorderImage {
 }
 
 /// One mask layer (CSS Masking 1 §7): `mask-image` placed by `mask-position`, `-size`, `-repeat`,
-/// `-origin` and `-clip` as a background layer is, and whether `mask-mode` takes its luminance
-/// (else its alpha).
+/// `-origin` and `-clip` as a background layer is, whether `mask-mode` takes its luminance
+/// (else its alpha), and how `mask-composite` composites it onto the layers below it (§7.7).
 #[derive(Clone, Debug, PartialEq)]
 pub struct MaskLayer {
     pub layer: BackgroundLayer,
     pub luminance: bool,
+    pub composite: snowlark_paint::MaskComposite,
 }
 
 impl Default for MaskLayer {
@@ -1618,6 +1619,7 @@ impl Default for MaskLayer {
                 ..BackgroundLayer::default()
             },
             luminance: false,
+            composite: snowlark_paint::MaskComposite::SourceOver,
         }
     }
 }
@@ -2337,6 +2339,11 @@ pub trait Style: Clone {
     /// is `currentcolor`.
     fn text_fill_color(&self) -> Color {
         self.color()
+    }
+    /// The stroke of glyphs' outlines (Compat §5.5-5.7 `-webkit-text-stroke`): its width in px
+    /// (0 for none) and colour.
+    fn text_stroke(&self) -> (f32, Color) {
+        (0.0, self.color())
     }
     fn line_height(&self) -> LineHeight;
     fn vertical_align(&self) -> VerticalAlign;

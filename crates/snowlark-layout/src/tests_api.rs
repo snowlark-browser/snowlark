@@ -508,6 +508,7 @@ fn a_mask_group_holds_the_mask_layers_then_the_masked_content() {
                 ..BackgroundLayer::default()
             },
             luminance: false,
+            ..MaskLayer::default()
         }];
     });
     t.doc.block(icon, |s| s.height = SizeValue::px(5.0));
@@ -534,6 +535,69 @@ fn a_mask_group_holds_the_mask_layers_then_the_masked_content() {
     assert!(list.items[content..pop]
         .iter()
         .any(|i| matches!(i, Item::FillRect { color, .. } if *color == Color::BLACK)));
+}
+
+/// CSS Masking 1 §7.7: the bottom layer (the list's last) is painted first; each layer above it
+/// follows a mask layer item with its own `mask-composite` and `mask-mode` (the gradient border of
+/// `mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite:
+/// exclude`).
+#[test]
+fn each_mask_layer_above_the_bottom_one_carries_its_composite_operator() {
+    use snowlark_paint::{Color, ImageId, MaskComposite};
+    let mut t = T::new();
+    let r0 = t.root();
+    let layer = |id: u32, origin: BoxArea| BackgroundLayer {
+        image: Image::raster(ImageId(id), 10.0, 10.0),
+        origin,
+        clip: origin,
+        ..BackgroundLayer::default()
+    };
+    t.doc.block(r0, |s| {
+        s.width = SizeValue::px(20.0);
+        s.height = SizeValue::px(20.0);
+        s.padding = [LengthPercentage::px(2.0); 4];
+        s.background_color = Color::BLACK;
+        s.mask_layers = vec![
+            MaskLayer {
+                layer: layer(1, BoxArea::ContentBox),
+                luminance: true,
+                composite: MaskComposite::Xor,
+            },
+            MaskLayer {
+                layer: layer(2, BoxArea::BorderBox),
+                luminance: false,
+                // (the bottom layer's operator composites with nothing)
+                composite: MaskComposite::SourceIn,
+            },
+        ];
+    });
+    let f = t.run(200.0, 200.0);
+    let mut b = DisplayListBuilder::new();
+    paint(&f, &t.text, Size::new(200.0, 200.0), &mut b);
+    let list = b.build();
+    let at = |pred: &dyn Fn(&Item) -> bool| list.items.iter().position(pred).unwrap();
+    let push = at(&|i| matches!(i, Item::PushMask { .. }));
+    let content = at(&|i| matches!(i, Item::MaskContent));
+    let image = |id: u32| at(&|i| matches!(i, Item::Image { image, .. } if *image == ImageId(id)));
+    let layers: Vec<usize> = (push..content)
+        .filter(|&i| matches!(list.items[i], Item::MaskLayer { .. }))
+        .collect();
+    assert!(matches!(
+        list.items[push],
+        Item::PushMask {
+            luminance: false,
+            ..
+        }
+    ));
+    assert_eq!(layers.len(), 1, "{:?}", &list.items[push..content]);
+    assert_eq!(
+        list.items[layers[0]],
+        Item::MaskLayer {
+            composite: MaskComposite::Xor,
+            luminance: true
+        }
+    );
+    assert!(push < image(2) && image(2) < layers[0] && layers[0] < image(1) && image(1) < content);
 }
 
 #[test]

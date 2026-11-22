@@ -273,6 +273,9 @@ pub struct TextRun {
     /// The glyphs are set for vertical layout (DirectWrite's `isSideways`): turned a quarter turn
     /// left and placed by their vertical metrics, the run being drawn under a quarter turn right.
     pub sideways: bool,
+    /// Above 0, the glyphs' outlines are stroked with `color` at this width (CSS px, centered on
+    /// the outline: Compat §5.5 `-webkit-text-stroke`) instead of filled.
+    pub stroke: f32,
 }
 
 /// How a layer of a display list (see [`Item::PushLayer`]) moves when the viewport scrolls, so that a
@@ -508,6 +511,45 @@ impl StickyConstraint {
     }
 }
 
+/// How a mask layer is composited onto the layers below it ([`Item::MaskLayer`]): a Porter-Duff
+/// operator (Compositing 1 §9.1), the layer the source and the layers below the destination.
+/// `mask-composite`'s `add`, `subtract`, `intersect` and `exclude` (CSS Masking 1 §7.7) are
+/// `SourceOver`, `SourceOut`, `SourceIn` and `Xor`; the others are the legacy
+/// `-webkit-mask-composite` operators (`Plus` is `plus-lighter`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MaskComposite {
+    #[default]
+    SourceOver,
+    SourceIn,
+    SourceOut,
+    SourceAtop,
+    DestinationOver,
+    DestinationIn,
+    DestinationOut,
+    DestinationAtop,
+    Xor,
+    Plus,
+    Copy,
+    Clear,
+}
+
+impl MaskComposite {
+    const ALL: [MaskComposite; 12] = [
+        MaskComposite::SourceOver,
+        MaskComposite::SourceIn,
+        MaskComposite::SourceOut,
+        MaskComposite::SourceAtop,
+        MaskComposite::DestinationOver,
+        MaskComposite::DestinationIn,
+        MaskComposite::DestinationOut,
+        MaskComposite::DestinationAtop,
+        MaskComposite::Xor,
+        MaskComposite::Plus,
+        MaskComposite::Copy,
+        MaskComposite::Clear,
+    ];
+}
+
 /// One display item.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Item {
@@ -660,6 +702,15 @@ pub enum Item {
         bounds: Rect,
         luminance: bool,
     },
+    /// Between a mask's items (directly in them, not in a group of theirs): the items before it,
+    /// since the mask's start or the previous one, are one mask layer, and those after it, up to
+    /// the next one or [`Item::MaskContent`], the next layer (CSS Masking 1 §7.7): composited onto
+    /// the layers below by `composite`, its alpha (or with `luminance`, its luminance) its coverage.
+    /// The mask's first layer takes the mode of [`Item::PushMask`].
+    MaskLayer {
+        composite: MaskComposite,
+        luminance: bool,
+    },
     /// Ends a mask's items: what follows is the masked content.
     MaskContent,
     PopMask,
@@ -724,6 +775,7 @@ impl Item {
                 | Item::PushLayer { .. }
                 | Item::PopLayer
                 | Item::PushMask { .. }
+                | Item::MaskLayer { .. }
                 | Item::MaskContent
                 | Item::PopMask
                 | Item::PushPlus
@@ -1041,6 +1093,11 @@ impl DisplayList {
                 Item::PushLayer { .. } => stack.push(Group::Layer),
                 Item::PopLayer => pop(&mut stack, Group::Layer)?,
                 Item::PushMask { .. } => stack.push(Group::Mask),
+                Item::MaskLayer { .. } => {
+                    if stack.last() != Some(&Group::Mask) {
+                        return Err(ListError::Unbalanced(i));
+                    }
+                }
                 Item::MaskContent => {
                     pop(&mut stack, Group::Mask)?;
                     stack.push(Group::MaskBody);
@@ -1295,12 +1352,14 @@ impl DisplayList {
                 }),
                 Item::Text(t) => {
                     let w = self.run_width(t);
-                    // (glyphs reach above the ascent and below the descent; diacritics, emoji)
+                    // (glyphs reach above the ascent and below the descent; diacritics, emoji;
+                    // a stroke half its width past the outline)
+                    let s = t.stroke.max(0.0) / 2.0;
                     Some(Rect::new(
-                        t.origin.x - t.size * 0.5,
-                        t.origin.y - t.size * 1.5,
-                        w + t.size,
-                        t.size * 2.2,
+                        t.origin.x - t.size * 0.5 - s,
+                        t.origin.y - t.size * 1.5 - s,
+                        w + t.size + 2.0 * s,
+                        t.size * 2.2 + 2.0 * s,
                     ))
                 }
                 Item::PushClipRect { rect }
@@ -1337,6 +1396,7 @@ impl DisplayList {
                 | Item::PopFilter
                 | Item::PushLayer { .. }
                 | Item::PopLayer
+                | Item::MaskLayer { .. }
                 | Item::MaskContent
                 | Item::PushPlus
                 | Item::PopPlus => None,
@@ -2082,7 +2142,7 @@ impl DisplayList {
 
     // ----- encoding -----
 
-    const MAGIC: [u8; 4] = *b"ODL4";
+    const MAGIC: [u8; 4] = *b"ODL5";
 
     /// Appends the list's binary encoding (little-endian, versioned) to `out`.
     pub fn encode(&self, out: &mut Vec<u8>) {
@@ -2488,7 +2548,7 @@ fn item_finite(item: &Item) -> bool {
                 && radii_finite(&b.radii)
                 && b.widths.to_array().iter().all(|w| w.is_finite())
         }
-        Item::Text(t) => p(&t.origin) && t.size.is_finite(),
+        Item::Text(t) => p(&t.origin) && t.size.is_finite() && t.stroke.is_finite(),
         Item::Image {
             dest, src, opacity, ..
         } => rect_finite(dest) && rect_finite(src) && opacity.is_finite(),
@@ -2550,6 +2610,7 @@ fn item_finite(item: &Item) -> bool {
         | Item::PopOpacity
         | Item::PopFilter
         | Item::PopLayer
+        | Item::MaskLayer { .. }
         | Item::MaskContent
         | Item::PopMask
         | Item::PushPlus
@@ -2663,6 +2724,7 @@ impl DisplayListBuilder {
     }
 
     /// A glyph run; the three slices are parallel (one entry per glyph) and are copied into the list.
+    /// Whether it was added (an empty or transparent run is not).
     #[allow(clippy::too_many_arguments)]
     pub fn text(
         &mut self,
@@ -2674,13 +2736,13 @@ impl DisplayListBuilder {
         size: f32,
         color: Color,
         bidi_level: u8,
-    ) {
+    ) -> bool {
         assert!(
             glyphs.len() == advances.len() && glyphs.len() == offsets.len(),
             "glyph slices differ in length"
         );
         if glyphs.is_empty() || color.is_transparent() || size <= 0.0 {
-            return;
+            return false;
         }
         let start = self.list.glyph_ids.len() as u32;
         self.list.glyph_ids.extend_from_slice(glyphs);
@@ -2697,13 +2759,23 @@ impl DisplayListBuilder {
             color,
             bidi_level: bidi_level.min(125),
             sideways: false,
+            stroke: 0.0,
         }));
+        true
     }
 
     /// Marks the run [`DisplayListBuilder::text`] just added as set for vertical layout.
     pub fn last_text_sideways(&mut self) {
         if let Some(Item::Text(t)) = self.list.items.last_mut() {
             t.sideways = true;
+        }
+    }
+
+    /// Makes the run [`DisplayListBuilder::text`] just added (when it returned true) a stroke of
+    /// its glyphs' outlines `width` wide ([`TextRun::stroke`]).
+    pub fn last_text_stroke(&mut self, width: f32) {
+        if let Some(Item::Text(t)) = self.list.items.last_mut() {
+            t.stroke = width;
         }
     }
 
@@ -3144,6 +3216,20 @@ impl DisplayListBuilder {
         self.list.items.push(Item::PushMask { bounds, luminance });
     }
 
+    /// Between a mask's items: what follows is its next layer ([`Item::MaskLayer`]), composited
+    /// onto what came before by `composite`.
+    pub fn mask_layer(&mut self, composite: MaskComposite, luminance: bool) {
+        assert_eq!(
+            self.stack.last(),
+            Some(&Group::Mask),
+            "mask layer outside a mask's items"
+        );
+        self.list.items.push(Item::MaskLayer {
+            composite,
+            luminance,
+        });
+    }
+
     /// Ends the mask's items: what follows is masked.
     pub fn mask_content(&mut self) {
         self.pop(Group::Mask, Item::MaskContent);
@@ -3579,6 +3665,7 @@ impl Enc<'_> {
                 self.color(t.color);
                 self.u8(t.bidi_level);
                 self.u8(t.sideways as u8);
+                self.f32(t.stroke);
             }
             Item::Image {
                 image,
@@ -3740,6 +3827,14 @@ impl Enc<'_> {
             }
             Item::MaskContent => self.u8(21),
             Item::PopMask => self.u8(22),
+            Item::MaskLayer {
+                composite,
+                luminance,
+            } => {
+                self.u8(35);
+                self.u8(*composite as u8);
+                self.u8(*luminance as u8);
+            }
             Item::ConicGradient {
                 rect,
                 radii,
@@ -4194,6 +4289,7 @@ impl<'a> Dec<'a> {
                 color: self.color()?,
                 bidi_level: self.u8()?,
                 sideways: self.u8()? != 0,
+                stroke: self.f32()?,
             }),
             7 => {
                 let image = ImageId(self.u32()?);
@@ -4444,6 +4540,22 @@ impl<'a> Dec<'a> {
                     self.f32()?,
                 ),
             },
+            35 => {
+                let p = self.pos;
+                let composite = *MaskComposite::ALL
+                    .get(self.u8()? as usize)
+                    .ok_or(ListError::BadTag(p))?;
+                let p = self.pos;
+                let luminance = match self.u8()? {
+                    0 => false,
+                    1 => true,
+                    _ => return Err(ListError::BadTag(p)),
+                };
+                Item::MaskLayer {
+                    composite,
+                    luminance,
+                }
+            }
             _ => return Err(ListError::BadTag(at)),
         })
     }
@@ -4710,6 +4822,24 @@ mod tests {
             Matrix::rotation(0.3),
             pattern_tile(),
         );
+        // A mask of two layers, the upper one excluded from the lower, over a stroked run.
+        b.push_mask(Rect::new(0.0, 0.0, 30.0, 30.0), false);
+        b.fill_rect(Rect::new(0.0, 0.0, 30.0, 30.0), Color::BLACK);
+        b.mask_layer(MaskComposite::Xor, true);
+        b.fill_rect(Rect::new(4.0, 4.0, 22.0, 22.0), Color::WHITE);
+        b.mask_content();
+        assert!(b.text(
+            &[13],
+            &[9.0],
+            &[GlyphOffset::default()],
+            Point::new(2.0, 20.0),
+            FontId(2),
+            24.0,
+            Color::hex(0x804020),
+            0,
+        ));
+        b.last_text_stroke(1.5);
+        b.pop_mask();
         b.build()
     }
 
@@ -5406,8 +5536,10 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(runs.len(), 2);
+        assert_eq!(runs.len(), 3);
         assert_eq!(list.glyphs(runs[1].glyphs).0, &[10, 11, 12]);
+        assert_eq!(list.glyphs(runs[2].glyphs).0, &[13]);
+        assert_eq!(runs[2].stroke, 1.5);
         let grad = list.items.iter().find_map(|i| match i {
             Item::LinearGradient { stops, .. } => Some(*stops),
             _ => None,

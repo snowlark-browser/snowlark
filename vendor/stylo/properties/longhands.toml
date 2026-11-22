@@ -2600,7 +2600,6 @@ affects = "paint"
 type = "Color"
 initial = "computed_value::T::currentcolor()"
 struct = "inherited_text"
-engine = "gecko"
 ignored_when_colors_disabled = true
 spec = "https://compat.spec.whatwg.org/#the-webkit-text-stroke-color"
 affects = "paint"
@@ -2609,7 +2608,6 @@ affects = "paint"
 type = "LineWidth"
 initial = "app_units::Au(0)"
 struct = "inherited_text"
-engine = "gecko"
 spec = "https://compat.spec.whatwg.org/#the-webkit-text-stroke-width"
 animation_type = "discrete"
 affects = "overflow"
@@ -4286,7 +4284,9 @@ animation_type = "discrete"
 affects = "paint"
 vector = {}
 extra_prefixes = ["webkit"]
-keyword = { values = ["add", "subtract", "intersect", "exclude"] }
+# Snowlark: the servo values after `exclude` are the legacy `-webkit-mask-composite` operators
+# (`<composite-style>`); only that alias parses them (`properties/mod.rs` `parse_into`).
+keyword = { values = ["add", "subtract", "intersect", "exclude"], extra_servo_values = ["clear", "copy", "source-over", "source-in", "source-out", "source-atop", "destination-over", "destination-in", "destination-out", "destination-atop", "xor", "plus-lighter"] }
 
 [table-layout]
 struct = "table"

@@ -2514,6 +2514,14 @@ impl ls::Style for RenderStyle {
         self.color_of(&self.values.get_inherited_text()._webkit_text_fill_color)
     }
 
+    fn text_stroke(&self) -> (f32, Color) {
+        let t = self.values.get_inherited_text();
+        (
+            t._webkit_text_stroke_width.to_f32_px(),
+            self.color_of(&t._webkit_text_stroke_color),
+        )
+    }
+
     fn text_decoration_color(&self) -> Color {
         self.color_of(&self.values.get_text().text_decoration_color)
     }
@@ -3003,6 +3011,24 @@ impl ls::Style for RenderStyle {
             // (`match-source` takes an image's alpha; only an SVG `<mask>` reference, not
             // supported, would take its luminance)
             luminance: *nth(&m.mask_mode.0, index) == Mode::Luminance,
+            composite: {
+                use snowlark_paint::MaskComposite as P;
+                use style::properties::longhands::mask_composite::single_value::computed_value::T as K;
+                match nth(&m.mask_composite.0, index) {
+                    K::Add | K::SourceOver => P::SourceOver,
+                    K::Subtract | K::SourceOut => P::SourceOut,
+                    K::Intersect | K::SourceIn => P::SourceIn,
+                    K::Exclude | K::Xor => P::Xor,
+                    K::Clear => P::Clear,
+                    K::Copy => P::Copy,
+                    K::SourceAtop => P::SourceAtop,
+                    K::DestinationOver => P::DestinationOver,
+                    K::DestinationIn => P::DestinationIn,
+                    K::DestinationOut => P::DestinationOut,
+                    K::DestinationAtop => P::DestinationAtop,
+                    K::PlusLighter => P::Plus,
+                }
+            },
         }
     }
 

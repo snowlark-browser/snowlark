@@ -2300,7 +2300,7 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
         };
         let glyphs = (&self.glyphs, &self.advances, &self.offsets);
         let draw = |out: &mut DisplayListBuilder, origin: Point, color: Color| {
-            out.text(
+            let added = out.text(
                 glyphs.0,
                 glyphs.1,
                 glyphs.2,
@@ -2310,8 +2310,16 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                 color,
                 run.bidi_level,
             );
-            if run.upright && c0 < c1 {
+            if added && run.upright && c0 < c1 {
                 out.last_text_sideways();
+            }
+            added
+        };
+        // `-webkit-text-stroke` (Compat §5.5): the glyphs' outlines, stroked over their fill.
+        let (stroke_width, stroke_color) = s.text_stroke();
+        let stroke = |out: &mut DisplayListBuilder| {
+            if stroke_width > 0.0 && draw(out, origin, stroke_color) {
+                out.last_text_stroke(stroke_width);
             }
         };
         // Text shadows (CSS Text Decoration 3 §4): below the text and its decorations, each the
@@ -2488,11 +2496,14 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
         let zero = Point::new(0.0, 0.0);
         in_pieces(self.out, &|out, c| decorate(out, Lines::UnderOver, zero, c));
         match part {
-            Some((_, _, c, _)) if c != color => {
-                in_pieces(self.out, &|out, c| draw(out, origin, c.unwrap_or(color)))
+            Some((_, _, c, _)) if c != color => in_pieces(self.out, &|out, c| {
+                draw(out, origin, c.unwrap_or(color));
+            }),
+            _ => {
+                draw(self.out, origin, color);
             }
-            _ => draw(self.out, origin, color),
         }
+        stroke(self.out);
         in_pieces(self.out, &|out, c| decorate(out, Lines::Through, zero, c));
         // The caret of an editing host.
         if let (Some(sel), Some(n)) = (self.selection, t.node) {
@@ -2874,11 +2885,10 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
         let border_box = Rect::new(at.x, at.y, f.size.width, f.size.height);
         let padding_box = border_box.deflate(&b.border);
         let content_box = padding_box.deflate(&b.padding);
+        // (bottom layer first: the last in the list)
         let layers: Vec<MaskLayer> = (0..n).rev().map(|i| s.mask_layer(i)).collect();
-        // (one mode for the whole mask: the top layer's)
-        let luminance = layers.last().is_some_and(|l| l.luminance);
-        self.out.push_mask(border_box, luminance);
-        // Layers composite with `add` (source-over), the initial `mask-composite`.
+        self.out
+            .push_mask(border_box, layers.first().is_some_and(|l| l.luminance));
         let geo = LayerArea {
             boxes: [border_box, padding_box, content_box],
             radii: [Radii::ZERO; 3],
@@ -2887,12 +2897,20 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
             clip_override: None,
             strip: None,
         };
-        paint_image_layers(
-            self.out,
-            layers.into_iter().map(|l| l.layer),
-            s.image_rendering(),
-            &geo,
-        );
+        // Each layer above the bottom one is composited onto those below it by its own
+        // `mask-composite` (the bottom layer's has nothing to composite with, §7.7) and takes its own
+        // `mask-mode`.
+        for (k, l) in layers.into_iter().enumerate() {
+            if k > 0 {
+                self.out.mask_layer(l.composite, l.luminance);
+            }
+            paint_image_layers(
+                self.out,
+                std::iter::once(l.layer),
+                s.image_rendering(),
+                &geo,
+            );
+        }
         self.out.mask_content();
         true
     }

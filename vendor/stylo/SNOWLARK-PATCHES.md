@@ -493,6 +493,19 @@ the source; `git log -p vendor/stylo` shows the diff.
    Scroll Snap 1): `scroll-snap-type`, `scroll-snap-align` and `scroll-snap-stop` lose their gecko-only engine
    line, and `ScrollSnapType` (`axis`, `strictness`) and `ScrollSnapAlign` (`block`, `inline`) get public
    getters. snowlark-page snaps scrolls with them; `scroll-margin` and `scroll-padding` were already there.
+86. **`animation-duration: auto` in the servo build** (`values/specified/animation.rs`,
+   `values/generics/animation.rs`, CSS Animations 2 §3.3): upstream parses and serializes `auto` only with the
+   scroll-driven animations pref; the servo build takes it without the rest of scroll-driven animations (its
+   computed value is upstream's: 0s on the document timeline, resolved as `0s` while `animation-timeline` is
+   `auto`).
+87. **Legacy `-webkit-mask-composite` operators** (`properties/longhands.toml`, `properties/mod.rs`,
+   `properties/shorthands.rs`): `mask-composite`'s keyword gets the `<composite-style>` operators (`clear`,
+   `copy`, `source-over` ... `xor`, `plus-lighter`) as servo values; `parse_into` refuses them unless the
+   declaration was spelled `-webkit-mask-composite`, and the `mask` shorthand never takes them
+   (`is_standard_mask_composite`). snowlark-layout composites mask layers with them.
+88. **`-webkit-text-stroke` in the servo build** (`properties/longhands.toml`, `properties/shorthands.toml`,
+   `properties/shorthands.rs`, Compat §5.5-5.7): the shorthand and its two longhands lose their gecko-only
+   lines; snowlark-layout strokes glyph outlines with them.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

@@ -274,3 +274,21 @@ fn transition_values_compare_equal_only_with_the_same_zoom_and_font_size() {
         &b
     ));
 }
+
+/// CSS Animations 2 §3.3: `animation-duration: auto` parses, alone and in the shorthand, and
+/// resolves to 0s on the document timeline.
+#[test]
+fn an_auto_duration_parses_and_resolves_to_zero_seconds() {
+    let mut p = Page::new(
+        "<!DOCTYPE html><style>
+        #a { animation: grow auto linear forwards; }
+        #b { animation-name: grow; animation-duration: auto; }
+      </style><div id=a></div><div id=b></div>",
+    );
+    p.restyle_at(0.0);
+    assert_eq!(p.get("#a", "animation-name"), "grow");
+    assert_eq!(p.get("#a", "animation-fill-mode"), "forwards");
+    assert_eq!(p.get("#a", "animation-duration"), "0s");
+    assert_eq!(p.get("#b", "animation-name"), "grow");
+    assert_eq!(p.get("#b", "animation-duration"), "0s");
+}
