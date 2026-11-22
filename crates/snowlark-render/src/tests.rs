@@ -518,6 +518,17 @@ fn word_break_break_word() {
     assert_eq!(d.s("b").word_break(), WordBreak::BreakWord);
 }
 
+/// CSS Text 4 §5.2: `word-break: auto-phrase` is a value of its own (a later one does not drop
+/// it), and breaks as `normal` without phrase analysis for the language.
+#[test]
+fn word_break_auto_phrase_breaks_as_normal() {
+    let d = doc(
+        "<!DOCTYPE html><style>#a { word-break: break-all; word-break: auto-phrase }</style>\
+         <div id=a lang=ja></div>",
+    );
+    assert_eq!(d.s("a").word_break(), WordBreak::Normal);
+}
+
 #[test]
 fn text_properties() {
     let d = doc("<!DOCTYPE html><style>

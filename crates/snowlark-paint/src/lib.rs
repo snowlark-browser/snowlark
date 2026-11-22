@@ -40,6 +40,7 @@ pub mod font_files;
 pub mod geom;
 pub mod gpu;
 pub mod image;
+mod ink;
 pub mod input;
 pub mod layer_animation;
 pub mod pdf;

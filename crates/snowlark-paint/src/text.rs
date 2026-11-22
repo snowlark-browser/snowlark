@@ -483,6 +483,8 @@ pub struct TextEngine {
     pub(crate) shared_text: SharedTextCaches,
     /// The system fonts as `fontdb` lists them (for usvg's SVG and canvas text), loaded once.
     font_db: OnceLock<std::sync::Arc<fontdb::Database>>,
+    /// Glyph outlines' extents in decoration bands (`text-decoration-skip-ink`).
+    ink: crate::ink::InkCache,
 }
 
 // SAFETY: every COM object the engine holds comes from DirectWrite's *shared* factory, whose objects are
@@ -523,6 +525,7 @@ impl TextEngine {
                 simple_scripts: OnceLock::new(),
                 shared_text: Default::default(),
                 font_db: OnceLock::new(),
+                ink: Default::default(),
             })
         }
     }
@@ -624,6 +627,27 @@ impl TextEngine {
             .faces
             .get(font.0 as usize)
             .map(|f| (f.face.clone(), f.color))
+    }
+
+    /// CSS Text Decoration 4 §2.6 `text-decoration-skip-ink`: the leftmost and rightmost x, from the
+    /// glyph's origin, of `glyph`'s outline at `size` between `top` and `bottom` (CSS px below the
+    /// baseline), or `None` when the outline does not reach into that band. Cached.
+    pub fn glyph_intercept(
+        &self,
+        font: FontId,
+        size: f32,
+        glyph: u16,
+        top: f32,
+        bottom: f32,
+    ) -> Option<(f32, f32)> {
+        self.ink.intercept(
+            || self.face(font).map(|f| f.0),
+            font,
+            size,
+            glyph,
+            top,
+            bottom,
+        )
     }
 
     /// The family name of a face (for diagnostics and tests).

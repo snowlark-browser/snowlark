@@ -16433,6 +16433,90 @@ pub(crate) fn attr_prop_dash__x_text_scale_set<D: Dom, const LO: u16, const HI: 
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=accent-color] attribute CSSOMString accentColor;`.
+pub(crate) fn attr_prop_accent_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.accentColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "accent-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=accent-color] attribute CSSOMString accentColor;`.
+pub(crate) fn attr_prop_accent_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.accentColor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "accent-color", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=accent-color] attribute CSSOMString accent-color;`.
+pub(crate) fn attr_prop_dash_accent_color_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.accent-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "accent-color");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=accent-color] attribute CSSOMString accent-color;`.
+pub(crate) fn attr_prop_dash_accent_color_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.accent-color");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "accent-color", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=align-content] attribute CSSOMString alignContent;`.
 pub(crate) fn attr_prop_align_content_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -30841,6 +30925,90 @@ pub(crate) fn attr_prop_dash_empty_cells_set<D: Dom, const LO: u16, const HI: u1
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=field-sizing] attribute CSSOMString fieldSizing;`.
+pub(crate) fn attr_prop_field_sizing_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.fieldSizing");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "field-sizing");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=field-sizing] attribute CSSOMString fieldSizing;`.
+pub(crate) fn attr_prop_field_sizing_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.fieldSizing");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "field-sizing", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=field-sizing] attribute CSSOMString field-sizing;`.
+pub(crate) fn attr_prop_dash_field_sizing_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.field-sizing");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "field-sizing");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=field-sizing] attribute CSSOMString field-sizing;`.
+pub(crate) fn attr_prop_dash_field_sizing_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.field-sizing");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "field-sizing", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=fill] attribute CSSOMString fill;`.
 pub(crate) fn attr_prop_fill_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -37155,6 +37323,102 @@ pub(crate) fn attr_prop_dash_inset_inline_start_set<D: Dom, const LO: u16, const
             &mut cx,
             this,
             "inset-inline-start",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=interpolate-size] attribute CSSOMString interpolateSize;`.
+pub(crate) fn attr_prop_interpolate_size_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.interpolateSize");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "interpolate-size");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=interpolate-size] attribute CSSOMString interpolateSize;`.
+pub(crate) fn attr_prop_interpolate_size_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.interpolateSize");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "interpolate-size",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=interpolate-size] attribute CSSOMString interpolate-size;`.
+pub(crate) fn attr_prop_dash_interpolate_size_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.interpolate-size");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "interpolate-size");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=interpolate-size] attribute CSSOMString interpolate-size;`.
+pub(crate) fn attr_prop_dash_interpolate_size_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.interpolate-size");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "interpolate-size",
             &value,
         )
     };
@@ -51267,6 +51531,102 @@ pub(crate) fn attr_prop_dash_text_decoration_line_set<D: Dom, const LO: u16, con
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=text-decoration-skip-ink] attribute CSSOMString textDecorationSkipInk;`.
+pub(crate) fn attr_prop_text_decoration_skip_ink_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.textDecorationSkipInk");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "text-decoration-skip-ink");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=text-decoration-skip-ink] attribute CSSOMString textDecorationSkipInk;`.
+pub(crate) fn attr_prop_text_decoration_skip_ink_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.textDecorationSkipInk");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "text-decoration-skip-ink",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=text-decoration-skip-ink] attribute CSSOMString text-decoration-skip-ink;`.
+pub(crate) fn attr_prop_dash_text_decoration_skip_ink_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.text-decoration-skip-ink");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "text-decoration-skip-ink");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=text-decoration-skip-ink] attribute CSSOMString text-decoration-skip-ink;`.
+pub(crate) fn attr_prop_dash_text_decoration_skip_ink_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.text-decoration-skip-ink");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "text-decoration-skip-ink",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=text-decoration-style] attribute CSSOMString textDecorationStyle;`.
 pub(crate) fn attr_prop_text_decoration_style_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -62623,6 +62983,40 @@ pub(crate) fn template<'s, D: Dom>(
     {
         let g = rt::getter(
             scope,
+            rt::builder(super::css_style_properties::attr_prop_accent_color_get::<D, LO, HI>),
+            "accentColor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_accent_color_set::<D, LO, HI>),
+            "accentColor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "accentColor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_accent_color_get::<D, LO, HI>),
+            "accent-color",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_accent_color_set::<D, LO, HI>),
+            "accent-color",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "accent-color", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
             rt::builder(super::css_style_properties::attr_prop_align_content_get::<D, LO, HI>),
             "alignContent",
             Some(sig),
@@ -68710,6 +69104,40 @@ pub(crate) fn template<'s, D: Dom>(
     {
         let g = rt::getter(
             scope,
+            rt::builder(super::css_style_properties::attr_prop_field_sizing_get::<D, LO, HI>),
+            "fieldSizing",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_field_sizing_set::<D, LO, HI>),
+            "fieldSizing",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "fieldSizing", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_field_sizing_get::<D, LO, HI>),
+            "field-sizing",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_field_sizing_set::<D, LO, HI>),
+            "field-sizing",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "field-sizing", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
             rt::builder(super::css_style_properties::attr_prop_fill_get::<D, LO, HI>),
             "fill",
             Some(sig),
@@ -71314,6 +71742,44 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "inset-inline-start", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_interpolate_size_get::<D, LO, HI>),
+            "interpolateSize",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_interpolate_size_set::<D, LO, HI>),
+            "interpolateSize",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "interpolateSize", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_interpolate_size_get::<D, LO, HI>,
+            ),
+            "interpolate-size",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_interpolate_size_set::<D, LO, HI>,
+            ),
+            "interpolate-size",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "interpolate-size", g, s, false);
     }
     {
         let g = rt::getter(
@@ -77121,6 +77587,48 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "text-decoration-line", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_text_decoration_skip_ink_get::<D, LO, HI>,
+            ),
+            "textDecorationSkipInk",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_text_decoration_skip_ink_set::<D, LO, HI>,
+            ),
+            "textDecorationSkipInk",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "textDecorationSkipInk", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_text_decoration_skip_ink_get::<D, LO, HI>,
+            ),
+            "text-decoration-skip-ink",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_text_decoration_skip_ink_set::<D, LO, HI>,
+            ),
+            "text-decoration-skip-ink",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "text-decoration-skip-ink", g, s, false);
     }
     {
         let g = rt::getter(

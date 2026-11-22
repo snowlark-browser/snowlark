@@ -138,6 +138,33 @@ pub(crate) fn natural_size<S: Style>(
 ) -> (f32, f32) {
     let font = tree_font_info(tree, text, s);
     let line = line_height(s, &font);
+    // CSS UI 4 §6.3 `field-sizing: content`: the control is as large as its value (or placeholder)
+    // and a caret, whatever its `size`, `cols` or `rows`; a drop-down as wide as the selected option.
+    if s.field_sizing_content() {
+        match &c.kind {
+            ControlKind::TextField { text: t, .. } => {
+                return (measure(text, s, &font, t) + CARET, line);
+            }
+            ControlKind::TextArea { text: t, .. } => {
+                let widest = t
+                    .split('\n')
+                    .map(|l| measure(text, s, &font, l))
+                    .fold(0.0f32, f32::max);
+                return (widest + CARET, t.split('\n').count() as f32 * line);
+            }
+            ControlKind::Select {
+                options,
+                list_rows: None,
+            } => {
+                let selected = options
+                    .iter()
+                    .find(|o| o.selected && !o.group)
+                    .map_or(0.0, |o| measure(text, s, &font, &o.label));
+                return (selected + 4.0 + ARROW_AREA, line);
+            }
+            _ => {}
+        }
+    }
     match &c.kind {
         // §15.5.x: `size` times the average character width.
         ControlKind::TextField { size, .. } => (*size as f32 * char_width(text, s, &font), line),
@@ -181,6 +208,33 @@ pub(crate) fn natural_size<S: Style>(
         ControlKind::Progress { .. } => (10.0 * s.font_size(), s.font_size()),
         ControlKind::Meter { .. } => (5.0 * s.font_size(), s.font_size()),
     }
+}
+
+/// The width `field-sizing: content` keeps for the caret after a control's text.
+const CARET: f32 = 1.0;
+
+/// A `field-sizing: content` textarea's content height when its content box is `width` wide: its
+/// text's lines, wrapped as they are laid out, and the line a final newline starts.
+pub(crate) fn content_height<S: Style>(
+    tree: &BoxTree<S>,
+    text: &TextEngine,
+    s: &S,
+    c: &Control,
+    width: f32,
+) -> Option<f32> {
+    let ControlKind::TextArea { text: t, .. } = &c.kind else {
+        return None;
+    };
+    if !s.field_sizing_content() {
+        return None;
+    }
+    let font = tree_font_info(tree, text, s);
+    let line = line_height(s, &font);
+    let mut rows = break_lines(&shape(text, s, &font, t), width).len().max(1);
+    if t.ends_with('\n') {
+        rows += 1;
+    }
+    Some(rows as f32 * line)
 }
 
 /// Greedy line breaking of shaped text into `width` (break opportunities, hard breaks; a cluster
@@ -613,6 +667,34 @@ fn stroke(out: &mut DisplayListBuilder, a: Point, b: Point, width: f32, color: C
     out.pop_transform();
 }
 
+/// The checkmark and radio ring drawn on an accent: white, as the light controls have them, unless
+/// the accent is too light to stand out from white (a contrast ratio under 1.3) and stands out more
+/// from the dark controls' background, which is then used instead.
+fn mark_color(accent: Color) -> Color {
+    const DARK: Color = Color::rgb(0x3b, 0x3b, 0x3b);
+    fn luminance(c: Color) -> f32 {
+        let lin = |v: u8| {
+            let v = v as f32 / 255.0;
+            if v <= 0.04045 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
+    }
+    let contrast = |a: Color, b: Color| {
+        let (la, lb) = (luminance(a), luminance(b));
+        (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+    };
+    let (light, dark) = (contrast(accent, Color::WHITE), contrast(accent, DARK));
+    if light < 1.3 && light < dark {
+        DARK
+    } else {
+        Color::WHITE
+    }
+}
+
 fn circle(out: &mut DisplayListBuilder, r: Rect, color: Color) {
     let radius = r.width.min(r.height) / 2.0;
     out.fill_rounded_rect(r, Radii::uniform(radius), color);
@@ -641,6 +723,9 @@ pub(crate) fn paint<S: Style>(
 ) {
     let off = c.disabled;
     let text_color = s.color();
+    // CSS UI 4 §6.2 `accent-color`, and the checkmark in a colour that stands out from it.
+    let accent = s.accent_color().unwrap_or(ACCENT);
+    let mark = mark_color(accent);
     if c.native {
         match &c.kind {
             ControlKind::Checkbox {
@@ -651,17 +736,17 @@ pub(crate) fn paint<S: Style>(
                 let k = b.width / 13.0;
                 let radii = Radii::uniform(2.0 * k);
                 if *checked || *indeterminate {
-                    out.fill_rounded_rect(b, radii, dim(ACCENT, off));
+                    out.fill_rounded_rect(b, radii, dim(accent, off));
                     if *indeterminate {
                         out.fill_rect(
                             Rect::new(b.x + 3.0 * k, b.y + 5.5 * k, 7.0 * k, 2.0 * k),
-                            Color::WHITE,
+                            mark,
                         );
                     } else {
                         let p = |x: f32, y: f32| Point::new(b.x + x * k, b.y + y * k);
                         let w = 1.8 * k;
-                        stroke(out, p(3.2, 6.6), p(5.4, 8.8), w, Color::WHITE);
-                        stroke(out, p(5.4, 8.8), p(9.9, 4.3), w, Color::WHITE);
+                        stroke(out, p(3.2, 6.6), p(5.4, 8.8), w, mark);
+                        stroke(out, p(5.4, 8.8), p(9.9, 4.3), w, mark);
                     }
                 } else {
                     out.fill_rounded_rect(b, radii, dim(BORDER, off));
@@ -673,9 +758,9 @@ pub(crate) fn paint<S: Style>(
                 let b = square(content);
                 let k = b.width / 13.0;
                 if *checked {
-                    circle(out, b, dim(ACCENT, off));
-                    circle(out, b.inflate(-k, -k), Color::WHITE);
-                    circle(out, b.inflate(-3.0 * k, -3.0 * k), dim(ACCENT, off));
+                    circle(out, b, dim(accent, off));
+                    circle(out, b.inflate(-k, -k), mark);
+                    circle(out, b.inflate(-3.0 * k, -3.0 * k), dim(accent, off));
                 } else {
                     circle(out, b, dim(BORDER, off));
                     circle(out, b.inflate(-k, -k), Color::WHITE);
@@ -692,12 +777,12 @@ pub(crate) fn paint<S: Style>(
                 out.fill_rounded_rect(
                     Rect::new(track.x, track.y, x - track.x, track.height),
                     radii,
-                    dim(ACCENT, off),
+                    dim(accent, off),
                 );
                 circle(
                     out,
                     Rect::new(x - thumb / 2.0, cy - thumb / 2.0, thumb, thumb),
-                    dim(ACCENT, off),
+                    dim(accent, off),
                 );
             }
             ControlKind::Color(color) => {
@@ -769,7 +854,7 @@ pub(crate) fn paint<S: Style>(
                             content.height,
                         ),
                         radii,
-                        dim(ACCENT, off),
+                        dim(accent, off),
                     );
                 }
             }

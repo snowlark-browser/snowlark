@@ -139,7 +139,14 @@ fn used_size<S: Style>(
     let (mut width, mut height) = match (w, h) {
         (Some(w), Some(h)) => (w, h),
         (Some(w), None) => {
-            let h = n.ratio.map(|r| w / r).or(n.height).unwrap_or(
+            // (a `field-sizing: content` textarea is as tall as its text wrapped to its width)
+            let wrapped = match &b.data {
+                BoxData::Replaced(ReplacedContent {
+                    control: Some(c), ..
+                }) => crate::controls::content_height(tree, text, s, c, w),
+                _ => None,
+            };
+            let h = wrapped.or(n.ratio.map(|r| w / r)).or(n.height).unwrap_or(
                 default_h
                     .min(w / 2.0)
                     .max(if n.ratio.is_none() { default_h } else { 0.0 }),

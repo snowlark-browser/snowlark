@@ -134,7 +134,6 @@ affects = "layout"
 type = "ColorOrAuto"
 initial = "generics::color::ColorOrAuto::Auto"
 struct = "inherited_ui"
-engine = "gecko"
 spec = "https://drafts.csswg.org/css-ui-4/#widget-accent"
 ignored_when_colors_disabled = true
 affects = "paint"
@@ -2702,7 +2701,6 @@ affects = "layout"
 type = "TextDecorationSkipInk"
 initial = "computed::TextDecorationSkipInk::Auto"
 struct = "inherited_text"
-engine = "gecko"
 animation_type = "discrete"
 spec = "https://drafts.csswg.org/css-text-decor-4/#text-decoration-skip-ink-property"
 affects = "overflow"
@@ -3867,6 +3865,16 @@ animation_type = "discrete"
 affects = ""
 keyword = { values = ["auto", "smooth"] }
 
+# Snowlark: CSS Values 5 interpolate-size, parsed and computed; transitions and animations do not
+# interpolate to or from intrinsic size keywords yet.
+[interpolate-size]
+struct = "inherited_box"
+engine = "servo"
+spec = "https://drafts.csswg.org/css-values-5/#interpolate-size"
+animation_type = "none"
+affects = ""
+keyword = { values = ["numeric-only", "allow-keywords"] }
+
 [isolation]
 struct = "box"
 spec = "https://drafts.fxtf.org/compositing/#isolation"
@@ -4376,7 +4384,6 @@ keyword = { values = ["auto", "none"] }
 
 [field-sizing]
 struct = "ui"
-engine = "gecko"
 spec = "https://drafts.csswg.org/css-ui/#field-sizing"
 animation_type = "discrete"
 affects = "layout"

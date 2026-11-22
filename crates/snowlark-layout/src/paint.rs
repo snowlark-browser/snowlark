@@ -1909,6 +1909,52 @@ fn clip_radii<S: Style>(f: &Fragment<S>, b: &BoxFragment<S>) -> Radii {
     outer.inner(&b.border)
 }
 
+/// The widest gap, in CSS px, `text-decoration-skip-ink` leaves on either side of a glyph.
+const MAX_INK_DILATION: f32 = 13.0;
+
+/// Where the glyphs of a run (`font`, `size`, right to left or not) cross the band between `band.0`
+/// and `band.1` below the baseline: each crossing glyph's extent in it, widened by `dilation` on
+/// either side, from the run's left end, sorted and merged where they meet, into `out`.
+fn ink_gaps(
+    text: &TextEngine,
+    (font, size, rtl): (snowlark_paint::FontId, f32, bool),
+    (glyphs, advances, offsets): (&[u16], &[f32], &[snowlark_paint::GlyphOffset]),
+    band: (f32, f32),
+    dilation: f32,
+    out: &mut Vec<(f32, f32)>,
+) {
+    out.clear();
+    let total: f32 = advances.iter().sum();
+    let mut pen = if rtl { total } else { 0.0 };
+    for ((&g, &advance), o) in glyphs.iter().zip(advances).zip(offsets) {
+        // (a right-to-left run's glyphs go leftwards from its right end, each to the left of its pen)
+        let x = if rtl {
+            pen -= advance;
+            pen - o.advance_offset
+        } else {
+            let x = pen + o.advance_offset;
+            pen += advance;
+            x
+        };
+        // (a glyph raised by its offset meets the band lower in its own outline)
+        let lift = o.ascender_offset;
+        if let Some((lo, hi)) = text.glyph_intercept(font, size, g, band.0 + lift, band.1 + lift) {
+            out.push((x + lo - dilation, x + hi + dilation));
+        }
+    }
+    out.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut merged = 0;
+    for i in 0..out.len() {
+        if merged > 0 && out[i].0 <= out[merged - 1].1 {
+            out[merged - 1].1 = out[merged - 1].1.max(out[i].1);
+        } else {
+            out[merged] = out[i];
+            merged += 1;
+        }
+    }
+    out.truncate(merged);
+}
+
 // ----- the display list sink -----
 
 /// Writes display items.
@@ -1937,6 +1983,9 @@ pub(crate) struct DisplayListSink<'a> {
     glyphs: Vec<u16>,
     advances: Vec<f32>,
     offsets: Vec<snowlark_paint::GlyphOffset>,
+    /// Where the glyphs interrupt the underline and the overline (`text-decoration-skip-ink`), from
+    /// the text's left end, sorted and apart.
+    ink: [Vec<(f32, f32)>; 2],
 }
 
 impl<'a> DisplayListSink<'a> {
@@ -1956,6 +2005,7 @@ impl<'a> DisplayListSink<'a> {
             glyphs: Vec::new(),
             advances: Vec::new(),
             offsets: Vec::new(),
+            ink: Default::default(),
         }
     }
 
@@ -2266,6 +2316,39 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
             Some(self.text.metrics(run.font, run.size))
         };
         let width = size.width;
+        // `text-decoration-skip-ink` (CSS Text Decoration 4 §2.6): underlines and overlines stop
+        // where a glyph's outline crosses them, a gap of the line's thickness (at most
+        // `MAX_INK_DILATION`) on either side; line-throughs are never interrupted.
+        self.ink[0].clear();
+        self.ink[1].clear();
+        if let Some(m) = metrics.filter(|_| {
+            c0 < c1 && t.combined.is_none() && !run.upright && s.text_decoration_skip_ink()
+        }) {
+            let thickness = m.underline_thickness.max(1.0);
+            let glyphs = (&self.glyphs[..], &self.advances[..], &self.offsets[..]);
+            for (k, which, top) in [
+                (0, TextDecorationLine::UNDERLINE, m.underline_offset),
+                (1, TextDecorationLine::OVERLINE, -m.ascent),
+            ] {
+                let mut lines = t.decorations.iter().filter(|d| d.line.contains(which));
+                let Some(first) = lines.next() else {
+                    continue;
+                };
+                // (a double line's band covers both of its lines)
+                let double = first.style == TextDecorationStyle::Double
+                    || lines.any(|d| d.style == TextDecorationStyle::Double);
+                let band = (top, top + thickness * if double { 3.0 } else { 1.0 });
+                ink_gaps(
+                    self.text,
+                    (run.font, run.size, run.bidi_level % 2 == 1),
+                    glyphs,
+                    band,
+                    thickness.min(MAX_INK_DILATION),
+                    &mut self.ink[k],
+                );
+            }
+        }
+        let ink = &self.ink;
         // (`lines`: underlines and overlines, line-throughs or both; `shift` and `paint` move and
         // recolor them for a shadow)
         let decorate = |out: &mut DisplayListBuilder,
@@ -2279,22 +2362,41 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
             let (x, base) = (at.x + shift.x, origin.y + shift.y);
             for d in &t.decorations {
                 let color = paint.unwrap_or(d.color);
-                let mut line = |y: f32, th: f32| {
-                    out.fill_rect(Rect::new(x, y, width, th), color);
-                    if d.style == TextDecorationStyle::Double {
-                        out.fill_rect(Rect::new(x, y + th * 2.0, width, th), color);
+                let mut line = |y: f32, th: f32, gaps: &[(f32, f32)]| {
+                    let mut stripe = |from: f32, to: f32| {
+                        out.fill_rect(Rect::new(x + from, y, to - from, th), color);
+                        if d.style == TextDecorationStyle::Double {
+                            out.fill_rect(Rect::new(x + from, y + th * 2.0, to - from, th), color);
+                        }
+                    };
+                    let mut from = 0.0f32;
+                    for &(a, b) in gaps {
+                        if a >= width {
+                            break;
+                        }
+                        if a > from {
+                            stripe(from, a);
+                        }
+                        from = from.max(b);
+                    }
+                    if from < width {
+                        stripe(from, width);
                     }
                 };
                 if lines != Lines::Through {
                     if d.line.contains(TextDecorationLine::UNDERLINE) {
-                        line(base + m.underline_offset, thickness);
+                        line(base + m.underline_offset, thickness, &ink[0]);
                     }
                     if d.line.contains(TextDecorationLine::OVERLINE) {
-                        line(base - m.ascent, thickness);
+                        line(base - m.ascent, thickness, &ink[1]);
                     }
                 }
                 if lines != Lines::UnderOver && d.line.contains(TextDecorationLine::LINE_THROUGH) {
-                    line(base + m.strikeout_offset, m.strikeout_thickness.max(1.0));
+                    line(
+                        base + m.strikeout_offset,
+                        m.strikeout_thickness.max(1.0),
+                        &[],
+                    );
                 }
             }
         };

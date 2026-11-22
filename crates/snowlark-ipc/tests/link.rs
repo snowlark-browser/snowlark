@@ -58,7 +58,9 @@ fn next(host: &Host) -> Msg {
 }
 
 fn bytes_of(seq: u32, len: usize) -> Vec<u8> {
-    let mut x = seq as u64 * 0x9E37_79B9_7F4A_7C15 + 1;
+    let mut x = (seq as u64)
+        .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        .wrapping_add(1);
     (0..len)
         .map(|_| {
             x ^= x << 13;

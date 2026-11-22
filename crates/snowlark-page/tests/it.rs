@@ -8,6 +8,7 @@
 //! A test that needs a process of its own (process-wide state it changes) gets its own `[[test]]`
 //! target in Cargo.toml instead.
 
+mod accent_color;
 mod animated_images;
 mod audio_context;
 mod audio_output;
@@ -89,6 +90,7 @@ mod session_history;
 mod shadow_dom;
 mod shadow_input;
 mod shadow_render;
+mod skip_ink;
 mod storage_manager;
 mod streams;
 mod subtle;

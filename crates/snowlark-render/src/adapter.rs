@@ -2389,6 +2389,9 @@ impl ls::Style for RenderStyle {
             // (CSS Text 3 §5.2: `normal` with `overflow-wrap: anywhere`, which line breaking
             // applies)
             W::BreakWord => ls::WordBreak::BreakWord,
+            // (CSS Text 4 §5.2: `normal`, except for the languages a UA has phrase analysis for,
+            // which this engine has for none)
+            W::AutoPhrase => ls::WordBreak::Normal,
         }
     }
 
@@ -2520,6 +2523,24 @@ impl ls::Style for RenderStyle {
             t._webkit_text_stroke_width.to_f32_px(),
             self.color_of(&t._webkit_text_stroke_color),
         )
+    }
+
+    fn text_decoration_skip_ink(&self) -> bool {
+        use style::values::computed::TextDecorationSkipInk as S;
+        self.values.get_inherited_text().text_decoration_skip_ink != S::None
+    }
+
+    fn field_sizing_content(&self) -> bool {
+        use style::computed_values::field_sizing::T;
+        self.values.get_ui().field_sizing == T::Content
+    }
+
+    fn accent_color(&self) -> Option<Color> {
+        use style::values::generics::color::ColorOrAuto;
+        match &self.values.get_inherited_ui().accent_color {
+            ColorOrAuto::Color(c) => Some(self.color_of(c)),
+            ColorOrAuto::Auto => None,
+        }
     }
 
     fn text_decoration_color(&self) -> Color {

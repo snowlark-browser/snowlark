@@ -506,6 +506,17 @@ the source; `git log -p vendor/stylo` shows the diff.
 88. **`-webkit-text-stroke` in the servo build** (`properties/longhands.toml`, `properties/shorthands.toml`,
    `properties/shorthands.rs`, Compat §5.5-5.7): the shorthand and its two longhands lose their gecko-only
    lines; snowlark-layout strokes glyph outlines with them.
+89. **`text-decoration-skip-ink`, `accent-color` and `field-sizing` in the servo build**
+   (`properties/longhands.toml`; CSS Text Decoration 4 §2.6, CSS UI 4 §6.2-6.3): the three lose their
+   gecko-only lines (`field-sizing`'s gecko pref does not apply to servo). snowlark-layout interrupts
+   underlines and overlines at glyph outlines, paints form controls' accents and sizes form controls
+   from their values with them.
+90. **`interpolate-size` in the servo build** (`properties/longhands.toml`, CSS Values 5 §11.1): a servo
+   longhand of the inherited box struct, `numeric-only | allow-keywords`, not animatable. It is parsed
+   and computed only: transitions and animations do not interpolate to or from intrinsic size keywords.
+91. **`word-break: auto-phrase`** (`values/specified/text.rs`, CSS Text 4 §5.2): a `WordBreak` value.
+   snowlark-layout breaks it as `normal`, which the specification allows for languages without phrase
+   analysis (all of them here).
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

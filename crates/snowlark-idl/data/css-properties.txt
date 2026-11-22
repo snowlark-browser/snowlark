@@ -108,6 +108,7 @@
 -webkit-user-select
 -webkit-writing-mode
 -x-text-scale
+accent-color
 align-content
 align-items
 align-self
@@ -273,6 +274,7 @@ direction
 display
 dominant-baseline
 empty-cells
+field-sizing
 fill
 fill-opacity
 fill-rule
@@ -348,6 +350,7 @@ inset-block-start
 inset-inline
 inset-inline-end
 inset-inline-start
+interpolate-size
 isolation
 justify-content
 justify-items
@@ -515,6 +518,7 @@ text-decoration
 text-decoration-color
 text-decoration-inset
 text-decoration-line
+text-decoration-skip-ink
 text-decoration-style
 text-decoration-thickness
 text-indent

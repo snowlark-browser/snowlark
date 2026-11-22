@@ -2345,6 +2345,19 @@ pub trait Style: Clone {
     fn text_stroke(&self) -> (f32, Color) {
         (0.0, self.color())
     }
+    /// CSS Text Decoration 4 §2.6 `text-decoration-skip-ink`: underlines and overlines are interrupted
+    /// where they would cross the glyphs (`auto` and `all`).
+    fn text_decoration_skip_ink(&self) -> bool {
+        false
+    }
+    /// CSS UI 4 §6.3 `field-sizing: content`: a form control sized from its value.
+    fn field_sizing_content(&self) -> bool {
+        false
+    }
+    /// CSS UI 4 §6.2 `accent-color`: the accent of form controls, `None` for `auto`.
+    fn accent_color(&self) -> Option<Color> {
+        None
+    }
     fn line_height(&self) -> LineHeight;
     fn vertical_align(&self) -> VerticalAlign;
     fn text_box_trim(&self) -> TextBoxTrim {
