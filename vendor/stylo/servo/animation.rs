@@ -812,6 +812,23 @@ impl Animation {
         progress >= self.current_iteration_end_progress()
     }
 
+    /// Whether `other`, this animation built again from a new style, has the same timing (Snowlark
+    /// patch 94): duration, delay, iteration count, direction, fill mode and play state. Its
+    /// keyframes (with the easing and composition in them) may still differ.
+    fn has_timing_of(&self, other: &Self) -> bool {
+        let limit = |s: &KeyframesIterationState| match *s {
+            KeyframesIterationState::Finite(_, max) => Some(max),
+            KeyframesIterationState::Infinite(_) => None,
+        };
+        let paused = |s: &AnimationState| matches!(s, AnimationState::Paused(_));
+        self.duration == other.duration
+            && self.delay == other.delay
+            && limit(&self.iteration_state) == limit(&other.iteration_state)
+            && self.direction == other.direction
+            && self.fill_mode == other.fill_mode
+            && paused(&self.state) == paused(&other.state)
+    }
+
     /// Updates the appropiate state from other animation.
     ///
     /// This happens when an animation is re-submitted to layout, presumably
@@ -1993,7 +2010,7 @@ pub fn maybe_start_animations<E>(
     E: TElement,
 {
     let style = new_style.get_ui();
-    for (i, name) in style.animation_name_iter().enumerate() {
+    'names: for (i, name) in style.animation_name_iter().enumerate() {
         let name = match name.as_atom() {
             Some(atom) => atom,
             None => continue,
@@ -2009,6 +2026,14 @@ pub fn maybe_start_animations<E>(
                 .stylist
                 .lookup_keyframes_for_style(name, element, new_style, &context.guards)
         else {
+            // (Snowlark patch 94: a name that matches no @keyframes rule runs no animation, CSS
+            // Animations 1 §3.1: one whose rule was removed or renamed is canceled)
+            for existing in animation_state.animations.iter_mut() {
+                if existing.name == *name && existing.state != AnimationState::Canceled {
+                    existing.state = AnimationState::Canceled;
+                    animation_state.dirty = true;
+                }
+            }
             continue;
         };
 
@@ -2113,9 +2138,19 @@ pub fn maybe_start_animations<E>(
             }
 
             if new_animation.name == existing_animation.name {
-                existing_animation
-                    .update_from_other(&new_animation, context.current_time_for_animations);
-                return;
+                // (Snowlark patch 94: an animation whose timing is unchanged takes up its
+                // keyframes as they are now, CSS Animations 1 §3, and keeps its iteration, state
+                // and start time; the next name of the list is looked at too)
+                if existing_animation.has_timing_of(&new_animation) {
+                    existing_animation.computed_steps = new_animation.computed_steps;
+                    existing_animation.properties_changed = new_animation.properties_changed;
+                    existing_animation.number_of_animating_properties =
+                        new_animation.number_of_animating_properties;
+                } else {
+                    existing_animation
+                        .update_from_other(&new_animation, context.current_time_for_animations);
+                }
+                continue 'names;
             }
         }
 

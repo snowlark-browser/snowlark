@@ -80,9 +80,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   descriptors, `size-adjust`, metric override descriptors, `font-display` periods, `FontFaceSet` loading events, and
   lazy loading of faces nothing uses. Request modifiers on a `src` URL are not parsed. (ref 68)
 - **Animations.** Replacing the effect of a CSS animation (`animation.effect = ...`) does nothing: the element keeps
-  the CSS animation's values. Script animations on pseudo-elements do not reach the cascade. A running CSS
-  animation keeps the keyframes it started with when script edits, renames or removes its `@keyframes` rule.
-  An animation of zero duration never starts: it fills nothing and fires no events. (ref 115, 33, 635, 651)
+  the CSS animation's values. Script animations on pseudo-elements do not reach the cascade.
+  An animation of zero duration never starts: it fills nothing and fires no events. (ref 115, 33, 651)
 - **Highlight pseudo-elements.** A `text-decoration` declared on `::selection` is not painted, and a selected
   image or other replaced element that is positioned gets no highlight.
   `::highlight()` and `::search-text` are not parsed. (ref 502)

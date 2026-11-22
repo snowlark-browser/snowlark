@@ -531,6 +531,14 @@ the source; `git log -p vendor/stylo` shows the diff.
    longhand loses its gecko-only engine line (its gecko pref does not apply to servo) and changes to it
    repaint instead of rebuilding boxes. snowlark-render leaves boxes with `none` and their subtrees out of
    the scroll anchor selection.
+94. **A running CSS animation follows edits of its `@keyframes` rule** (`servo/animation.rs`, CSS Animations 1
+   §3): `maybe_start_animations`, which snowlark-style has run for every restyled element with animations
+   after a change of the rules (`TraversalFlags::ForCSSRuleChanges`), gives an existing animation whose
+   timing is unchanged (`Animation::has_timing_of`: duration, delay, iteration count, direction, fill mode,
+   paused or not) the keyframes as they are now and keeps the rest of it (its iteration, state and start
+   time; `update_from_other` reset the current iteration of an infinite one), cancels an animation whose name
+   no longer matches a `@keyframes` rule (removed or renamed), and goes on to the next name of the list
+   where upstream returned after the first animation it found again.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

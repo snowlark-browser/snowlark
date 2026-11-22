@@ -4096,6 +4096,11 @@ impl StyleEngine {
         self.flush_dirty_hints(dom, data);
         data.reserve(dom.arena_len());
         self.sync_page_color_scheme(dom, data);
+        // CSS Animations 1 §3: a running animation uses its `@keyframes` rule as it is now, so after
+        // a change of the rules every element restyled updates its animations from them (the keyframes
+        // of one whose timing is unchanged; one whose rule is gone is canceled).
+        let rules_changed =
+            self.stylist.stylesheets_have_changed() || !self.dirty_shadows.is_empty();
         if self.global_style_change_pending() {
             self.matched_properties.clear();
         }
@@ -4142,7 +4147,11 @@ impl StyleEngine {
                 options: GLOBAL_STYLE_DATA.options.clone(),
                 guards,
                 current_time_for_animations: now,
-                traversal_flags: TraversalFlags::empty(),
+                traversal_flags: if rules_changed {
+                    TraversalFlags::ForCSSRuleChanges
+                } else {
+                    TraversalFlags::empty()
+                },
                 snapshot_map: &self.snapshots,
                 animations: self.animations.clone(),
                 registered_speculative_painters: &NoPainters,

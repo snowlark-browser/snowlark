@@ -2184,6 +2184,53 @@ fn keyframes_rule_cssom() {
     );
 }
 
+/// CSS Animations 1 §3: a running CSS animation uses its `@keyframes` rule as it is now. An edit of
+/// the rule's keyframes (`appendRule`, `deleteRule`, a keyframe's `style` or `keyText`) changes the
+/// animated value at once and keeps the animation, its object and its time; a rule renamed or removed
+/// cancels it, and a rule added later starts the animation that names it. Each name of an
+/// `animation-name` list is updated, not only the first.
+#[test]
+fn keyframes_edits_reach_running_animations() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style id=s>@keyframes k { from { margin-left: 0px } to { margin-left: 100px } }\
+         @keyframes p { from { padding-left: 0px } to { padding-left: 100px } }\
+         #d { animation: p 100s linear -50s paused, k 100s linear -50s paused }\
+         #e { animation: later 100s linear -50s paused }</style><div id=d></div><div id=e></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const s = document.getElementById('s').sheet, k = s.cssRules[0], p = s.cssRules[1];
+         const d = document.getElementById('d'), e = document.getElementById('e');
+         const ml = () => getComputedStyle(d).marginLeft, pl = () => getComputedStyle(d).paddingLeft;
+         const out = [ml(), pl()];
+         const a = d.getAnimations()[1], t = a.currentTime;
+         k.deleteRule('to');
+         k.appendRule('to { margin-left: 200px }');
+         out.push(ml(), d.getAnimations()[1] === a, a.currentTime === t,
+           a.effect.getKeyframes().map(f => f.marginLeft).join(','));
+         k.findRule('to').style.marginLeft = '300px';
+         out.push(ml());
+         k.findRule('to').keyText = '50%';
+         out.push(ml());
+         p.cssRules[1].style.paddingLeft = '40px';
+         out.push(pl(), ml());
+         k.name = 'renamed';
+         out.push(ml(), d.getAnimations().length, pl());
+         s.deleteRule(1);
+         out.push(pl(), d.getAnimations().length);
+         out.push(getComputedStyle(e).marginLeft, e.getAnimations().length);
+         s.insertRule('@keyframes later { to { margin-left: 80px } }', 0);
+         out.push(getComputedStyle(e).marginLeft, e.getAnimations().length);
+         out.join('|')",
+    );
+    assert_eq!(
+        r,
+        "50px|50px|100px|true|true|0px,200px|150px|300px|20px|300px|0px|1|20px|0px|0|0px|0|40px|1"
+    );
+}
+
 /// The legacy `display: -webkit-box` (Compat) lays its items out as a single-line flex container
 /// from the `-webkit-box-*` properties: `-webkit-box-pack` packs them along the main axis,
 /// `-webkit-box-align` aligns every item across it, `-webkit-box-direction: reverse` reverses the
