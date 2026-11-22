@@ -318,17 +318,96 @@ fn what_is_not_recorded_is_drawn_as_the_image() {
     let mut r = render(
         &net,
         "<svg width=120 height=100>
-           <pattern id=g width=20 height=20 patternUnits=userSpaceOnUse><rect width=20 height=20 fill=red /></pattern>
+           <pattern id=a width=5 height=5 patternUnits=userSpaceOnUse><rect width=5 height=5 fill=red /></pattern>
+           <pattern id=g width=20 height=20 patternUnits=userSpaceOnUse><rect width=20 height=20 fill='url(#a)' /></pattern>
            <rect x=0 y=0 width=20 height=20 fill='url(#g)' />
          </svg>",
     );
     let list = r.paint(VIEWPORT, Point::ZERO);
-    assert_eq!(r.inline_svg_unsupported(svg_of(&r)), Some("paint server"));
+    assert_eq!(
+        r.inline_svg_unsupported(svg_of(&r)),
+        Some("pattern in a pattern")
+    );
     assert_eq!(r.stats().svgs_not_recorded, 1);
     assert!(list.items.iter().any(|i| matches!(i, Item::Image { .. })));
     let px = pixels(&mut r);
     assert_pixel(&px, 10, 10, RED);
     assert_pixel(&px, 30, 10, WHITE);
+}
+
+/// Pattern fills and strokes (SVG 2 §14.3) are recorded, and draw as the image path draws the
+/// same svg (in an `img` beside it): user-space and bounding-box tiles and content, a `viewBox`,
+/// `patternTransform`, an `href` chain, a stroke and a fill opacity.
+#[test]
+fn patterns_are_recorded_and_draw_as_the_image_path() {
+    let cases = [
+        // user space tiles, 10 by 10, a red quarter
+        "<pattern id='p' width='10' height='10' patternUnits='userSpaceOnUse'>
+           <rect width='5' height='5' fill='red' /><circle cx='7.5' cy='7.5' r='2' fill='blue' /></pattern>
+         <rect x='2' y='3' width='44' height='40' fill='url(#p)' />",
+        // bounding box tiles (a quarter of the box wide, half high) and content
+        "<pattern id='p' width='.25' height='.5' patternContentUnits='objectBoundingBox'>
+           <rect width='.125' height='.25' fill='green' /></pattern>
+         <rect x='4' y='4' width='40' height='40' fill='url(#p)' />",
+        // a viewBox, a rotated and moved tile
+        "<pattern id='p' x='3' y='1' width='12' height='8' patternUnits='userSpaceOnUse' viewBox='0 0 6 4'
+             patternTransform='rotate(30) translate(2 1)'>
+           <rect width='3' height='2' fill='blue' /><rect x='3' y='2' width='3' height='2' fill='red' /></pattern>
+         <ellipse cx='25' cy='25' rx='22' ry='18' fill='url(#p)' />",
+        // attributes from one pattern, content from the one its href names; a stroke and an opacity
+        "<pattern id='c'><rect width='4' height='4' fill='red' /><rect x='4' y='4' width='4' height='4' fill='green' /></pattern>
+         <pattern id='p' href='#c' width='8' height='8' patternUnits='userSpaceOnUse' />
+         <rect x='5' y='5' width='30' height='30' fill='url(#p)' fill-opacity='.5' stroke='url(#p)' stroke-width='6' />",
+    ];
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    for (i, case) in cases.iter().enumerate() {
+        let svg =
+            format!("<svg xmlns='http://www.w3.org/2000/svg' width='50' height='50'>{case}</svg>");
+        let data: String = svg
+            .bytes()
+            .map(|c| match c {
+                b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' => (c as char).to_string(),
+                c => format!("%{c:02X}"),
+            })
+            .collect();
+        let mut r = render(
+            &net,
+            &format!(
+                "{svg}<img style='position: absolute; left: 60px; top: 0' \
+                 src=\"data:image/svg+xml,{data}\">"
+            ),
+        );
+        let list = r.paint(VIEWPORT, Point::ZERO);
+        assert_eq!(r.inline_svg_unsupported(svg_of(&r)), None, "case {i}");
+        assert!(
+            list.items
+                .iter()
+                .any(|it| matches!(it, Item::FillPattern { .. })),
+            "case {i}: no pattern fill"
+        );
+        let px = pixels(&mut r);
+        let mut off = 0;
+        let mut painted = 0;
+        for y in 0..50 {
+            for x in 0..50 {
+                let (a, b) = (px.pixel(x, y), px.pixel(x + 60, y));
+                let d = |p: u8, q: u8| (p as i32 - q as i32).abs();
+                if d(a.r, b.r).max(d(a.g, b.g)).max(d(a.b, b.b)) > 40 {
+                    off += 1;
+                }
+                if b != WHITE {
+                    painted += 1;
+                }
+            }
+        }
+        assert!(
+            painted >= 200,
+            "case {i}: the image painted {painted} pixels ({:?})",
+            r.resource_counts()
+        );
+        // (edges are antialiased and tiles sampled a little differently)
+        assert!(off <= 60, "case {i}: {off} of 2500 pixels differ");
+    }
 }
 
 #[test]

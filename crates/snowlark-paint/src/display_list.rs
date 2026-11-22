@@ -681,6 +681,23 @@ pub enum Item {
         stroke: Stroke,
         antialias: bool,
     },
+    /// Fills `rect` (local coordinates) with a pattern (SVG 2 §14.3): the list of
+    /// [`DisplayList::patterns`]`[pattern]` drawn in its tile, `(0, 0)` to its size in the tile's own
+    /// space and clipped to it, repeated in both directions; `transform` maps the tile's space to
+    /// local coordinates.
+    FillPattern {
+        rect: Rect,
+        pattern: u32,
+        transform: Matrix,
+    },
+}
+
+/// A pattern's tile ([`Item::FillPattern`]): what is drawn in it, in its own space, and its size.
+/// Its list holds no patterns of its own, no layers, videos or backdrop filters.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Pattern {
+    pub tile: Size,
+    pub list: DisplayList,
 }
 
 impl Item {
@@ -753,6 +770,8 @@ pub struct DisplayList {
     pub paths: Box<PathData>,
     /// The filter functions of the filter groups (see [`FilterRange`]).
     pub filters: Vec<FilterOp>,
+    /// The tiles of the pattern fills ([`Item::FillPattern`]).
+    pub patterns: Vec<Pattern>,
     /// The transform and opacity animations of its composited boxes that a compositor runs
     /// ([`crate::layer_animation`]). Not part of the list's items or its encoding: whoever hands the
     /// list's pieces to a compositor sends them beside it.
@@ -814,6 +833,7 @@ impl DisplayList {
         self.paths.points.clear();
         self.paths.dashes.clear();
         self.filters.clear();
+        self.patterns.clear();
         self.animations.clear();
     }
 
@@ -1042,8 +1062,27 @@ impl DisplayList {
                         return Err(ListError::BadValue(i));
                     }
                 }
+                Item::FillPattern { pattern, .. } if *pattern as usize >= self.patterns.len() => {
+                    return Err(ListError::BadRange(i));
+                }
                 _ => {}
             }
+        }
+        for p in &self.patterns {
+            let size_ok = |v: f32| v.is_finite() && v > 0.0;
+            if !size_ok(p.tile.width) || !size_ok(p.tile.height) {
+                return Err(ListError::BadValue(0));
+            }
+            // (a tile is painted on its own: nothing in it reaches out of it)
+            let inside_only = p.list.patterns.is_empty()
+                && !p.list.items.iter().any(|it| {
+                    it.is_video()
+                        || matches!(it, Item::PushLayer { .. } | Item::BackdropFilter { .. })
+                });
+            if !inside_only {
+                return Err(ListError::BadValue(0));
+            }
+            p.list.validate()?;
         }
         if self
             .paths
@@ -1189,6 +1228,27 @@ impl DisplayList {
                         }
                     }
                 }
+                Item::FillPattern {
+                    rect,
+                    pattern,
+                    transform,
+                } => {
+                    e.item(&Item::FillPattern {
+                        rect,
+                        pattern: 0,
+                        transform,
+                    });
+                    // (the tile by its content: its size and its items' hashes)
+                    if let Some(p) = self.patterns.get(pattern as usize) {
+                        e.f32(p.tile.width);
+                        e.f32(p.tile.height);
+                        let mut inner = Vec::new();
+                        p.list.content_hashes(image_version, &mut inner);
+                        for h in inner {
+                            e.bytes(&h.to_le_bytes());
+                        }
+                    }
+                }
                 _ => e.item(item),
             }
             out.push(hash_bytes(&scratch));
@@ -1212,7 +1272,8 @@ impl DisplayList {
                 | Item::FillRoundedRect { rect, .. }
                 | Item::LinearGradient { rect, .. }
                 | Item::RadialGradient { rect, .. }
-                | Item::ConicGradient { rect, .. } => Some(*rect),
+                | Item::ConicGradient { rect, .. }
+                | Item::FillPattern { rect, .. } => Some(*rect),
                 Item::Border(b) => Some(b.rect),
                 Item::StrokeRect { rect, width, .. }
                 | Item::StrokeRoundedRect { rect, width, .. } => {
@@ -2021,7 +2082,7 @@ impl DisplayList {
 
     // ----- encoding -----
 
-    const MAGIC: [u8; 4] = *b"ODL3";
+    const MAGIC: [u8; 4] = *b"ODL4";
 
     /// Appends the list's binary encoding (little-endian, versioned) to `out`.
     pub fn encode(&self, out: &mut Vec<u8>) {
@@ -2034,6 +2095,7 @@ impl DisplayList {
         e.u32(self.paths.points.len() as u32);
         e.u32(self.paths.dashes.len() as u32);
         e.u32(self.filters.len() as u32);
+        e.u32(self.patterns.len() as u32);
         for g in &self.glyph_ids {
             e.u16(*g);
         }
@@ -2058,6 +2120,16 @@ impl DisplayList {
         for op in &self.filters {
             e.filter_op(op);
         }
+        for p in &self.patterns {
+            e.f32(p.tile.width);
+            e.f32(p.tile.height);
+            // (the tile's list in its own encoding, after its length)
+            let at = e.0.len();
+            e.u32(0);
+            p.list.encode(e.0);
+            let len = (e.0.len() - at - 4) as u32;
+            e.0[at..at + 4].copy_from_slice(&len.to_le_bytes());
+        }
         for item in &self.items {
             e.item(item);
         }
@@ -2074,14 +2146,15 @@ impl DisplayList {
     /// when the bytes are refused).
     pub fn decode_from(&mut self, bytes: &[u8]) -> Result<(), ListError> {
         self.clear();
-        let result = self.read(bytes);
+        let result = self.read(bytes, false);
         if result.is_err() {
             self.clear();
         }
         result
     }
 
-    fn read(&mut self, bytes: &[u8]) -> Result<(), ListError> {
+    /// Reads a list; `tile` for a pattern's tile, which holds no patterns of its own.
+    fn read(&mut self, bytes: &[u8], tile: bool) -> Result<(), ListError> {
         let mut d = Dec { b: bytes, pos: 0 };
         if d.take(4)? != Self::MAGIC {
             return Err(ListError::BadHeader);
@@ -2093,6 +2166,10 @@ impl DisplayList {
         let points = d.u32()? as usize;
         let dashes = d.u32()? as usize;
         let filters = d.u32()? as usize;
+        let patterns = d.u32()? as usize;
+        if tile && patterns > 0 {
+            return Err(ListError::BadValue(0));
+        }
         // (counts are checked against the remaining bytes before anything is reserved)
         let remaining = bytes.len() - d.pos;
         if items > remaining
@@ -2102,6 +2179,7 @@ impl DisplayList {
             || points.saturating_mul(8) > remaining
             || dashes.saturating_mul(4) > remaining
             || filters.saturating_mul(5) > remaining
+            || patterns.saturating_mul(12) > remaining
         {
             return Err(ListError::Truncated);
         }
@@ -2140,6 +2218,14 @@ impl DisplayList {
         self.filters.reserve(filters);
         for _ in 0..filters {
             self.filters.push(d.filter_op()?);
+        }
+        self.patterns.reserve(patterns);
+        for _ in 0..patterns {
+            let tile = Size::new(d.f32()?, d.f32()?);
+            let len = d.u32()? as usize;
+            let mut list = DisplayList::new();
+            list.read(d.take(len)?, true)?;
+            self.patterns.push(Pattern { tile, list });
         }
         for _ in 0..items {
             self.items.push(d.item()?);
@@ -2290,6 +2376,8 @@ fn append_list(to: &mut DisplayList, from: &DisplayList) {
     to.paths.dashes.extend_from_slice(&from.paths.dashes);
     let filters = to.filters.len() as u32;
     to.filters.extend_from_slice(&from.filters);
+    let patterns = to.patterns.len() as u32;
+    to.patterns.extend_from_slice(&from.patterns);
     to.items.reserve(from.items.len());
     for item in &from.items {
         let mut item = *item;
@@ -2310,6 +2398,7 @@ fn append_list(to: &mut DisplayList, from: &DisplayList) {
                 path.points += points;
                 stroke.dashes.start += dashes;
             }
+            Item::FillPattern { pattern, .. } => *pattern += patterns,
             _ => {}
         }
         to.items.push(item);
@@ -2342,6 +2431,15 @@ fn copy_item(to: &mut DisplayList, from: &DisplayList, item: &Item) {
             path.points = to.paths.points.len() as u32;
             to.paths.verbs.extend_from_slice(verbs);
             to.paths.points.extend_from_slice(points);
+        }
+        Item::FillPattern { pattern, .. } => {
+            let p = from
+                .patterns
+                .get(*pattern as usize)
+                .cloned()
+                .unwrap_or_default();
+            *pattern = to.patterns.len() as u32;
+            to.patterns.push(p);
         }
         _ => {}
     }
@@ -2444,6 +2542,9 @@ fn item_finite(item: &Item) -> bool {
                 && stroke.miter_limit.is_finite()
                 && stroke.dash_offset.is_finite()
         }
+        Item::FillPattern {
+            rect, transform, ..
+        } => rect_finite(rect) && transform.is_finite(),
         Item::PopClip
         | Item::PopTransform
         | Item::PopOpacity
@@ -3063,6 +3164,38 @@ impl DisplayListBuilder {
         append_list(&mut self.list, list);
     }
 
+    /// Fills `rect` with a pattern ([`Item::FillPattern`]): `tile`'s list drawn in a tile of
+    /// `size` and repeated, through `transform` from the tile's space to this list's. Nothing for
+    /// an empty area or tile, a tile that draws nothing, or one that cannot be a tile (patterns,
+    /// layers, videos or backdrop filters in it, or a list that does not validate).
+    pub fn fill_pattern(&mut self, rect: Rect, size: Size, transform: Matrix, tile: DisplayList) {
+        if rect.is_empty()
+            || !(size.width > 0.0 && size.height > 0.0)
+            || !transform.is_finite()
+            || !tile.items.iter().any(Item::is_drawing)
+        {
+            return;
+        }
+        let p = Pattern {
+            tile: size,
+            list: tile,
+        };
+        let probe = DisplayList {
+            patterns: vec![p],
+            ..DisplayList::default()
+        };
+        if probe.validate().is_err() {
+            return;
+        }
+        let pattern = self.list.patterns.len() as u32;
+        self.list.patterns.extend(probe.patterns);
+        self.list.items.push(Item::FillPattern {
+            rect,
+            pattern,
+            transform,
+        });
+    }
+
     fn pop(&mut self, group: Group, item: Item) {
         match self.stack.last() {
             Some(g) if *g == group => {
@@ -3659,6 +3792,18 @@ impl Enc<'_> {
                 self.u32(stroke.dashes.len);
                 self.f32(stroke.dash_offset);
                 self.u8(*antialias as u8);
+            }
+            Item::FillPattern {
+                rect,
+                pattern,
+                transform: m,
+            } => {
+                self.u8(34);
+                self.rect(rect);
+                self.u32(*pattern);
+                for v in [m.m11, m.m12, m.m21, m.m22, m.dx, m.dy] {
+                    self.f32(v);
+                }
             }
         }
     }
@@ -4287,6 +4432,18 @@ impl<'a> Dec<'a> {
                     antialias: self.flag()?,
                 }
             }
+            34 => Item::FillPattern {
+                rect: self.rect()?,
+                pattern: self.u32()?,
+                transform: Matrix::new(
+                    self.f32()?,
+                    self.f32()?,
+                    self.f32()?,
+                    self.f32()?,
+                    self.f32()?,
+                    self.f32()?,
+                ),
+            },
             _ => return Err(ListError::BadTag(at)),
         })
     }
@@ -4547,7 +4704,108 @@ mod tests {
             1.0,
             ImageRendering::Pixelated,
         );
+        b.fill_pattern(
+            Rect::new(0.0, 0.0, 40.0, 30.0),
+            Size::new(4.0, 3.0),
+            Matrix::rotation(0.3),
+            pattern_tile(),
+        );
         b.build()
+    }
+
+    /// A pattern's tile: a square and a path in a 4 by 3 tile.
+    fn pattern_tile() -> DisplayList {
+        let mut t = DisplayListBuilder::new();
+        t.fill_rect(Rect::new(0.0, 0.0, 2.0, 2.0), Color::hex(0x204080));
+        let path = t
+            .add_path(&[
+                PathEl::MoveTo(Point::new(2.0, 0.0)),
+                PathEl::LineTo(Point::new(4.0, 3.0)),
+                PathEl::LineTo(Point::new(2.0, 3.0)),
+                PathEl::Close,
+            ])
+            .unwrap();
+        t.fill_path(path, Color::hex(0xff8000), false, true);
+        t.build()
+    }
+
+    /// A pattern fill keeps its tile through encoding, appending and copying, and a tile that holds
+    /// a pattern of its own, a layer or a video, or a fill naming no tile, is refused.
+    #[test]
+    fn pattern_tiles_travel_with_their_fills() {
+        let list = sample();
+        assert_eq!(list.patterns.len(), 1);
+        let mut bytes = Vec::new();
+        list.encode(&mut bytes);
+        assert_eq!(DisplayList::decode(&bytes).as_ref(), Ok(&list));
+        // every shorter prefix is refused, none panics
+        for n in 0..bytes.len() {
+            assert!(DisplayList::decode(&bytes[..n]).is_err());
+        }
+        // appended after another list, the fill names the tile at its new place
+        let mut b = DisplayListBuilder::new();
+        b.fill_pattern(
+            Rect::new(0.0, 0.0, 8.0, 8.0),
+            Size::new(1.0, 1.0),
+            Matrix::IDENTITY,
+            pattern_tile(),
+        );
+        b.append(&list);
+        let both = b.build();
+        assert_eq!(both.validate(), Ok(()));
+        let fills: Vec<u32> = both
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                Item::FillPattern { pattern, .. } => Some(*pattern),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(fills, [0, 1]);
+        assert_eq!(both.patterns[1], list.patterns[0]);
+        // the content hash follows the tile's content, not its index
+        let none = |_: ImageId| 0;
+        let (mut a, mut c) = (Vec::new(), Vec::new());
+        list.content_hashes(&none, &mut a);
+        let mut changed = list.clone();
+        changed.patterns[0].list.items[0] = Item::FillRect {
+            rect: Rect::new(0.0, 0.0, 2.0, 2.0),
+            color: Color::hex(0x204081),
+        };
+        changed.content_hashes(&none, &mut c);
+        let at = list
+            .items
+            .iter()
+            .position(|i| matches!(i, Item::FillPattern { .. }))
+            .unwrap();
+        assert_ne!(a[at], c[at]);
+        assert_eq!(a[..at], c[..at]);
+        // tiles that reach out of themselves, and fills without a tile
+        let mut nested = list.clone();
+        nested.patterns[0]
+            .list
+            .patterns
+            .push(list.patterns[0].clone());
+        assert!(nested.validate().is_err());
+        let mut layered = list.clone();
+        layered.patterns[0].list.items.insert(
+            0,
+            Item::PushLayer {
+                kind: LayerKind::Fixed,
+            },
+        );
+        layered.patterns[0].list.items.push(Item::PopLayer);
+        assert!(layered.validate().is_err());
+        let mut missing = list.clone();
+        missing.patterns.clear();
+        assert_eq!(missing.validate(), Err(ListError::BadRange(at)));
+        let mut bad = list.clone();
+        bad.patterns[0].tile.width = 0.0;
+        assert!(bad.validate().is_err());
+        // a tile's own encoding that holds a pattern is refused before it is read
+        let mut nested_bytes = Vec::new();
+        nested.encode(&mut nested_bytes);
+        assert!(DisplayList::decode(&nested_bytes).is_err());
     }
 
     #[test]

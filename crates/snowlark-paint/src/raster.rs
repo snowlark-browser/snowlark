@@ -381,6 +381,10 @@ struct Mark {
 /// How deep backdrops are read within backdrops (each paints again what is under it).
 const MAX_BACKDROP_DEPTH: u32 = 3;
 
+/// The most device pixels a side of a pattern's tile is recorded at (a larger tile is recorded
+/// smaller and drawn scaled up).
+const MAX_PATTERN_TILE: f32 = 4096.0;
+
 impl<'a> Painter<'a> {
     /// `base` maps CSS pixels to the target's device pixels; `opaque` says whether the target's
     /// pixels are opaque (ClearType) or not (grayscale text).
@@ -669,6 +673,47 @@ impl<'a> Painter<'a> {
         });
         self.res.record_ctxs.push(rctx);
         drawn
+    }
+
+    /// A pattern fill ([`Item::FillPattern`]): the tile's list recorded once at about the device
+    /// pixels it covers (its size rounded to whole pixels, at most [`MAX_PATTERN_TILE`] a side),
+    /// then `rect` filled with an image brush that repeats it both ways through `transform`.
+    // SAFETY contract: as `record`.
+    unsafe fn fill_pattern(&mut self, p: &Pattern, rect: Rect, transform: Matrix) -> Result<()> {
+        let to_device = transform.then(&self.transform);
+        if to_device.determinant() == 0.0 || !to_device.is_finite() {
+            return Ok(());
+        }
+        // (the device pixels a tile unit covers along each of the tile's axes)
+        let sx = to_device.m11.hypot(to_device.m12);
+        let sy = to_device.m21.hypot(to_device.m22);
+        let pixels = |units: f32, scale: f32| (units * scale).round().clamp(1.0, MAX_PATTERN_TILE);
+        let (pw, ph) = (pixels(p.tile.width, sx), pixels(p.tile.height, sy));
+        let (kx, ky) = (pw / p.tile.width, ph / p.tile.height);
+        let cmd = self.record_at(
+            &p.list,
+            0..p.list.items.len(),
+            Matrix::scale(kx, ky),
+            None,
+            None,
+            self.depth,
+        )?;
+        let image: ID2D1Image = cmd.cast()?;
+        let brush = self.ctx.CreateImageBrush(
+            &image,
+            &D2D1_IMAGE_BRUSH_PROPERTIES {
+                sourceRectangle: rect_f(&Rect::new(0.0, 0.0, pw, ph)),
+                extendModeX: D2D1_EXTEND_MODE_WRAP,
+                extendModeY: D2D1_EXTEND_MODE_WRAP,
+                interpolationMode: D2D1_INTERPOLATION_MODE_LINEAR,
+            },
+            Some(&D2D1_BRUSH_PROPERTIES {
+                opacity: 1.0,
+                transform: matrix_3x2(&Matrix::scale(1.0 / kx, 1.0 / ky).then(&transform)),
+            }),
+        )?;
+        self.ctx.FillRectangle(&rect_f(&rect), &brush);
+        Ok(())
     }
 
     /// A filter group ([`Item::PushFilter`]): its content (`range` of `list`) recorded in device
@@ -1050,6 +1095,15 @@ impl<'a> Painter<'a> {
                         ..*s
                     };
                     self.box_shadow(&s)?
+                }
+                Item::FillPattern {
+                    rect,
+                    pattern,
+                    transform,
+                } => {
+                    if let Some(p) = list.patterns.get(pattern as usize) {
+                        self.fill_pattern(p, rect, transform)?;
+                    }
                 }
                 Item::FillPath {
                     path,

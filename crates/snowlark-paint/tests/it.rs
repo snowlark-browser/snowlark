@@ -17,6 +17,7 @@ mod damage;
 mod filters;
 mod font_table;
 mod gradients;
+mod patterns;
 mod pdf;
 mod render_demo;
 mod svg_filters;

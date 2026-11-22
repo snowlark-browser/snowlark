@@ -11,8 +11,9 @@
 //!
 //! What it does not record yet falls back to the image path ([`crate::inline_svg`], drawn by resvg):
 //! [`record`] then says why, and the whole `svg` element is drawn as before. Recorded: `g` and `a`,
-//! the basic shapes and `path` with solid paints (fill and stroke opacity, `fill-rule`, caps, joins,
-//! dashes, `shape-rendering`, `paint-order`), `transform`, `opacity`, `visibility`, clip paths of one
+//! the basic shapes and `path` with solid paints, gradients and patterns (a pattern's tile recorded
+//! once and repeated by the raster side, [`snowlark_paint::Item::FillPattern`]; fill and stroke
+//! opacity, `fill-rule`, caps, joins, dashes, `shape-rendering`, `paint-order`), `transform`, `opacity`, `visibility`, clip paths of one
 //! `rect` in user space, and `text` and `tspan` of horizontal text with one position per element.
 
 use kurbo::BezPath;
@@ -78,6 +79,7 @@ pub fn record(q: &SvgQuery, svg: NodeId, size: (f32, f32)) -> Result<DisplayList
         b: DisplayListBuilder::new(),
         diag: ((vw * vw + vh * vh) / 2.0).sqrt(),
         path: Vec::new(),
+        in_pattern: false,
     };
     r.b.push_transform(paint_matrix(&m));
     r.children(svg)?;
@@ -124,7 +126,7 @@ impl Fingerprint {
 /// The fingerprint of outermost `svg` element `svg`, or `None` when it needs its markup: it
 /// fetches something (`use`, `image`, `feImage`, an `href` or a `url()` to another document,
 /// which the writer in [`crate::inline_svg`] finds and starts), or holds what [`record`] does not
-/// record (paint servers, markers, filters, masks, nested `svg`, `textPath`, `animateMotion`, a
+/// record (paint servers outside it, markers, filters, masks, nested `svg`, `textPath`, `animateMotion`, a
 /// clip path outside the svg). `document` and `base` are the document's URL and base URL.
 pub(crate) fn fingerprint(
     dom: &snowlark_dom::Dom,
@@ -170,9 +172,9 @@ pub(crate) fn fingerprint(
                         let value = a.value();
                         if name == "href" && local != "a" {
                             let id = value.trim().strip_prefix('#')?;
-                            // (a gradient taking stops or attributes from another: that one is
-                            // part of what the walk sees)
-                            if matches!(local, "linearGradient" | "radialGradient") {
+                            // (a gradient or pattern taking stops, content or attributes from
+                            // another: that one is part of what the walk sees)
+                            if matches!(local, "linearGradient" | "radialGradient" | "pattern") {
                                 self.inside_id(id)?;
                             }
                         }
@@ -323,6 +325,8 @@ struct Recorder<'q, 'a> {
     /// resolve against).
     diag: f32,
     path: Vec<PathEl>,
+    /// Whether it records a pattern's tile.
+    in_pattern: bool,
 }
 
 /// What an element is for painting.
@@ -736,10 +740,11 @@ impl Recorder<'_, '_> {
         let stroke_first = Self::stroke_first(v);
         let draw_fill = |b: &mut DisplayListBuilder| match &fill {
             Some(Paint::Solid(c)) => b.fill_path(range, *c, evenodd, antialias),
-            // (the gradient under the shape's fill as a clip: SVG 2 §13.2 paints the fill area)
-            Some(Paint::Gradient(g)) => {
+            // (the gradient or pattern under the shape's fill as a clip: SVG 2 §13.2 paints the
+            // fill area)
+            Some(p) => {
                 b.push_clip_path(range, evenodd);
-                g.paint(b, bbox);
+                p.paint(b, bbox);
                 b.pop_clip();
             }
             None => {}
@@ -751,8 +756,8 @@ impl Recorder<'_, '_> {
             (Some(Paint::Solid(c)), Some(s)) => {
                 self.b.stroke_path(range, *c, s, &dashes, antialias)
             }
-            (Some(Paint::Gradient(g)), Some(s)) => {
-                // (the stroke's coverage as the gradient's mask)
+            (Some(g), Some(s)) => {
+                // (the stroke's coverage as the gradient's or pattern's mask)
                 let half = s.width as f64 / 2.0;
                 let reach = half * (s.miter_limit.max(std::f32::consts::SQRT_2) as f64);
                 let area = bbox.inflate(reach, reach);
@@ -796,7 +801,133 @@ impl Recorder<'_, '_> {
             .indexed_element_by_id(dom.root(n), id)
             .flatten()
             .ok_or("paint server")?;
+        if is_svg(dom, target, "pattern") {
+            return self.pattern(n, target, o, bbox);
+        }
         Gradient::of(q, n, target, o, bbox)
+    }
+
+    /// The paint of the `pattern` element `target` (SVG 2 §14.3) for a shape `n` whose geometry
+    /// box is `bbox`, composited with `opacity`. Attributes and content it does not have come from
+    /// the patterns its `href` names (§14.3.3: each attribute from the first that has it, the
+    /// content from the first with element children). The tile is `x`, `y`, `width` and `height`
+    /// in `patternUnits` (by default fractions of `bbox`); its content is recorded in the tile's
+    /// space through the `viewBox` or, without one, `patternContentUnits`, and the tiles are placed
+    /// in the shape's user space through `patternTransform`. A tile of no area, an empty
+    /// `viewBox`, a transform that cannot be inverted or no content paints nothing.
+    fn pattern(
+        &self,
+        n: NodeId,
+        target: NodeId,
+        opacity: f32,
+        bbox: kurbo::Rect,
+    ) -> Result<Option<Paint>, Unsupported> {
+        // (a pattern's tile is painted on its own: one inside another is drawn by the image path)
+        if self.in_pattern {
+            return Err("pattern in a pattern");
+        }
+        let q = self.q;
+        let dom = q.dom();
+        let mut chain: smallvec::SmallVec<[NodeId; 4]> = smallvec::smallvec![target];
+        let mut cur = target;
+        while chain.len() < MAX_GRADIENT_CHAIN {
+            let href = dom
+                .attr(cur, &ns!(), &snowlark_dom::local_name!("href"))
+                .or_else(|| dom.attr(cur, &ns!(xlink), &snowlark_dom::local_name!("href")));
+            let Some(href) = href.map(str::trim) else {
+                break;
+            };
+            let id = href.strip_prefix('#').ok_or("paint server href")?;
+            let Some(next) = dom.indexed_element_by_id(dom.root(target), id).flatten() else {
+                break;
+            };
+            if !is_svg(dom, next, "pattern") || chain.contains(&next) {
+                break;
+            }
+            chain.push(next);
+            cur = next;
+        }
+        let attr = |a: &str| chain.iter().find_map(|&g| q.attr(g, a));
+        let obb = !matches!(attr("patternUnits").map(str::trim), Some("userSpaceOnUse"));
+        if obb && (bbox.width() <= 0.0 || bbox.height() <= 0.0) {
+            return Ok(None);
+        }
+        let len = |a: &str, dir: LengthDir| -> f64 {
+            let l = attr(a)
+                .and_then(|v| snowlark_layout::svg::Length::parse(v.trim()))
+                .unwrap_or(snowlark_layout::svg::Length::ZERO);
+            if obb {
+                match l.unit {
+                    snowlark_layout::svg::LengthUnit::Percent => l.value as f64 / 100.0,
+                    _ => l.value as f64,
+                }
+            } else {
+                q.to_user(n, &l, dir) as f64
+            }
+        };
+        let (mut x, mut y) = (
+            len("x", LengthDir::Horizontal),
+            len("y", LengthDir::Vertical),
+        );
+        let (mut w, mut h) = (
+            len("width", LengthDir::Horizontal),
+            len("height", LengthDir::Vertical),
+        );
+        if obb {
+            x = bbox.x0 + x * bbox.width();
+            y = bbox.y0 + y * bbox.height();
+            w *= bbox.width();
+            h *= bbox.height();
+        }
+        if !(w > 0.0 && h > 0.0 && w.is_finite() && h.is_finite()) {
+            return Ok(None);
+        }
+        let Some(content) = chain
+            .iter()
+            .copied()
+            .find(|&g| dom.children(g).any(|c| dom.element(c).is_some()))
+        else {
+            return Ok(None);
+        };
+        use snowlark_layout::svg::{AspectRatio, ViewBox};
+        let content_units = match attr("viewBox").and_then(ViewBox::parse) {
+            Some(vb) if vb.width <= 0.0 || vb.height <= 0.0 => return Ok(None),
+            Some(vb) => attr("preserveAspectRatio")
+                .and_then(AspectRatio::parse)
+                .unwrap_or_default()
+                .transform(&vb, w, h),
+            None => match attr("patternContentUnits").map(str::trim) {
+                Some("objectBoundingBox") => Matrix::scale_non_uniform(bbox.width(), bbox.height()),
+                _ => Matrix::IDENTITY,
+            },
+        };
+        let transform = chain
+            .iter()
+            .find(|&&g| q.attr(g, "patternTransform").is_some())
+            .map_or(Matrix::IDENTITY, |&g| {
+                q.transform_attr(g, "patternTransform")
+            });
+        let det = transform.determinant();
+        if det == 0.0 || !det.is_finite() {
+            return Ok(None);
+        }
+        let mut r = Recorder {
+            q,
+            text: self.text,
+            b: DisplayListBuilder::new(),
+            diag: self.diag,
+            path: Vec::new(),
+            in_pattern: true,
+        };
+        r.b.push_transform(paint_matrix(&content_units));
+        r.children(content)?;
+        r.b.pop_transform();
+        Ok(Some(Paint::Pattern(PatternPaint {
+            size: snowlark_paint::Size::new(w as f32, h as f32),
+            to_user: transform * Matrix::translate((x, y)),
+            tile: r.b.build(),
+            opacity,
+        })))
     }
 
     /// A text element: its characters (white space collapsed as SVG 2 §11.7.1 says) in runs, one
@@ -1109,11 +1240,61 @@ fn geometry_has_calc(v: &ComputedValues) -> bool {
         || size(&pos.height)
 }
 
-/// A kurbo path as display list path elements (into `out`, cleared first).
+/// Whether `n` is the SVG element `name`.
+fn is_svg(dom: &snowlark_dom::Dom, n: NodeId, name: &str) -> bool {
+    dom.element(n)
+        .is_some_and(|e| e.name().ns == ns!(svg) && &*e.name().local == name)
+}
+
 /// A shape's fill or stroke.
 enum Paint {
     Solid(Color),
     Gradient(Gradient),
+    Pattern(PatternPaint),
+}
+
+impl Paint {
+    /// Paints `area` (user space), under whatever clip or mask is open.
+    fn paint(&self, b: &mut DisplayListBuilder, area: kurbo::Rect) {
+        match self {
+            Paint::Solid(c) => b.fill_rect(rect_of(area), *c),
+            Paint::Gradient(g) => g.paint(b, area),
+            Paint::Pattern(p) => p.paint(b, area),
+        }
+    }
+}
+
+/// A pattern's tile (SVG 2 §14.3): its content recorded in the tile's space, a tile of `size`,
+/// which `to_user` places in the user space of the shape it paints (the tile's offset, then
+/// `patternTransform`).
+struct PatternPaint {
+    size: snowlark_paint::Size,
+    to_user: Matrix,
+    tile: DisplayList,
+    opacity: f32,
+}
+
+impl PatternPaint {
+    /// Fills `area` (user space) with the tiles, under whatever clip or mask is open.
+    fn paint(&self, b: &mut DisplayListBuilder, area: kurbo::Rect) {
+        if self.opacity <= 0.0 {
+            return;
+        }
+        let rect = rect_of(area);
+        let translucent = self.opacity < 1.0;
+        if translucent {
+            b.push_opacity(self.opacity, rect);
+        }
+        b.fill_pattern(
+            rect,
+            self.size,
+            paint_matrix(&self.to_user),
+            self.tile.clone(),
+        );
+        if translucent {
+            b.pop_opacity();
+        }
+    }
 }
 
 /// A linear or radial gradient (SVG 2 §14.2) in its own space, which `to_user` maps to the user

@@ -1,6 +1,6 @@
 # Inline SVG painted from the DOM
 
-Status: step 1 done 2026-11-16; presentation attributes parsed one by one 2026-11-17; `d` parsed once, clip paths of any shapes and linear and radial gradients 2026-11-17; patterns, focal points, markers, `pathLength` and steps 4-6 open.
+Status: step 1 done 2026-11-16; presentation attributes parsed one by one 2026-11-17; `d` parsed once, clip paths of any shapes and linear and radial gradients 2026-11-17; patterns 2026-11-22; focal points, markers, `pathLength` and steps 4-6 open.
 
 ## Where we are
 
@@ -51,7 +51,7 @@ iteration on the complex-DOM pages' icons before recordings were shared).
 | Basic shapes, `path`, `g`, `a`, opacity, visibility, `display`, conditional processing | `svg_paint::Recorder` | done |
 | `text`, `tspan` with one position per element | `svg_paint::Recorder::text` | done; per-character positions, decoration, stroke, baselines later (step 4) |
 | Clip paths (`write_referenced`, `style_reference`) | shapes under their transforms, the `clipPath`'s transform and units: one as a path clip (a rectangle along the axes as a clip rectangle), several as an alpha mask | done; `text` and `use` in a clip path, and a clip path's own `clip-path`, fall back |
-| Paint servers: gradients, patterns (`write_referenced`, `write_resources`) | linear and radial gradients (`Gradient`): the fill's path as a clip, the stroke as a mask, under the gradient's units and transform | done; patterns ("paint server", the Guardian's audio waveform) and radial focal points ("gradient focal point") fall back: patterns as a recorded tile |
+| Paint servers: gradients, patterns (`write_referenced`, `write_resources`) | linear and radial gradients (`Gradient`): the fill's path as a clip, the stroke as a mask, under the gradient's units and transform | done: patterns as a recorded tile (`Item::FillPattern`: the tile's own list beside the list, repeated by the raster side through an image brush at device pixels); a pattern inside a pattern's tile ("pattern in a pattern") and radial focal points ("gradient focal point") fall back |
 | Markers (`marker_path`, `marker_instances`) | falls back ("markers") | step 3: vertices from the parsed path, the marker's content recorded as a container per vertex |
 | `use` and its instance ids (`use_reference`, `prefix`, `prefixed_refs`, `write_instances`) | falls back ("use") | step 5: record the referenced content under the `use`'s transform; instance styling needs the shadow tree's cascade (the DOM already builds a `use` shadow tree: `inline_svg.rs` reads `dom.shadow_root(el)`) |
 | External resources: `use` of another document, `url()` of another document (`External`, `svg_resource.rs`) | falls back | after step 5; the fetches stay where they are (see step 1) |

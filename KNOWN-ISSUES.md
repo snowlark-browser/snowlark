@@ -166,9 +166,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Inline SVG painting.** Inline SVG is still drawn through a serialize-and-rasterize path. `foreignObject`,
   `vector-effect`, text beyond what the rasterizer supports (`inline-size`, `shape-inside`, `textLength` on lists),
   percentage dashes and `context-fill` corners are not supported. (ref 67)
-- **Animated inline SVG with patterns.** An inline `svg` that fills with a `<pattern>` is rasterized whole again
-  each time it changes, on the page's thread: a large one that animates every frame slows the whole page and
-  its scrolling. (ref 643)
+- **Patterns inside patterns.** An inline `svg` whose `<pattern>` tile itself uses a pattern is rasterized whole
+  again each time it changes, on the page's thread: a large one that animates every frame slows the page.
 - **SVG DOM details.** `:target` inside a resource document, SMIL animation of `d` where path arithmetic differs,
   focus inside hidden SVG containers, `getScreenCTM()` through CSS transforms of HTML ancestors,
   `attributeStyleMap` on SVG elements, and listeners added to an original that should reach its `<use>` instances are
