@@ -27,6 +27,8 @@ mod hang_ui;
 mod history_ui;
 pub mod incognito;
 pub(crate) mod node_menu;
+mod passwords_page_ui;
+mod passwords_ui;
 mod popup_window;
 mod restore_ui;
 pub(crate) mod settings_ui;
@@ -254,6 +256,10 @@ pub struct Browser {
     /// The download folder chosen in the folder picker the settings' Change button opened (on a
     /// thread of its own), until the window takes it.
     picked_download_dir: Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
+    /// The OS's answer to the confirmation a Reveal on the passwords page asked for (on a thread
+    /// of its own): the login it was for and how it ended, until the window takes it.
+    password_verification:
+        Arc<std::sync::Mutex<Option<(u64, snowlark_paint::window::UserVerification)>>>,
     /// What the toolbar's downloads button showed last ([`downloads_ui::DownloadsButton`]).
     downloads_button: Option<crate::chrome::DownloadsButton>,
     profile: Profile,
@@ -380,6 +386,15 @@ pub struct Browser {
     /// The session of an unexpected exit, offered by `restore_bubble`.
     offer: Option<crate::restore::SessionFile>,
     restore_bubble: Option<crate::restore_bubble::RestoreBubble>,
+    /// The password manager's save or update prompt, with the login it offers (`passwords_ui`).
+    password_bubble: Option<(
+        crate::password_bubble::PasswordBubble,
+        crate::passwords::PendingLogin,
+    )>,
+    /// Submitted logins waiting for the next page of their tab.
+    pending_logins: Vec<(TabId, crate::passwords::PendingLogin)>,
+    /// The saved passwords (`None` in an Incognito window: it neither saves nor fills).
+    passwords: Option<Arc<std::sync::Mutex<crate::passwords::PasswordStore>>>,
     /// The updates' prompt (`update_ui`).
     update_bubble: Option<crate::update_bubble::UpdateBubble>,
     /// The browser's own fullscreen (F11) and a page's.
@@ -456,6 +471,10 @@ impl Browser {
             // (the regular windows' one list; an Incognito window's files are kept, its list of
             // them only while it is open)
             downloads: app.downloads(off_the_record),
+            passwords: app.passwords(off_the_record),
+            passwords_revealed: Vec::new(),
+            passwords_verified_ms: None,
+            passwords_notice: None,
             off_the_record,
         }));
         // (content blocking: the windows' one, `App::new`)
@@ -500,10 +519,10 @@ impl Browser {
             // were when it opened, and keeps its own changes in memory)
             bookmarks = bookmarks.snapshot();
         }
-        let downloads = {
+        let (downloads, passwords) = {
             let mut st = internal.lock().unwrap_or_else(|e| e.into_inner());
             st.bookmarks = bookmarks.snapshot();
-            st.downloads.clone()
+            (st.downloads.clone(), st.passwords.clone())
         };
         window.set_dark_frame(dark || off_the_record);
         let dock = Dock::from_name(&settings.devtools_dock);
@@ -536,6 +555,7 @@ impl Browser {
             history,
             downloads,
             picked_download_dir: Arc::default(),
+            password_verification: Arc::default(),
             downloads_button: None,
             profile: profile.clone(),
             settings,
@@ -610,6 +630,9 @@ impl Browser {
             placed: None,
             offer: None,
             restore_bubble: None,
+            password_bubble: None,
+            pending_logins: Vec::new(),
+            passwords,
             update_bubble: None,
             fullscreen: Default::default(),
             internal,
@@ -1304,6 +1327,7 @@ impl Browser {
         if let Some(b) = &mut self.restore_bubble {
             b.place(area);
         }
+        self.place_password_bubble(area);
         if let Some(b) = &mut self.update_bubble {
             b.place(area, &self.fonts);
         }
@@ -1402,6 +1426,7 @@ impl Browser {
                         self.exit_tab_fullscreen(window);
                     }
                     self.tabs.get_mut(i).unwrap().tab.committed(url, scroll);
+                    self.password_committed(id);
                     self.chrome_dirty = true;
                 }
                 TabEvent::DocumentUrl { url, navigation } => {
@@ -1440,6 +1465,7 @@ impl Browser {
                     self.chrome_dirty = true;
                 }
                 TabEvent::Fullscreen(on) => self.tab_asks_fullscreen(window, id, on),
+                TabEvent::Passwords(e) => self.tab_passwords(i, id, e),
                 TabEvent::Traverse(steps) => {
                     let tab = &mut self.tabs.get_mut(i).unwrap().tab;
                     tab.go(steps);
@@ -1566,6 +1592,9 @@ impl Browser {
                 }
                 TabEvent::Internal(crate::driver::InternalRequest::Downloads(q)) => {
                     self.apply_downloads(window, &q)
+                }
+                TabEvent::Internal(crate::driver::InternalRequest::Passwords(q)) => {
+                    self.apply_passwords(window, &q)
                 }
                 TabEvent::Crashed(message) => {
                     if self.autoscroll.is_some_and(|s| s.tab == id) {
@@ -1821,6 +1850,7 @@ impl Browser {
             m.paint(&mut b, &self.fonts, &theme);
         }
         self.paint_restore_bubble(&mut b, &theme);
+        self.paint_password_bubble(&mut b, &theme);
         self.paint_update_bubble(&mut b, &theme);
         self.paint_fullscreen_bubble(&mut b);
         if let Some(c) = &self.tab_card {
@@ -1913,6 +1943,7 @@ impl Browser {
             || self.site_info_move(p)
             || self.blocker_panel_move(p)
             || self.restore_bubble_move(p)
+            || self.password_bubble_move(p)
             || self.update_bubble_move(p)
             || self.task_manager_move(p)
         {
@@ -2127,6 +2158,9 @@ impl Browser {
             return;
         }
         if self.restore_bubble_press(cp) {
+            return;
+        }
+        if self.password_bubble_press(cp) {
             return;
         }
         if self.update_bubble_press(window, cp) {
@@ -3020,6 +3054,7 @@ impl WindowHandler for Browser {
                 // (another regular window may have changed the settings or the bookmarks)
                 self.take_shared(window);
                 self.take_picked_download_dir();
+                self.take_password_verification();
                 self.drain_tab_events(window);
                 if self.current.is_none() {
                     // (chosen in the tools' window's menus)

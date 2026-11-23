@@ -176,6 +176,9 @@ pub struct Settings {
     pub clear_cache: bool,
     #[serde(default = "yes")]
     pub clear_downloads: bool,
+    /// Delete browsing data: the saved passwords (off until the user checks it).
+    #[serde(default)]
+    pub clear_passwords: bool,
     /// Check for new versions of the browser (`crate::update`): unset until the user answers the
     /// question the window asks on its first start, and off until then.
     pub update_check: Option<bool>,
@@ -210,6 +213,7 @@ impl Default for Settings {
             clear_cookies: true,
             clear_cache: true,
             clear_downloads: true,
+            clear_passwords: false,
             update_check: None,
             download_dir: None,
             download_ask: false,

@@ -1085,6 +1085,11 @@ impl TabHost {
         self.session.len()
     }
 
+    /// The site the tab's renderer is locked to (`None`: none yet).
+    pub fn site(&self) -> Option<&str> {
+        self.site.as_deref()
+    }
+
     /// The current entry's URL.
     pub fn current_url(&self) -> Option<&Url> {
         self.session.current().map(|e| &e.url)

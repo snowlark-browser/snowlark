@@ -166,6 +166,11 @@ impl Profile {
         self.dir.join("downloads.json")
     }
 
+    /// The saved passwords ([`crate::passwords`]).
+    pub fn passwords_file(&self) -> PathBuf {
+        self.dir.join("passwords.json")
+    }
+
     /// Where the minidumps of crashed renderer processes go (`snowlark_ipc::Launch::crash_dumps`); Chrome
     /// keeps its crash reports in the profile's `Crashpad/reports` folder.
     pub fn crash_dumps_dir(&self) -> PathBuf {

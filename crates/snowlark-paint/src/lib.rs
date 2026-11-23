@@ -43,6 +43,7 @@ pub mod image;
 mod ink;
 pub mod input;
 pub mod layer_animation;
+pub mod os_crypt;
 pub mod pdf;
 pub mod placement;
 pub mod raster;

@@ -183,6 +183,9 @@ drives it over a WPT checkout, summarises the results per spec area and compares
 M0 to M5 are done. Process isolation (renderer, GPU and network processes, a sandbox) is under way:
 `docs/process-isolation.md`. How performance is measured, and current numbers: `docs/benchmarks.md`.
 
+A password manager (saving and filling logins, an encrypted store, `snowlark://passwords`) is built in four
+stages: `docs/password-manager.md`.
+
 Planned after the Windows build is complete: **Linux**. Snowlark runs only on Windows today; the platform parts
 (painting and text, GPU compositing, media decoding, the window and input, the process sandbox, the OS calls in
 `snowlark-shell`) each need a Linux counterpart behind the same interfaces, so that the engine crates stay

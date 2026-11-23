@@ -167,6 +167,7 @@ impl Engine {
         }
         for d in windows {
             self.close_watchers_note_activation(d);
+            self.password_fields_activated(d);
         }
     }
 

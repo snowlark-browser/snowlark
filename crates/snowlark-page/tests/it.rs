@@ -73,6 +73,7 @@ mod net_apis;
 mod opener_policy;
 mod page;
 mod page_reachable_panics;
+mod password_forms;
 mod picker_activation;
 mod pointer_boundary;
 mod pointer_capture;

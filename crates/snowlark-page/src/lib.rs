@@ -48,6 +48,7 @@ pub mod keyboard;
 mod loader;
 pub mod media;
 mod page;
+pub mod passwords;
 pub mod popup;
 pub mod profile;
 mod refresh;

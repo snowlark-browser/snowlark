@@ -155,6 +155,8 @@ pub struct App {
     pub(super) closed: Rc<RefCell<Vec<String>>>,
     /// The regular profile's downloads, loaded when its first window opens.
     downloads: RefCell<Option<Arc<std::sync::Mutex<crate::downloads::DownloadHistory>>>>,
+    /// The saved passwords, loaded by the first regular window.
+    passwords: RefCell<Option<Arc<std::sync::Mutex<crate::passwords::PasswordStore>>>>,
     /// The process's session file, which every regular window keeps its part of; opened by the
     /// first regular window.
     session: RefCell<Option<Store>>,
@@ -253,6 +255,7 @@ impl App {
             shared: RefCell::default(),
             closed: Rc::default(),
             downloads: RefCell::default(),
+            passwords: RefCell::default(),
             session: RefCell::default(),
             next_window: Cell::new(1),
             restart_session: RefCell::default(),
@@ -327,6 +330,30 @@ impl App {
         for (_, proxy) in regular.iter().chain(incognito.iter()) {
             proxy.wake();
         }
+    }
+
+    /// The saved passwords a new window uses: the profile's, or none for an Incognito window
+    /// (it neither saves nor fills: `docs/password-manager.md`).
+    pub(super) fn passwords(
+        &self,
+        off_the_record: bool,
+    ) -> Option<Arc<std::sync::Mutex<crate::passwords::PasswordStore>>> {
+        if off_the_record {
+            return None;
+        }
+        Some(
+            self.passwords
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    Arc::new(std::sync::Mutex::new(
+                        crate::passwords::PasswordStore::load(
+                            &self.profile.passwords_file(),
+                            Box::new(crate::passwords::Dpapi),
+                        ),
+                    ))
+                })
+                .clone(),
+        )
     }
 
     /// The downloads list a new window shows: the regular profile's one, or an Incognito

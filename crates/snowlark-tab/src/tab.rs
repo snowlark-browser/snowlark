@@ -104,6 +104,9 @@ pub enum TabCommand {
     /// The window shows the tab fullscreen now, or no longer (the Fullscreen API): the answer to
     /// a [`TabEvent::Fullscreen`], sent after the tab's new [`Device`], or the user's own exit.
     Fullscreen(bool),
+    /// The browser's password manager fills a saved login into the page (its values hidden from
+    /// script until the user activates the page).
+    FillPassword(snowlark_page::passwords::PasswordFill),
     /// The browser's answer to [`TabEvent::OpenWindow`]: it shows the page's window `window` as
     /// its tab `tab`, laid out in `device`. The renderer serves that tab as a view of this tab's
     /// page (its events go up as `tab`'s), and the browser sends the tab's commands here as
@@ -262,6 +265,8 @@ pub enum TabEvent {
     Traverse(isize),
     /// The page asks the window to show it fullscreen (`true`) or to leave fullscreen.
     Fullscreen(bool),
+    /// The top-level document's login forms, for the browser's password manager (`docs/password-manager.md`).
+    Passwords(snowlark_page::passwords::PasswordEvent),
     /// The browser's own: the response of the navigation numbered so has its head (or failed),
     /// for the tab's host to decide on. Never a renderer's: one that sends it dies.
     NavigationReady(u64),
@@ -1520,6 +1525,7 @@ impl TabRenderer {
             TabCommand::ClearSiteData(site) => self.driver.clear_site_data(site.as_deref()),
             TabCommand::ContextMenu(at) => self.driver.context_menu_at(at),
             TabCommand::Fullscreen(on) => self.driver.fullscreen(on),
+            TabCommand::FillPassword(fill) => self.driver.fill_password(&fill),
             TabCommand::ColorScheme(dark) => {
                 self.driver.set_color_scheme(dark);
                 self.needs_paint = true;
@@ -1647,6 +1653,7 @@ impl TabRenderer {
             | TabCommand::Stop
             | TabCommand::Devtools(_)
             | TabCommand::Fullscreen(_)
+            | TabCommand::FillPassword(_)
             | TabCommand::ClearSiteData(_)
             | TabCommand::ColorScheme(_)
             | TabCommand::Wake
@@ -1826,6 +1833,9 @@ impl TabRenderer {
         }
         for on in self.driver.take_fullscreen_asks() {
             self.event(TabEvent::Fullscreen(on));
+        }
+        for e in self.driver.take_password_events() {
+            self.event(TabEvent::Passwords(e));
         }
         for e in self.driver.take_devtools() {
             self.event(TabEvent::Devtools(Box::new(e)));

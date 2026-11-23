@@ -57,6 +57,9 @@ pub const RENDERER_QUOTA: u64 = 256 << 20;
 pub const CONNECT_WAIT: Duration = Duration::from_secs(20);
 /// The largest favicon a renderer may send, each way (px).
 pub const MAX_ICON: u32 = 4096;
+/// The most login forms, and fields in one, a password form report may hold.
+pub const MAX_PASSWORD_FORMS: usize = 64;
+pub const MAX_PASSWORD_FIELDS: usize = 512;
 
 /// The tab's messages from the browser to its renderer.
 #[derive(Debug, Serialize, Deserialize)]
@@ -767,6 +770,7 @@ pub(crate) fn check_event(
         | TabEvent::BeginNavigation(_)
         | TabEvent::Traverse(_)
         | TabEvent::Fullscreen(_)
+        | TabEvent::Passwords(_)
         | TabEvent::Devtools(_) = event
         {
             return Err(format!("a page's own event from view tab {of}"));
@@ -776,6 +780,18 @@ pub(crate) fn check_event(
         let side = |v: f32| v.is_finite() && (0.0..=crate::tab::MAX_WINDOW_SIDE).contains(&v);
         if !side(size.0) || !side(size.1) {
             return Err(format!("a window of {size:?}"));
+        }
+    }
+    if let TabEvent::Passwords(p) = event {
+        use snowlark_page::passwords::PasswordEvent;
+        let forms = match p {
+            PasswordEvent::Submitted(f) => std::slice::from_ref(f),
+            PasswordEvent::Rendered(v) => v.as_slice(),
+        };
+        if forms.len() > MAX_PASSWORD_FORMS
+            || forms.iter().any(|f| f.fields.len() > MAX_PASSWORD_FIELDS)
+        {
+            return Err(format!("a password form report of {} forms", forms.len()));
         }
     }
     if let TabEvent::Favicon(icon, _) = event {

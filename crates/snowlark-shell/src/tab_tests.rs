@@ -2834,3 +2834,135 @@ fn a_tab_serves_the_windows_its_page_opens_as_views() {
     }
     panic!("the tab's thread goes on with no view left");
 }
+
+// ----- The password manager ------------------------------------------------------------------------
+
+/// Save then fill on a local page: the page reports a login form's submission, the next page's
+/// report (no login form) makes it a successful login, which is saved; the login page loaded again
+/// reports its form, the browser's choice fills it, and the page's script sees the values only
+/// after a click.
+#[test]
+fn a_login_saved_after_its_submission_fills_the_form_again() {
+    use crate::passwords::*;
+    use snowlark_page::passwords::PasswordEvent;
+    const LOGIN: &str = "<!doctype html><title>login</title>\
+        <style>body{margin:0}button{display:block;width:100px;height:40px}</style>\
+        <button id=b type=button onclick=\"u.value='alice';p.value='pw1';f.requestSubmit()\">go</button>\
+        <form id=f action=/welcome method=post><input id=u name=user><input id=p name=pass type=password></form>\
+        <script>onload=()=>setInterval(()=>{document.title='v:'+u.value+'|'+p.value},20)</script>";
+    let (ctx, _net, rx, _comp_rx) = remote_context();
+    let origin = serve_html(vec![
+        ("/login", LOGIN),
+        ("/welcome", "<!doctype html><title>welcome</title>signed in"),
+    ]);
+    let login = Url::parse(&format!("{origin}/login")).unwrap();
+    let mut tab = spawn(
+        1,
+        ctx,
+        DEVICE,
+        login.clone(),
+        crate::page_driver::PageDriver::factory(),
+    );
+    // (what the window does with a tab's events, keeping the password reports)
+    let mut reports: Vec<PasswordEvent> = Vec::new();
+    let hear_until = |tab: &mut TabHost, title: &str, reports: &mut Vec<PasswordEvent>| {
+        let deadline = Instant::now() + std::time::Duration::from_secs(20);
+        while tab.state.title != title {
+            let left = deadline.saturating_duration_since(Instant::now());
+            match rx.recv_timeout(left) {
+                Ok((_, TabEvent::Passwords(p))) => reports.push(p),
+                Ok((_, e)) => drive(tab, &e),
+                Err(e) => panic!("no title {title:?} (it is {:?}): {e}", tab.state.title),
+            }
+        }
+    };
+    let click = |tab: &TabHost, at: Point| {
+        tab.send(TabCommand::Pointer(Pointer::Down(
+            at,
+            snowlark_paint::input::MouseButton::Left,
+            Default::default(),
+            1,
+        )));
+        tab.send(TabCommand::Pointer(Pointer::Up(
+            at,
+            snowlark_paint::input::MouseButton::Left,
+            Default::default(),
+        )));
+    };
+    let page_origin_of =
+        |tab: &TabHost| page_origin(tab.current_url().unwrap(), tab.site()).unwrap();
+    let mut store = PasswordStore::in_memory(Box::new(Dpapi));
+
+    hear_until(&mut tab, "v:|", &mut reports);
+    let o = page_origin_of(&tab);
+    assert_eq!(o, origin);
+    click(&tab, Point::new(10.0, 10.0));
+    hear_until(&mut tab, "welcome", &mut reports);
+    let submitted = reports
+        .iter()
+        .find_map(|r| match r {
+            PasswordEvent::Submitted(f) => Some(f.clone()),
+            _ => None,
+        })
+        .expect("the submission was reported");
+    let mut pending = pending_login(&o, &submitted).unwrap();
+    assert_eq!(
+        (pending.username.as_str(), pending.password.as_str()),
+        ("alice", "pw1")
+    );
+    pending.committed = true;
+    // The welcome page's report: no login form, so the login worked.
+    let deadline = Instant::now() + std::time::Duration::from_secs(20);
+    let after = loop {
+        if let Some(PasswordEvent::Rendered(f)) = reports
+            .iter()
+            .rev()
+            .find(|r| matches!(r, PasswordEvent::Rendered(_)))
+        {
+            if tab.state.title == "welcome" && reports.len() >= 3 {
+                break f.clone();
+            }
+        }
+        match rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+            Ok((_, TabEvent::Passwords(p))) => reports.push(p),
+            Ok((_, e)) => drive(&mut tab, &e),
+            Err(e) => panic!("no report from the welcome page: {e}"),
+        }
+    };
+    assert!(after.is_empty());
+    assert!(!login_failed(&pending, &after));
+    assert_eq!(store.offer(&o, "alice", "pw1"), Offer::Save);
+    store.save_login(
+        &o,
+        &pending.username,
+        &pending.username_element,
+        &pending.password_element,
+        &pending.password,
+    );
+
+    // The login page again: its report gets the saved login, hidden from script until a click.
+    reports.clear();
+    tab.navigate(login);
+    hear_until(&mut tab, "v:|", &mut reports);
+    let deadline = Instant::now() + std::time::Duration::from_secs(20);
+    let forms = loop {
+        if let Some(PasswordEvent::Rendered(f)) = reports.last() {
+            break f.clone();
+        }
+        match rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+            Ok((_, TabEvent::Passwords(p))) => reports.push(p),
+            Ok((_, e)) => drive(&mut tab, &e),
+            Err(e) => panic!("no report from the login page: {e}"),
+        }
+    };
+    let (_, fill) = choose_fill(&mut store, &page_origin_of(&tab), &forms).expect("a fill");
+    tab.send(TabCommand::FillPassword(fill));
+    // (the page's script polls the values for 400 ms: they stay hidden)
+    let until = Instant::now() + std::time::Duration::from_millis(400);
+    while let Ok((_, e)) = rx.recv_timeout(until.saturating_duration_since(Instant::now())) {
+        drive(&mut tab, &e);
+    }
+    assert_eq!(tab.state.title, "v:|");
+    click(&tab, Point::new(400.0, 300.0));
+    hear_until(&mut tab, "v:alice|pw1", &mut reports);
+}

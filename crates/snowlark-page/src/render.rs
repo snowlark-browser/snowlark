@@ -1595,7 +1595,9 @@ impl Engine {
             state.indeterminate = self.indeterminate(el);
             return Some(state);
         }
-        if self.ctl(el, |c| c.value.is_some()) {
+        if let Some(s) = self.ctl_read(el, |c| c.suggested.clone()) {
+            state.value = Some(s);
+        } else if self.ctl(el, |c| c.value.is_some()) {
             state.value = Some(self.editor_value(el));
         }
         if self.focused_element(doc) == Some(el) && self.is_text_control(el) {

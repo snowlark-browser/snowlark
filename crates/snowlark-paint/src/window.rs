@@ -1128,6 +1128,59 @@ pub fn pick_folder_dialog(
     }
 }
 
+/// How asking the OS to confirm the user ended ([`verify_user`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UserVerification {
+    Verified,
+    /// The user canceled, or the check failed.
+    Refused,
+    /// Windows Hello is not set up for this user on this device.
+    Unavailable,
+}
+
+/// Asks Windows Hello to confirm the signed-in user (face, fingerprint or PIN), in a prompt owned
+/// by `owner` that shows `message`. Blocks until it closes, so it runs off the window's thread
+/// (it sets up COM for its own). The browser never sees what the user entered.
+pub fn verify_user(owner: WindowHandle, message: &str) -> UserVerification {
+    use windows::Security::Credentials::UI::{
+        UserConsentVerificationResult, UserConsentVerifier, UserConsentVerifierAvailability,
+    };
+    use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
+    use windows::Win32::System::WinRT::IUserConsentVerifierInterop;
+    // SAFETY: COM is set up for this thread for the prompt's sake and balanced below when that
+    // succeeded; the WinRT objects are released inside the closure, before that. The owner is the
+    // browser's window, alive while it waits on this thread.
+    unsafe {
+        let com = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
+        let outcome = (|| {
+            let available = UserConsentVerifier::CheckAvailabilityAsync()
+                .and_then(|op| op.join())
+                .ok();
+            if available != Some(UserConsentVerifierAvailability::Available) {
+                return UserVerification::Unavailable;
+            }
+            let Ok(interop) =
+                windows::core::factory::<UserConsentVerifier, IUserConsentVerifierInterop>()
+            else {
+                return UserVerification::Unavailable;
+            };
+            let result = interop
+                .RequestVerificationForWindowAsync::<
+                    windows_future::IAsyncOperation<UserConsentVerificationResult>,
+                >(owner.hwnd(), &windows::core::HSTRING::from(message))
+                .and_then(|op| op.join());
+            match result {
+                Ok(UserConsentVerificationResult::Verified) => UserVerification::Verified,
+                _ => UserVerification::Refused,
+            }
+        })();
+        if com {
+            CoUninitialize();
+        }
+        outcome
+    }
+}
+
 /// Asks where to save a file with the system's Save As dialog, owned by `owner`, offering
 /// `suggested` as the name and `filters` as (description, patterns) pairs ("PNG image",
 /// "*.png"), in the folder `dir` (the system's choice when `None`). Blocks until the dialog

@@ -223,7 +223,7 @@ impl Browser {
         }
     }
 
-    fn send_to_tab(&self, tab: TabId, c: TabCommand) {
+    pub(super) fn send_to_tab(&self, tab: TabId, c: TabCommand) {
         if let Some(e) = self
             .tabs
             .iter()

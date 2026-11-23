@@ -90,6 +90,8 @@ pub enum InternalKind {
     Bookmarks,
     /// The downloads page.
     Downloads,
+    /// The saved passwords page.
+    Passwords,
     /// Not one of those (an address the browser has no page at, or another scheme).
     Other,
 }
@@ -192,6 +194,9 @@ pub enum InternalRequest {
     /// What the downloads page asks for (its query): open a file, show it in its folder, copy its
     /// link, remove it from the list, cancel or retry it, clear the list, undo a removal.
     Downloads(String),
+    /// What the passwords page asks for (its query): reveal or delete a login, take a site off the
+    /// Never list.
+    Passwords(String),
 }
 
 /// What a driver gets when its tab starts.
@@ -663,6 +668,14 @@ pub trait TabDriver {
     /// The window shows the page fullscreen now (`true`), or no longer: its answer to an ask, or
     /// the user's own exit.
     fn fullscreen(&mut self, _on: bool) {}
+
+    /// What the page reported for the browser's password manager since the last call.
+    fn take_password_events(&mut self) -> Vec<snowlark_page::passwords::PasswordEvent> {
+        Vec::new()
+    }
+
+    /// Fills a saved login the browser's password manager chose.
+    fn fill_password(&mut self, _fill: &snowlark_page::passwords::PasswordFill) {}
 
     /// Scrolls a scroll container by `delta`; whether it moved.
     fn scroll_container(&mut self, node: NodeId, delta: Point) -> bool;

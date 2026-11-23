@@ -46,6 +46,7 @@ impl Browser {
                     local_storage: &self.partition.local_storage,
                     code_cache: self.code_cache.as_deref(),
                     downloads: &self.downloads,
+                    passwords: self.passwords.as_deref(),
                 },
                 choice,
                 now,

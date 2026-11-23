@@ -29,6 +29,15 @@ pub struct InternalState {
     pub bookmark_toast: Option<(String, i64)>,
     /// The profile's downloads, for the downloads page (the same store the window records in).
     pub downloads: Arc<Mutex<crate::downloads::DownloadHistory>>,
+    /// The saved passwords, for the passwords page (`None` in an Incognito window).
+    pub passwords: Option<Arc<Mutex<crate::passwords::PasswordStore>>>,
+    /// The logins whose passwords the passwords page shows (the user revealed them), while the
+    /// confirmation by the OS at `passwords_verified_ms` is recent enough
+    /// (`passwords_page::REVEAL_WINDOW_MS`).
+    pub passwords_revealed: Vec<u64>,
+    pub passwords_verified_ms: Option<i64>,
+    /// A line at the top of the passwords page (why a reveal did not happen).
+    pub passwords_notice: Option<String>,
     /// An Incognito window's pages: its new tab page is the Incognito one.
     pub off_the_record: bool,
 }
@@ -70,6 +79,8 @@ impl BrowserPages {
             InternalKind::Bookmarks
         } else if crate::downloads_page::is_downloads_url(url) {
             InternalKind::Downloads
+        } else if crate::passwords_page::is_passwords_url(url) {
+            InternalKind::Passwords
         } else {
             InternalKind::Other
         }
@@ -98,6 +109,7 @@ impl BrowserPages {
             InternalKind::History => crate::history_page::shown_url(url),
             InternalKind::Bookmarks => crate::bookmarks_page::shown_url(url),
             InternalKind::Downloads => crate::downloads_page::shown_url(url),
+            InternalKind::Passwords => crate::passwords_page::shown_url(url),
             InternalKind::Other => url.clone(),
         };
         let html = match Self::kind_of(&shown) {
@@ -143,6 +155,34 @@ impl BrowserPages {
                     now_ms(),
                     &window::local_offset_ms,
                     &|p| p.is_file(),
+                ))
+            }
+            InternalKind::Passwords => {
+                let (dark, store, revealed, notice) = {
+                    let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+                    let fresh = st
+                        .passwords_verified_ms
+                        .is_some_and(|at| now_ms() - at < crate::passwords_page::REVEAL_WINDOW_MS);
+                    (
+                        st.dark,
+                        st.passwords.clone(),
+                        if fresh {
+                            st.passwords_revealed.clone()
+                        } else {
+                            Vec::new()
+                        },
+                        st.passwords_notice.clone(),
+                    )
+                };
+                let mut guard = store
+                    .as_ref()
+                    .map(|s| s.lock().unwrap_or_else(|e| e.into_inner()));
+                Some(crate::passwords_page::passwords_html(
+                    guard.as_deref_mut(),
+                    &revealed,
+                    notice.as_deref(),
+                    &crate::passwords_page::query_of(&shown),
+                    dark,
                 ))
             }
             InternalKind::Settings | InternalKind::About => {
@@ -241,6 +281,7 @@ impl Browser {
                 || e.tab.state.url.starts_with("snowlark://history")
                 || e.tab.state.url.starts_with("snowlark://bookmarks")
                 || e.tab.state.url.starts_with("snowlark://downloads")
+                || e.tab.state.url.starts_with("snowlark://passwords")
             {
                 e.tab.reload();
             }
@@ -430,6 +471,11 @@ mod tests {
         assert_eq!(kind("snowlark://settings/help"), InternalKind::About);
         assert_eq!(kind("snowlark://credits/"), InternalKind::Credits);
         assert_eq!(kind("snowlark://history/?q=a"), InternalKind::History);
+        assert_eq!(kind("snowlark://passwords/?q=a"), InternalKind::Passwords);
+        let (shown, html) = page("snowlark://passwords/apply?op=delete&id=1&q=a");
+        assert_eq!(shown, "snowlark://passwords/?q=a");
+        // (no saved passwords in this state: the Incognito wording)
+        assert!(html.is_some_and(|h| h.contains("<title>Passwords</title>")));
         let (shown, html) = page("snowlark://settings/clearBrowserData");
         assert_eq!(shown, "snowlark://settings/clearBrowserData");
         assert!(html.is_some_and(|h| h.contains("id=cbd ")));
@@ -1033,13 +1079,16 @@ mod tests {
                 &mut d,
                 &format!("{boxes}.map(b => b.name + ':' + b.checked).join()")
             ),
-            "history:true,downloads:true,cookies:true,cache:true"
+            "history:true,downloads:true,passwords:false,cookies:true,cache:true"
         );
         assert_eq!(
             eval(&mut d, "document.querySelector('#cbd select').value"),
             "hour"
         );
-        eval(&mut d, &format!("{boxes}.forEach(b => b.click())"));
+        eval(
+            &mut d,
+            &format!("{boxes}.filter(b => b.checked).forEach(b => b.click())"),
+        );
         assert_eq!(
             eval(&mut d, "document.getElementById('cbd-delete').disabled"),
             "true"
@@ -1075,6 +1124,7 @@ mod tests {
                 cookies: true,
                 cache: false,
                 downloads: false,
+                passwords: false,
             })
         );
     }

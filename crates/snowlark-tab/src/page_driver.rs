@@ -247,6 +247,8 @@ impl PageDriver {
             broadcast: Some(ctx.broadcast.clone()),
             web_storage: Some(ctx.web_storage.clone()),
             idb: Some(ctx.idb.clone()),
+            // (the window's tabs: the browser's password manager)
+            password_forms: true,
             ..Default::default()
         });
         // The page's network and timer wake-ups wake the tab's thread too.
@@ -492,6 +494,14 @@ impl PageDriver {
             let downloads = |u: &Url| self.ctx.internal.kind(u) == InternalKind::Downloads;
             if from.as_ref().is_some_and(downloads) && downloads(&url) && url.path() == "/apply" {
                 self.internal_requests.push(InternalRequest::Downloads(
+                    url.query().unwrap_or("").to_owned(),
+                ));
+                continue;
+            }
+            // (and the passwords page's, to act on a login or the Never list)
+            let passwords = |u: &Url| self.ctx.internal.kind(u) == InternalKind::Passwords;
+            if from.as_ref().is_some_and(passwords) && passwords(&url) && url.path() == "/apply" {
+                self.internal_requests.push(InternalRequest::Passwords(
                     url.query().unwrap_or("").to_owned(),
                 ));
                 continue;
@@ -1068,6 +1078,14 @@ impl TabDriver for PageDriver {
 
     fn fullscreen(&mut self, on: bool) {
         self.page.engine().fullscreen_viewport_answer(on);
+    }
+
+    fn take_password_events(&mut self) -> Vec<snowlark_page::passwords::PasswordEvent> {
+        self.page.engine().take_password_events()
+    }
+
+    fn fill_password(&mut self, fill: &snowlark_page::passwords::PasswordFill) {
+        self.page.engine().fill_password(fill);
     }
 
     fn reload(&mut self, url: Url) {
@@ -1687,6 +1705,9 @@ mod tests {
                 Ok(u) if u.scheme() == "snowlark" && u.host_str() == Some("downloads") => {
                     InternalKind::Downloads
                 }
+                Ok(u) if u.scheme() == "snowlark" && u.host_str() == Some("passwords") => {
+                    InternalKind::Passwords
+                }
                 Ok(u) if u.scheme() == "snowlark" && u.host_str() == Some("settings") => {
                     if u.path().trim_end_matches('/') == "/help" {
                         InternalKind::About
@@ -1708,6 +1729,7 @@ mod tests {
                         InternalKind::History => Some("<title>History</title>"),
                         InternalKind::Bookmarks => Some("<title>Bookmarks</title>"),
                         InternalKind::Downloads => Some("<title>Downloads</title>"),
+                        InternalKind::Passwords => Some("<title>Passwords</title>"),
                         InternalKind::Other => None,
                     };
                     InternalAnswer::Page {

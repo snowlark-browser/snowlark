@@ -39,6 +39,10 @@ pub struct PageOptions {
     /// The pointing devices the page sees: the `pointer` and `hover` media features,
     /// `navigator.maxTouchPoints` and whether the legacy touch event APIs are exposed.
     pub input: snowlark_style::InputDevices,
+    /// The browser's password manager's half in the page: report login forms, fill what the
+    /// browser sends (`docs/password-manager.md`). Off by default and in the headless modes, unless
+    /// `SNOWLARK_PASSWORD_FORMS=1` (to show a run with it on observes the same).
+    pub password_forms: bool,
 }
 
 impl Default for PageOptions {
@@ -59,6 +63,7 @@ impl Default for PageOptions {
             idb: None,
             web_storage: None,
             input: snowlark_style::InputDevices::MOUSE,
+            password_forms: std::env::var("SNOWLARK_PASSWORD_FORMS").is_ok_and(|v| v == "1"),
         }
     }
 }
@@ -182,6 +187,7 @@ impl Page {
             h.resource_override = options.resource_override;
         }
         engine.set_content_filter(options.content_filter);
+        engine.set_password_forms(options.password_forms);
         if let Some(service) = options.web_storage {
             engine.set_web_storage(service);
         }

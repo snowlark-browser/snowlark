@@ -44,6 +44,8 @@ pub enum Command {
     History,
     /// The downloads page, in a new tab (or the one showing it).
     Downloads,
+    /// The saved passwords page, in a new tab (or the one showing it).
+    Passwords,
     BookmarkManager,
     Back,
     Forward,
@@ -162,6 +164,7 @@ impl Browser {
             Entry::item("Bookmark manager", Command::BookmarkManager).shortcut("Ctrl+Shift+O"),
             Entry::item("History", Command::History).shortcut("Ctrl+H"),
             Entry::item("Downloads", Command::Downloads).shortcut("Ctrl+J"),
+            Entry::item("Passwords", Command::Passwords),
             Entry::Separator,
             Entry::item("Zoom in", Command::ZoomIn).shortcut("Ctrl++"),
             Entry::item("Zoom out", Command::ZoomOut).shortcut("Ctrl+-"),
@@ -294,6 +297,7 @@ impl Browser {
             Command::Settings => self.open_settings(),
             Command::History => self.open_history(),
             Command::Downloads => self.open_downloads(),
+            Command::Passwords => self.open_passwords(),
             Command::BookmarkManager => self.open_bookmark_manager(),
             Command::About => self.open_about(),
             Command::Back => self.go_active(-1),

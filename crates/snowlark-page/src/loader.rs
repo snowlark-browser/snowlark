@@ -2741,6 +2741,7 @@ impl Engine {
                                 crate::engine::events::EventExt::PageTransition(false),
                             );
                             e.dispatch(cx, ev, w, true);
+                            e.password_forms_loaded(doc);
                         }
                         // "Completely finish loading": the container's load event.
                         if let Some(id) = e.context_of_document(doc) {

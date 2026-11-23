@@ -65,6 +65,7 @@ pub(crate) mod media_capabilities;
 mod node;
 mod notification;
 pub(crate) mod observer;
+mod password_forms;
 pub(crate) mod platform;
 mod pointer_tilt;
 pub(crate) mod policy;
@@ -584,6 +585,8 @@ pub struct Engine {
     /// The focused elements the last rendering update synced (focus leaving a field changes what it
     /// shows).
     pub(crate) controls_focused: RefCell<Vec<NodeId>>,
+    /// The browser's password manager's half in the page (`password_forms`).
+    pub(crate) password_forms: RefCell<password_forms::PasswordForms>,
     /// Elements whose form pseudo-classes (`:valid`, `:in-range`, `:user-invalid`, `:disabled`...)
     /// are to be computed again (`Engine::sync_form_states`).
     /// (Each once: an element on it carries `element_flags::FORM_STATE_MARKED`.)
@@ -749,6 +752,7 @@ impl Engine {
             controls_synced: Cell::new(0),
             controls_resync: Cell::new(true),
             controls_focused: RefCell::default(),
+            password_forms: RefCell::default(),
             form_states_dirty: RefCell::default(),
             form_states_dirty_script: RefCell::default(),
             form_states_dirty_detached: RefCell::default(),

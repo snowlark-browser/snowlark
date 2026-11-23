@@ -27,6 +27,8 @@ features = [
     # The PDF viewer's rasterizer (`pdf`).
     "Data_Pdf",
     "Foundation",
+    # Windows Hello's check before the passwords page reveals a password (`window::verify_user`).
+    "Security_Credentials_UI",
     "Storage_Streams",
     "Win32_Devices_Display",
     "Win32_Foundation",
@@ -59,6 +61,7 @@ features = [
     "Win32_System_Threading",
     # Local time's offset by date (`window::local_offset_ms`).
     "Win32_System_Time",
+    "Win32_System_WinRT",
     "Win32_UI_Controls",
     "Win32_UI_Controls_Dialogs",
     "Win32_UI_HiDpi",
@@ -69,6 +72,8 @@ features = [
     "Win32_UI_Shell_Common",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Security",
+    # The password store's key (`os_crypt`).
+    "Win32_Security_Cryptography",
     "Win32_Storage_FileSystem",
 ]
 

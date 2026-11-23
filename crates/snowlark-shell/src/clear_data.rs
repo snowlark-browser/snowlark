@@ -94,6 +94,8 @@ pub struct Choice {
     pub cache: bool,
     /// The list of downloads (not the files).
     pub downloads: bool,
+    /// The saved passwords.
+    pub passwords: bool,
 }
 
 impl Choice {
@@ -105,6 +107,7 @@ impl Choice {
             cookies: s.clear_cookies,
             cache: s.clear_cache,
             downloads: s.clear_downloads,
+            passwords: s.clear_passwords,
         }
     }
 
@@ -115,6 +118,7 @@ impl Choice {
         s.clear_cookies = self.cookies;
         s.clear_cache = self.cache;
         s.clear_downloads = self.downloads;
+        s.clear_passwords = self.passwords;
     }
 
     /// The dialog's submission (`clearData=1`), or `None` for any other form.
@@ -132,11 +136,12 @@ impl Choice {
             cookies: get("cookies") == Some("1"),
             cache: get("cache") == Some("1"),
             downloads: get("downloads") == Some("1"),
+            passwords: get("passwords") == Some("1"),
         })
     }
 
     pub fn any(self) -> bool {
-        self.history || self.cookies || self.cache || self.downloads
+        self.history || self.cookies || self.cache || self.downloads || self.passwords
     }
 }
 
@@ -176,7 +181,7 @@ pub fn dialog_html(s: &Settings) -> String {
 <form action='{SETTINGS_PAGE}apply' method=get><input type=hidden name=at value=privacy><input type=hidden name=clearData value=1>\
 <h2 id=cbd-title>Delete browsing data</h2>\
 <label class=cbd-period>Time range <select name=period>{periods}</select></label>\
-{history}{downloads}{cookies}{cache}\
+{history}{downloads}{passwords}{cookies}{cache}\
 <div class=cbd-buttons><a id=cbd-cancel class=button href='{SETTINGS_PAGE}privacy'>Cancel</a>\
 <button id=cbd-delete class=action>Delete data</button></div></form></div></div>",
         history = check(
@@ -197,6 +202,12 @@ pub fn dialog_html(s: &Settings) -> String {
             c.downloads,
             "Download history",
             "Deletes the list of downloads; the files stay"
+        ),
+        passwords = check(
+            "passwords",
+            c.passwords,
+            "Passwords",
+            "Deletes the saved passwords from this period"
         ),
     )
 }
@@ -224,6 +235,8 @@ pub struct Stores<'a> {
     pub local_storage: &'a crate::local_storage::LocalStorage,
     pub code_cache: Option<&'a dyn snowlark_js::code_cache::CodeCacheStore>,
     pub downloads: &'a Mutex<crate::downloads::DownloadHistory>,
+    /// The saved passwords (`None` in an Incognito window).
+    pub passwords: Option<&'a Mutex<crate::passwords::PasswordStore>>,
 }
 
 /// Deletes what `choice` names from `now` back to its period's beginning. Session storage lives
@@ -249,6 +262,13 @@ pub fn delete(stores: &Stores, choice: Choice, now: i64) {
             let _ = d.save();
         }
     }
+    if choice.passwords {
+        if let Some(p) = stores.passwords {
+            let mut p = p.lock().unwrap_or_else(|e| e.into_inner());
+            p.delete_between(begin, i64::MAX);
+            let _ = p.save();
+        }
+    }
     if choice.cache {
         stores.net.clear_http_cache(begin, i64::MAX);
         if let Some(c) = stores.code_cache {
@@ -261,6 +281,17 @@ pub fn delete(stores: &Stores, choice: Choice, now: i64) {
 mod tests {
     use super::*;
     use crate::settings::form_pairs;
+
+    /// A stand-in for the OS's key protection.
+    struct XorWrap;
+    impl crate::passwords::KeyWrap for XorWrap {
+        fn wrap(&self, key: &[u8]) -> Option<Vec<u8>> {
+            Some(key.iter().map(|b| b ^ 0x5a).collect())
+        }
+        fn unwrap(&self, wrapped: &[u8]) -> Option<Vec<u8>> {
+            Some(wrapped.iter().map(|b| b ^ 0x5a).collect())
+        }
+    }
 
     #[test]
     fn each_period_begins_where_the_reference_says() {
@@ -294,6 +325,7 @@ mod tests {
                 cookies: true,
                 cache: true,
                 downloads: true,
+                passwords: false,
             }
         );
         let html = dialog_html(&s);
@@ -301,6 +333,10 @@ mod tests {
         assert_eq!(html.matches(" checked>").count(), 4);
         assert!(html.contains(
             "<input type=checkbox name=downloads value=1 checked><span class=text>Download history"
+        ));
+        // (passwords are unchecked until the user checks them)
+        assert!(html.contains(
+            "<input type=checkbox name=passwords value=1><span class=text>Passwords<span class=sub>Deletes the saved passwords from this period</span>"
         ));
         // Unchecked boxes send only their hidden 0.
         let q = "at=privacy&clearData=1&period=week&history=0&history=1&cookies=0&cache=0&cache=1&downloads=0";
@@ -313,6 +349,7 @@ mod tests {
                 cookies: false,
                 cache: true,
                 downloads: false,
+                passwords: false,
             }
         );
         c.keep(&mut s);
@@ -323,6 +360,12 @@ mod tests {
         assert!(Choice::from_pairs(&form_pairs(only_downloads))
             .unwrap()
             .any());
+        let only_passwords =
+            "clearData=1&history=0&cookies=0&cache=0&downloads=0&passwords=0&passwords=1";
+        let c = Choice::from_pairs(&form_pairs(only_passwords)).unwrap();
+        assert!(c.passwords && c.any());
+        c.keep(&mut s);
+        assert!(Choice::of(&s).passwords);
         assert_eq!(Choice::from_pairs(&form_pairs("theme=dark")), None);
     }
 
@@ -369,12 +412,22 @@ mod tests {
             d.finish(new, State::Complete, None, ms(now));
             (old, running)
         };
+        // A login saved "now" (the store stamps it with the clock).
+        let passwords = Mutex::new(crate::passwords::PasswordStore::in_memory(Box::new(
+            XorWrap,
+        )));
+        passwords
+            .lock()
+            .unwrap()
+            .save_login("https://a.example", "ann", "u", "p", "pw")
+            .unwrap();
         let stores = Stores {
             history: &history,
             net: &client,
             local_storage: &local,
             code_cache: None,
             downloads: &downloads,
+            passwords: Some(&passwords),
         };
         let only = |history, cookies| Choice {
             period: TimePeriod::LastHour,
@@ -382,7 +435,29 @@ mod tests {
             cookies,
             cache: false,
             downloads: false,
+            passwords: false,
         };
+        // Passwords of an hour that began after the login was saved: it stays.
+        let later = ms(now) + 2 * 3_600_000;
+        delete(
+            &stores,
+            Choice {
+                passwords: true,
+                ..only(false, false)
+            },
+            later,
+        );
+        assert_eq!(passwords.lock().unwrap().len(), 1);
+        // Passwords of an hour that includes it: it goes.
+        delete(
+            &stores,
+            Choice {
+                passwords: true,
+                ..only(false, false)
+            },
+            ms(now),
+        );
+        assert!(passwords.lock().unwrap().is_empty());
         // History only: the cookies and the downloads stay.
         delete(&stores, only(true, false), ms(now));
         assert_eq!(downloads.lock().unwrap().entries().len(), 3);
@@ -422,6 +497,7 @@ mod tests {
             cookies: true,
             cache: true,
             downloads: true,
+            passwords: true,
         };
         delete(&stores, all, ms(now));
         assert!(history.lock().unwrap().entries().is_empty());

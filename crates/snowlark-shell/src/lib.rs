@@ -50,6 +50,9 @@ pub mod incognito_page;
 pub mod local_storage;
 pub mod menu;
 pub mod partition;
+pub mod password_bubble;
+pub mod passwords;
+pub mod passwords_page;
 pub mod popup;
 pub mod profile;
 #[cfg(test)]

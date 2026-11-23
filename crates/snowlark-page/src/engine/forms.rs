@@ -62,6 +62,11 @@ pub struct ControlState {
     pub editor: Option<String>,
     /// HTML §4.10.18 "user validity": the user committed a change, or the form was submitted.
     pub user_validity: bool,
+    /// The user edited the text (never set by script): the password manager's "typed in".
+    pub user_edited: bool,
+    /// A value the password manager filled that script cannot read yet: the field shows it, and it
+    /// becomes the value at the page's next user activation (`docs/password-manager.md`).
+    pub suggested: Option<String>,
 }
 
 impl Default for ControlState {
@@ -79,6 +84,8 @@ impl Default for ControlState {
             no_selection: false,
             editor: None,
             user_validity: false,
+            user_edited: false,
+            suggested: None,
         }
     }
 }
@@ -993,6 +1000,10 @@ impl Engine {
     /// sanitized (none, for input that is not a number: bad input).
     pub(crate) fn set_edited_text(&self, el: NodeId, text: String) {
         self.form_state_changed(el);
+        self.ctl(el, |c| {
+            c.user_edited = true;
+            c.suggested = None;
+        });
         if self.input_type(el).as_deref() == Some("number") {
             let value = sanitize("number", &number_from_user(&text));
             self.ctl(el, |c| {
@@ -1767,6 +1778,8 @@ impl Engine {
         if url.scheme() == "javascript" && self.form_action_blocked(cx, doc, &url) {
             return;
         }
+        // (the browser's password manager hears of a login form submitting)
+        self.password_form_submitted(form);
         // 22-23. Replace the form's planned navigation (see `cancel_planned_form_navigation`),
         // then plan to navigate the chosen navigable.
         if fire {
@@ -2697,6 +2710,8 @@ impl HTMLInputElementImpl for Engine {
                 self.ctl(el, |c| {
                     c.value = Some(v);
                     c.editor = None;
+                    // (a value the password manager suggested gives way to the page's)
+                    c.suggested = None;
                     if changed {
                         c.selection = (len, len, "none");
                     }

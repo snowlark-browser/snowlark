@@ -228,6 +228,7 @@ every_variant!(internal_request: InternalRequest, [
     InternalRequest::History(_) => InternalRequest::History("r=1-2+https%3A%2F%2Fa.example%2F".into()),
     InternalRequest::Bookmarks(_) => InternalRequest::Bookmarks("op=delete&id=3".into()),
     InternalRequest::Downloads(_) => InternalRequest::Downloads("op=remove&id=3".into()),
+    InternalRequest::Passwords(_) => InternalRequest::Passwords("op=delete&id=3".into()),
 ]);
 
 every_variant!(cursor: Cursor, [
@@ -485,6 +486,13 @@ every_variant!(tab_command: TabCommand, [
     TabCommand::ColorScheme(_) => TabCommand::ColorScheme(true),
     TabCommand::Shown(_) => TabCommand::Shown(false),
     TabCommand::Fullscreen(_) => TabCommand::Fullscreen(true),
+    TabCommand::FillPassword(_) => TabCommand::FillPassword(snowlark_page::passwords::PasswordFill {
+        origin: "https://a.example".into(),
+        username_field: Some(1),
+        password_field: 2,
+        username: "u".into(),
+        password: "p".into(),
+    }),
     TabCommand::ContextMenu(_) => TabCommand::ContextMenu(Some(point())),
     TabCommand::Wake => TabCommand::Wake,
     TabCommand::UseBeginFrames => TabCommand::UseBeginFrames,
@@ -543,6 +551,9 @@ every_variant!(tab_event: TabEvent, [
     },
     TabEvent::Traverse(_) => TabEvent::Traverse(-2),
     TabEvent::Fullscreen(_) => TabEvent::Fullscreen(true),
+    TabEvent::Passwords(_) => TabEvent::Passwords(snowlark_page::passwords::PasswordEvent::Rendered(vec![
+        snowlark_page::passwords::FormData::default(),
+    ])),
     TabEvent::NavigationReady(_) => TabEvent::NavigationReady(9),
     TabEvent::Hover { .. } => TabEvent::Hover {
         cursor: Cursor::Hand,
