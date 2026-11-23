@@ -1104,10 +1104,16 @@ pub(crate) fn layout_block_children<S: Style>(
         let frag = &result.fragment;
         let h = frag.size.height;
         let x = (band.0 - left) + result.margin.left;
-        let mut rel = cx.relative_offset(&child_style, content_width, cb_height);
+        let own_rel = cx.relative_offset(&child_style, content_width, cb_height);
         let split = cx.split_inline_offset(child, content_width, cb_height);
-        rel.x += split.x;
-        rel.y += split.y;
+        let rel = Point::new(own_rel.x + split.x, own_rel.y + split.y);
+        // (a block an inline was split around sits in an anonymous block box across the content
+        // box, CSS 2 §9.2.1.1, which the inline's offset moves and the block's own does not: the
+        // inline's client rect beside the block. Kept in a physical frame only.)
+        if style.view().is_identity() && cx.tree.split_owners.contains_key(&child) {
+            let wrapper = Rect::new(-(x + own_rel.x), -own_rel.y, content_width, h);
+            cx.tree.split_wrappers.insert(child, wrapper);
+        }
         let offset = Point::new(x + rel.x, actual_top + rel.y);
         // (the margins as computed: an over-constrained end margin is not shortened here)
         let computed = |side: Side, used: f32| match child_style.margin(side) {

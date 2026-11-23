@@ -59,11 +59,15 @@ All optional. Set them in the environment, or as `KEY=VALUE` lines in a file `de
 ## Tests
 
 ```powershell
-.\dev.ps1 test --workspace
+.\tools\test-workspace.ps1
 ```
 
-A full run compiles and links every test binary, which is most of its time. While iterating, test the crates
-you touched (`.\dev.ps1 test -p <crate>`, one `-p` each) and leave `--workspace` for before a pull request.
+This runs every crate's tests with the `iter` profile and `--no-fail-fast`, writes the whole output to
+`target\test-workspace.log` and prints a summary that marks each failure as known (listed in
+`tools/test-workspace-known.txt`) or new; it exits 0 when every failure is known. `-FromLog <log>` summarises an
+earlier run without running anything. A full run compiles and links every test binary, which is most of its time.
+While iterating, test the crates you touched (`.\dev.ps1 test -p <crate>`, one `-p` each) and leave the full run
+for before a pull request.
 
 - Unit tests live in the crates' sources.
 - Each crate's integration tests are **one** test binary, `it` (`crates/<crate>/tests/it.rs`, with

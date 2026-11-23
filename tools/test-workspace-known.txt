@@ -1,0 +1,4 @@
+# Test failures `tools/test-workspace.ps1` reports as known (iter profile): <binary>|<failure>|<why>
+# Both fields are regular expressions: the binary as the summary names it (`<crate> lib`, `<crate> it`), the
+# failure as a test's full name or `exit code N ...`. Remove a line when its cause is fixed.
+snowlark-page it|^exit code 2170|exits with 0x87A (2170) after every test passed, when many modules run in one process (open issue)

@@ -765,6 +765,7 @@ impl<S: Style> LayoutTree<S> {
         fn rects<S: Style, P: lookup::Place>(
             found: &[(P, P, &Fragment<S>)],
             node: NodeId,
+            wrappers: &rustc_hash::FxHashMap<BoxId, Rect>,
             map: impl Fn(P, Rect) -> Rect,
         ) -> Vec<Rect> {
             let mut out = Vec::new();
@@ -785,23 +786,28 @@ impl<S: Style> LayoutTree<S> {
                 else {
                     continue;
                 };
-                // (the block's inline-axis margins count too, as in Chrome, whose inline box holds
-                // the block's margin box on its line; the block's own transform is left out, as for
-                // the inline's own pieces: it transforms the block, not the inline, CSSOM View §6.1)
-                let ml = b.style.margin(style::Side::Left).resolve_or_zero(0.0);
-                let mr = b.style.margin(style::Side::Right).resolve_or_zero(0.0);
-                out.push(map(
-                    *placed,
-                    Rect::new(-ml, 0.0, f.size.width + ml + mr, f.size.height),
-                ));
+                // (the anonymous block box that holds the block on the inline's line, CSS 2
+                // §9.2.1.1: across its containing block's content box, where the block is before its
+                // own relative offset. Its transform is left out too, as for the inline's own
+                // pieces: it transforms the block, not the inline, CSSOM View §6.1)
+                let wrapper = b.box_id.and_then(|id| wrappers.get(&id)).copied();
+                let r = wrapper.unwrap_or_else(|| {
+                    // (not placed by block layout: a block fragmented across columns or in a
+                    // vertical flow; its margin box)
+                    let ml = b.style.margin(style::Side::Left).resolve_or_zero(0.0);
+                    let mr = b.style.margin(style::Side::Right).resolve_or_zero(0.0);
+                    Rect::new(-ml, 0.0, f.size.width + ml + mr, f.size.height)
+                });
+                out.push(map(*placed, r));
             }
             out
         }
         let boxes = tree.len();
+        let wrappers = &tree.split_wrappers;
         if transforms {
             self.lookup
                 .with_many_transformed(root, &targets, ancestors, boxes, |found| {
-                    rects(found, node, |p: lookup::Transformed, r| {
+                    rects(found, node, wrappers, |p: lookup::Transformed, r| {
                         if p.any {
                             p.m.apply_rect(&r)
                         } else {
@@ -812,7 +818,7 @@ impl<S: Style> LayoutTree<S> {
         } else {
             self.lookup
                 .with_many(root, &targets, ancestors, boxes, |found| {
-                    rects(found, node, |p: Point, r| r.translate(p.x, p.y))
+                    rects(found, node, wrappers, |p: Point, r| r.translate(p.x, p.y))
                 })
         }
     }

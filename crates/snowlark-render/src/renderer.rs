@@ -5189,8 +5189,8 @@ impl Renderer {
         parent: Option<NodeId>,
         grid: Option<(String, String)>,
     ) -> NodeUsedValues {
-        // The containing block: the nearest ancestor with a box (for absolutely positioned boxes, the
-        // nearest positioned one; for fixed, the viewport).
+        // The containing block: the nearest ancestor block container (for absolutely positioned
+        // boxes, the nearest positioned ancestor with a box; for fixed, the viewport).
         let position = values.get_box().position;
         use style::values::computed::PositionProperty as P;
         let viewport = doc
@@ -5212,6 +5212,10 @@ impl Renderer {
                         break;
                     }
                     P::Fixed => break,
+                    // (CSS 2 §10.1: a static or relative box's containing block is formed by its
+                    // nearest block container ancestor, so an inline box it sits in, as a block
+                    // an inline is split around does, is not it)
+                    _ if g.inline => {}
                     _ => {
                         cb = Some(g.content_box);
                         break;

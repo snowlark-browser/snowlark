@@ -340,6 +340,11 @@ pub struct BoxTree<S: Style> {
     /// inline boxes split (innermost first): their client rects include the block's, as browsers
     /// report them.
     pub(crate) split_owners: std::collections::HashMap<BoxId, SmallVec<[NodeId; 2]>>,
+    /// For a block-level box in `split_owners`, the anonymous block box that holds it among the
+    /// pieces of the inline (CSS 2 §9.2.1.1) as its last placement made it, relative to the block's
+    /// border box: its containing block's content width, the block's height, where the block is
+    /// before its own relative offset. The inline's client rect beside the block is this box.
+    pub(crate) split_wrappers: rustc_hash::FxHashMap<BoxId, snowlark_paint::Rect>,
     /// The boxes made dirty since the last layout (some may have died since), so clearing the flags
     /// after a layout costs what changed, not the tree.
     dirty: Vec<BoxId>,
@@ -370,6 +375,7 @@ impl<S: Style> BoxTree<S> {
             split_inlines: Default::default(),
             line_height_quirk: false,
             split_owners: Default::default(),
+            split_wrappers: Default::default(),
             dirty: Vec::new(),
         }
     }
@@ -506,6 +512,9 @@ impl<S: Style> BoxTree<S> {
             }
             if !self.split_owners.is_empty() {
                 self.split_owners.remove(&id);
+            }
+            if !self.split_wrappers.is_empty() {
+                self.split_wrappers.remove(&id);
             }
             stack.extend(b.children.iter().copied());
             stack.extend(b.marker);

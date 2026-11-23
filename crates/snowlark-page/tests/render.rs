@@ -436,6 +436,29 @@ fn generated_pseudo_elements_resolve_to_used_sizes() {
     );
 }
 
+/// An inline split around a block (CSS 2 §9.2.1.1): its rect beside the block is the anonymous
+/// block box across the containing block, and the block's insets resolve against that block
+/// container, not the inline (CSS 2 §10.1). What Chrome gives for the same page.
+#[test]
+fn an_inline_split_around_a_block_reads_the_anonymous_block_and_its_container() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>\
+         h2 { width: 600px; margin: 0; padding-left: 7px }\
+         img { display: block; width: 300px; height: 40px; position: relative; left: 50%;\
+               transform: translateX(-50%) }\
+         </style><body style='margin:0'><h2><picture id=p><img id=i></picture></h2>",
+    );
+    let r = eval(
+        &mut page,
+        "const b = e => { const r = document.getElementById(e).getBoundingClientRect();
+                           return [r.x, r.y, r.width, r.height].join(','); };
+         [b('p'), b('i'), getComputedStyle(document.getElementById('i')).left].join('|')",
+    );
+    assert_eq!(r, "7,0,600,40|157,0,300,40|300px");
+}
+
 #[test]
 fn computed_and_inline_style_declarations() {
     let net = NetThread::start(NetConfig::default()).unwrap();

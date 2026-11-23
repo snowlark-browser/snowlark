@@ -45,10 +45,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   box. (ref 99)
 - **Geometry reads near split inlines.** An inline box split around a block still walks the tree on geometry reads,
   which costs time on large pages. (ref 97)
-- **Geometry of an inline split around a block.** `getBoundingClientRect()` of an inline box split around a block
-  reports the block's own box, not the full-width anonymous block that holds it, and a relatively positioned block
-  inside such an inline resolves a percentage `left` against the inline (as 0) in `getComputedStyle()`. Layout and
-  painting are right. (ref 615)
 - **Block details.** `align-content` on block containers that are not independent formatting contexts is not applied,
   and hit testing treats rounded clips as rectangles. (ref 41)
 

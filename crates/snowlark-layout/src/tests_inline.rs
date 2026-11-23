@@ -454,8 +454,8 @@ fn text_box_trim_on_inline_box_sets_its_content_area() {
 
 #[test]
 fn inline_split_around_a_block_reports_the_block_too() {
-    // <a><div 20x20></div></a>: the link's client rects include the block it was split around
-    // (Hacker News' logo and vote links; Chrome reports the block's box for the inline).
+    // <a><div 20x20></div></a>: the link's client rects include the anonymous block box that holds
+    // the block it was split around (CSS 2 §9.2.1.1; Hacker News' logo and vote links).
     let mut t = T::new();
     let r0 = t.root();
     let p = t.doc.block(r0, |_| {});
@@ -471,17 +471,17 @@ fn inline_split_around_a_block_reports_the_block_too() {
         ];
     });
     t.run(400.0, 400.0);
-    // (with its inline-axis margins, as Chrome reports it)
+    // (across the containing block, the block's border box high, as Chrome reports it)
     let rects = t.layout.client_rects(a);
-    assert!(rects.contains(&r(0.0, 3.0, 24.0, 20.0)), "{rects:?}");
+    assert!(rects.contains(&r(0.0, 3.0, 400.0, 20.0)), "{rects:?}");
     assert_eq!(t.layout.client_rects(d), vec![r(2.0, 3.0, 20.0, 20.0)]);
 }
 
 #[test]
 fn inline_split_around_a_transformed_block_reports_its_untransformed_box() {
     // <picture><img style="display:block; transform:scale(2)"></picture>: the block's transform
-    // is not one of the inline's (CSSOM View §6.1), so the inline reports the block's layout box;
-    // the block's own rect is transformed.
+    // is not one of the inline's (CSSOM View §6.1), so the inline reports the untransformed
+    // anonymous block box around it; the block's own rect is transformed.
     let mut t = T::new();
     let r0 = t.root();
     let p = t.doc.block(r0, |_| {});
@@ -494,10 +494,40 @@ fn inline_split_around_a_transformed_block_reports_its_untransformed_box() {
     });
     t.run(400.0, 400.0);
     let rects = t.layout.client_rects(a);
-    assert!(rects.contains(&r(0.0, 0.0, 50.0, 10.0)), "{rects:?}");
+    assert!(rects.contains(&r(0.0, 0.0, 400.0, 10.0)), "{rects:?}");
     assert!(rects.iter().all(|r| r.y >= 0.0), "{rects:?}");
     // scaled about its center (40, 5)
     assert_eq!(t.layout.client_rects(d), vec![r(20.0, -5.0, 40.0, 20.0)]);
+}
+
+#[test]
+fn inline_split_around_a_relative_block_reports_the_anonymous_block() {
+    // <div padding-left 7><picture style="position:relative; left:4px"><img block 300x40
+    // style="position:relative; left:50%; top:5px"></picture></div> (600px wide): the picture's
+    // rect beside the img is the anonymous block box across the containing block (CSS 2
+    // §9.2.1.1), moved by the picture's offset and not by the img's (Chrome: 11,0,600x40).
+    let mut t = T::new();
+    let r0 = t.root();
+    let p = t.doc.block(r0, |s| {
+        s.width = SizeValue::px(600.0);
+        s.padding[3] = LengthPercentage::px(7.0);
+    });
+    let a = t.doc.span(p, |s| {
+        s.position = Position::Relative;
+        s.inset[3] = LengthPercentageAuto::px(4.0);
+    });
+    let d = t.doc.block(a, |s| {
+        s.width = SizeValue::px(300.0);
+        s.height = SizeValue::px(40.0);
+        s.position = Position::Relative;
+        s.inset[3] = LengthPercentageAuto::percent(50.0);
+        s.inset[0] = LengthPercentageAuto::px(5.0);
+    });
+    t.run(800.0, 400.0);
+    let rects = t.layout.client_rects(a);
+    assert!(rects.contains(&r(11.0, 0.0, 600.0, 40.0)), "{rects:?}");
+    assert_eq!(t.layout.client_rects(d), vec![r(311.0, 5.0, 300.0, 40.0)]);
+    assert_eq!(t.layout.layout_rects(a), rects);
 }
 
 #[test]
