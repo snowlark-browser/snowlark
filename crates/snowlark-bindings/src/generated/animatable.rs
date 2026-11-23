@@ -73,12 +73,10 @@ pub(crate) fn op_animate<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_object(scope, v, "Failed to execute 'animate': parameter 1")).map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_object(scope, v, "Failed to execute 'animate': parameter 1")).map(Some)
             }
         }?;
         let a1 = {

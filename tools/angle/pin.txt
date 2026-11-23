@@ -1,0 +1,6 @@
+# ANGLE, the OpenGL ES implementation WebGL runs on (docs/webgl.md). tools/angle/build.ps1 builds this commit of
+# https://chromium.googlesource.com/angle/angle into <dev dir>/angle/<name>; dev.ps1 hands that folder to the build.
+commit=d6bf16b6cc1e67afbb23ed4ec22ba19497da0ae7
+name=angle-d6bf16b6cc1e
+libEGL-sha256=081530316d60d9072550b09e7e7a3ed70ab38f946a84cd0a7bab19a046b35f92
+libGLESv2-sha256=e5f149fba384bc5c96f95deae20b24f22045c3bfaa8b15b00f5ebfaf6bc52bad

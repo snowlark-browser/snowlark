@@ -263,13 +263,10 @@ pub(crate) fn op_set_keyframes<D: Dom, const LO: u16, const HI: u16>(call: rt::C
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_object(scope, v, "Failed to execute 'setKeyframes': parameter 1"))
-                        .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_object(scope, v, "Failed to execute 'setKeyframes': parameter 1")).map(Some)
             }
         }?;
         let r = {
@@ -291,30 +288,26 @@ fn ctor_0<'s, D: Dom, const LO: u16, const HI: u16>(
 ) -> Option<Handle> {
     let a0 = {
         let v = args.get(0);
-        {
-            if v.is_null_or_undefined() {
-                Some(None)
-            } else {
-                (rt::to_interface(
-                    scope,
-                    v,
-                    ids::ELEMENT,
-                    ids::ELEMENT_END,
-                    "Failed to execute 'constructor': parameter 1",
-                    "Element",
-                ))
-                .map(Some)
-            }
+        if v.is_null_or_undefined() {
+            Some(None)
+        } else {
+            (rt::to_interface(
+                scope,
+                v,
+                ids::ELEMENT,
+                ids::ELEMENT_END,
+                "Failed to execute 'constructor': parameter 1",
+                "Element",
+            ))
+            .map(Some)
         }
     }?;
     let a1 = {
         let v = args.get(1);
-        {
-            if v.is_null_or_undefined() {
-                Some(None)
-            } else {
-                (rt::to_object(scope, v, "Failed to execute 'constructor': parameter 2")).map(Some)
-            }
+        if v.is_null_or_undefined() {
+            Some(None)
+        } else {
+            (rt::to_object(scope, v, "Failed to execute 'constructor': parameter 2")).map(Some)
         }
     }?;
     let a2 = {

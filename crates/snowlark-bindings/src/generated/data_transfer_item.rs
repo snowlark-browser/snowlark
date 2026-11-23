@@ -95,19 +95,17 @@ pub(crate) fn op_get_as_string<D: Dom, const LO: u16, const HI: u16>(call: rt::C
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_callback_function(
-                        scope,
-                        v,
-                        false,
-                        "Failed to execute 'getAsString': parameter 1",
-                    )
-                    .and_then(|o| o.map(FunctionStringCallback)))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_callback_function(
+                    scope,
+                    v,
+                    false,
+                    "Failed to execute 'getAsString': parameter 1",
+                )
+                .and_then(|o| o.map(FunctionStringCallback)))
+                .map(Some)
             }
         }?;
         let r = {

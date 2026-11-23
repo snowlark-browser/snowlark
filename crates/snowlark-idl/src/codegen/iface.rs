@@ -1269,6 +1269,13 @@ impl Plan<'_> {
                     }
                     None => conv,
                 };
+                // (a nullable conversion is a block of its own: here it is the block's value)
+                let conv = match conv.strip_prefix("{ ").and_then(|c| c.strip_suffix(" }")) {
+                    Some(inner) if inner.starts_with("if v.is_null_or_undefined()") => {
+                        inner.to_string()
+                    }
+                    _ => conv,
+                };
                 writeln!(
                     o,
                     "{ind}let {var} = {{ let v = {}; {conv} }}?;",

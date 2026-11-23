@@ -684,20 +684,18 @@ pub(crate) fn op_is_equal_node<D: Dom, const LO: u16, const HI: u16>(call: rt::C
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_interface(
-                        scope,
-                        v,
-                        ids::NODE,
-                        ids::NODE_END,
-                        "Failed to execute 'isEqualNode': parameter 1",
-                        "Node",
-                    ))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_interface(
+                    scope,
+                    v,
+                    ids::NODE,
+                    ids::NODE_END,
+                    "Failed to execute 'isEqualNode': parameter 1",
+                    "Node",
+                ))
+                .map(Some)
             }
         }?;
         let r = {
@@ -724,20 +722,18 @@ pub(crate) fn op_is_same_node<D: Dom, const LO: u16, const HI: u16>(call: rt::Ca
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_interface(
-                        scope,
-                        v,
-                        ids::NODE,
-                        ids::NODE_END,
-                        "Failed to execute 'isSameNode': parameter 1",
-                        "Node",
-                    ))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_interface(
+                    scope,
+                    v,
+                    ids::NODE,
+                    ids::NODE_END,
+                    "Failed to execute 'isSameNode': parameter 1",
+                    "Node",
+                ))
+                .map(Some)
             }
         }?;
         let r = {
@@ -797,20 +793,18 @@ pub(crate) fn op_contains<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) 
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_interface(
-                        scope,
-                        v,
-                        ids::NODE,
-                        ids::NODE_END,
-                        "Failed to execute 'contains': parameter 1",
-                        "Node",
-                    ))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_interface(
+                    scope,
+                    v,
+                    ids::NODE,
+                    ids::NODE_END,
+                    "Failed to execute 'contains': parameter 1",
+                    "Node",
+                ))
+                .map(Some)
             }
         }?;
         let r = {
@@ -837,12 +831,10 @@ pub(crate) fn op_lookup_prefix<D: Dom, const LO: u16, const HI: u16>(call: rt::C
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_dom_string(scope, v)).map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_dom_string(scope, v)).map(Some)
             }
         }?;
         let r = {
@@ -871,12 +863,10 @@ pub(crate) fn op_lookup_namespace_uri<D: Dom, const LO: u16, const HI: u16>(call
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_dom_string(scope, v)).map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_dom_string(scope, v)).map(Some)
             }
         }?;
         let r = {
@@ -905,12 +895,10 @@ pub(crate) fn op_is_default_namespace<D: Dom, const LO: u16, const HI: u16>(call
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_dom_string(scope, v)).map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_dom_string(scope, v)).map(Some)
             }
         }?;
         let r = {
@@ -948,20 +936,18 @@ pub(crate) fn op_insert_before<D: Dom, const LO: u16, const HI: u16>(call: rt::C
         }?;
         let a1 = {
             let v = call.arg(1);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_interface(
-                        scope,
-                        v,
-                        ids::NODE,
-                        ids::NODE_END,
-                        "Failed to execute 'insertBefore': parameter 2",
-                        "Node",
-                    ))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_interface(
+                    scope,
+                    v,
+                    ids::NODE,
+                    ids::NODE_END,
+                    "Failed to execute 'insertBefore': parameter 2",
+                    "Node",
+                ))
+                .map(Some)
             }
         }?;
         <D as rt::Host>::push_ce_reactions(dom);

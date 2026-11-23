@@ -104,6 +104,7 @@ mod trusted_types;
 mod user_agent;
 mod web_audio;
 mod web_storage;
+mod webgl;
 mod wheel_legacy;
 mod xpath;
 

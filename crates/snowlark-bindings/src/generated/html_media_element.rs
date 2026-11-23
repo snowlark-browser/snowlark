@@ -1887,20 +1887,18 @@ fn op_set_media_keys_0<'s, D: Dom, const LO: u16, const HI: u16>(
 ) -> Option<v8::Local<'s, v8::Value>> {
     let a0 = {
         let v = args.get(0);
-        {
-            if v.is_null_or_undefined() {
-                Some(None)
-            } else {
-                (rt::to_interface(
-                    scope,
-                    v,
-                    ids::MEDIA_KEYS,
-                    ids::MEDIA_KEYS_END,
-                    "Failed to execute 'setMediaKeys': parameter 1",
-                    "MediaKeys",
-                ))
-                .map(Some)
-            }
+        if v.is_null_or_undefined() {
+            Some(None)
+        } else {
+            (rt::to_interface(
+                scope,
+                v,
+                ids::MEDIA_KEYS,
+                ids::MEDIA_KEYS_END,
+                "Failed to execute 'setMediaKeys': parameter 1",
+                "MediaKeys",
+            ))
+            .map(Some)
         }
     }?;
     let st = rt::state(scope);

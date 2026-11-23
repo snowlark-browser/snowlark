@@ -117,6 +117,14 @@ fn class(o: &Object) -> Class {
         // A media query list lives while script can reach it or it has a `change` listener
         // ([`Engine::media_list_pins`]): pages make one per `matchMedia(..).matches` read.
         Object::MediaQueryList(_) => Class::Weak,
+        // WebGL objects without state of their own; contexts and GL objects stay (their GL
+        // objects are freed with the page).
+        Object::WebGl(o) => match **o {
+            super::webgl::WebGlObject::ActiveInfo { .. }
+            | super::webgl::WebGlObject::Precision(_)
+            | super::webgl::WebGlObject::UniformLocation { .. } => Class::Weak,
+            _ => Class::Strong,
+        },
         // IndexedDB's requests, key ranges and records live while script reaches them or a
         // transaction's request list (or a queued event) keeps them ([`IdbObject::weak`]).
         Object::Idb(o) if o.weak() => Class::Weak,
@@ -251,6 +259,7 @@ fn refs(o: &Object, r: &mut Refs) {
         },
         Object::StyleDeclaration(Decl::Computed(n, _)) => r.nodes.push(*n),
         Object::StyleDeclaration(Decl::Rule(h) | Decl::FontFace(h)) => r.objects.push(*h),
+        Object::WebGl(o) => o.gc_refs(&mut r.nodes, &mut r.objects),
         Object::Canvas2D(c) => {
             r.nodes.push(c.element);
             r.opt(c.fill_object);
@@ -2307,6 +2316,10 @@ impl Engine {
             .borrow_mut()
             .retain(|n| !freed.contains(n));
         self.canvases.borrow_mut().retain(|n, _| !freed.contains(n));
+        self.gl
+            .borrow_mut()
+            .contexts
+            .retain(|n, _| !freed.contains(n));
         self.xml_documents
             .borrow_mut()
             .retain(|n| !freed.contains(n));

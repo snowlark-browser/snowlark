@@ -321,6 +321,19 @@ pub const SCOPE: &[&str] = &[
     "TextMetrics",
     "Path2D",
     "ImageData",
+    // WebGL 1.0.
+    "WebGLRenderingContext",
+    "WebGLObject",
+    "WebGLBuffer",
+    "WebGLFramebuffer",
+    "WebGLProgram",
+    "WebGLRenderbuffer",
+    "WebGLShader",
+    "WebGLTexture",
+    "WebGLUniformLocation",
+    "WebGLActiveInfo",
+    "WebGLShaderPrecisionFormat",
+    "WebGLContextEvent",
     // Web Cryptography (getRandomValues, randomUUID).
     "Crypto",
     "SubtleCrypto",
@@ -585,7 +598,7 @@ pub const UNSHIPPED: &[(&str, &str)] = &[
 /// Dictionaries an engine algorithm converts from an `any` value itself (IndexedDB §5.12: `getAll()`'s
 /// `queryOrOptions` is an `IDBGetAllOptions` when it is not a key range): they get a public
 /// `from_value`.
-pub const ENGINE_CONVERTED_DICTIONARIES: &[&str] = &["IDBGetAllOptions"];
+pub const ENGINE_CONVERTED_DICTIONARIES: &[&str] = &["IDBGetAllOptions", "WebGLContextAttributes"];
 
 /// Members of shipped interfaces that the engine does not implement yet, with the reason: left
 /// out rather than generated as members that would pretend. (interface or dictionary, member,
@@ -612,6 +625,17 @@ pub const NOT_YET: &[(&str, &str, &str)] = &[
         "AudioContextOptions",
         "sinkId",
         "audio output device selection is not implemented",
+    ),
+    // WebGL: what needs WebXR, and sized drawing buffer formats (later stages of WebGL).
+    (
+        "WebGLRenderingContext",
+        "makeXRCompatible",
+        "WebXR is not implemented",
+    ),
+    (
+        "WebGLRenderingContext",
+        "drawingBufferStorage",
+        "sized drawing buffer formats are not implemented",
     ),
 ];
 

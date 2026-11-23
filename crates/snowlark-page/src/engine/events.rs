@@ -246,6 +246,8 @@ pub enum EventExt {
         new_url: String,
     },
     PageTransition(bool),
+    /// `WebGLContextEvent.statusMessage`.
+    WebGlContext(String),
     PopState(Option<super::held::Held<v8::Value>>),
     Progress {
         length_computable: bool,

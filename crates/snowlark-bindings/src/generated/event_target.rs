@@ -94,18 +94,16 @@ fn op_add_event_listener_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let a1 = {
         let v = args.get(1);
-        {
-            if v.is_null_or_undefined() {
-                Some(None)
-            } else {
-                (rt::to_callback_interface(
-                    scope,
-                    v,
-                    "Failed to execute 'addEventListener': parameter 2",
-                )
-                .map(EventListener))
-                .map(Some)
-            }
+        if v.is_null_or_undefined() {
+            Some(None)
+        } else {
+            (rt::to_callback_interface(
+                scope,
+                v,
+                "Failed to execute 'addEventListener': parameter 2",
+            )
+            .map(EventListener))
+            .map(Some)
         }
     }?;
     let a2 = {
@@ -175,18 +173,16 @@ fn op_remove_event_listener_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let a1 = {
         let v = args.get(1);
-        {
-            if v.is_null_or_undefined() {
-                Some(None)
-            } else {
-                (rt::to_callback_interface(
-                    scope,
-                    v,
-                    "Failed to execute 'removeEventListener': parameter 2",
-                )
-                .map(EventListener))
-                .map(Some)
-            }
+        if v.is_null_or_undefined() {
+            Some(None)
+        } else {
+            (rt::to_callback_interface(
+                scope,
+                v,
+                "Failed to execute 'removeEventListener': parameter 2",
+            )
+            .map(EventListener))
+            .map(Some)
         }
     }?;
     let a2 = {

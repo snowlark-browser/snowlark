@@ -93,6 +93,7 @@ pub(crate) mod trusted_types;
 pub(crate) mod url;
 pub(crate) mod view;
 pub(crate) mod view_transition;
+pub(crate) mod webgl;
 pub(crate) mod websocket;
 pub mod window;
 pub(crate) mod xhr;
@@ -398,6 +399,8 @@ pub enum Object {
         descent: f64,
     },
     ImageData(Box<canvas::ImageDataObj>),
+    /// WebGL's context and objects: [webgl].
+    WebGl(Box<webgl::WebGlObject>),
     Crypto,
     Selection(Box<selection::SelectionData>),
     /// Media elements' objects (`MediaError`, `TimeRanges`, tracks, MSE): [`crate::media`].
@@ -533,6 +536,8 @@ pub struct Engine {
     /// Canvas 2D contexts by their element, and the canvases that drew since the last rendering
     /// update.
     pub(crate) canvases: RefCell<rustc_hash::FxHashMap<NodeId, Handle>>,
+    /// WebGL: the service, queued commands, contexts by canvas ([webgl::GlState]).
+    pub(crate) gl: RefCell<webgl::GlState>,
     pub(crate) canvas_dirty: RefCell<Vec<NodeId>>,
     /// The frames a rendering update asked of the canvas thread before its layout, oldest first,
     /// taken after it or, when they come later, at the next one ([`Engine::flush_canvases`]).
@@ -732,6 +737,7 @@ impl Engine {
             }),
             history: RefCell::new(history::HistoryState::default()),
             canvases: RefCell::default(),
+            gl: RefCell::default(),
             canvas_dirty: RefCell::new(Vec::new()),
             canvas_frames_pending: RefCell::new(Vec::new()),
             canvas_frames_async: Cell::new(false),
@@ -1251,6 +1257,7 @@ impl Engine {
             Object::Path2D(_) => InterfaceId::Path2D,
             Object::TextMetrics { .. } => InterfaceId::TextMetrics,
             Object::ImageData(_) => InterfaceId::ImageData,
+            Object::WebGl(o) => o.interface(),
             Object::Crypto => InterfaceId::Crypto,
             Object::Selection(_) => InterfaceId::Selection,
             Object::Media(m) => m.interface(),

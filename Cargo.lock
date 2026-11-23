@@ -2813,6 +2813,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "snowlark-gl"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "windows",
+]
+
+[[package]]
 name = "snowlark-idb"
 version = "0.1.0"
 dependencies = [
@@ -2944,6 +2952,7 @@ dependencies = [
  "snowlark-audio",
  "snowlark-bindings",
  "snowlark-dom",
+ "snowlark-gl",
  "snowlark-idb",
  "snowlark-ipc",
  "snowlark-js",

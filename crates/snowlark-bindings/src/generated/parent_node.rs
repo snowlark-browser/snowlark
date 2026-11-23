@@ -363,20 +363,18 @@ pub(crate) fn op_move_before<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
         }?;
         let a1 = {
             let v = call.arg(1);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_interface(
-                        scope,
-                        v,
-                        ids::NODE,
-                        ids::NODE_END,
-                        "Failed to execute 'moveBefore': parameter 2",
-                        "Node",
-                    ))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_interface(
+                    scope,
+                    v,
+                    ids::NODE,
+                    ids::NODE_END,
+                    "Failed to execute 'moveBefore': parameter 2",
+                    "Node",
+                ))
+                .map(Some)
             }
         }?;
         <D as rt::Host>::push_ce_reactions(dom);

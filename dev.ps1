@@ -206,6 +206,17 @@ if ($command -ne 'fmt' -and -not $env:RUSTY_V8_ARCHIVE -and -not $env:SNOWLARK_V
         }
     }
 }
+# ANGLE, WebGL's OpenGL ES (docs/webgl.md): tools\angle\pin.txt names the build; its libEGL.dll and libGLESv2.dll
+# are in SNOWLARK_ANGLE_DIR or <dev dir>\angle\<name> (tools\angle\build.ps1 makes them). snowlark-gl's build
+# script copies them beside the executables; without them the build has no WebGL.
+if ($command -ne 'fmt' -and -not $env:SNOWLARK_ANGLE_DIR -and $devDir) {
+    foreach ($line in Get-Content (Join-Path $root 'tools\angle\pin.txt')) {
+        if ($line -match '^name=(.+)$') {
+            $angleDir = Join-Path $devDir "angle\$($matches[1].Trim())"
+            if (Test-Path (Join-Path $angleDir 'libGLESv2.dll')) { $env:SNOWLARK_ANGLE_DIR = $angleDir }
+        }
+    }
+}
 # LTO is for what ships: a test run would pay for it again in every test binary.
 if ($command -eq 'test' -and -not $env:CARGO_PROFILE_RELEASE_LTO) { $env:CARGO_PROFILE_RELEASE_LTO = 'false' }
 try {

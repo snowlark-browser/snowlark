@@ -169,18 +169,16 @@ pub(crate) fn op_add_listener<D: Dom, const LO: u16, const HI: u16>(call: rt::Ca
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_callback_interface(
-                        scope,
-                        v,
-                        "Failed to execute 'addListener': parameter 1",
-                    )
-                    .map(EventListener))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_callback_interface(
+                    scope,
+                    v,
+                    "Failed to execute 'addListener': parameter 1",
+                )
+                .map(EventListener))
+                .map(Some)
             }
         }?;
         let r = {
@@ -207,18 +205,16 @@ pub(crate) fn op_remove_listener<D: Dom, const LO: u16, const HI: u16>(call: rt:
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_callback_interface(
-                        scope,
-                        v,
-                        "Failed to execute 'removeListener': parameter 1",
-                    )
-                    .map(EventListener))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_callback_interface(
+                    scope,
+                    v,
+                    "Failed to execute 'removeListener': parameter 1",
+                )
+                .map(EventListener))
+                .map(Some)
             }
         }?;
         let r = {

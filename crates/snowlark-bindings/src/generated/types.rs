@@ -5416,6 +5416,48 @@ impl ToJs for TransferFunction {
     }
 }
 
+/// `enum WebGLPowerPreference` (webgl1.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum WebGLPowerPreference {
+    /// `"default"`
+    Default,
+    /// `"low-power"`
+    LowPower,
+    /// `"high-performance"`
+    HighPerformance,
+}
+
+impl WebGLPowerPreference {
+    pub const VALUES: &'static [&'static str] = &["default", "low-power", "high-performance"];
+    const ALL: &'static [WebGLPowerPreference] = &[
+        WebGLPowerPreference::Default,
+        WebGLPowerPreference::LowPower,
+        WebGLPowerPreference::HighPerformance,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "WebGLPowerPreference").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for WebGLPowerPreference {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
 /// `enum WorkerType` (html.idl).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WorkerType {
@@ -51453,6 +51495,492 @@ impl ToJs for WaveShaperOptions {
     }
 }
 
+/// `dictionary WebGLContextAttributes` (webgl1.idl).
+#[derive(Clone)]
+pub struct WebGLContextAttributes {
+    /// `boolean alpha = true`
+    pub alpha: bool,
+    /// `boolean antialias = true`
+    pub antialias: bool,
+    /// `boolean depth = true`
+    pub depth: bool,
+    /// `boolean desynchronized = false`
+    pub desynchronized: bool,
+    /// `boolean failIfMajorPerformanceCaveat = false`
+    pub fail_if_major_performance_caveat: bool,
+    /// `WebGLPowerPreference powerPreference = "default"`
+    pub power_preference: WebGLPowerPreference,
+    /// `boolean premultipliedAlpha = true`
+    pub premultiplied_alpha: bool,
+    /// `boolean preserveDrawingBuffer = false`
+    pub preserve_drawing_buffer: bool,
+    /// `boolean stencil = false`
+    pub stencil: bool,
+    /// `boolean xrCompatible = false`
+    pub xr_compatible: bool,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for WebGLContextAttributes {
+    fn default() -> Self {
+        WebGLContextAttributes {
+            alpha: true,
+            antialias: true,
+            depth: true,
+            desynchronized: false,
+            fail_if_major_performance_caveat: false,
+            power_preference: WebGLPowerPreference::Default,
+            premultiplied_alpha: true,
+            preserve_drawing_buffer: false,
+            stencil: false,
+            xr_compatible: false,
+        }
+    }
+}
+
+impl WebGLContextAttributes {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "WebGLContextAttributes")?;
+        let m_alpha = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("alpha");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    true
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => true,
+        };
+        let m_antialias = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("antialias");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    true
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => true,
+        };
+        let m_depth = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("depth");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    true
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => true,
+        };
+        let m_desynchronized = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("desynchronized");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_fail_if_major_performance_caveat = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("failIfMajorPerformanceCaveat");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_power_preference = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("powerPreference");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    WebGLPowerPreference::Default
+                } else {
+                    WebGLPowerPreference::from_js(scope, v)?
+                }
+            }
+            None => WebGLPowerPreference::Default,
+        };
+        let m_premultiplied_alpha = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("premultipliedAlpha");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    true
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => true,
+        };
+        let m_preserve_drawing_buffer = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("preserveDrawingBuffer");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_stencil = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("stencil");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_xr_compatible = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("xrCompatible");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        Some(WebGLContextAttributes {
+            alpha: m_alpha,
+            antialias: m_antialias,
+            depth: m_depth,
+            desynchronized: m_desynchronized,
+            fail_if_major_performance_caveat: m_fail_if_major_performance_caveat,
+            power_preference: m_power_preference,
+            premultiplied_alpha: m_premultiplied_alpha,
+            preserve_drawing_buffer: m_preserve_drawing_buffer,
+            stencil: m_stencil,
+            xr_compatible: m_xr_compatible,
+        })
+    }
+
+    /// Converts a value the engine holds to this dictionary (Web IDL §3.2.17), for an algorithm
+    /// that converts an `any` argument itself; `Err(Pending)` with the exception thrown.
+    pub fn from_value(cx: &mut Cx, v: &JsValue) -> Result<Self> {
+        let scope = cx.scope();
+        let v = v8::Local::new(scope, v.global());
+        Self::from_js(scope, v).ok_or(rt::Error::Pending)
+    }
+}
+
+impl ToJs for WebGLContextAttributes {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.alpha.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("alpha");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.antialias.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("antialias");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.depth.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("depth");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.desynchronized.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("desynchronized");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.fail_if_major_performance_caveat.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("failIfMajorPerformanceCaveat");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.power_preference.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("powerPreference");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.premultiplied_alpha.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("premultipliedAlpha");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.preserve_drawing_buffer.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("preserveDrawingBuffer");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.stencil.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("stencil");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.xr_compatible.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("xrCompatible");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary WebGLContextEventInit : EventInit` (webgl1.idl).
+#[derive(Clone)]
+pub struct WebGLContextEventInit {
+    /// `boolean bubbles = false`
+    pub bubbles: bool,
+    /// `boolean cancelable = false`
+    pub cancelable: bool,
+    /// `boolean composed = false`
+    pub composed: bool,
+    /// `DOMString statusMessage = ""`
+    pub status_message: String,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for WebGLContextEventInit {
+    fn default() -> Self {
+        WebGLContextEventInit {
+            bubbles: false,
+            cancelable: false,
+            composed: false,
+            status_message: String::from(""),
+        }
+    }
+}
+
+impl WebGLContextEventInit {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "WebGLContextEventInit")?;
+        let m_bubbles = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("bubbles");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_cancelable = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("cancelable");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_composed = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("composed");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_status_message = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("statusMessage");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    String::from("")
+                } else {
+                    rt::to_dom_string(scope, v)?
+                }
+            }
+            None => String::from(""),
+        };
+        Some(WebGLContextEventInit {
+            bubbles: m_bubbles,
+            cancelable: m_cancelable,
+            composed: m_composed,
+            status_message: m_status_message,
+        })
+    }
+}
+
+impl ToJs for WebGLContextEventInit {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.bubbles.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("bubbles");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.cancelable.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("cancelable");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.composed.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("composed");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.status_message.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("statusMessage");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
 /// `dictionary WebInstallResult` (install-element.idl).
 #[derive(Clone)]
 pub struct WebInstallResult {}
@@ -53534,6 +54062,70 @@ impl ToJs for BooleanOrUnrestrictedDoubleOrString {
     }
 }
 
+/// `(CanvasRenderingContext2D or WebGLRenderingContext)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum CanvasRenderingContext2DOrWebGLRenderingContext {
+    CanvasRenderingContext2D(Handle),
+    WebGLRenderingContext(Handle),
+}
+
+impl CanvasRenderingContext2DOrWebGLRenderingContext {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(
+            v,
+            ids::CANVAS_RENDERING_CONTEXT2_D,
+            ids::CANVAS_RENDERING_CONTEXT2_D_END,
+        )
+        .is_some()
+        {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CANVAS_RENDERING_CONTEXT2_D,
+                ids::CANVAS_RENDERING_CONTEXT2_D_END,
+                "The value",
+                "CanvasRenderingContext2D",
+            ))
+            .map(CanvasRenderingContext2DOrWebGLRenderingContext::CanvasRenderingContext2D);
+        }
+        if rt::unwrap_value(
+            v,
+            ids::WEB_GL_RENDERING_CONTEXT,
+            ids::WEB_GL_RENDERING_CONTEXT_END,
+        )
+        .is_some()
+        {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::WEB_GL_RENDERING_CONTEXT,
+                ids::WEB_GL_RENDERING_CONTEXT_END,
+                "The value",
+                "WebGLRenderingContext",
+            ))
+            .map(CanvasRenderingContext2DOrWebGLRenderingContext::WebGLRenderingContext);
+        }
+        rt::type_error(
+            scope,
+            "The value is not of type '(CanvasRenderingContext2D or WebGLRenderingContext)'",
+        )
+    }
+}
+
+impl ToJs for CanvasRenderingContext2DOrWebGLRenderingContext {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            CanvasRenderingContext2DOrWebGLRenderingContext::CanvasRenderingContext2D(x) => {
+                x.to_js(scope)
+            }
+            CanvasRenderingContext2DOrWebGLRenderingContext::WebGLRenderingContext(x) => {
+                x.to_js(scope)
+            }
+        }
+    }
+}
+
 /// `(unsigned long or ConstrainULongRange)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -54086,6 +54678,47 @@ impl ToJs for FileOrStringOrFormData {
     }
 }
 
+/// `(Float32Array or sequence<unrestricted float>)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum Float32ArrayOrUnrestrictedFloatSequence {
+    Float32Array(JsObject),
+    UnrestrictedFloatSequence(Vec<f32>),
+}
+
+impl Float32ArrayOrUnrestrictedFloatSequence {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if v.is_float32_array() {
+            return (rt::to_buffer(scope, v, true, "The value"))
+                .map(Float32ArrayOrUnrestrictedFloatSequence::Float32Array);
+        }
+        if v.is_object() && rt::is_iterable(scope, v)? {
+            return ({
+                let mut out = Vec::new();
+                rt::iterate(scope, v, |scope, item| {
+                    out.push(rt::to_float(scope, item, false)?);
+                    Some(())
+                })
+                .map(|_| out)
+            })
+            .map(Float32ArrayOrUnrestrictedFloatSequence::UnrestrictedFloatSequence);
+        }
+        rt::type_error(
+            scope,
+            "The value is not of type '(Float32Array or sequence<unrestricted float>)'",
+        )
+    }
+}
+
+impl ToJs for Float32ArrayOrUnrestrictedFloatSequence {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            Float32ArrayOrUnrestrictedFloatSequence::Float32Array(x) => x.to_js(scope),
+            Float32ArrayOrUnrestrictedFloatSequence::UnrestrictedFloatSequence(x) => x.to_js(scope),
+        }
+    }
+}
+
 /// `(HTMLCollection or Element)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -54417,6 +55050,132 @@ impl ToJs for IDBObjectStoreOrIDBIndexOrIDBCursor {
             IDBObjectStoreOrIDBIndexOrIDBCursor::IDBObjectStore(x) => x.to_js(scope),
             IDBObjectStoreOrIDBIndexOrIDBCursor::IDBIndex(x) => x.to_js(scope),
             IDBObjectStoreOrIDBIndexOrIDBCursor::IDBCursor(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(ImageData or HTMLImageElement or HTMLCanvasElement or HTMLVideoElement)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement {
+    ImageData(Handle),
+    HTMLImageElement(Handle),
+    HTMLCanvasElement(Handle),
+    HTMLVideoElement(Handle),
+}
+
+impl ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(v, ids::IMAGE_DATA, ids::IMAGE_DATA_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::IMAGE_DATA,
+                ids::IMAGE_DATA_END,
+                "The value",
+                "ImageData",
+            ))
+            .map(ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::ImageData);
+        }
+        if rt::unwrap_value(v, ids::HTML_IMAGE_ELEMENT, ids::HTML_IMAGE_ELEMENT_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::HTML_IMAGE_ELEMENT,
+                ids::HTML_IMAGE_ELEMENT_END,
+                "The value",
+                "HTMLImageElement",
+            ))
+            .map(
+                ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLImageElement,
+            );
+        }
+        if rt::unwrap_value(v, ids::HTML_CANVAS_ELEMENT, ids::HTML_CANVAS_ELEMENT_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::HTML_CANVAS_ELEMENT,
+                ids::HTML_CANVAS_ELEMENT_END,
+                "The value",
+                "HTMLCanvasElement",
+            ))
+            .map(
+                ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLCanvasElement,
+            );
+        }
+        if rt::unwrap_value(v, ids::HTML_VIDEO_ELEMENT, ids::HTML_VIDEO_ELEMENT_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::HTML_VIDEO_ELEMENT,
+                ids::HTML_VIDEO_ELEMENT_END,
+                "The value",
+                "HTMLVideoElement",
+            ))
+            .map(
+                ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLVideoElement,
+            );
+        }
+        rt::type_error(scope, "The value is not of type '(ImageData or HTMLImageElement or HTMLCanvasElement or HTMLVideoElement)'")
+    }
+}
+
+impl ToJs for ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::ImageData(x) => {
+                x.to_js(scope)
+            }
+            ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLImageElement(
+                x,
+            ) => x.to_js(scope),
+            ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLCanvasElement(
+                x,
+            ) => x.to_js(scope),
+            ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLVideoElement(
+                x,
+            ) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(Int32Array or sequence<long>)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum Int32ArrayOrLongSequence {
+    Int32Array(JsObject),
+    LongSequence(Vec<i32>),
+}
+
+impl Int32ArrayOrLongSequence {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if v.is_int32_array() {
+            return (rt::to_buffer(scope, v, true, "The value"))
+                .map(Int32ArrayOrLongSequence::Int32Array);
+        }
+        if v.is_object() && rt::is_iterable(scope, v)? {
+            return ({
+                let mut out = Vec::new();
+                rt::iterate(scope, v, |scope, item| {
+                    out.push(rt::to_long(scope, item, rt::IntMode::Wrap)?);
+                    Some(())
+                })
+                .map(|_| out)
+            })
+            .map(Int32ArrayOrLongSequence::LongSequence);
+        }
+        rt::type_error(
+            scope,
+            "The value is not of type '(Int32Array or sequence<long>)'",
+        )
+    }
+}
+
+impl ToJs for Int32ArrayOrLongSequence {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            Int32ArrayOrLongSequence::Int32Array(x) => x.to_js(scope),
+            Int32ArrayOrLongSequence::LongSequence(x) => x.to_js(scope),
         }
     }
 }

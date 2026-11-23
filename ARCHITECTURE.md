@@ -58,6 +58,8 @@ crates/
                    layout → paint is the dependency and painting a fragment tree is layout's job). WIC images.
   snowlark-net       Fetch: HTTP/1.1 and 2 with TLS, cookies, cache, HSTS, mixed-content and CSP checks,
                    blob:/data:, the request policy.
+  snowlark-gl        WebGL's service (docs/webgl.md): the plain-data protocol a page's contexts send, and its
+                   executor on ANGLE (OpenGL ES over Direct3D 11), loaded at run time.
   snowlark-ipc       The process boundary (docs/process-isolation.md section 7): pipes on one IO thread,
                    sections, handle passing, framing, send and call, Untrusted<T>, process launch, a loopback.
   snowlark-idb       IndexedDB's storage, free of V8: keys and key paths, databases with object stores and
@@ -162,7 +164,7 @@ proxy) across its navigations. They share the address space all the same. The mo
 `docs/process-isolation.md`.
 
 **Security defaults.** Mixed content blocked, HSTS persisted, file:// isolated, CSP enforced from the start,
-`unsafe` only in snowlark-js, snowlark-paint, snowlark-media's Windows half, snowlark-ipc and the generated
+`unsafe` only in snowlark-js, snowlark-paint, snowlark-media's Windows half, snowlark-ipc, snowlark-gl (its calls into ANGLE) and the generated
 bindings, each `unsafe` block with a comment saying what invariant makes it sound.
 
 **Testing from day one.** `snowlark --wpt <list> <outdir>` runs web-platform-tests headless; `tools/wpt/run.py`
@@ -186,7 +188,10 @@ M0 to M5 are done. Process isolation (renderer, GPU and network processes, a san
 A password manager (saving and filling logins, an encrypted store, `snowlark://passwords`) is built in four
 stages: `docs/password-manager.md`.
 
-Planned after the Windows build is complete: **Linux**. Snowlark runs only on Windows today; the platform parts
-(painting and text, GPU compositing, media decoding, the window and input, the process sandbox, the OS calls in
-`snowlark-shell`) each need a Linux counterpart behind the same interfaces, so that the engine crates stay
-platform-free. A design document that lists those parts and the order to port them comes first.
+WebGL runs on ANGLE (OpenGL ES over Direct3D 11) behind a command protocol that can cross a process boundary, in
+four stages from a WebGL 1 context to conformance and WebGL 2: `docs/webgl.md`.
+
+Planned after the Windows build is complete: **Linux, then macOS**. Snowlark runs only on Windows today; the
+platform parts (painting and text, GPU compositing, media decoding, the window and input, the process sandbox, the OS
+calls in `snowlark-shell`) each need a Linux and a macOS counterpart behind the same interfaces, so that the engine
+crates stay platform-free. A design document that lists those parts and the order to port them comes first.

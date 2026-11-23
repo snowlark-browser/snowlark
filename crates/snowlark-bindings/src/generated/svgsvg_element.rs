@@ -509,20 +509,18 @@ pub(crate) fn op_get_intersection_list<D: Dom, const LO: u16, const HI: u16>(cal
         }?;
         let a1 = {
             let v = call.arg(1);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_interface(
-                        scope,
-                        v,
-                        ids::SVG_ELEMENT,
-                        ids::SVG_ELEMENT_END,
-                        "Failed to execute 'getIntersectionList': parameter 2",
-                        "SVGElement",
-                    ))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_interface(
+                    scope,
+                    v,
+                    ids::SVG_ELEMENT,
+                    ids::SVG_ELEMENT_END,
+                    "Failed to execute 'getIntersectionList': parameter 2",
+                    "SVGElement",
+                ))
+                .map(Some)
             }
         }?;
         let r = {
@@ -560,20 +558,18 @@ pub(crate) fn op_get_enclosure_list<D: Dom, const LO: u16, const HI: u16>(call: 
         }?;
         let a1 = {
             let v = call.arg(1);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_interface(
-                        scope,
-                        v,
-                        ids::SVG_ELEMENT,
-                        ids::SVG_ELEMENT_END,
-                        "Failed to execute 'getEnclosureList': parameter 2",
-                        "SVGElement",
-                    ))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_interface(
+                    scope,
+                    v,
+                    ids::SVG_ELEMENT,
+                    ids::SVG_ELEMENT_END,
+                    "Failed to execute 'getEnclosureList': parameter 2",
+                    "SVGElement",
+                ))
+                .map(Some)
             }
         }?;
         let r = {

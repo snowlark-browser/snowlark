@@ -142,10 +142,13 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   attribute-node paths are not implemented. Frames share the top-level document's time origin. (ref 33)
 - **XPath resolvers from another realm.** When a namespace resolver made in another frame is not callable, the
   `TypeError` is created and reported in the calling frame instead of the resolver's. (ref 661)
-- **No WebGL, `OffscreenCanvas` or WebGPU.** `getContext('webgl')` returns null, and `OffscreenCanvas` and
-  `navigator.gpu` are absent. Pages fall back to their 2D-canvas drawing where they have one: Google Maps then
-  zooms without its animation, the imagery grey until the new level's tiles arrive, as in Chrome with WebGL
-  off. (ref 117, 682)
+- **WebGL 1 only, without extensions or image textures; no WebGL 2, `OffscreenCanvas` or WebGPU.**
+  `getContext('webgl')` gives a WebGL 1 context (`docs/webgl.md`), but `getSupportedExtensions()` is empty,
+  textures load only from typed arrays (not from images, canvases or video), and `getContext('webgl2')`,
+  `OffscreenCanvas` and `navigator.gpu` are absent. Pages that need those fall back to their 2D-canvas drawing
+  where they have one: Google Maps then zooms without its animation, the imagery grey until the new level's tiles
+  arrive. WebGL objects are freed only with the page. The release package does not carry WebGL's libraries yet.
+  (ref 117, 682, 700, 701)
 - **Service workers.** `navigator.serviceWorker` and the Cache API are not implemented. Pages that check for service
   workers print a warning. (ref 127)
 - **IndexedDB.** Names with lone surrogates are not supported, there is no storage partitioning by top-level site,
@@ -212,6 +215,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Very short clips.** A two-frame autoplaying MP4 stays at `HAVE_METADATA` (no `loadeddata` or `canplay`) yet
   plays to its end, fires `ended` twice and rejects its `play()` promise with `AbortError`. Its load also waits
   until the element is in a document. (ref 709)
+- **Long lines in some text areas.** Text typed into some text areas (GitHub's comment box) runs off the
+  right edge instead of wrapping. (ref 723)
+- **Saving passwords on some sites.** Snowlark does not yet offer to save the password after signing
+  in on some sites, such as Hacker News. (ref 727)
 
 ## Editing and input
 

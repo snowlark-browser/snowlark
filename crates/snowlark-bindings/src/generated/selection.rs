@@ -587,20 +587,18 @@ pub(crate) fn op_collapse<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) 
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_interface(
-                        scope,
-                        v,
-                        ids::NODE,
-                        ids::NODE_END,
-                        "Failed to execute 'collapse': parameter 1",
-                        "Node",
-                    ))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_interface(
+                    scope,
+                    v,
+                    ids::NODE,
+                    ids::NODE_END,
+                    "Failed to execute 'collapse': parameter 1",
+                    "Node",
+                ))
+                .map(Some)
             }
         }?;
         let a1 = {
@@ -635,20 +633,18 @@ pub(crate) fn op_set_position<D: Dom, const LO: u16, const HI: u16>(call: rt::Ca
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_interface(
-                        scope,
-                        v,
-                        ids::NODE,
-                        ids::NODE_END,
-                        "Failed to execute 'setPosition': parameter 1",
-                        "Node",
-                    ))
-                    .map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_interface(
+                    scope,
+                    v,
+                    ids::NODE,
+                    ids::NODE_END,
+                    "Failed to execute 'setPosition': parameter 1",
+                    "Node",
+                ))
+                .map(Some)
             }
         }?;
         let a1 = {

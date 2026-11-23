@@ -12,6 +12,7 @@ snowlark-bindings = { path = "../snowlark-bindings" }
 snowlark-js = { path = "../snowlark-js" }
 snowlark-net = { path = "../snowlark-net" }
 snowlark-render = { path = "../snowlark-render" }
+snowlark-gl = { path = "../snowlark-gl" }
 snowlark-style = { path = "../snowlark-style" }
 snowlark-layout = { path = "../snowlark-layout" }
 snowlark-paint = { path = "../snowlark-paint" }

@@ -250,12 +250,10 @@ pub(crate) fn op_set_form_value<D: Dom, const LO: u16, const HI: u16>(call: rt::
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (FileOrStringOrFormData::from_js(scope, v)).map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (FileOrStringOrFormData::from_js(scope, v)).map(Some)
             }
         }?;
         let a1 = {

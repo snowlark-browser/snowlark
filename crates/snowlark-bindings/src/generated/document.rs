@@ -2599,12 +2599,10 @@ pub(crate) fn op_get_elements_by_tag_name_ns<D: Dom, const LO: u16, const HI: u1
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_dom_string(scope, v)).map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_dom_string(scope, v)).map(Some)
             }
         }?;
         let mut a1_buf = [std::mem::MaybeUninit::<u8>::uninit(); 64];
@@ -2705,12 +2703,10 @@ pub(crate) fn op_create_element_ns<D: Dom, const LO: u16, const HI: u16>(call: r
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_dom_string(scope, v)).map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_dom_string(scope, v)).map(Some)
             }
         }?;
         let mut a1_buf = [std::mem::MaybeUninit::<u8>::uninit(); 64];
@@ -3002,12 +2998,10 @@ pub(crate) fn op_create_attribute_ns<D: Dom, const LO: u16, const HI: u16>(call:
     let v = call.with_scope(|scope, mut rv| {
         let a0 = {
             let v = call.arg(0);
-            {
-                if v.is_null_or_undefined() {
-                    Some(None)
-                } else {
-                    (rt::to_dom_string(scope, v)).map(Some)
-                }
+            if v.is_null_or_undefined() {
+                Some(None)
+            } else {
+                (rt::to_dom_string(scope, v)).map(Some)
             }
         }?;
         let mut a1_buf = [std::mem::MaybeUninit::<u8>::uninit(); 64];

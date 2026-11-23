@@ -80,6 +80,7 @@ impl Engine {
 
     /// A canvas's `width` or `height` attribute changed: its context's bitmap is reset.
     pub(crate) fn canvas_resized(&self, el: NodeId) {
+        self.webgl_resized(el);
         let Some(h) = self.canvases.borrow().get(&el).copied() else {
             return;
         };
@@ -220,7 +221,11 @@ impl Engine {
         any
     }
 
-    fn show_canvas_frame(&self, el: NodeId, frame: Option<snowlark_paint::image::Frame>) -> bool {
+    pub(crate) fn show_canvas_frame(
+        &self,
+        el: NodeId,
+        frame: Option<snowlark_paint::image::Frame>,
+    ) -> bool {
         let Some(frame) = frame else {
             return false;
         };
@@ -447,20 +452,31 @@ impl HTMLCanvasElementImpl for Engine {
         self.set_dim_attr(cx, self.n(this), "height", value, 150);
         Ok(())
     }
-    /// HTML §4.12.5 `getContext(contextId)`: "2d" (other context types are not supported: null).
+    /// HTML §4.12.5 `getContext(contextId, options)`: "2d", "webgl" (and its old name
+    /// "experimental-webgl"); a canvas keeps the kind of context it first gave (another kind is
+    /// null); other kinds are not supported (null).
     fn get_context(
         &self,
-        _cx: &mut Cx,
+        cx: &mut Cx,
         this: Handle,
         context_id: &str,
-        _options: JsValue,
-    ) -> rt::Result<Option<Handle>> {
+        options: JsValue,
+    ) -> rt::Result<Option<g::CanvasRenderingContext2DOrWebGLRenderingContext>> {
+        use g::CanvasRenderingContext2DOrWebGLRenderingContext as R;
         let el = self.n(this);
-        if context_id != "2d" {
+        if context_id == "webgl" || context_id == "experimental-webgl" {
+            if self.canvases.borrow().contains_key(&el) {
+                return Ok(None);
+            }
+            return Ok(self
+                .webgl_get_context(cx, el, &options)?
+                .map(R::WebGLRenderingContext));
+        }
+        if context_id != "2d" || self.has_webgl(el) {
             return Ok(None);
         }
         if let Some(h) = self.canvases.borrow().get(&el) {
-            return Ok(Some(*h));
+            return Ok(Some(R::CanvasRenderingContext2D(*h)));
         }
         let (w, h) = self.canvas_size(el);
         let ctx = self.alloc(Object::Canvas2D(Box::new(ContextObj {
@@ -470,7 +486,7 @@ impl HTMLCanvasElementImpl for Engine {
             stroke_object: None,
         })));
         self.canvases.borrow_mut().insert(el, ctx);
-        Ok(Some(ctx))
+        Ok(Some(R::CanvasRenderingContext2D(ctx)))
     }
     /// `toDataURL()`: a PNG of the bitmap.
     fn to_data_url(
@@ -484,6 +500,13 @@ impl HTMLCanvasElementImpl for Engine {
         let (w, h) = self.canvas_size(el);
         if w == 0 || h == 0 {
             return Ok(DomStr::Borrowed("data:,"));
+        }
+        if let Some(frame) = self.webgl_snapshot(el) {
+            let png = cv::pixmap_from_frame(&frame).and_then(|p| p.encode_png().ok());
+            return Ok(DomStr::Owned(match png {
+                Some(bytes) => format!("data:image/png;base64,{}", base64_encode(&bytes)),
+                None => "data:,".into(),
+            }));
         }
         let ctx = self.canvases.borrow().get(&el).copied();
         let pixmap = match ctx {

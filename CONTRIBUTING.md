@@ -174,7 +174,7 @@ describes the micro benchmarks (`bench/micro`, `tools/micro-bench/run.py`), the 
   `idl/`. If an interface or member is missing, add its implementation; never add an ad-hoc V8 property.
 - **Dependency direction** is as `ARCHITECTURE.md` draws it. `snowlark-dom` must not depend on V8, style or
   layout. A lower crate that needs something from above gets a trait or a callback.
-- **`unsafe`** only in `snowlark-js`, `snowlark-paint`, `snowlark-media/src/win`, `snowlark-ipc` and generated
+- **`unsafe`** only in `snowlark-js`, `snowlark-paint`, `snowlark-media/src/win`, `snowlark-ipc`, `snowlark-gl` and generated
   code, each block with a `// SAFETY:` comment.
 - **Process isolation** ([docs/process-isolation.md](docs/process-isolation.md)): no new shared object in
   `TabContext`, `DriverContext` or `PageOptions` without a message-shaped trait. No `std::fs` or OS calls in

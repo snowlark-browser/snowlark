@@ -183,6 +183,8 @@ SVGPathElement.getTotalLength: not shipped (a later level's proposal)
 SVGPathElement.pathLength: not shipped (a later level's proposal)
 StorageManager.getDirectory(): interface FileSystemDirectoryHandle is not generated
 VTTCue.region: interface VTTRegion is not generated
+WebGLRenderingContext.drawingBufferStorage: sized drawing buffer formats are not implemented
+WebGLRenderingContext.makeXRCompatible: WebXR is not implemented
 Window.caches: interface CacheStorage is not generated
 Window.cookieStore: interface CookieStore is not generated
 Window.crashReport: interface CrashReportContext is not generated
