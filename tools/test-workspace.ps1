@@ -5,6 +5,9 @@
 # Runs every crate's tests once, the way a change is checked before it is merged, and prints a short summary.
 #
 #   .\tools\test-workspace.ps1                      every crate (`--workspace`)
+#   .\tools\test-workspace.ps1 -Affected            the crates the branch changes (against its merge base with
+#                                                   origin/main, or -Base <rev>) and every crate depending on them
+#                                                   (-ListOnly: print them and stop)
 #   .\tools\test-workspace.ps1 -Packages a,b        only those crates
 #   .\tools\test-workspace.ps1 -FromLog <file>      summarise an earlier run's log without running anything
 #
@@ -17,12 +20,99 @@
 
 param(
     [string[]]$Packages = @(),
+    [switch]$Affected,
+    [switch]$ListOnly,
+    [string]$Base = '',
     [string]$Log = '',
     [string]$FromLog = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
+
+# The crates a change can break: those whose files it touches, those whose vendored or IDL inputs it touches, and
+# every crate that depends on one of them (normal, dev or build dependency, transitively). A change to the
+# workspace's own build files counts as touching every crate.
+function Get-AffectedCrates([string]$base) {
+    $crates = @{}
+    $deps = @{}
+    foreach ($dir in Get-ChildItem (Join-Path $repo 'crates') -Directory) {
+        $toml = Join-Path $dir.FullName 'Cargo.toml'
+        if (-not (Test-Path $toml)) { continue }
+        $text = Get-Content -Raw -Encoding utf8 $toml
+        $name = if ($text -match '(?m)^name\s*=\s*"([^"]+)"') { $Matches[1] } else { $dir.Name }
+        $crates[$dir.Name] = [pscustomobject]@{ Name = $name; Text = $text }
+        $deps[$name] = @([regex]::Matches($text, 'path\s*=\s*"\.\./([^"/]+)"') | ForEach-Object { $_.Groups[1].Value })
+    }
+    $dirToName = @{}
+    foreach ($k in $crates.Keys) { $dirToName[$k] = $crates[$k].Name }
+    if (-not $base) {
+        $base = (git -C $repo merge-base origin/main HEAD 2>$null)
+        if (-not $base) { $base = 'origin/main' }
+    }
+    $files = @(git -C $repo diff --name-only $base) + @(git -C $repo ls-files --others --exclude-standard)
+    $seeds = @{}
+    $all = $false
+    $why = New-Object System.Collections.Generic.List[string]
+    # The WPT gate measures what pages observe in `snowlark --wpt`. Every crate that mode links and runs counts,
+    # which is all of them but the window's browser half (`snowlark-shell`) and the IDL generator; so do the
+    # vendored crates, the IDL, the build files and the WPT runner itself.
+    $gateWhy = New-Object System.Collections.Generic.List[string]
+    foreach ($f in ($files | Where-Object { $_ } | Sort-Object -Unique)) {
+        if (($f -match '^crates/([^/]+)/' -and $Matches[1] -notin @('snowlark-shell', 'snowlark-idl')) -or
+            $f -match '^(vendor/|idl/|tools/wpt/|Cargo\.toml|Cargo\.lock|rust-toolchain|\.cargo/|dev\.ps1)') {
+            if ($gateWhy.Count -lt 3) { $gateWhy.Add($f) }
+        }
+        if ($f -match '^crates/([^/]+)/') {
+            if ($dirToName.ContainsKey($Matches[1])) { $seeds[$dirToName[$Matches[1]]] = $true }
+        } elseif ($f -match '^vendor/([^/]+)/') {
+            $v = $Matches[1]
+            $users = @($crates.Values | Where-Object { $_.Text -match "(?m)^$([regex]::Escape($v))\s*=" } | ForEach-Object { $_.Name })
+            if ($users.Count -eq 0) { $all = $true; $why.Add("$f (no crate names $v)") } else { foreach ($u in $users) { $seeds[$u] = $true } }
+        } elseif ($f -match '^idl/') {
+            foreach ($u in 'snowlark-idl', 'snowlark-bindings') { if ($deps.ContainsKey($u)) { $seeds[$u] = $true } }
+        } elseif ($f -match '^(Cargo\.toml|Cargo\.lock|rust-toolchain(\.toml)?|\.cargo/|dev\.ps1|build\.rs)') {
+            $all = $true; $why.Add($f)
+        }
+        # Anything else (tools, docs, notes, benchmarks, Markdown) builds into no crate.
+    }
+    if ($all) { return [pscustomobject]@{ All = $true; Crates = @(); Why = $why; Files = $files.Count; Gate = $gateWhy } }
+    $result = @{}
+    $queue = New-Object System.Collections.Generic.Queue[string]
+    foreach ($s in $seeds.Keys) { $result[$s] = $true; $queue.Enqueue($s) }
+    while ($queue.Count -gt 0) {
+        $c = $queue.Dequeue()
+        foreach ($k in $crates.Keys) {
+            $n = $crates[$k].Name
+            if (-not $result.ContainsKey($n)) {
+                $dependsOn = $deps[$n] | ForEach-Object { $dirToName[$_] }
+                if ($dependsOn -contains $c) { $result[$n] = $true; $queue.Enqueue($n) }
+            }
+        }
+    }
+    $list = @($result.Keys | Sort-Object)
+    return [pscustomobject]@{ All = ($list.Count -eq $crates.Count); Crates = $list; Why = $why; Files = $files.Count; Seeds = @($seeds.Keys | Sort-Object); Gate = $gateWhy }
+}
+
+if ($Affected -and -not $FromLog) {
+    $a = Get-AffectedCrates $Base
+    if ($a.Gate.Count -gt 0) {
+        Write-Host "test-workspace: WPT gate needed (pages can observe: $($a.Gate -join ', ')$(if ($a.Gate.Count -ge 3) { ', ...' }))"
+    } else {
+        Write-Host 'test-workspace: WPT gate not needed (nothing `snowlark --wpt` runs has changed)'
+    }
+    if ($a.All) {
+        Write-Host "test-workspace: the change reaches every crate$(if ($a.Why.Count) { ' (' + ($a.Why -join ', ') + ')' }); running all of them"
+        $Packages = @()
+    } elseif ($a.Crates.Count -eq 0) {
+        Write-Host "test-workspace: the change ($($a.Files) files) touches no crate; nothing to test"
+        exit 0
+    } else {
+        Write-Host "test-workspace: changed $($a.Seeds -join ', '); with their dependents: $($a.Crates -join ', ')"
+        $Packages = $a.Crates
+    }
+    if ($ListOnly) { exit 0 }
+}
 
 if ($FromLog) {
     $Log = $FromLog
