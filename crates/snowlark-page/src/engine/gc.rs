@@ -2285,6 +2285,9 @@ impl Engine {
         self.controls_dirty
             .borrow_mut()
             .retain(|n| !freed.contains(n));
+        self.controls_waiting
+            .borrow_mut()
+            .retain(|n| !freed.contains(n));
         self.controls_focused
             .borrow_mut()
             .retain(|n| !freed.contains(n));

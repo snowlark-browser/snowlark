@@ -133,6 +133,8 @@ pub struct DocumentStyles<'a> {
     auto_intrinsic: Cell<bool>,
     /// HTML "PDF viewer supported": PDF `object`s and `embed`s show a nested document.
     pdf_viewer: bool,
+    /// [`crate::adapter::CustomScrollbars`] of the renderer (none: each is cascaded).
+    custom_scrollbars: Option<&'a crate::adapter::CustomScrollbars>,
 }
 
 /// The URL an `object` (`data`) or `embed` (`src`) element would load, when it has one and is not
@@ -285,7 +287,17 @@ impl<'a> DocumentStyles<'a> {
             remembered: None,
             auto_intrinsic: Cell::new(false),
             pdf_viewer: false,
+            custom_scrollbars: None,
         }
+    }
+
+    /// The renderer's custom scroll bars by element, reused while nothing that decides them changed.
+    pub(crate) fn with_custom_scrollbars(
+        mut self,
+        cache: &'a crate::adapter::CustomScrollbars,
+    ) -> Self {
+        self.custom_scrollbars = Some(cache);
+        self
     }
 
     /// Whether the embedder views PDFs inline (HTML "PDF viewer supported").
@@ -759,13 +771,16 @@ impl StyleSource for DocumentStyles<'_> {
             style.remembered = self.remembered.and_then(|m| m.get(&element).copied());
         }
         if crate::adapter::shows_scrollbars(&style.values) {
-            style.custom_scrollbar = crate::adapter::custom_scrollbar(
-                self.engine,
-                self.dom,
-                self.data,
-                &self.env,
-                element,
-            );
+            style.custom_scrollbar = match self.custom_scrollbars {
+                Some(cache) => cache.get(self.engine, self.dom, self.data, &self.env, element),
+                None => crate::adapter::custom_scrollbar(
+                    self.engine,
+                    self.dom,
+                    self.data,
+                    &self.env,
+                    element,
+                ),
+            };
         }
         Some(style)
     }

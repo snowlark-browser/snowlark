@@ -94,6 +94,9 @@ pub struct RenderStats {
     /// that could not be (drawn as images).
     pub svgs_recorded: u64,
     pub svgs_not_recorded: u64,
+    /// Elements' `::-webkit-scrollbar` parts cascaded ([`crate::adapter::CustomScrollbars`]) in the
+    /// current document.
+    pub custom_scrollbars_cascaded: u64,
     /// Boxes laid out, and boxes whose cached fragment was reused.
     pub laid_out: u64,
     pub reused: u64,
@@ -487,6 +490,8 @@ struct Doc {
     /// The viewport's custom scroll bar in the last layout (`::-webkit-scrollbar` on the body or
     /// the root), when it has one.
     viewport_custom_scrollbar: Option<snowlark_layout::style::CustomScrollbar>,
+    /// The elements' custom scroll bars, kept while their styles and the sheets are unchanged.
+    custom_scrollbars: crate::adapter::CustomScrollbars,
     scroll: HashMap<NodeId, Point>,
     requests: usize,
     counts: ResourceCounts,
@@ -1386,6 +1391,7 @@ impl Renderer {
             vertical_scrollbar: false,
             vertical_scrollbar_width: 0.0,
             viewport_custom_scrollbar: None,
+            custom_scrollbars: Default::default(),
             scroll: HashMap::new(),
             requests: 0,
             counts: ResourceCounts::default(),
@@ -4199,7 +4205,8 @@ impl Renderer {
         .with_pdf_viewer(pdf_viewer)
         .with_remembered(&doc.remembered)
         .with_clip_references(&doc.clip_references)
-        .with_filter_references(&doc.filter_references);
+        .with_filter_references(&doc.filter_references)
+        .with_custom_scrollbars(&doc.custom_scrollbars);
         // The restyle records since the last update, as box tree changes.
         let mut counters = false;
         for r in &restyles.elements {
@@ -4348,6 +4355,10 @@ impl Renderer {
             .doc
             .as_ref()
             .map_or(0, |d| d.engine.sheets_generation());
+        s.custom_scrollbars_cascaded = self
+            .doc
+            .as_ref()
+            .map_or(0, |d| d.custom_scrollbars.cascaded());
         s
     }
 
@@ -5779,6 +5790,7 @@ impl Renderer {
         doc.media.retain(|n, _| !freed.contains(n));
         doc.video_frames.retain(|n, _| !freed.contains(n));
         doc.control_states.retain(|n, _| !freed.contains(n));
+        doc.custom_scrollbars.nodes_freed(freed);
         doc.changes.restyled.retain(|c| !freed.contains(&c.node));
         doc.changes.children.retain(|n| !freed.contains(n));
         doc.changes.text.retain(|n| !freed.contains(n));
@@ -6294,7 +6306,10 @@ fn viewport_custom_scrollbar(
     [dom.body(doc.document), Some(root)]
         .into_iter()
         .flatten()
-        .find_map(|e| crate::adapter::custom_scrollbar(&doc.engine, dom, &doc.data, &doc.env, e))
+        .find_map(|e| {
+            doc.custom_scrollbars
+                .get(&doc.engine, dom, &doc.data, &doc.env, e)
+        })
 }
 
 /// The canvas surface's color for the root's used color scheme (CSS Color Adjust 1 §2.4).

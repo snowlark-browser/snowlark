@@ -1068,9 +1068,7 @@ impl Engine {
         self.sync_form_states(None, crate::engine::forms::FormSync::Connected);
         // (a control's state set by script, such as a textarea's value, decides its box: the read
         // measures it, not what the last rendering update showed)
-        if !self.controls_dirty.borrow().is_empty() {
-            self.sync_controls();
-        }
+        self.sync_marked_controls();
         let now = self.document_time(doc);
         let top = self.rendered_top() == Some(doc);
         self.with_doc_renderer(doc, |r, st| {
@@ -1444,6 +1442,7 @@ impl Engine {
             return;
         }
         let mut els: Vec<NodeId> = self.controls_dirty.borrow_mut().drain().collect();
+        els.extend(self.controls_waiting.borrow_mut().drain());
         if self.controls_resync.replace(false) {
             els.extend(self.html.borrow().controls.keys().copied());
         }
@@ -1455,7 +1454,33 @@ impl Engine {
         }
         els.extend(focused.iter().copied());
         els.extend(self.controls_focused.replace(focused));
-        // (controls of documents not rendered wait for theirs: one adopted into a rendered document
+        self.hand_controls_over(els);
+    }
+
+    /// For a forced layout: the controls whose state script changed since the last rendering
+    /// update (`controls_dirty`), as a read measures them (a textarea's value decides its box).
+    /// The focus and the controls of documents not rendered are the rendering update's
+    /// ([`Engine::sync_controls`]): neither changes what a read in a rendered document measures.
+    pub(crate) fn sync_marked_controls(&self) {
+        if self.controls_dirty.borrow().is_empty() || self.rendered_top().is_none() {
+            return;
+        }
+        let els: Vec<NodeId> = self.controls_dirty.borrow_mut().drain().collect();
+        self.hand_controls_over(els);
+    }
+
+    /// How many controls' state was looked at for the renderers since the page started (each
+    /// control of each [`Engine::sync_controls`] and forced layout that had one to look at).
+    pub fn controls_synced(&self) -> u64 {
+        self.controls_synced.get()
+    }
+
+    /// Gives the renderers the state of `els` (controls, or options for their select).
+    fn hand_controls_over(&self, els: Vec<NodeId>) {
+        self.controls_synced
+            .set(self.controls_synced.get() + els.len() as u64);
+        // (controls of documents not rendered wait for theirs, apart from the marked ones so that
+        // they do not hold every forced layout to this: one adopted into a rendered document
         // shows its state there)
         let mut waiting: Vec<NodeId> = Vec::new();
         let mut seen = rustc_hash::FxHashSet::default();
@@ -1507,9 +1532,8 @@ impl Engine {
             }
         }
         // (what the reads above marked is up to date)
-        let mut dirty = self.controls_dirty.borrow_mut();
-        dirty.clear();
-        dirty.extend(waiting);
+        self.controls_dirty.borrow_mut().clear();
+        self.controls_waiting.borrow_mut().extend(waiting);
     }
 
     fn control_render_state(

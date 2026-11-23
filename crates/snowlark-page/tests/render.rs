@@ -2588,6 +2588,37 @@ fn textarea_scroll_height_follows_a_value_set_by_script() {
     assert_eq!(r, "100 40 140");
 }
 
+/// A control whose state was set in a document that is not rendered waits for its document: the
+/// geometry reads of the rendered one look at no control for it (a forced layout syncs only what
+/// script marked since the last rendering update), and a value set in the rendered one is still
+/// measured by the next read.
+#[test]
+fn a_control_of_a_document_not_rendered_does_not_hold_up_geometry_reads() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0 } textarea { display: block; width: 300px; \
+         border: 0; padding: 0; font: 14px/20px monospace; overflow: hidden }</style>\
+         <textarea id=t rows=1></textarea>",
+    );
+    eval(
+        &mut page,
+        "const d = document.implementation.createHTMLDocument('');
+         window.kept = d.body.appendChild(d.createElement('input'));
+         kept.value = 'x'; t.scrollHeight",
+    );
+    page.update_the_rendering();
+    let before = page.engine().controls_synced();
+    eval(
+        &mut page,
+        "for (let i = 0; i < 50; i++) document.body.offsetHeight",
+    );
+    let looked_at = page.engine().controls_synced() - before;
+    assert_eq!(looked_at, 0);
+    let r = eval(&mut page, "t.value = '1\\n2\\n3'; t.scrollHeight");
+    assert_eq!(r, "60");
+}
+
 /// CSSOM View §6.1 `getBoundingClientRect()`: the union leaves out only rects whose width and
 /// height are both zero, so an inline box's 0-wide piece on a line holding only a `<br>` counts.
 #[test]

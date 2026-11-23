@@ -572,6 +572,12 @@ pub struct Engine {
     /// Form controls whose value, checkedness, selection or focus changed: their rendering follows
     /// at the next rendering update.
     pub(crate) controls_dirty: RefCell<rustc_hash::FxHashSet<NodeId>>,
+    /// Marked controls of documents that were not rendered at the last rendering update: they show
+    /// their state once their document is (kept apart from `controls_dirty`, which a forced layout
+    /// syncs).
+    pub(crate) controls_waiting: RefCell<rustc_hash::FxHashSet<NodeId>>,
+    /// [`Engine::controls_synced`].
+    pub(crate) controls_synced: Cell<u64>,
     /// Every control with page state is synced at the next rendering update (a renderer was made,
     /// which has none of their states).
     pub(crate) controls_resync: Cell<bool>,
@@ -739,6 +745,8 @@ impl Engine {
             forced_states: RefCell::new(Vec::new()),
             devtools_results: RefCell::default(),
             controls_dirty: RefCell::default(),
+            controls_waiting: RefCell::default(),
+            controls_synced: Cell::new(0),
             controls_resync: Cell::new(true),
             controls_focused: RefCell::default(),
             form_states_dirty: RefCell::default(),

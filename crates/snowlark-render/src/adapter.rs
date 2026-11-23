@@ -3365,6 +3365,60 @@ pub(crate) fn custom_scrollbar(
     ))
 }
 
+/// An element's style, the sheets' generation it was cascaded under, and its scroll bar parts.
+type CascadedBars = (ServoArc<ComputedValues>, u64, Option<ls::CustomScrollbar>);
+
+/// [`custom_scrollbar`] by element, kept while the element's computed style and the style sheets
+/// are the ones it was cascaded from: the parts are cascaded from the element's style and the
+/// sheets' rules alone, and a restyle that can change what matches them gives the element a new
+/// style. Cascading them is a full cascade per part (a page whose sheets style
+/// `::-webkit-scrollbar` for every element matches it on every scroll container), so layouts and
+/// style lookups that find nothing restyled reuse it.
+#[derive(Default)]
+pub(crate) struct CustomScrollbars {
+    by_element: std::cell::RefCell<std::collections::HashMap<snowlark_dom::NodeId, CascadedBars>>,
+    /// How many times the parts were cascaded (`RenderStats::custom_scrollbars_cascaded`).
+    cascaded: std::cell::Cell<u64>,
+}
+
+impl CustomScrollbars {
+    /// The custom scroll bars of `element` ([`custom_scrollbar`]).
+    pub(crate) fn get(
+        &self,
+        engine: &snowlark_style::StyleEngine,
+        dom: &snowlark_dom::Dom,
+        data: &snowlark_style::StyleData,
+        env: &Arc<StyleEnv>,
+        element: snowlark_dom::NodeId,
+    ) -> Option<ls::CustomScrollbar> {
+        let values = data.styles_arc(element)?;
+        let generation = engine.sheets_generation();
+        if let Some((v, g, bars)) = self.by_element.borrow().get(&element) {
+            if *g == generation && ServoArc::ptr_eq(v, &values) {
+                return *bars;
+            }
+        }
+        let bars = custom_scrollbar(engine, dom, data, env, element);
+        self.cascaded.set(self.cascaded.get() + 1);
+        self.by_element
+            .borrow_mut()
+            .insert(element, (values, generation, bars));
+        bars
+    }
+
+    /// How many times the parts were cascaded.
+    pub(crate) fn cascaded(&self) -> u64 {
+        self.cascaded.get()
+    }
+
+    /// Forgets the freed elements.
+    pub(crate) fn nodes_freed(&self, freed: &snowlark_dom::NodeSet) {
+        self.by_element
+            .borrow_mut()
+            .retain(|n, _| !freed.contains(n));
+    }
+}
+
 /// Whether `values` make a scroll container that shows scroll bars: `overflow` `auto` or `scroll`
 /// on an axis (CSS Overflow 3 §3).
 pub(crate) fn shows_scrollbars(values: &ComputedValues) -> bool {

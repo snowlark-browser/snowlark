@@ -740,6 +740,52 @@ fn webkit_scrollbar_parts_take_layout_space() {
     );
 }
 
+/// An element's `::-webkit-scrollbar` parts are cascaded once for each of its styles: layouts after
+/// a restyle of other elements take the same bars again, and a restyle that changes the rule they match takes
+/// the new one (here the viewport's bar, from the body).
+#[test]
+fn custom_scroll_bars_are_cascaded_once_per_style() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let url = Url::parse("http://example.test/").unwrap();
+    let mut r = renderer(&net, 800.0, 600.0);
+    r.set_scrollbar_width(17.0);
+    r.load_html(
+        b"<!doctype html><style>::-webkit-scrollbar { width: 10px }\
+          .wide::-webkit-scrollbar { width: 30px }\
+          .box { overflow: auto; height: 100px }</style><body style='margin:0'>\
+          <div class=box><div style='height:300px'></div></div><div id=t style='height:2000px'></div>",
+        &url,
+        None,
+    );
+    fn set(r: &mut Renderer, el: snowlark_dom::NodeId, name: &str, value: &str) {
+        let mut dom = r.dom_mut().unwrap();
+        dom.set_reactions_enabled(true);
+        dom.set_attribute(el, name, value).unwrap();
+        let reactions = dom.take_reactions();
+        drop(dom);
+        r.dom_changed(&reactions);
+    }
+    let viewport = Size::new(800.0, 600.0);
+    r.layout(viewport).unwrap();
+    assert_eq!(r.layout_viewport(viewport).width, 790.0);
+    let first = r.stats().custom_scrollbars_cascaded;
+    assert!(first >= 1);
+    let t = by_id(&r, "t");
+    for height in [2100, 2200, 2300, 2400] {
+        set(&mut r, t, "style", &format!("height:{height}px"));
+        r.layout(viewport).unwrap();
+    }
+    assert_eq!(r.stats().custom_scrollbars_cascaded, first);
+
+    let body = {
+        let dom = r.dom().unwrap();
+        dom.body(r.document().unwrap()).unwrap()
+    };
+    set(&mut r, body, "class", "wide");
+    r.layout(viewport).unwrap();
+    assert_eq!(r.layout_viewport(viewport).width, 770.0);
+}
+
 /// A scroll container's `::-webkit-scrollbar` parts style its scroll bars when it sets neither
 /// `scrollbar-width` nor `scrollbar-color`: `display: none` hides them, the part's `width` is the
 /// bar's, the thumb and track are drawn in their backgrounds, and a state pseudo-class after a part
