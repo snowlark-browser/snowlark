@@ -3339,7 +3339,11 @@ pub fn scrollbar_width(values: &ComputedValues) -> ls::ScrollbarWidth {
 }
 
 /// The custom scroll bars of `element`, when a rule styles its `::-webkit-scrollbar` (the parts'
-/// styles, cascaded from it: [`ls::CustomScrollbar::from_parts`]).
+/// styles, cascaded from it: [`ls::CustomScrollbar::from_parts`]). A rule whose
+/// `::-webkit-scrollbar` takes a pseudo-class (`::-webkit-scrollbar:vertical`) styles a bar but
+/// does not make one: the bars are custom when a rule without one matches. Each
+/// bar's parts are then cascaded for that bar, so the scroll bar pseudo-classes after a part
+/// match its orientation.
 pub(crate) fn custom_scrollbar(
     engine: &snowlark_style::StyleEngine,
     dom: &snowlark_dom::Dom,
@@ -3347,20 +3351,55 @@ pub(crate) fn custom_scrollbar(
     env: &Arc<StyleEnv>,
     element: snowlark_dom::NodeId,
 ) -> Option<ls::CustomScrollbar> {
-    use style::selector_parser::PseudoElement as P;
-    let part = |p: P| {
+    use style::selector_parser::{
+        PseudoElement as P, ScrollbarPart, ScrollbarPartState, ScrollbarStateFlags as F,
+    };
+    engine.pseudo_style(dom, data, element, &P::WebkitScrollbar)?;
+    let values = data.styles(element)?;
+    // (the bars' state as the cascade knows it, before layout: the corner shows when both bars
+    // always do; a bar has something to scroll, as `:enabled`; the platform's bars have buttons)
+    let corner_present = {
+        use style::values::specified::box_::Overflow as O;
+        let b = values.get_box();
+        b.overflow_x == O::Scroll && b.overflow_y == O::Scroll
+    };
+    let mut flags = F::ENABLED | F::HAS_BUTTONS;
+    flags.set(F::CORNER_PRESENT, corner_present);
+    let part = |p: P, part: ScrollbarPart, flags: F| {
+        let state = ScrollbarPartState {
+            part,
+            flags,
+            ..ScrollbarPartState::default()
+        };
         engine
-            .pseudo_style(dom, data, element, &p)
+            .scrollbar_part_style(dom, data, element, &p, state)
             .map(|v| RenderStyle::new(v, env.clone()))
     };
-    let bar = part(P::WebkitScrollbar)?;
-    let thumb = part(P::WebkitScrollbarThumb);
-    let track = part(P::WebkitScrollbarTrack);
-    let corner = part(P::WebkitScrollbarCorner);
+    let bar = |flags: F| {
+        (
+            part(P::WebkitScrollbar, ScrollbarPart::Bar, flags),
+            part(P::WebkitScrollbarThumb, ScrollbarPart::Thumb, flags),
+            part(P::WebkitScrollbarTrack, ScrollbarPart::Track, flags),
+        )
+    };
+    let vertical = bar(flags | F::VERTICAL);
+    let horizontal = bar(flags);
+    let corner = part(P::WebkitScrollbarCorner, ScrollbarPart::Corner, flags);
+    type Parts = (
+        Option<RenderStyle>,
+        Option<RenderStyle>,
+        Option<RenderStyle>,
+    );
+    fn styles((bar, thumb, track): &Parts) -> Option<ls::CustomBarStyles<'_, RenderStyle>> {
+        Some(ls::CustomBarStyles {
+            bar: bar.as_ref()?,
+            thumb: thumb.as_ref(),
+            track: track.as_ref(),
+        })
+    }
     Some(ls::CustomScrollbar::from_parts(
-        &bar,
-        thumb.as_ref(),
-        track.as_ref(),
+        styles(&vertical)?,
+        styles(&horizontal)?,
         corner.as_ref(),
     ))
 }

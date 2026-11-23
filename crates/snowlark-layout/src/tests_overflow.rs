@@ -616,13 +616,15 @@ fn custom_bars(w: f32) -> Option<CustomScrollbar> {
     Some(CustomScrollbar {
         vertical: Some(w),
         horizontal: Some(w),
-        thumb: Some(CustomScrollbarThumb {
-            color: snowlark_paint::Color::rgb(255, 0, 0),
-            radius: (0.0, 0.0),
-            inset: 0.0,
-            min_length: [None, None],
-        }),
-        track: Some(snowlark_paint::Color::rgb(0, 0, 255)),
+        bars: [CustomBar {
+            thumb: Some(CustomScrollbarThumb {
+                color: snowlark_paint::Color::rgb(255, 0, 0),
+                radius: (0.0, 0.0),
+                inset: 0.0,
+                min_length: None,
+            }),
+            track: Some(snowlark_paint::Color::rgb(0, 0, 255)),
+        }; 2],
         corner: None,
     })
 }
@@ -735,11 +737,10 @@ fn custom_scroll_bars_are_drawn_in_their_space() {
     let a = scroller(&mut t, r0, |s| {
         s.overflow_x = Overflow::Hidden;
         s.custom_scrollbar = custom_bars(8.0);
-        if let Some(CustomScrollbar {
-            thumb: Some(thumb), ..
-        }) = &mut s.custom_scrollbar
-        {
-            thumb.min_length[0] = Some(40.0);
+        if let Some(CustomScrollbar { bars, .. }) = &mut s.custom_scrollbar {
+            if let Some(thumb) = &mut bars[0].thumb {
+                thumb.min_length = Some(40.0);
+            }
         }
     });
     t.doc.block(a, |s| s.height = SizeValue::px(400.0));

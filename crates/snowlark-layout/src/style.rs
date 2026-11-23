@@ -728,18 +728,26 @@ pub struct CustomScrollbar {
     pub vertical: Option<f32>,
     /// The horizontal bar's height, as `vertical`.
     pub horizontal: Option<f32>,
+    /// The vertical bar's thumb and track, and the horizontal bar's: each bar's parts are
+    /// cascaded for it (`::-webkit-scrollbar-thumb:vertical`).
+    pub bars: [CustomBar; 2],
+    /// The scroll corner's color (`::-webkit-scrollbar-corner`'s background, where two bars meet),
+    /// `None` when no rule styles it or it is transparent.
+    pub corner: Option<Color>,
+}
+
+/// One bar of a [`CustomScrollbar`]: its thumb and track.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CustomBar {
     /// The thumb (`::-webkit-scrollbar-thumb`), `None` when it is not drawn: no rule styles it,
     /// or `display: none`.
     pub thumb: Option<CustomScrollbarThumb>,
     /// The track's color (`::-webkit-scrollbar-track`'s background, else
     /// `::-webkit-scrollbar`'s), `None` when transparent.
     pub track: Option<Color>,
-    /// The scroll corner's color (`::-webkit-scrollbar-corner`'s background, where two bars meet),
-    /// `None` when no rule styles it or it is transparent.
-    pub corner: Option<Color>,
 }
 
-/// The thumb of a [`CustomScrollbar`].
+/// The thumb of a [`CustomBar`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CustomScrollbarThumb {
     pub color: Color,
@@ -748,32 +756,40 @@ pub struct CustomScrollbarThumb {
     /// How far the painted thumb stands in from each side of the bar across it: its border, when
     /// `background-clip` leaves the border out (CSS px).
     pub inset: f32,
-    /// Its shortest length on the vertical bar and on the horizontal one (CSS px): the part's
-    /// `height` (`width`) or `min-height` (`min-width`), the larger; `None` where both are
-    /// `auto` (the automatic thumb's minimum).
-    pub min_length: [Option<f32>; 2],
+    /// Its shortest length along the bar (CSS px): the part's `height` or `min-height` on the
+    /// vertical bar (`width` or `min-width` on the horizontal one), the larger; `None` where both
+    /// are `auto` (the automatic thumb's minimum).
+    pub min_length: Option<f32>,
+}
+
+/// The styles of one bar's parts, for [`CustomScrollbar::from_parts`]: `::-webkit-scrollbar`'s,
+/// and `-thumb`'s and `-track`'s when a rule styles them.
+#[derive(Clone, Copy, Debug)]
+pub struct CustomBarStyles<'a, S> {
+    pub bar: &'a S,
+    pub thumb: Option<&'a S>,
+    pub track: Option<&'a S>,
 }
 
 impl CustomScrollbar {
-    /// The bars the styles of the parts say: `bar` is `::-webkit-scrollbar`'s, `thumb` and `track`
-    /// those of `-thumb`, `-track` and `-corner` when a rule styles them. A part is drawn as its background
-    /// color; a bar's thickness is its `width` (vertical) or `height` (horizontal), percentages
-    /// against nothing (zero), `auto` the automatic bar's, and none for `display: none`.
+    /// The bars the styles of the parts say: the vertical bar's and the horizontal bar's parts,
+    /// each cascaded for its bar, and `-corner`'s when a rule styles it. A part is drawn as its
+    /// background color; a bar's thickness is its `width` (vertical) or `height` (horizontal),
+    /// percentages against nothing (zero), `auto` the automatic bar's, and none for
+    /// `display: none`.
     pub fn from_parts<S: Style>(
-        bar: &S,
-        thumb: Option<&S>,
-        track: Option<&S>,
+        vertical: CustomBarStyles<'_, S>,
+        horizontal: CustomBarStyles<'_, S>,
         corner: Option<&S>,
     ) -> CustomScrollbar {
-        let hidden = bar.display() == Display::None;
         // (whole CSS px, as the bar's part is sized; a percentage of nothing is zero; `min-*`
         // and `max-*` bound it, `auto` being the automatic thickness there too)
         let length = |v: SizeValue| match v {
             SizeValue::LengthPercentage(l) => l.resolve(0.0).max(0.0).trunc(),
             _ => Self::AUTO_THICKNESS,
         };
-        let thickness = |v: SizeValue, min: SizeValue, max: MaxSizeValue| {
-            if hidden {
+        let thickness = |bar: &S, v: SizeValue, min: SizeValue, max: MaxSizeValue| {
+            if bar.display() == Display::None {
                 return Some(0.0);
             }
             let bounded =
@@ -801,33 +817,34 @@ impl CustomScrollbar {
                 (a, b) => a.or(b),
             }
         };
-        let thumb = thumb
-            .filter(|t| t.display() != Display::None)
-            .and_then(|t| {
-                let (r, _) = t.phys_border_radius(Corner::TopLeft);
-                Some(CustomScrollbarThumb {
-                    color: fill(t)?,
-                    radius: (r.length, r.percent.unwrap_or(0.0)),
-                    inset: if t.background_color_layer().clip == BoxArea::BorderBox {
-                        0.0
-                    } else {
-                        t.phys_border_width(Side::Left)
-                    },
-                    min_length: [
-                        min_length(t.phys_height(), t.phys_min_height()),
-                        min_length(t.phys_width(), t.phys_min_width()),
-                    ],
-                })
-            });
+        let parts = |b: CustomBarStyles<'_, S>, is_vertical: bool| CustomBar {
+            thumb: b
+                .thumb
+                .filter(|t| t.display() != Display::None)
+                .and_then(|t| {
+                    let (r, _) = t.phys_border_radius(Corner::TopLeft);
+                    Some(CustomScrollbarThumb {
+                        color: fill(t)?,
+                        radius: (r.length, r.percent.unwrap_or(0.0)),
+                        inset: if t.background_color_layer().clip == BoxArea::BorderBox {
+                            0.0
+                        } else {
+                            t.phys_border_width(Side::Left)
+                        },
+                        min_length: if is_vertical {
+                            min_length(t.phys_height(), t.phys_min_height())
+                        } else {
+                            min_length(t.phys_width(), t.phys_min_width())
+                        },
+                    })
+                }),
+            track: b.track.and_then(fill).or_else(|| fill(b.bar)),
+        };
+        let (v, h) = (vertical.bar, horizontal.bar);
         CustomScrollbar {
-            vertical: thickness(bar.phys_width(), bar.phys_min_width(), bar.phys_max_width()),
-            horizontal: thickness(
-                bar.phys_height(),
-                bar.phys_min_height(),
-                bar.phys_max_height(),
-            ),
-            thumb,
-            track: track.and_then(fill).or_else(|| fill(bar)),
+            vertical: thickness(v, v.phys_width(), v.phys_min_width(), v.phys_max_width()),
+            horizontal: thickness(h, h.phys_height(), h.phys_min_height(), h.phys_max_height()),
+            bars: [parts(vertical, true), parts(horizontal, false)],
             corner: corner
                 .filter(|c| c.display() != Display::None)
                 .and_then(fill),

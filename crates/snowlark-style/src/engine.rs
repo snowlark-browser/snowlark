@@ -4378,6 +4378,38 @@ impl StyleEngine {
         Some(style)
     }
 
+    /// The style of a `::-webkit-scrollbar` part of `element` cascaded in `state`: the part, its
+    /// bar's orientation and what the pointer is over, which the scroll bar pseudo-classes after
+    /// the part (`::-webkit-scrollbar:vertical`, `::-webkit-scrollbar-thumb:hover`) match. `None`
+    /// when no rule matches the part.
+    pub fn scrollbar_part_style(
+        &self,
+        dom: &Dom,
+        data: &StyleData,
+        element: NodeId,
+        pseudo: &PseudoElement,
+        state: style::selector_parser::ScrollbarPartState,
+    ) -> Option<Arc<ComputedValues>> {
+        let primary = self.computed_style(dom, data, element)?;
+        let entered = !thread_state::get().is_layout();
+        if entered {
+            thread_state::enter(ThreadState::LAYOUT);
+        }
+        let style = self.guards_and_view(dom, data, |shared, view| {
+            self.stylist.lazily_compute_scrollbar_part_style(
+                &shared.guards,
+                view.element(element),
+                pseudo,
+                &primary,
+                state,
+            )
+        });
+        if entered {
+            thread_state::exit(ThreadState::LAYOUT);
+        }
+        style
+    }
+
     /// The style `getComputedStyle(element, pseudo)` reads (CSSOM §6.7.1: a pseudo-element's
     /// computed values whether or not it generates a box): [`StyleEngine::pseudo_style`]'s, and
     /// for a pseudo-element no rule creates (a `::before` with no rule, or whose `content` is

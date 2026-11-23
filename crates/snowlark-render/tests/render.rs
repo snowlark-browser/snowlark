@@ -740,6 +740,42 @@ fn webkit_scrollbar_parts_take_layout_space() {
     );
 }
 
+/// The scroll bar pseudo-classes after a `::-webkit-scrollbar` part match the bar it is cascaded
+/// for: `:vertical` sizes the vertical bar and `:horizontal` the horizontal one, and the others
+/// (`:decrement`, `:start`...) match neither bar (only buttons and track pieces). A box whose only
+/// `::-webkit-scrollbar` rules take a pseudo-class has no custom bars.
+#[test]
+fn webkit_scrollbar_pseudo_classes_match_each_bar() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let url = Url::parse("http://example.test/").unwrap();
+    let mut r = renderer(&net, 400.0, 600.0);
+    r.load_html(
+        b"<!doctype html><style>\
+          .o, .p { width: 200px; height: 100px; overflow: scroll }\
+          .o::-webkit-scrollbar { width: 8px; height: 8px }\
+          .o::-webkit-scrollbar:vertical { width: 12px }\
+          .o::-webkit-scrollbar:horizontal:enabled { height: 4px }\
+          .o::-webkit-scrollbar:vertical:decrement, .o::-webkit-scrollbar:start { width: 30px }\
+          .p::-webkit-scrollbar:vertical { width: 12px; height: 12px }\
+          </style><body style='margin:0'>\
+          <div class=o><div id=o style='height:100%'></div></div>\
+          <div class=p><div id=p style='height:100%'></div></div>",
+        &url,
+        None,
+    );
+    r.layout(Size::new(400.0, 600.0)).unwrap();
+    let dom = r.dom().unwrap();
+    let size = |id: &str| {
+        let n = dom
+            .descendants(r.document().unwrap())
+            .find(|&n| dom.is_element(n) && dom.get_attribute(n, "id") == Some(id))
+            .unwrap();
+        let b = r.geometry(n).unwrap().border_box;
+        (b.width, b.height)
+    };
+    assert_eq!([size("o"), size("p")], [(188.0, 96.0), (200.0, 100.0)]);
+}
+
 /// An element's `::-webkit-scrollbar` parts are cascaded once for each of its styles: layouts after
 /// a restyle of other elements take the same bars again, and a restyle that changes the rule they match takes
 /// the new one (here the viewport's bar, from the body).

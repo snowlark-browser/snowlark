@@ -55,10 +55,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 ## CSS and style
 
 - **Custom scroll bars.** `::-webkit-scrollbar` and its thumb and track style a box's scroll bars (hidden, thinner,
-  colored) and take layout space beside the content, but their `:hover` and `:active` rules do not apply, the
-  buttons are not drawn, and the scrollbar pseudo-classes
-  (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
-  parse but style nothing. (ref 627)
+  colored) and take layout space beside the content, and `:horizontal`/`:vertical` style each bar, but their
+  `:hover` and `:active` rules do not apply and the buttons and track pieces are not drawn. The spin, search,
+  slider and date parts of form controls parse but style nothing. (ref 627)
 - **Scroll anchoring, the rest.** The page and the scrollable boxes in it keep what the reader sees in place
   when content above it grows or shrinks, with a focused editable element preferred as the anchor. Not yet:
   the find-in-page match as the preferred anchor, restoring the anchor on back/forward and fragment
@@ -245,7 +244,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   too slow to crash. The Media Source test `an_append_ends_once_however_the_media_side_reports_it` fails in a debug
   build (its `update` and `updateend` events arrive after the check) and passes in optimised builds. (ref 56, 91, 560)
 - **Other test-suite problems.** Debug-profile tests overflow their stack in `snowlark-ipc` and `snowlark-js` (ref 562);
-  `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572); the WPT files
+  `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572), and once
+  stopped with an access violation that did not happen again (ref 707); the WPT files
   `navigation-timing/test-document-open.html` and `fetch/api/abort/general.any.html` vary from run to run
   (ref 60, 563); a headless
   Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py` can read one arm slower than the other for the same binary when the arms share a core (ref 509).

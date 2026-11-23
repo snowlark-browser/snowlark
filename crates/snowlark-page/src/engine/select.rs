@@ -106,6 +106,21 @@ impl Borrow<Namespace> for CssNamespace {
     }
 }
 
+/// The scroll bar pseudo-classes, a compat feature of `::-webkit-scrollbar` parts.
+const SCROLLBAR_PSEUDO_CLASSES: [&str; 11] = [
+    "horizontal",
+    "vertical",
+    "decrement",
+    "increment",
+    "start",
+    "end",
+    "double-button",
+    "single-button",
+    "no-button",
+    "corner-present",
+    "window-inactive",
+];
+
 /// The non-tree-structural pseudo-classes DOM-level matching knows.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PseudoClass {
@@ -141,6 +156,9 @@ pub enum PseudoClass {
     Modal,
     Fullscreen,
     HasSlotted,
+    /// A scroll bar pseudo-class (:horizontal, :decrement...), named without its colon: it only
+    /// matches a ::-webkit-scrollbar part, never an element.
+    Scrollbar(&'static str),
     State(String),
     /// `:dir()` with its argument, lowercased (any identifier parses; only `ltr` and `rtl` match).
     Dir(String),
@@ -183,6 +201,10 @@ impl ToCss for PseudoClass {
             PseudoClass::Modal => ":modal",
             PseudoClass::Fullscreen => ":fullscreen",
             PseudoClass::HasSlotted => ":has-slotted",
+            PseudoClass::Scrollbar(name) => {
+                dest.write_char(':')?;
+                *name
+            }
             PseudoClass::State(s) => {
                 dest.write_str(":state(")?;
                 cssparser::serialize_identifier(s, dest)?;
@@ -215,7 +237,12 @@ impl selectors::parser::NonTSPseudoClass for PseudoClass {
     fn is_user_action_state(&self) -> bool {
         matches!(
             self,
-            PseudoClass::Active | PseudoClass::Hover | PseudoClass::Focus
+            PseudoClass::Active
+                | PseudoClass::Hover
+                | PseudoClass::Focus
+                | PseudoClass::Enabled
+                | PseudoClass::Disabled
+                | PseudoClass::Scrollbar(_)
         )
     }
 }
@@ -357,7 +384,13 @@ impl<'i> selectors::Parser<'i> for SelectorParser {
                 ("has-slotted", PseudoClass::HasSlotted),
             ],
         );
-        pc.ok_or_else(unsupported)
+        pc.or_else(|| {
+            SCROLLBAR_PSEUDO_CLASSES
+                .iter()
+                .find(|n| n.eq_ignore_ascii_case(&name))
+                .map(|n| PseudoClass::Scrollbar(n))
+        })
+        .ok_or_else(unsupported)
     }
 
     fn parse_non_ts_functional_pseudo_class(
@@ -658,6 +691,7 @@ impl selectors::Element for El<'_> {
             }
             PseudoClass::PopoverOpen => e.popover_showing(id),
             PseudoClass::HasSlotted => e.has_slotted(id),
+            PseudoClass::Scrollbar(_) => false,
         }
     }
 

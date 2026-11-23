@@ -3806,14 +3806,15 @@ impl Renderer {
                 ..ViewportScrollbar::default()
             };
         };
-        // (a custom bar's parts: its thumb and track, transparent where no rule colors them)
+        // (a custom bar's parts: its thumb and track, transparent where no rule colors them; the
+        // viewport's bar is the vertical one)
         let custom = self
             .doc
             .as_deref()
             .and_then(|d| d.viewport_custom_scrollbar)
             .map(|c| snowlark_layout::style::ScrollbarColors {
-                thumb: c.thumb.map_or(Color::TRANSPARENT, |t| t.color),
-                track: c.track.unwrap_or(Color::TRANSPARENT),
+                thumb: c.bars[0].thumb.map_or(Color::TRANSPARENT, |t| t.color),
+                track: c.bars[0].track.unwrap_or(Color::TRANSPARENT),
             });
         ViewportScrollbar {
             width,
