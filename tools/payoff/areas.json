@@ -1,0 +1,795 @@
+{
+ "about": "Spec areas and features for tools/payoff/rank.py. Each area: id, title, size (S, M, L: a few days of work, a week or two, longer), spec (where to read), wpt (directory prefixes; a leading ! leaves a directory out), match (regular expressions over signal keys: 'api: <member>', 'ecmascript: <member>', 'css: <sweep supports group>', 'layout: <sweep layout group>', 'scroll: ...', 'exception: <message>'). A signal belongs to the first area that matches it. weights override rank.py's DEFAULT_WEIGHTS.",
+ "weights": {},
+ "ignore_about": "Signals not counted: members no standard asks for (one engine's experiments and private APIs), members specs removed, and CSS with no effect on a screen (speech, printing, installed-app window regions).",
+ "ignore": [
+  "browsingTopics",
+  "featurePolicy",
+  "FeaturePolicy",
+  "^api: (Summarizer|Translator|LanguageModel|LanguageDetector|Writer|Rewriter|Proofreader)\\b",
+  "^api: window\\.(TEMPORARY|PERSISTENT|webkit)",
+  "^api: DOMError\\b",
+  "lastModifiedDate",
+  "zoomAndPan",
+  "PerformanceSoftNavigation|SoftNavigation",
+  "TimelineTrigger",
+  "^api: .*\\b(chrome|Chrome)\\b",
+  "^api: .*(AttributionReporting|attributionSrc|SharedStorage|sharedStorage|Fence|fence|joinAdInterestGroup|runAdAuction|InterestGroup|privateToken|PrivateToken)",
+  "^css: (prop:speak|prop:(-webkit-)?app-region|prop:(-webkit-)?print-color-adjust|rule:page|prop:size)$"
+ ],
+ "areas": [
+  {
+   "id": "scrollbars",
+   "title": "Custom scroll bars (::-webkit-scrollbar, scrollbar-color, scrollbar-width, scrollbar-gutter)",
+   "size": "M",
+   "spec": "CSS Scrollbars Styling 1; CSS Overflow 3 (scrollbar-gutter)",
+   "wpt": [
+    "css/css-scrollbars/"
+   ],
+   "match": [
+    "^css: .*scrollbar",
+    "^layout: .*scrollbar"
+   ]
+  },
+  {
+   "id": "view-transitions",
+   "title": "View Transitions",
+   "size": "L",
+   "spec": "CSS View Transitions 1 and 2",
+   "wpt": [
+    "css/css-view-transitions/"
+   ],
+   "match": [
+    "^css: .*view-transition",
+    "^api: .*(ViewTransition|startViewTransition|activeViewTransition)"
+   ]
+  },
+  {
+   "id": "filter-effects",
+   "title": "Filter effects (filter, backdrop-filter, canvas filter)",
+   "size": "L",
+   "spec": "Filter Effects 1 and 2; HTML canvas 'Filters'",
+   "wpt": [
+    "css/filter-effects/"
+   ],
+   "match": [
+    "^css: .*(prop|kw):(-webkit-)?(backdrop-)?filter\\b",
+    "^css: fn:(blur|drop-shadow|grayscale|sepia|saturate|hue-rotate|invert|brightness|contrast)\\(",
+    "^layout: value: (backdrop-)?filter$"
+   ]
+  },
+  {
+   "id": "masking",
+   "title": "Masking and clipping (mask, -webkit-mask, clip-path)",
+   "size": "M",
+   "spec": "CSS Masking 1",
+   "wpt": [
+    "css/css-masking/"
+   ],
+   "match": [
+    "^css: .*(mask|clip-path)",
+    "^layout: value: (clip-path|mask.*)$"
+   ]
+  },
+  {
+   "id": "multicol",
+   "title": "Multi-column layout",
+   "size": "L",
+   "spec": "CSS Multi-column Layout 1",
+   "wpt": [
+    "css/css-multicol/"
+   ],
+   "match": [
+    "^css: .*(column-(count|width|span|fill|rule|gap|break)|columns\\b|break-(inside|before|after))",
+    "^layout: .*multicol"
+   ]
+  },
+  {
+   "id": "anchor-positioning",
+   "title": "Anchor positioning",
+   "size": "L",
+   "spec": "CSS Anchor Positioning 1",
+   "wpt": [
+    "css/css-anchor-position/"
+   ],
+   "match": [
+    "^css: .*((?<!overflow-)anchor|position-area|position-try|position-visibility|inset-area)",
+    "^css: kw:(left|right|top|bottom|inset[a-z-]*):(left|right|top|bottom|start|end|self-start|self-end|center|inside|outside)$"
+   ]
+  },
+  {
+   "id": "scroll-driven-animations",
+   "title": "Scroll-driven animations (animation-timeline, ScrollTimeline, ViewTimeline)",
+   "size": "L",
+   "spec": "Scroll-driven Animations 1",
+   "wpt": [
+    "scroll-animations/"
+   ],
+   "match": [
+    "^css: .*(animation-timeline|animation-range|scroll-timeline|view-timeline|timeline-scope|fn:scroll\\(|fn:view\\()",
+    "^api: .*(ScrollTimeline|ViewTimeline|Animation\\.prototype\\.range(Start|End))"
+   ]
+  },
+  {
+   "id": "animations",
+   "title": "CSS Animations, Transitions and Web Animations (the rest)",
+   "size": "M",
+   "spec": "CSS Animations 1 and 2, CSS Transitions 1 and 2, Web Animations 1 and 2",
+   "wpt": [
+    "css/css-animations/",
+    "css/css-transitions/",
+    "web-animations/"
+   ],
+   "match": [
+    "^css: .*(animation|transition|interpolate-size|starting-style|calc-size)",
+    "^api: .*(Animation|KeyframeEffect|getAnimations|TransitionEvent)"
+   ]
+  },
+  {
+   "id": "highlights-pseudo",
+   "title": "Highlight pseudo-elements and the Custom Highlight API (::selection, ::highlight, ::target-text, ::spelling-error)",
+   "size": "M",
+   "spec": "CSS Pseudo-Elements 4; CSS Custom Highlight API 1",
+   "wpt": [
+    "css/css-highlight-api/",
+    "css/css-pseudo/"
+   ],
+   "match": [
+    "^css: .*(::highlight|::selection|::target-text|::spelling-error|::grammar-error|::search-text)",
+    "^api: .*(Highlight|CSS\\.highlights)"
+   ]
+  },
+  {
+   "id": "media-text-tracks",
+   "title": "Media elements: text tracks (::cue, WebVTT) and control parts",
+   "size": "M",
+   "spec": "WebVTT; HTML media elements (text tracks)",
+   "wpt": [
+    "webvtt/",
+    "html/semantics/embedded-content/media-elements/track/"
+   ],
+   "match": [
+    "^css: .*(::cue|-webkit-media-)",
+    "^api: .*(TextTrack|VTTCue|VTTRegion)"
+   ]
+  },
+  {
+   "id": "forms-ui",
+   "title": "Form controls and CSS UI (cursor, field-sizing, appearance, accent-color, date and number parts, textarea, button layout)",
+   "size": "M",
+   "spec": "CSS Basic User Interface 4; HTML forms and 'Rendering: form controls'",
+   "wpt": [
+    "css/css-ui/",
+    "html/semantics/forms/",
+    "html/rendering/widgets/"
+   ],
+   "match": [
+    "^css: .*(cursor|field-sizing|appearance|accent-color|caret|-webkit-(date|datetime|inner-spin|outer-spin|search|calendar|file-upload|textfield|contacts)|::placeholder|::file-selector|:autofill|user-invalid|user-valid|placeholder-shown)",
+    "^layout: .*(button|textarea|input|select)"
+   ]
+  },
+  {
+   "id": "fonts",
+   "title": "Fonts (font matching, font-feature and variation settings, font metrics)",
+   "size": "M",
+   "spec": "CSS Fonts 4 and 5",
+   "wpt": [
+    "css/css-fonts/"
+   ],
+   "match": [
+    "^layout: text: (text-width|accumulated|glyph)",
+    "^css: .*(font|@font-face|@font-feature|size-adjust|ascent-override|descent-override)",
+    "^layout: value: font",
+    "^api: .*(FontFace|document\\.fonts)"
+   ]
+  },
+  {
+   "id": "text",
+   "title": "CSS Text and text decoration (text-wrap, word-break, hyphens, text-decoration-skip-ink, text stroke, line clamp)",
+   "size": "M",
+   "spec": "CSS Text 3 and 4; CSS Text Decoration 3 and 4; CSS Overflow 4 (line-clamp)",
+   "wpt": [
+    "css/css-text/",
+    "css/css-text-decor/",
+    "css/css-overflow/line-clamp/"
+   ],
+   "match": [
+    "^css: .*(text-wrap|word-break|line-break|hyphen|text-decoration|text-underline|text-emphasis|text-stroke|text-fill|text-spacing|text-autospace|text-box|white-space|line-clamp|text-size-adjust|word-spacing|letter-spacing|initial-letter)",
+    "^layout: value: (text-|white-space|word-|letter-spacing|line-clamp|-webkit-line-clamp|hyphens)",
+    "^layout: text: (text-wrap|white-space|hyphen|line-break|word-break|overflow-wrap|text-align|ellipsis)",
+    "^css: .*text-align",
+    "^layout: value: (parent:)?text-align"
+   ]
+  },
+  {
+   "id": "ruby",
+   "title": "Ruby layout (ruby-position, ruby-align)",
+   "size": "M",
+   "spec": "CSS Ruby 1",
+   "wpt": [
+    "css/css-ruby/"
+   ],
+   "match": [
+    "^css: .*ruby"
+   ]
+  },
+  {
+   "id": "shapes",
+   "title": "CSS Shapes (shape-outside around floats)",
+   "size": "M",
+   "spec": "CSS Shapes 1",
+   "wpt": [
+    "css/css-shapes/"
+   ],
+   "match": [
+    "^css: .*shape-(outside|margin|image-threshold)"
+   ]
+  },
+  {
+   "id": "container-queries",
+   "title": "Container queries and container units",
+   "size": "M",
+   "spec": "CSS Conditional 5 (container queries)",
+   "wpt": [
+    "css/css-conditional/container-queries/"
+   ],
+   "match": [
+    "^css: .*(container|@container|unit:cq)",
+    "^layout: .*container queries"
+   ]
+  },
+  {
+   "id": "grid",
+   "title": "Grid layout (incl. subgrid, grid-lanes)",
+   "size": "L",
+   "spec": "CSS Grid Layout 2 and 3",
+   "wpt": [
+    "css/css-grid/"
+   ],
+   "match": [
+    "^css: .*grid",
+    "^layout: .*(grid|subgrid)",
+    "^layout: value: (parent:)?grid"
+   ]
+  },
+  {
+   "id": "flexbox-alignment",
+   "title": "Flex layout and box alignment",
+   "size": "M",
+   "spec": "CSS Flexible Box Layout 1; CSS Box Alignment 3",
+   "wpt": [
+    "css/css-flexbox/",
+    "css/css-align/"
+   ],
+   "match": [
+    "^layout: .*flex",
+    "^layout: value: (parent:)?(flex|align-|justify-|place-|order|gap|row-gap|column-gap)",
+    "^css: .*(align-|justify-|place-|flex)"
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Table layout",
+   "size": "M",
+   "spec": "CSS Tables 3; CSS 2 §17",
+   "wpt": [
+    "css/css-tables/"
+   ],
+   "match": [
+    "^layout: .*table"
+   ]
+  },
+  {
+   "id": "positioned",
+   "title": "Positioned layout and floats (absolute, fixed, sticky, floats)",
+   "size": "M",
+   "spec": "CSS Positioned Layout 3; CSS 2 §9.5",
+   "wpt": [
+    "css/css-position/"
+   ],
+   "match": [
+    "^layout: .*(position|float)",
+    "^layout: value: (top|left|right|bottom|inset|position|float|clear|z-index)"
+   ]
+  },
+  {
+   "id": "transforms",
+   "title": "Transforms (2D and 3D, individual transform properties)",
+   "size": "M",
+   "spec": "CSS Transforms 1 and 2",
+   "wpt": [
+    "css/css-transforms/"
+   ],
+   "match": [
+    "^layout: .*transform",
+    "^css: .*(transform|perspective|backface|translate|rotate|scale)"
+   ]
+  },
+  {
+   "id": "overflow-scrolling",
+   "title": "Overflow, scroll anchoring and scroll snap",
+   "size": "M",
+   "spec": "CSS Overflow 3 and 4; CSS Scroll Anchoring 1; CSS Scroll Snap 1",
+   "wpt": [
+    "css/css-overflow/",
+    "css/css-scroll-anchoring/",
+    "css/css-scroll-snap/",
+    "!css/css-overflow/line-clamp/"
+   ],
+   "match": [
+    "^css: .*(overflow|scroll-snap|scroll-margin|scroll-padding|overscroll|scroll-behavior)",
+    "^layout: .*overflow",
+    "^layout: value: (overflow|scroll)"
+   ]
+  },
+  {
+   "id": "aspect-sizing",
+   "title": "Block and inline layout, intrinsic sizing and aspect-ratio",
+   "size": "L",
+   "spec": "CSS 2 §9-10; CSS Sizing 3 and 4; CSS Inline 3; CSS Display 3",
+   "wpt": [
+    "css/css-sizing/",
+    "css/css-inline/",
+    "css/css-display/",
+    "css/CSS2/"
+   ],
+   "match": [
+    "^layout: text: (inline-box|baseline|line-height)",
+    "^layout: .*(block flow|inline|aspect-ratio)",
+    "^layout: value: (width|height|min-|max-|margin|padding|display|vertical-align|line-height|box-sizing|aspect-ratio|contain-intrinsic)",
+    "^css: .*(aspect-ratio|contain-intrinsic|min-content|max-content|fit-content|stretch|-webkit-fill-available|display:)"
+   ]
+  },
+  {
+   "id": "cascade-at-rules",
+   "title": "Cascade and at-rules (@scope, @layer, @property, nesting)",
+   "size": "M",
+   "spec": "CSS Cascade 5 and 6; CSS Nesting 1; CSS Properties and Values API 1",
+   "wpt": [
+    "css/css-cascade/",
+    "css/css-nesting/",
+    "css/css-properties-values-api/"
+   ],
+   "match": [
+    "^css: cssom:(scope|layer|property|nest)",
+    "^css: .*@(scope|layer|property)",
+    "^api: .*(CSSScopeRule|CSSLayer|CSSPropertyRule|CSS\\.registerProperty)"
+   ]
+  },
+  {
+   "id": "color",
+   "title": "CSS Color 4 and 5 (color-mix, relative colors, light-dark, wide gamut)",
+   "size": "M",
+   "spec": "CSS Color 4 and 5",
+   "wpt": [
+    "css/css-color/"
+   ],
+   "match": [
+    "^css: .*(color-mix|light-dark|oklch|oklab|lch\\(|lab\\(|color\\(|contrast-color|from |dynamic-range|color-scheme|forced-color)",
+    "^layout: value: (parent:)?(color|background-color)$"
+   ]
+  },
+  {
+   "id": "values-units",
+   "title": "CSS values and units (math functions, new units, attr(), if())",
+   "size": "M",
+   "spec": "CSS Values and Units 4 and 5",
+   "wpt": [
+    "css/css-values/"
+   ],
+   "match": [
+    "^css: (fn|unit):",
+    "^css: .*(attr\\(|if\\(|round\\(|mod\\(|rem\\(|sibling-)"
+   ]
+  },
+  {
+   "id": "selectors",
+   "title": "Selectors (pseudo-classes and pseudo-elements not claimed above)",
+   "size": "M",
+   "spec": "Selectors 4; CSS Pseudo-Elements 4",
+   "wpt": [
+    "css/selectors/"
+   ],
+   "match": [
+    "^css: (pseudo|attr):"
+   ]
+  },
+  {
+   "id": "backgrounds-images",
+   "title": "Backgrounds, borders and images (image-set, gradients, object-fit, borders)",
+   "size": "M",
+   "spec": "CSS Backgrounds 3; CSS Images 3 and 4",
+   "wpt": [
+    "css/css-backgrounds/",
+    "css/css-images/",
+    "css/css-borders/"
+   ],
+   "match": [
+    "^css: .*(background|border|image-set|cross-fade|gradient|object-fit|object-position|image-rendering|box-shadow)",
+    "^layout: value: (background|border|box-shadow|object-)"
+   ]
+  },
+  {
+   "id": "scroll-rendering",
+   "title": "Scrolling in the window: fixed and sticky content repainted per position, blank rows",
+   "size": "M",
+   "spec": "(rendering: compositing of fixed and sticky layers, tiling)",
+   "wpt": [],
+   "match": [
+    "^scroll: "
+   ]
+  },
+  {
+   "id": "svg",
+   "title": "SVG (SVG 2, SVG animations, SVG as an image)",
+   "size": "L",
+   "spec": "SVG 2; SVG Animations; HTML 'images' (SVG in <img>)",
+   "wpt": [
+    "svg/"
+   ],
+   "match": [
+    "^api: .*SVG",
+    "^layout: .*svg",
+    "^css: .*(paint-order|vector-effect|marker|stroke|fill|stop-color|flood|lighting-color)"
+   ]
+  },
+  {
+   "id": "trusted-types",
+   "title": "Trusted Types",
+   "size": "M",
+   "spec": "Trusted Types",
+   "wpt": [
+    "trusted-types/"
+   ],
+   "match": [
+    "^api: .*(trustedTypes|Trusted(HTML|Script|ScriptURL|TypePolicy))"
+   ]
+  },
+  {
+   "id": "navigation-api",
+   "title": "Navigation API",
+   "size": "L",
+   "spec": "HTML 'Navigation API'",
+   "wpt": [
+    "navigation-api/"
+   ],
+   "match": [
+    "^api: .*(Navigation(History)?Entry|NavigateEvent|NavigationTransition|NavigationDestination|window\\.navigation\\b|^api: Navigation\\b)"
+   ]
+  },
+  {
+   "id": "performance-timing",
+   "title": "Performance timelines (navigation, resource, paint, LCP, layout shift, event timing, long tasks)",
+   "size": "M",
+   "spec": "Performance Timeline; Navigation Timing 2; Resource Timing; Paint Timing; LCP; Layout Instability; Event Timing",
+   "wpt": [
+    "performance-timeline/",
+    "navigation-timing/",
+    "resource-timing/",
+    "paint-timing/",
+    "largest-contentful-paint/",
+    "layout-instability/",
+    "event-timing/",
+    "longtask-timing/",
+    "user-timing/"
+   ],
+   "match": [
+    "^api: .*(Performance|performance\\.|PerformanceObserver|LargestContentfulPaint|LayoutShift|TaskAttribution|VisibilityStateEntry)"
+   ]
+  },
+  {
+   "id": "ua-client-hints",
+   "title": "User-Agent Client Hints (navigator.userAgentData)",
+   "size": "S",
+   "spec": "User-Agent Client Hints",
+   "wpt": [
+    "client-hints/"
+   ],
+   "match": [
+    "^api: .*(userAgentData|NavigatorUAData)"
+   ]
+  },
+  {
+   "id": "input-events",
+   "title": "Pointer, mouse and wheel events (legacy members, coordinates, event order, hit testing)",
+   "size": "M",
+   "spec": "UI Events; Pointer Events 3; CSSOM View (coordinates); HTML (activation)",
+   "wpt": [
+    "pointerevents/",
+    "uievents/",
+    "input-events/"
+   ],
+   "match": [
+    "^api: .*(WheelEvent|MouseEvent|PointerEvent|UIEvent|TouchEvent|Touch\\b|TouchList)"
+   ]
+  },
+  {
+   "id": "intersection-geometry",
+   "title": "Intersection Observer and CSSOM View geometry",
+   "size": "M",
+   "spec": "Intersection Observer; CSSOM View 1",
+   "wpt": [
+    "intersection-observer/",
+    "css/cssom-view/"
+   ],
+   "match": [
+    "^api: .*(IntersectionObserver|ResizeObserver|getClientRects|checkVisibility|scrollIntoView|elementsFromPoint|caretPositionFromPoint|VisualViewport|visualViewport)"
+   ]
+  },
+  {
+   "id": "media-playback",
+   "title": "Media playback (Media Source Extensions, codecs, WebCodecs)",
+   "size": "L",
+   "spec": "Media Source Extensions 2; HTML media elements; WebCodecs",
+   "wpt": [
+    "media-source/",
+    "html/semantics/embedded-content/media-elements/",
+    "webcodecs/",
+    "!html/semantics/embedded-content/media-elements/track/"
+   ],
+   "match": [
+    "^api: .*(MediaSource|SourceBuffer|VideoDecoder|AudioDecoder|VideoEncoder|EncodedVideoChunk|VideoFrame|ImageDecoder|MediaCapabilities|mediaCapabilities|HTMLMediaElement|HTMLVideoElement|PictureInPicture)"
+   ]
+  },
+  {
+   "id": "drm",
+   "title": "Encrypted Media Extensions (protected playback)",
+   "size": "L",
+   "spec": "Encrypted Media Extensions",
+   "wpt": [
+    "encrypted-media/"
+   ],
+   "match": [
+    "^api: .*(MediaKey|requestMediaKeySystemAccess|setMediaKeys)"
+   ]
+  },
+  {
+   "id": "webgl",
+   "title": "WebGL and WebGPU",
+   "size": "L",
+   "spec": "WebGL 1 and 2; WebGPU",
+   "wpt": [
+    "webgl/",
+    "webgpu/"
+   ],
+   "match": [
+    "^api: .*(WebGL|GPU|gpu\\b|ANGLE_|OES_|EXT_|WEBGL_)"
+   ]
+  },
+  {
+   "id": "canvas",
+   "title": "Canvas 2D and OffscreenCanvas",
+   "size": "M",
+   "spec": "HTML 'The canvas element'",
+   "wpt": [
+    "html/canvas/"
+   ],
+   "match": [
+    "^api: .*(CanvasRenderingContext2D|OffscreenCanvas|Path2D|ImageBitmap|createImageBitmap)"
+   ]
+  },
+  {
+   "id": "web-audio",
+   "title": "Web Audio",
+   "size": "L",
+   "spec": "Web Audio API 1.1",
+   "wpt": [
+    "webaudio/"
+   ],
+   "match": [
+    "^api: .*(AudioContext|AudioNode|AudioParam|AudioWorklet|AudioBuffer|OfflineAudioContext|Oscillator|GainNode|AnalyserNode|BiquadFilter|MediaStreamAudio)"
+   ]
+  },
+  {
+   "id": "media-capture-webrtc",
+   "title": "Media capture and WebRTC (getUserMedia, MediaDevices, RTCPeerConnection)",
+   "size": "L",
+   "spec": "Media Capture and Streams; WebRTC 1.0; Screen Capture",
+   "wpt": [
+    "mediacapture-streams/",
+    "webrtc/",
+    "screen-capture/"
+   ],
+   "match": [
+    "^api: .*(MediaDevices|mediaDevices|getUserMedia|getDisplayMedia|MediaStream|RTC[A-Z]|MediaRecorder)"
+   ]
+  },
+  {
+   "id": "geolocation",
+   "title": "Geolocation API",
+   "size": "S",
+   "spec": "Geolocation",
+   "wpt": [
+    "geolocation/"
+   ],
+   "match": [
+    "^api: .*(Geolocation|geolocation)"
+   ]
+  },
+  {
+   "id": "web-locks",
+   "title": "Web Locks API (navigator.locks)",
+   "size": "S",
+   "spec": "Web Locks API",
+   "wpt": [
+    "web-locks/"
+   ],
+   "match": [
+    "^api: .*(LockManager|Navigator\\.prototype\\.locks|\\bLock\\b)"
+   ]
+  },
+  {
+   "id": "media-session",
+   "title": "Media Session (navigator.mediaSession, MediaMetadata)",
+   "size": "S",
+   "spec": "Media Session",
+   "wpt": [
+    "mediasession/"
+   ],
+   "match": [
+    "^api: .*(MediaSession|mediaSession|MediaMetadata)"
+   ]
+  },
+  {
+   "id": "reporting",
+   "title": "Reporting API (ReportingObserver)",
+   "size": "S",
+   "spec": "Reporting API",
+   "wpt": [
+    "reporting/"
+   ],
+   "match": [
+    "^api: .*(ReportingObserver|ReportBody|Report\\b|CSPViolationReportBody|DeprecationReportBody|InterventionReportBody)"
+   ]
+  },
+  {
+   "id": "server-sent-events",
+   "title": "Server-sent events (EventSource)",
+   "size": "S",
+   "spec": "HTML 'Server-sent events'",
+   "wpt": [
+    "eventsource/"
+   ],
+   "match": [
+    "^api: .*EventSource"
+   ]
+  },
+  {
+   "id": "typed-om",
+   "title": "CSS Typed OM (styleMap, computedStyleMap, CSS numeric values)",
+   "size": "M",
+   "spec": "CSS Typed OM 1",
+   "wpt": [
+    "css/css-typed-om/"
+   ],
+   "match": [
+    "^api: .*(styleMap|StyleMap|CSS(Numeric|Unit|Math|Transform|Keyword|Style|Unparsed|Image|Perspective|Rotate|Scale|Skew|Translate|Matrix|Variable)[A-Za-z]*|CSS\\.(px|em|rem|number|percent|deg|s|ms|vw|vh|fr)\\b)"
+   ]
+  },
+  {
+   "id": "storage",
+   "title": "Storage (IndexedDB, Cache API, storage buckets, StorageManager, cookies API)",
+   "size": "M",
+   "spec": "IndexedDB 3; Service Workers (Cache); Storage; Cookie Store API",
+   "wpt": [
+    "IndexedDB/",
+    "storage/",
+    "cookie-store/",
+    "service-workers/cache-storage/"
+   ],
+   "match": [
+    "^api: .*(IDB|indexedDB|CacheStorage|caches\\b|StorageManager|storage\\.|cookieStore|CookieStore|StorageBucket)"
+   ]
+  },
+  {
+   "id": "service-workers",
+   "title": "Service workers, shared workers and push",
+   "size": "L",
+   "spec": "Service Workers; HTML 'Shared workers'; Push API; Notifications",
+   "wpt": [
+    "service-workers/",
+    "workers/",
+    "push-api/",
+    "notifications/",
+    "!service-workers/cache-storage/"
+   ],
+   "match": [
+    "^api: .*(ServiceWorker|serviceWorker|SharedWorker|PushManager|PushSubscription|Notification|BackgroundFetch|SyncManager)"
+   ]
+  },
+  {
+   "id": "fetch-streams",
+   "title": "Fetch, XHR and Streams",
+   "size": "M",
+   "spec": "Fetch; XMLHttpRequest; Streams",
+   "wpt": [
+    "fetch/",
+    "xhr/",
+    "streams/"
+   ],
+   "match": [
+    "^api: .*(ReadableStream|WritableStream|TransformStream|CompressionStream|DecompressionStream|Request|Response|Headers|fetchLater|TextDecoderStream|TextEncoderStream)"
+   ]
+  },
+  {
+   "id": "custom-elements",
+   "title": "Custom elements and Shadow DOM (scoped registries, declarative shadow DOM, focus)",
+   "size": "M",
+   "spec": "HTML 'Custom elements'; DOM 'Shadow trees'",
+   "wpt": [
+    "custom-elements/",
+    "shadow-dom/",
+    "!shadow-dom/reference-target/"
+   ],
+   "match": [
+    "^api: .*(CustomElementRegistry|ElementInternals|ShadowRoot|attachShadow|CustomStateSet|customElements)"
+   ]
+  },
+  {
+   "id": "editing",
+   "title": "Editing (contenteditable, execCommand, input events, selection)",
+   "size": "L",
+   "spec": "execCommand; Input Events 2; Selection API; EditContext",
+   "wpt": [
+    "editing/",
+    "input-events/",
+    "selection/"
+   ],
+   "match": [
+    "^api: .*(EditContext|execCommand|Selection|getTargetRanges|TextFormat|CharacterBounds)"
+   ]
+  },
+  {
+   "id": "sanitizer",
+   "title": "HTML Sanitizer API and setHTML",
+   "size": "M",
+   "spec": "HTML Sanitizer API",
+   "wpt": [
+    "sanitizer-api/",
+    "domparsing/"
+   ],
+   "match": [
+    "^api: .*(Sanitizer|setHTML|parseHTML)"
+   ]
+  },
+  {
+   "id": "clipboard-permissions",
+   "title": "Clipboard, permissions and device APIs (clipboard, permissions, wake lock, share, battery)",
+   "size": "M",
+   "spec": "Clipboard API; Permissions; Screen Wake Lock; Web Share; Battery Status",
+   "wpt": [
+    "clipboard-apis/",
+    "permissions/",
+    "screen-wake-lock/",
+    "web-share/",
+    "battery-status/"
+   ],
+   "match": [
+    "^api: .*(Clipboard|clipboard|Permissions|permissions|WakeLock|wakeLock|share\\b|canShare|getBattery|BatteryManager)"
+   ]
+  },
+  {
+   "id": "credentials",
+   "title": "Credential Management and WebAuthn (navigator.credentials, PublicKeyCredential)",
+   "size": "M",
+   "spec": "Credential Management 1; WebAuthn 3",
+   "wpt": [
+    "credential-management/",
+    "webauthn/"
+   ],
+   "match": [
+    "^api: .*(Credential|credentials|IdentityProvider)"
+   ]
+  },
+  {
+   "id": "javascript-engine",
+   "title": "JavaScript built-ins a newer V8 has",
+   "size": "M",
+   "spec": "ECMAScript; V8 release notes",
+   "wpt": [],
+   "match": [
+    "^ecmascript: "
+   ]
+  }
+ ]
+}

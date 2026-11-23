@@ -142,12 +142,16 @@ A baseline comes from a gate or full run of `main` (`--save-baseline <name>`). K
 in `tools/wpt/flaky.json`. A change that lowers an area's count is a regression unless the pull request says
 why.
 
-Two more tools locate conformance problems:
+More tools locate conformance problems:
 
 - `tools/layout-diff/` renders a URL in headless Chrome and in Snowlark and reports the first element whose box
   or computed style differs: the locator for "this page looks wrong".
 - `tools/census/` diffs the web-exposed API surface against Chrome's, weighted by how many sites of a corpus use
   each missing member, and records uncaught exceptions and blank renders per site.
+- `tools/sweep/` ranks whole features by how many sites of the corpus they break: CSS Chrome accepts and Snowlark
+  refuses, layout-diff root causes by layout feature, and repaints and blank rows while scrolling.
+- `tools/payoff/` joins the census, the sweep and WPT results into one list of spec areas and features, scored by
+  the sites each breaks, reported issues and failing WPT subtests, per size.
 
 ## Performance
 
