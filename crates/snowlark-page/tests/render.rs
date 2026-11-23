@@ -2064,6 +2064,34 @@ fn nowrap_text_keeps_its_spaces_in_the_min_content_width() {
     assert_eq!(r, "true true true true true true true");
 }
 
+/// CSS Text 3 §7.3: text shaping is not broken across inline box boundaries that change no
+/// formatting, so Arial's "AV" pair is kerned across `<span>A</span><span>V</span>` (and "A"
+/// against the space after it); it is broken where the box has padding, a `vertical-align` other
+/// than `baseline`, or another font. Widths of the "A" span from headless Chrome.
+#[test]
+fn text_is_shaped_across_inline_box_boundaries() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0; font: 100px Arial } div { white-space: nowrap }\
+         .p { padding-left: 1px } .s { vertical-align: super } .b { font-size: 101px }</style>\
+         <div><span id=a>A</span></div>\
+         <div><span id=c>A</span><span>V</span></div>\
+         <div><span id=d>A</span><a>V</a></div>\
+         <div><span id=e>A</span><span class=p>V</span></div>\
+         <div><span id=f>A</span><span class=s>V</span></div>\
+         <div><span id=g>A</span> <span>V</span></div>\
+         <div><span id=h>A</span><span class=b>V</span></div>\
+         <div><b><span id=k>A</span></b><span>V</span></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const w = id => document.getElementById(id).getBoundingClientRect().width.toFixed(1);
+         ['a', 'c', 'd', 'e', 'f', 'g', 'h', 'k'].map(w).join(' ')",
+    );
+    assert_eq!(r, "66.7 59.3 59.3 66.7 66.7 61.2 66.7 72.2");
+}
+
 /// CSS Grid 2 §9 subgrids: cards with `grid-template-rows: subgrid` take their rows (and the rows' names)
 /// from the grid they span, so their items line up across cards; each card's items size the shared rows,
 /// with the card's padding as extra margin at its edges, and the card's gutters are its parent's

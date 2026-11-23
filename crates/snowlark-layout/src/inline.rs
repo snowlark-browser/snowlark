@@ -39,6 +39,7 @@ use smallvec::SmallVec;
 use snowlark_paint::{
     visual_order, BreakAfter, FontFeature, FontId, FontListId, FontMetrics, FontQuery, Point, Rect,
     ShapeKey, ShapeOptions, ShapedText, Sides, Size, TextCache, TextEngine, VerticalText,
+    WordCache,
 };
 
 use crate::block::layout_float;
@@ -130,6 +131,9 @@ pub(crate) struct Item<S: Style> {
     /// Spaces and other space separators hang at line ends (CSS Text 3 §4.1.2): white space
     /// collapses, or is preserved but wraps.
     pub can_hang: bool,
+    /// Text items: `shaped` is this item's part of a shaping across inline box boundaries
+    /// ([`shape_across_boxes`]): it depends on the neighbours' text, so it is not reused alone.
+    pub joined: bool,
 }
 
 /// A block container's prepared inline content.
@@ -401,6 +405,7 @@ impl<S: Style> Prepare<'_, S> {
             letter_spacing,
             word_spacing,
             can_hang: collapsible || ws == WhiteSpaceCollapse::Preserve && wrap,
+            joined: false,
             style,
         }
     }
@@ -608,7 +613,7 @@ pub(crate) fn prepare<S: Style>(
     type Reused<'o> = (Arc<ShapedText>, FontInfo, Option<&'o [u8]>);
     let mut reuse: HashMap<(BoxId, &str), Reused<'_>> = HashMap::new();
     if let Some(old) = &old {
-        for it in &old.items {
+        for it in old.items.iter().filter(|it| !it.joined) {
             if let (Some(s), Some(f)) = (&it.shaped, it.font) {
                 reuse.insert(
                     (it.box_id, it.text.as_str()),
@@ -622,21 +627,43 @@ pub(crate) fn prepare<S: Style>(
     let mut cache: Option<std::sync::MutexGuard<'_, TextCache>> = None;
     let mut words_before = None;
     for it in &mut items {
-        match it.kind {
-            ItemKind::Text | ItemKind::Tab | ItemKind::Open | ItemKind::Close | ItemKind::Break => {
-                let font = tree_font_info(tree, text, &it.style);
-                it.font = Some(font);
-                if it.kind == ItemKind::Tab {
-                    it.space = text
-                        .measure(" ", font.list, font.size)
-                        .unwrap_or(font.size * 0.25)
-                        + it.style.letter_spacing()
-                        + it.style.word_spacing();
-                }
-                if it.kind != ItemKind::Text {
-                    continue;
-                }
+        if let ItemKind::Text | ItemKind::Tab | ItemKind::Open | ItemKind::Close | ItemKind::Break =
+            it.kind
+        {
+            let font = tree_font_info(tree, text, &it.style);
+            it.font = Some(font);
+            if it.kind == ItemKind::Tab {
+                it.space = text
+                    .measure(" ", font.list, font.size)
+                    .unwrap_or(font.size * 0.25)
+                    + it.style.letter_spacing()
+                    + it.style.word_spacing();
+            }
+            if it.kind == ItemKind::Text {
                 it.combine = central_baseline(&it.style) && it.style.text_combine_upright();
+            }
+        }
+    }
+    // Text shaped across inline box boundaries (CSS Text 3 §7.3), then each other text item alone.
+    let groups = if container.style.direction() == Direction::Ltr {
+        shaping_groups(&items)
+    } else {
+        Vec::new()
+    };
+    if !groups.is_empty() {
+        let cache = &mut **cache.get_or_insert_with(|| {
+            let g = tree.text_cache.lock().unwrap_or_else(|e| e.into_inner());
+            words_before = Some(g.words.stats());
+            g
+        });
+        for group in groups {
+            shape_across_boxes(&mut items, &group, text, cache, &mut buffer, stats);
+        }
+    }
+    for it in &mut items {
+        match it.kind {
+            ItemKind::Text if !it.joined => {
+                let font = it.font.expect("text items have a font");
                 if let Some((s, f, l)) = reuse.get(&(it.box_id, it.text.as_str())) {
                     if *f == font && *l == it.levels.as_deref() {
                         it.shaped = Some(s.clone());
@@ -729,6 +756,151 @@ pub(crate) fn prepare<S: Style>(
         plaintext,
         root_font,
     })
+}
+
+/// Whether text shaping goes on across an inline box's start or end item (CSS Text 3 §7.3: it is
+/// broken where the box has margin, border or padding on that side, where `vertical-align` is not
+/// `baseline`, and at a bidi embedding or isolation boundary).
+fn shapes_across<S: Style>(it: &Item<S>) -> bool {
+    // (edges in percentages are taken as present: the containing block is not known here)
+    matches!(it.kind, ItemKind::Open | ItemKind::Close)
+        && !has_inline_edge(it, 0.0)
+        && !has_inline_edge(it, 1.0e4)
+        && it.style.vertical_align() == VerticalAlign::Baseline
+        && it.style.unicode_bidi() == UnicodeBidi::Normal
+}
+
+/// Whether two text items are shaped as one text: nothing of their formatting differs (font,
+/// features, language, spacing), and the boundary between them is not after white space (text
+/// is shaped word by word, a word with the spaces after it: nothing joins the shaping of a
+/// space and the word after it).
+fn shape_together<S: Style>(a: &Item<S>, b: &Item<S>) -> bool {
+    let plain = |it: &Item<S>| {
+        it.kind == ItemKind::Text
+            && it.levels.is_none()
+            && !it.combine
+            && it.font.is_some_and(|f| f.vertical == VerticalText::None)
+    };
+    plain(a)
+        && plain(b)
+        && a.text
+            .chars()
+            .next_back()
+            .is_some_and(|c| !c.is_whitespace())
+        && a.font == b.font
+        && a.letter_spacing == b.letter_spacing
+        && a.word_spacing == b.word_spacing
+        && a.style.locale() == b.style.locale()
+        && a.style.font_features() == b.style.font_features()
+}
+
+/// The runs of text items that are shaped across the inline box boundaries between them (CSS Text 3
+/// §7.3: shaping is not broken across a boundary that changes no formatting), each as the indices
+/// of its text items, two or more. Only items that are shaped left to right without bidi levels
+/// are joined.
+fn shaping_groups<S: Style>(items: &[Item<S>]) -> Vec<Vec<usize>> {
+    let mut groups = Vec::new();
+    let mut group: Vec<usize> = Vec::new();
+    let mut open = true;
+    for (i, it) in items.iter().enumerate() {
+        match it.kind {
+            ItemKind::Text => {
+                let joins = open
+                    && group
+                        .last()
+                        .is_some_and(|&last| shape_together(&items[last], it));
+                if !joins {
+                    if group.len() > 1 {
+                        groups.push(std::mem::take(&mut group));
+                    }
+                    group.clear();
+                }
+                group.push(i);
+                open = true;
+            }
+            ItemKind::Open | ItemKind::Close => open = open && shapes_across(it),
+            _ => {
+                if group.len() > 1 {
+                    groups.push(std::mem::take(&mut group));
+                }
+                group.clear();
+                open = true;
+            }
+        }
+    }
+    if group.len() > 1 {
+        groups.push(group);
+    }
+    groups
+}
+
+/// Shapes a group of text items ([`shaping_groups`]) as one text and gives each item its part, so
+/// glyphs next to a boundary are positioned as in one text (kerning, contextual forms). A group
+/// whose shaping makes a cluster of characters on both sides of a boundary (a ligature) keeps
+/// the items' own shaping. The joined text's shaping is kept in the run cache like an item's.
+fn shape_across_boxes<S: Style>(
+    items: &mut [Item<S>],
+    group: &[usize],
+    text: &TextEngine,
+    cache: &mut TextCache,
+    buffer: &mut ShapedText,
+    stats: &mut LayoutStats,
+) {
+    let first = &items[group[0]];
+    let Some(font) = first.font else {
+        return;
+    };
+    let mut joined = String::new();
+    let mut ends = Vec::with_capacity(group.len());
+    for &i in group {
+        joined.push_str(&items[i].text);
+        ends.push(joined.len() as u32);
+    }
+    let features = first.style.font_features();
+    let locale = first.style.locale();
+    let key = ShapeKey {
+        text: &joined,
+        list: font.list,
+        size: font.size,
+        rtl: false,
+        vertical: VerticalText::None,
+        locale,
+        features: &features,
+    };
+    let shaped = match cache.runs.get(&key) {
+        Some(s) => {
+            stats.shape_cache_hits += 1;
+            s
+        }
+        None => {
+            let options = ShapeOptions {
+                size: font.size,
+                locale,
+                direction: Direction::Ltr,
+                features: &features,
+                vertical: VerticalText::None,
+                levels: None,
+            };
+            let words: &mut WordCache = &mut cache.words;
+            if text
+                .shape_cached(&joined, font.list, &options, Some(words), buffer)
+                .is_err()
+            {
+                return;
+            }
+            stats.shaped += 1;
+            let s = Arc::new(std::mem::take(buffer));
+            cache.runs.insert(&key, s.clone());
+            s
+        }
+    };
+    let Some(parts) = shaped.split(&ends) else {
+        return;
+    };
+    for (&i, part) in group.iter().zip(parts) {
+        items[i].shaped = Some(Arc::new(part));
+        items[i].joined = true;
+    }
 }
 
 const LRE: char = '\u{202A}';

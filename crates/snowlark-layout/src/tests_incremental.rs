@@ -240,13 +240,14 @@ fn a_layout_change_keeps_the_prepared_inline_content() {
     let f = t.relayout();
     assert_eq!(t.layout.stats().prepared, 0);
     assert_eq!(span_x(&f, &t.doc.dom), before + 35.0);
-    // A new font size is prepared (and shaped) again.
+    // A new font size is prepared (and shaped) again: the span's text, and " after", which was
+    // shaped with it (CSS Text 3 §7.3) and now is shaped alone.
     t.doc.restyle(span, |s| s.font_size = 30.0);
     update(&mut t, restyled(span, BoxDamage::Relayout));
     t.relayout();
     let s = t.layout.stats();
     assert_eq!(s.prepared, 1, "{s:?}");
-    assert_eq!(s.shaped, 1, "{s:?}");
+    assert_eq!(s.shaped, 2, "{s:?}");
 }
 
 /// The same in a flex container, whose items' fragments are also kept in its own caches.

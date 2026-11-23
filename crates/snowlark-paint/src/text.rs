@@ -328,6 +328,72 @@ impl ShapedText {
         }
         x - origin.x
     }
+
+    /// Splits the shaping of a concatenation of texts into the shaping of each part, `ends` being the
+    /// byte offset in the shaped text where each part ends (ascending, the last one the text's
+    /// length). Each part keeps the glyphs and advances shaped with its neighbours (kerning,
+    /// contextual forms across the boundary), its clusters' text offsets made relative to its own
+    /// start, and a wrap opportunity after its last cluster as if it ended the text (the caller
+    /// decides breaks at the boundaries). `None` when a cluster spans a boundary (a ligature of
+    /// characters on both sides) or a run is right-to-left: such text is shaped part by part.
+    pub fn split(&self, ends: &[u32]) -> Option<Vec<ShapedText>> {
+        if self.runs.iter().any(|r| r.bidi_level % 2 == 1) {
+            return None;
+        }
+        let mut parts = Vec::with_capacity(ends.len());
+        let mut c = 0usize;
+        let mut start = 0u32;
+        for &end in ends {
+            let c0 = c;
+            while c < self.clusters.len() && self.clusters[c].text.1 <= end {
+                c += 1;
+            }
+            if c < self.clusters.len() && self.clusters[c].text.0 < end {
+                return None;
+            }
+            let mut part = ShapedText::default();
+            if c > c0 {
+                let g0 = self.clusters[c0].glyphs.0;
+                let g1 = self.clusters[c - 1].glyphs.1;
+                let (gs, ge) = (g0 as usize, g1 as usize);
+                part.glyphs.extend_from_slice(&self.glyphs[gs..ge]);
+                part.advances.extend_from_slice(&self.advances[gs..ge]);
+                part.offsets.extend_from_slice(&self.offsets[gs..ge]);
+                part.clusters
+                    .extend(self.clusters[c0..c].iter().map(|k| Cluster {
+                        text: (k.text.0 - start, k.text.1 - start),
+                        glyphs: (k.glyphs.0 - g0, k.glyphs.1 - g0),
+                        ..*k
+                    }));
+                if let Some(last) = part.clusters.last_mut() {
+                    if last.break_after != BreakAfter::Mandatory {
+                        last.break_after = BreakAfter::Allowed;
+                    }
+                }
+                for run in &self.runs {
+                    let a = (run.clusters.0 as usize).max(c0);
+                    let b = (run.clusters.1 as usize).min(c);
+                    if a >= b {
+                        continue;
+                    }
+                    let (rg0, rg1) = (self.clusters[a].glyphs.0, self.clusters[b - 1].glyphs.1);
+                    part.runs.push(ShapedRun {
+                        text: (
+                            self.clusters[a].text.0 - start,
+                            self.clusters[b - 1].text.1 - start,
+                        ),
+                        glyphs: (rg0 - g0, rg1 - g0),
+                        clusters: ((a - c0) as u32, (b - c0) as u32),
+                        advance: self.advances[rg0 as usize..rg1 as usize].iter().sum(),
+                        ..*run
+                    });
+                }
+            }
+            parts.push(part);
+            start = end;
+        }
+        Some(parts)
+    }
 }
 
 /// UAX #9 rule L2: the visual order of items with the given embedding levels (indices into `levels`).
@@ -1822,6 +1888,44 @@ mod tests {
             stretch: FontStretch::NORMAL,
         })
         .unwrap()
+    }
+
+    /// Splitting the shaping of "AVA" after "A" keeps the "AV" kerning in the first part (narrower
+    /// than "A" shaped alone), gives each part clusters, runs and glyphs of its own with text offsets
+    /// from its start and a wrap opportunity at its end, and loses no advance; a cluster across a
+    /// boundary (a ligature) cannot be split.
+    #[test]
+    fn a_shaping_splits_into_the_parts_of_its_text() {
+        let e = engine();
+        let arial = list(&e, &["Arial"], 400);
+        let options = ShapeOptions {
+            size: 100.0,
+            ..Default::default()
+        };
+        let mut whole = ShapedText::default();
+        e.shape("AVA", arial, &options, &mut whole).unwrap();
+        let mut alone = ShapedText::default();
+        e.shape("A", arial, &options, &mut alone).unwrap();
+        let parts = whole.split(&[1, 3]).unwrap();
+        assert_eq!(parts.len(), 2);
+        assert!(
+            parts[0].width() < alone.width() - 1.0,
+            "{} {}",
+            parts[0].width(),
+            alone.width()
+        );
+        assert!((parts[0].width() + parts[1].width() - whole.width()).abs() < 0.001);
+        assert_eq!(parts[1].clusters.len(), 2);
+        assert_eq!(parts[1].clusters[0].text, (0, 1));
+        assert_eq!(parts[1].clusters[0].glyphs.0, 0);
+        assert_eq!(parts[1].runs[0].text, (0, 2));
+        assert_eq!(parts[1].glyphs.len(), 2);
+        assert_eq!(parts[0].clusters[0].break_after, BreakAfter::Allowed);
+
+        let mut ligature = whole.clone();
+        ligature.clusters[0].text.1 = 2;
+        ligature.clusters[1].text.0 = 2;
+        assert!(ligature.split(&[1, 3]).is_none());
     }
 
     /// A query resolves to the same list whatever the case of its family names (CSS Fonts 4 §5.1:
