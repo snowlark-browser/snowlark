@@ -292,7 +292,10 @@ impl HTMLMediaElementImpl for Engine {
         Ok(())
     }
     fn load(&self, cx: &mut Cx, this: Handle) -> rt::Result<()> {
-        self.media_load(cx, self.n(this));
+        let el = self.n(this);
+        // (script asked for the resource: preload=none no longer holds its fetch back)
+        self.media_el(el, |m| m.ignore_preload_none = true);
+        self.media_load(cx, el);
         Ok(())
     }
     fn can_play_type(

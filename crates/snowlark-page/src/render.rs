@@ -398,6 +398,9 @@ impl Engine {
         st.smooth.clear();
         st.scroll_request = None;
         st.scroll_adjust = None;
+        // (HTML "run the resize steps" fire when the document's viewport changed since they last
+        // ran: a size change the previous document had not seen yet is not this one's)
+        st.resized = false;
         st.dirty = true;
         st.needs_paint = true;
         drop(st);

@@ -373,6 +373,35 @@ fn rendering_updates_run_in_the_event_loop() {
     assert!(page.engine().take_needs_paint());
 }
 
+/// HTML "run the resize steps": a viewport size change the previous document had not seen yet
+/// (the window sized while the initial about:blank showed) fires no `resize` at the next document,
+/// which was created at the new size; a change after that does.
+#[test]
+fn a_new_document_gets_no_resize_for_a_size_it_was_created_at() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = Page::new(PageOptions {
+        net: Some(net.client()),
+        viewport: (800, 600),
+        render: Some(RenderSetup::new().unwrap()),
+        ..Default::default()
+    });
+    page.engine()
+        .set_viewport(snowlark_paint::Size::new(500.0, 400.0));
+    page.load_html(
+        "<!doctype html><script>
+         window.log = ['start ' + innerWidth];
+         addEventListener('resize', () => log.push('resize ' + innerWidth));
+         </script><p>hi</p>",
+        &url::Url::parse("http://example.test/").unwrap(),
+    );
+    assert!(page.run_until_settled(Duration::from_secs(5)), "settles");
+    assert_eq!(eval(&mut page, "log.join()"), "start 500");
+    page.engine()
+        .set_viewport(snowlark_paint::Size::new(600.0, 400.0));
+    page.run_until_settled(Duration::from_secs(2));
+    assert_eq!(eval(&mut page, "log.join()"), "start 500,resize 600");
+}
+
 #[test]
 fn inner_text_is_the_rendered_text() {
     let net = NetThread::start(NetConfig::default()).unwrap();

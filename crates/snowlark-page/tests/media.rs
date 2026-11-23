@@ -259,6 +259,41 @@ fn preload_none_waits_for_play() {
     );
 }
 
+/// `load()` is script asking for the resource: with `preload=none` the fetch then goes ahead
+/// (to `canplaythrough`, without playing); the `src` attribute being set again suspends it again.
+#[test]
+fn preload_none_fetches_after_load() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = page(
+        &net,
+        &format!("<video preload=none muted></video>{LOG}"),
+        AutoplayPolicy::Allowed,
+    );
+    eval(&mut page, "v.src = 'pattern.mp4';");
+    assert!(
+        wait_for(&mut page, "log.includes('suspend')", 10),
+        "{}",
+        eval(&mut page, "log.join()")
+    );
+    eval(&mut page, "log.length = 0; v.load();");
+    assert!(
+        wait_for(&mut page, "log.includes('canplaythrough')", 20),
+        "{}",
+        eval(&mut page, "log.join()")
+    );
+    assert_eq!(eval(&mut page, "[v.readyState, v.paused].join()"), "4,true");
+    eval(&mut page, "log.length = 0; v.src = 'pattern.mp4';");
+    assert!(
+        wait_for(&mut page, "log.includes('suspend')", 10),
+        "{}",
+        eval(&mut page, "log.join()")
+    );
+    assert_eq!(
+        eval(&mut page, "[v.readyState, v.networkState].join()"),
+        "0,1"
+    );
+}
+
 #[test]
 fn text_tracks_and_cues() {
     let net = NetThread::start(NetConfig::default()).unwrap();

@@ -209,6 +209,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   and 12-bit VP9 are reported as unsupported. (ref 98)
 - **Slow main script on return visits.** From the third visit on, YouTube's main script runs slowly because cached code
   still takes a path that recollects source positions. (ref 220)
+- **Very short clips.** A two-frame autoplaying MP4 stays at `HAVE_METADATA` (no `loadeddata` or `canplay`) yet
+  plays to its end, fires `ended` twice and rejects its `play()` promise with `AbortError`. Its load also waits
+  until the element is in a document. (ref 709)
 
 ## Editing and input
 
@@ -237,8 +240,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Other test-suite problems.** Debug-profile tests overflow their stack in `snowlark-ipc` and `snowlark-js` (ref 562);
   `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572), and once
   stopped with an access violation that did not happen again (ref 707); the WPT files
-- **Animated hero video on apple.com.** The animation at the top of apple.com's home page shows its first
-  frame and does not move. (ref 708)
   `navigation-timing/test-document-open.html` and `fetch/api/abort/general.any.html` vary from run to run
   (ref 60, 563); a headless
   Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py` can read one arm slower than the other for the same binary when the arms share a core (ref 509).

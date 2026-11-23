@@ -145,6 +145,10 @@ pub(crate) struct El {
     pub waiting_for_source: bool,
     /// A fetch held back by `preload=none` until playback is asked for.
     pub suspended: Option<(String, Option<String>)>,
+    /// Script asked for the resource with `load()`: `preload=none` no longer holds the fetch back
+    /// (it is the explicit request the resource fetch algorithm's optional suspend waits for). The
+    /// `src` attribute being set, or the element being inserted with no resource selected, clears it.
+    pub ignore_preload_none: bool,
     /// The resource selection waits (`loading=lazy`) until the element is rendered near the
     /// viewport.
     pub lazy: bool,
@@ -227,6 +231,7 @@ impl El {
             mode: None,
             waiting_for_source: false,
             suspended: None,
+            ignore_preload_none: false,
             lazy: false,
             lazy_released: false,
             poster_waits: false,
@@ -765,9 +770,11 @@ impl Engine {
         let preload_none = self
             .media_attr(el, "preload")
             .is_some_and(|p| p.eq_ignore_ascii_case("none"));
-        let wants_play = self.media_el(el, |m| !m.paused) || self.media_has_attr(el, "autoplay");
+        let wants_play = self.media_el(el, |m| !m.paused || m.ignore_preload_none)
+            || self.media_has_attr(el, "autoplay");
         if preload_none && !wants_play {
-            // HTML: with preload=none the user agent may suspend before fetching.
+            // HTML: with preload=none the user agent may suspend before fetching, until playback
+            // or `load()` asks for the resource.
             self.media_el(el, |m| {
                 m.suspended = Some((url, hint));
                 m.network = NETWORK_IDLE;
@@ -1962,6 +1969,7 @@ impl Engine {
             } || self.html.borrow().src_objects.contains_key(&el);
             let network = self.media_el(el, |m| m.network);
             if network == NETWORK_EMPTY && has_resource {
+                self.media_el(el, |m| m.ignore_preload_none = false);
                 self.media_select_resource(cx, el);
             }
         } else if let Some(p) = parent_media {
@@ -2024,7 +2032,10 @@ impl Engine {
             return;
         }
         match local {
-            "src" if present => self.media_load(cx, el),
+            "src" if present => {
+                self.media_el(el, |m| m.ignore_preload_none = false);
+                self.media_load(cx, el);
+            }
             // (HTML "is muted": while the muted state is "default" the element follows the
             // attribute, with no `volumechange`)
             "muted" => {
