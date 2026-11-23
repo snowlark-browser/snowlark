@@ -174,9 +174,16 @@ pub struct Settings {
     pub clear_cookies: bool,
     #[serde(default = "yes")]
     pub clear_cache: bool,
+    #[serde(default = "yes")]
+    pub clear_downloads: bool,
     /// Check for new versions of the browser (`crate::update`): unset until the user answers the
     /// question the window asks on its first start, and off until then.
     pub update_check: Option<bool>,
+    /// The folder downloads are saved in; unset: the system's Downloads folder
+    /// ([`Settings::download_folder`]).
+    pub download_dir: Option<PathBuf>,
+    /// Ask where to save each file before downloading (off: saved in the download folder).
+    pub download_ask: bool,
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,
 }
@@ -202,7 +209,10 @@ impl Default for Settings {
             clear_history: true,
             clear_cookies: true,
             clear_cache: true,
+            clear_downloads: true,
             update_check: None,
+            download_dir: None,
+            download_ask: false,
             other: Default::default(),
         }
     }
@@ -339,6 +349,7 @@ impl Settings {
                 "warnOnClose" => self.warn_on_close = v == "1",
                 "verticalTabs" => self.vertical_tabs = v == "1",
                 "updateCheck" => self.update_check = Some(v == "1"),
+                "downloadAsk" => self.download_ask = v == "1",
                 _ => {}
             }
         }
@@ -356,6 +367,13 @@ impl Settings {
             Some(ua) if self.user_agent != "default" => ua,
             _ => snowlark_net::ua::UserAgent::default_with_site_compat(),
         }
+    }
+
+    /// The folder downloads are saved in: the one chosen, else the system's Downloads folder.
+    pub fn download_folder(&self) -> Option<PathBuf> {
+        self.download_dir
+            .clone()
+            .or_else(snowlark_paint::window::downloads_folder)
     }
 
     /// The address a new window opens.
@@ -392,17 +410,19 @@ pub enum Category {
     Appearance,
     Search,
     Startup,
+    Downloads,
     System,
     About,
 }
 
 impl Category {
     /// In the sidebar's order.
-    pub const ALL: [Category; 6] = [
+    pub const ALL: [Category; 7] = [
         Category::Privacy,
         Category::Appearance,
         Category::Search,
         Category::Startup,
+        Category::Downloads,
         Category::System,
         Category::About,
     ];
@@ -414,6 +434,7 @@ impl Category {
             Category::Appearance => "appearance",
             Category::Search => "search",
             Category::Startup => "onStartup",
+            Category::Downloads => "downloads",
             Category::System => "system",
             Category::About => "help",
         }
@@ -425,6 +446,7 @@ impl Category {
             Category::Appearance => "Appearance",
             Category::Search => "Search engine",
             Category::Startup => "On startup",
+            Category::Downloads => "Downloads",
             Category::System => "System",
             Category::About => "About Snowlark",
         }
@@ -437,6 +459,7 @@ impl Category {
             Category::Appearance => "<svg viewBox='0 0 24 24'><circle cx='12' cy='12' r='8.5'/><path class=fill d='M12 3.5a8.5 8.5 0 0 1 0 17z'/></svg>",
             Category::Search => "<svg viewBox='0 0 24 24'><circle cx='10.5' cy='10.5' r='6'/><path d='M15 15l5.5 5.5'/></svg>",
             Category::Startup => "<svg viewBox='0 0 24 24'><path d='M12 3.5v8'/><path d='M7.4 6.8a7.5 7.5 0 1 0 9.2 0'/></svg>",
+            Category::Downloads => "<svg viewBox='0 0 24 24'><path d='M12 4.5v11M7 11l5 5 5-5M5 19.5h14'/></svg>",
             Category::System => "<svg viewBox='0 0 24 24'><path d='M4 7.5h9M17 7.5h3M4 16.5h3M11 16.5h9'/><circle cx='15' cy='7.5' r='2'/><circle cx='9' cy='16.5' r='2'/></svg>",
             Category::About => crate::about::ICON,
         }
@@ -467,6 +490,8 @@ pub struct PageInfo {
     pub category: Option<Category>,
     /// The delete browsing data dialog is open over the page.
     pub clear_dialog: bool,
+    /// The folder downloads are saved in ([`Settings::download_folder`]).
+    pub download_folder: Option<PathBuf>,
 }
 
 /// The content blocker's state for the settings page.
@@ -746,6 +771,32 @@ fn startup_page(s: &Settings) -> String {
     )
 }
 
+/// Downloads: the folder they are saved in (`folder`, [`Settings::download_folder`]) with a
+/// button that asks for another, and whether to ask where to save each one instead.
+fn downloads_page(s: &Settings, folder: Option<&Path>) -> String {
+    let folder = folder.map_or_else(
+        || "No folder: each download asks where to save it".to_owned(),
+        |f| escape_html(&f.to_string_lossy()),
+    );
+    format!(
+        "<div class=card>{at}{location}</form>{at}<input type=hidden name=downloadAsk value=0>{ask}</form></div>",
+        at = form(Category::Downloads),
+        location = setting(
+            "Location",
+            &folder,
+            "<button name=downloadDirChange value=1>Change</button>"
+        ),
+        ask = setting(
+            "Ask where to save each file before downloading",
+            "",
+            &format!(
+                "<input type=checkbox name=downloadAsk value=1{} onchange='this.form.submit()'>",
+                checked(s.download_ask)
+            )
+        ),
+    )
+}
+
 /// System: the user agent.
 fn system_page(s: &Settings) -> String {
     let user_agents: String = snowlark_net::ua::PRESETS
@@ -809,6 +860,7 @@ pub fn settings_html(s: &Settings, dark: bool, info: &PageInfo) -> String {
             Category::Appearance => appearance_page(s),
             Category::Search => search_page(s),
             Category::Startup => startup_page(s),
+            Category::Downloads => downloads_page(s, info.download_folder.as_deref()),
             Category::System => system_page(s),
             Category::About => crate::about::about_card(s),
         };
@@ -1165,8 +1217,10 @@ mod tests {
                 }),
                 category: Some(Category::Privacy),
                 clear_dialog: false,
+                download_folder: Some(PathBuf::from("C:\\a<b>\\Downloads")),
             },
         );
+        assert!(html.contains("<span class=sub>C:\\a&lt;b&gt;\\Downloads</span>"));
         assert!(html.contains("name=clearSite value='example.com'"));
         assert!(html.contains("2 cookies"));
         assert!(html.contains("value='https://x.example/?a=&#39;b&#39;&amp;c=&lt;d&gt;'"));
@@ -1180,6 +1234,43 @@ mod tests {
         assert!(html.contains("id=filter-lists"));
         assert!(is_settings_url(&Url::parse(SETTINGS_APPLY).unwrap()));
         assert!(!is_settings_url(&Url::parse("https://settings/").unwrap()));
+    }
+
+    #[test]
+    fn downloads_are_saved_in_a_folder_unless_the_user_asks_to_choose() {
+        let mut s = Settings::default();
+        // As in the engine family: saved in the Downloads folder without asking.
+        assert!(!s.download_ask);
+        assert_eq!(s.download_dir, None);
+        assert!(s.apply_query("at=downloads&downloadAsk=0&downloadAsk=1"));
+        assert!(s.download_ask);
+        assert!(s.apply_query("at=downloads&downloadAsk=0"));
+        assert!(!s.download_ask);
+        // The folder is chosen with the system's picker, never from the form.
+        assert!(!s.apply_query("at=downloads&downloadDir=C%3A%5Cx"));
+        s.download_dir = Some(PathBuf::from("D:\\Saved"));
+        assert_eq!(s.download_folder(), Some(PathBuf::from("D:\\Saved")));
+        let json = serde_json::to_string(&s).unwrap();
+        assert!(json.contains("\"downloadDir\":\"D:\\\\Saved\""), "{json}");
+        let back: Settings = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, s);
+        let page = |folder: Option<&str>| {
+            settings_html(
+                &s,
+                false,
+                &PageInfo {
+                    category: Some(Category::Downloads),
+                    download_folder: folder.map(PathBuf::from),
+                    ..Default::default()
+                },
+            )
+        };
+        let html = page(Some("D:\\Saved"));
+        assert!(html.contains("<section class='page current' data-category=downloads>"));
+        assert!(html.contains("<span class=sub>D:\\Saved</span>"));
+        assert!(html.contains("<button name=downloadDirChange value=1>Change</button>"));
+        assert!(html.contains("<input type=checkbox name=downloadAsk value=1 onchange="));
+        assert!(page(None).contains("No folder: each download asks where to save it"));
     }
 
     #[test]

@@ -45,10 +45,15 @@ impl Browser {
                     net: &self.tab_ctx.net,
                     local_storage: &self.partition.local_storage,
                     code_cache: self.code_cache.as_deref(),
+                    downloads: &self.downloads,
                 },
                 choice,
                 now,
             );
+            if choice.downloads {
+                // (the toolbar's button goes with the list's recent downloads)
+                self.downloads_changed();
+            }
             if choice.history {
                 // (the closed tabs' list forgets the pages the history no longer has)
                 let h = self.history.lock().unwrap_or_else(|e| e.into_inner());

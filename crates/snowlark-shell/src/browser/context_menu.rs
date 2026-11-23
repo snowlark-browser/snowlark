@@ -3,10 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! The page's context menu (a right-click the page didn't cancel, Shift+F10, the menu key): what
-//! it offers for a link, an image, selected text or the page, and saving an image.
+//! it offers for a link, an image, selected text or the page.
 
-use snowlark_net::{Client, Destination, Request, Url};
-use snowlark_paint::window::{self, Window};
+use snowlark_net::Url;
 use snowlark_paint::Point;
 
 use super::commands::{AddressEdit, Command};
@@ -263,46 +262,6 @@ impl Browser {
     pub(super) fn keyboard_context_menu(&mut self) {
         let at = self.page_hover.then(|| self.page_point(self.mouse));
         self.send_active(TabCommand::ContextMenu(at));
-    }
-
-    /// Saves the image at `url` where the user says (the Save As dialog and the download run on
-    /// a thread of their own; the window goes on).
-    pub(super) fn save_image(&mut self, window: &Window, url: Url) {
-        let owner = window.handle();
-        let net = self.tab_ctx.net.clone();
-        let page = Url::parse(&self.active_url()).ok();
-        let name = file_name_for(&url, "image");
-        let ext = name
-            .rsplit_once('.')
-            .map(|(_, e)| e.to_ascii_lowercase())
-            .filter(|e| e.len() <= 5 && !e.is_empty());
-        let _ = std::thread::Builder::new()
-            .name("snowlark save".into())
-            .spawn(move || {
-                let filter = ext.map(|e| (format!("{} image", e.to_uppercase()), format!("*.{e}")));
-                let filters: Vec<(&str, &str)> = filter
-                    .iter()
-                    .map(|(d, p)| (d.as_str(), p.as_str()))
-                    .collect();
-                let Some(path) = window::save_file_dialog(owner, &name, &filters) else {
-                    return;
-                };
-                let client = Client::for_url(page.as_ref().unwrap_or(&url));
-                let req = Request::subresource(
-                    url.clone(),
-                    Destination::Image,
-                    std::sync::Arc::new(client),
-                );
-                match net.fetch(req).read_all() {
-                    Ok(r) if r.head.status / 100 == 2 => {
-                        if let Err(e) = std::fs::write(&path, r.body_bytes()) {
-                            eprintln!("[save] {}: {e}", path.display());
-                        }
-                    }
-                    Ok(r) => eprintln!("[save] {url}: status {}", r.head.status),
-                    Err(e) => eprintln!("[save] {url}: {}", e.message),
-                }
-            });
     }
 }
 

@@ -92,6 +92,8 @@ pub struct Choice {
     pub cookies: bool,
     /// Cached images and files.
     pub cache: bool,
+    /// The list of downloads (not the files).
+    pub downloads: bool,
 }
 
 impl Choice {
@@ -102,6 +104,7 @@ impl Choice {
             history: s.clear_history,
             cookies: s.clear_cookies,
             cache: s.clear_cache,
+            downloads: s.clear_downloads,
         }
     }
 
@@ -111,6 +114,7 @@ impl Choice {
         s.clear_history = self.history;
         s.clear_cookies = self.cookies;
         s.clear_cache = self.cache;
+        s.clear_downloads = self.downloads;
     }
 
     /// The dialog's submission (`clearData=1`), or `None` for any other form.
@@ -127,11 +131,12 @@ impl Choice {
             history: get("history") == Some("1"),
             cookies: get("cookies") == Some("1"),
             cache: get("cache") == Some("1"),
+            downloads: get("downloads") == Some("1"),
         })
     }
 
     pub fn any(self) -> bool {
-        self.history || self.cookies || self.cache
+        self.history || self.cookies || self.cache || self.downloads
     }
 }
 
@@ -171,7 +176,7 @@ pub fn dialog_html(s: &Settings) -> String {
 <form action='{SETTINGS_PAGE}apply' method=get><input type=hidden name=at value=privacy><input type=hidden name=clearData value=1>\
 <h2 id=cbd-title>Delete browsing data</h2>\
 <label class=cbd-period>Time range <select name=period>{periods}</select></label>\
-{history}{cookies}{cache}\
+{history}{downloads}{cookies}{cache}\
 <div class=cbd-buttons><a id=cbd-cancel class=button href='{SETTINGS_PAGE}privacy'>Cancel</a>\
 <button id=cbd-delete class=action>Delete data</button></div></form></div></div>",
         history = check(
@@ -187,6 +192,12 @@ pub fn dialog_html(s: &Settings) -> String {
             "Signs you out of most sites."
         ),
         cache = check("cache", c.cache, "Cached images and files", ""),
+        downloads = check(
+            "downloads",
+            c.downloads,
+            "Download history",
+            "Deletes the list of downloads; the files stay"
+        ),
     )
 }
 
@@ -212,6 +223,7 @@ pub struct Stores<'a> {
     pub net: &'a snowlark_net::NetClient,
     pub local_storage: &'a crate::local_storage::LocalStorage,
     pub code_cache: Option<&'a dyn snowlark_js::code_cache::CodeCacheStore>,
+    pub downloads: &'a Mutex<crate::downloads::DownloadHistory>,
 }
 
 /// Deletes what `choice` names from `now` back to its period's beginning. Session storage lives
@@ -230,6 +242,12 @@ pub fn delete(stores: &Stores, choice: Choice, now: i64) {
     if choice.cookies {
         stores.net.cookies().delete_created_between(begin, i64::MAX);
         stores.local_storage.clear_modified_between(at(begin), far);
+    }
+    if choice.downloads {
+        let mut d = stores.downloads.lock().unwrap_or_else(|e| e.into_inner());
+        if d.delete_started_between(begin, i64::MAX) {
+            let _ = d.save();
+        }
     }
     if choice.cache {
         stores.net.clear_http_cache(begin, i64::MAX);
@@ -266,7 +284,7 @@ mod tests {
     #[test]
     fn the_dialog_starts_with_the_last_choice_and_its_submission_reads_back() {
         let mut s = Settings::default();
-        // The first time: the last hour, all three.
+        // The first time: the last hour, all four.
         let c = Choice::of(&s);
         assert_eq!(
             c,
@@ -274,14 +292,18 @@ mod tests {
                 period: TimePeriod::LastHour,
                 history: true,
                 cookies: true,
-                cache: true
+                cache: true,
+                downloads: true,
             }
         );
         let html = dialog_html(&s);
         assert!(html.contains("<option value=hour selected>Last hour</option>"));
-        assert_eq!(html.matches(" checked>").count(), 3);
+        assert_eq!(html.matches(" checked>").count(), 4);
+        assert!(html.contains(
+            "<input type=checkbox name=downloads value=1 checked><span class=text>Download history"
+        ));
         // Unchecked boxes send only their hidden 0.
-        let q = "at=privacy&clearData=1&period=week&history=0&history=1&cookies=0&cache=0&cache=1";
+        let q = "at=privacy&clearData=1&period=week&history=0&history=1&cookies=0&cache=0&cache=1&downloads=0";
         let c = Choice::from_pairs(&form_pairs(q)).unwrap();
         assert_eq!(
             c,
@@ -289,13 +311,18 @@ mod tests {
                 period: TimePeriod::LastWeek,
                 history: true,
                 cookies: false,
-                cache: true
+                cache: true,
+                downloads: false,
             }
         );
         c.keep(&mut s);
         let html = dialog_html(&s);
         assert!(html.contains("<option value=week selected>"));
         assert_eq!(html.matches(" checked>").count(), 2);
+        let only_downloads = "clearData=1&history=0&cookies=0&cache=0&downloads=0&downloads=1";
+        assert!(Choice::from_pairs(&form_pairs(only_downloads))
+            .unwrap()
+            .any());
         assert_eq!(Choice::from_pairs(&form_pairs("theme=dark")), None);
     }
 
@@ -325,20 +352,56 @@ mod tests {
             ms(now - 2 * hour),
         );
         cookies.set_cookie_at("b=1; Max-Age=86400", &ctx("https://new.example/"), ms(now));
+        let downloads = Mutex::new(crate::downloads::DownloadHistory::in_memory());
+        let (old_download, running) = {
+            use crate::downloads::{Start, State};
+            let mut d = downloads.lock().unwrap();
+            let mut add = |at: SystemTime| {
+                d.start(Start {
+                    start_time: ms(at),
+                    ..Default::default()
+                })
+            };
+            let old = add(now - 2 * hour);
+            let new = add(now);
+            let running = add(now);
+            d.finish(old, State::Complete, None, ms(now));
+            d.finish(new, State::Complete, None, ms(now));
+            (old, running)
+        };
         let stores = Stores {
             history: &history,
             net: &client,
             local_storage: &local,
             code_cache: None,
+            downloads: &downloads,
         };
         let only = |history, cookies| Choice {
             period: TimePeriod::LastHour,
             history,
             cookies,
             cache: false,
+            downloads: false,
         };
-        // History only: the cookies stay.
+        // History only: the cookies and the downloads stay.
         delete(&stores, only(true, false), ms(now));
+        assert_eq!(downloads.lock().unwrap().entries().len(), 3);
+        // Download history: the finished one of the last hour goes (and cannot be undone); the
+        // older one and the running one stay.
+        delete(
+            &stores,
+            Choice {
+                downloads: true,
+                ..only(false, false)
+            },
+            ms(now),
+        );
+        {
+            let mut d = downloads.lock().unwrap();
+            let ids: Vec<u64> = d.entries().iter().map(|e| e.id).collect();
+            assert_eq!(ids, [old_download, running]);
+            assert!(!d.undo());
+        }
         let urls: Vec<String> = history
             .lock()
             .unwrap()
@@ -358,9 +421,18 @@ mod tests {
             history: true,
             cookies: true,
             cache: true,
+            downloads: true,
         };
         delete(&stores, all, ms(now));
         assert!(history.lock().unwrap().entries().is_empty());
+        let ids: Vec<u64> = downloads
+            .lock()
+            .unwrap()
+            .entries()
+            .iter()
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(ids, [running]);
         assert!(cookies.is_empty());
         drop(local);
         let _ = std::fs::remove_dir_all(&dir);

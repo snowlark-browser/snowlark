@@ -13,7 +13,7 @@ use std::path::Path;
 
 use snowlark_net::Url;
 
-use crate::downloads::{Download, DownloadHistory, State};
+use crate::downloads::{search_fold, Download, DownloadHistory, State};
 use crate::history::{civil_from_days, local_day};
 use crate::history_page::{colors, encode};
 use crate::settings::{escape_html, form_pairs};
@@ -159,15 +159,12 @@ fn item(e: &Download, on_disk: bool, shown: bool) -> String {
     let name = escape_html(&e.file_name());
     let url = escape_html(e.url());
     let id = e.id;
-    let search = escape_html(
-        &format!(
-            "{}\n{}\n{}",
-            e.target_path.to_string_lossy(),
-            e.original_url(),
-            e.url()
-        )
-        .to_lowercase(),
-    );
+    let search = escape_html(&search_fold(&format!(
+        "{}\n{}\n{}",
+        e.target_path.to_string_lossy(),
+        e.original_url(),
+        e.url()
+    )));
     let button = |op: &str, label: &str, icon: &str| {
         format!("<button type=button class=icon data-op={op} data-id={id} title='{label}' aria-label='{label}'>{icon}</button>")
     };
@@ -472,6 +469,14 @@ mod tests {
         assert!(page.contains(".jpg' hidden>"));
         assert!(page.contains("value='report'"));
         assert!(page.contains("<p class=empty id=empty data-none='No search results found' data-all='Files you download appear here' hidden>"));
+        // In any case, with or without accents.
+        let accented = downloads_html(&h, "RÉPORT", false, 3000, &|_| 0, &|_| true);
+        assert!(!accented.contains(".pdf' hidden>") && accented.contains(".jpg' hidden>"));
+        let mut cafe = DownloadHistory::in_memory();
+        cafe.start(start("Café Crème.pdf", 1000));
+        let page = downloads_html(&cafe, "cafe creme", false, 3000, &|_| 0, &|_| true);
+        assert!(page.contains("data-search='c:\\downloads\\cafe creme.pdf\n"));
+        assert!(!page.contains(".pdf' hidden>"));
         let none = downloads_html(&h, "zebra", false, 3000, &|_| 0, &|_| true);
         assert!(none.contains("<section class=day hidden>"));
         assert!(none.contains(">No search results found</p>"));

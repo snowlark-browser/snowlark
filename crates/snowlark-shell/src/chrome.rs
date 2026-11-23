@@ -71,6 +71,7 @@ pub(crate) mod glyph {
     pub const STAR: char = '\u{E734}';
     pub const STAR_FILL: char = '\u{E735}';
     pub const MORE: char = '\u{E712}';
+    pub const DOWNLOAD: char = '\u{E896}';
     pub const FOLDER: char = '\u{E8B7}';
     pub const SETTINGS: char = '\u{E713}';
     pub const CODE: char = '\u{E943}';
@@ -296,6 +297,8 @@ pub enum Hit {
     Shield,
     /// An Incognito window's Incognito button.
     Incognito,
+    /// The downloads button (while downloads are recent).
+    Downloads,
     /// A bookmark (or folder) on the bookmarks bar.
     Bookmark(usize),
     /// The "»" button with the bookmarks that don't fit.
@@ -339,6 +342,8 @@ pub struct Layout {
     /// An Incognito window's Incognito button, between the content blocker's and the menu
     /// ([`Layout::with_incognito`]).
     pub incognito: Option<Rect>,
+    /// The downloads button, after the content blocker's ([`Layout::with_downloads`]).
+    pub downloads: Option<Rect>,
     /// The bookmarks bar, when it shows.
     pub bar: Option<BarLayout>,
     /// Which tabs show an audio indicator ([`Layout::with_audio`]).
@@ -598,6 +603,7 @@ impl Layout {
             menu,
             shield,
             incognito: None,
+            downloads: None,
             bar,
             audio: Vec::new(),
             maximized: false,
@@ -625,11 +631,33 @@ impl Layout {
         let room = width + 2.0;
         let button = Rect::new(self.menu.x - room, self.menu.y, width, self.menu.height);
         self.shield.x -= room;
+        if let Some(d) = &mut self.downloads {
+            d.x -= room;
+        }
+        self.narrow_address(room);
+        self.incognito = Some(button);
+        self
+    }
+
+    /// The layout with the downloads button, between the content blocker's and the menu (and an
+    /// Incognito window's Incognito button); the content blocker's button and the address bar's end
+    /// move left to make room. A popup window's location line has none.
+    pub fn with_downloads(mut self) -> Layout {
+        if self.popup || self.downloads.is_some() {
+            return self;
+        }
+        let room = BUTTON + 2.0;
+        self.downloads = Some(self.shield);
+        self.shield.x -= room;
+        self.narrow_address(room);
+        self
+    }
+
+    /// The address bar gives up `room` at its end.
+    fn narrow_address(&mut self, room: f32) {
         self.address.width = (self.address.width - room).max(40.0);
         self.star.x = self.address.right() - 4.0 - self.star.width;
         self.address_text.width = (self.address_text.width - room).max(10.0);
-        self.incognito = Some(button);
-        self
     }
 
     /// The layout of a fullscreen window: no chrome is shown, laid out or hit.
@@ -769,6 +797,9 @@ impl Layout {
     fn toolbar_hit(&self, p: Point) -> Hit {
         if self.incognito.is_some_and(|r| r.contains(p)) {
             return Hit::Incognito;
+        }
+        if self.downloads.is_some_and(|r| r.contains(p)) {
+            return Hit::Downloads;
         }
         for (r, h) in [
             (self.back, Hit::Back),
@@ -1135,6 +1166,120 @@ pub struct ChromeView<'a> {
     /// An Incognito window's Incognito button label ([`incognito_label`]), drawn where the layout
     /// puts it ([`Layout::with_incognito`]).
     pub incognito: Option<String>,
+    /// The downloads button, drawn where the layout puts it ([`Layout::with_downloads`]).
+    pub downloads: Option<DownloadsButton>,
+}
+
+/// What the toolbar's downloads button shows. It is there while a download runs and for an hour
+/// after the last one ended, in the accent colour for a minute after that.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DownloadsButton {
+    /// Downloads running: how much of them is done (0 to 1; `None` when a size is unknown),
+    /// drawn as a ring around the arrow.
+    pub running: Option<Option<f32>>,
+    /// A download ended less than a minute ago.
+    pub fresh: bool,
+}
+
+/// How long the downloads button stays after the last download ended (ms).
+pub const DOWNLOADS_BUTTON_MS: i64 = 60 * 60 * 1000;
+/// How long it stays in the accent colour after a download ended (ms).
+pub const DOWNLOADS_FRESH_MS: i64 = 60 * 1000;
+
+/// What the downloads button shows for downloads `(state, received, total, end time)` at `now`
+/// (ms); `None`: no button.
+pub fn downloads_button(
+    downloads: impl IntoIterator<Item = (bool, u64, u64, i64)>,
+    now: i64,
+) -> Option<DownloadsButton> {
+    let (mut running, mut received, mut total, mut unknown) = (0, 0u64, 0u64, false);
+    let mut last_end = None::<i64>;
+    for (in_progress, got, size, end) in downloads {
+        if in_progress {
+            running += 1;
+            received += got;
+            total += size;
+            unknown |= size == 0;
+        } else {
+            last_end = Some(last_end.map_or(end, |l| l.max(end)));
+        }
+    }
+    let since = last_end.map(|e| now - e);
+    if running == 0 && !since.is_some_and(|s| s < DOWNLOADS_BUTTON_MS) {
+        return None;
+    }
+    Some(DownloadsButton {
+        running: (running > 0).then(|| {
+            (!unknown && total > 0).then(|| (received as f64 / total as f64).min(1.0) as f32)
+        }),
+        fresh: since.is_some_and(|s| s < DOWNLOADS_FRESH_MS),
+    })
+}
+
+/// The downloads button: the arrow (in the accent colour while a download runs or just ended),
+/// with a ring of the running downloads' progress around it (a quarter turning while a size is
+/// unknown, `spin` its angle).
+fn downloads_button_paint(
+    b: &mut DisplayListBuilder,
+    r: Rect,
+    d: DownloadsButton,
+    view: &ChromeView,
+    fonts: &Fonts,
+) {
+    let t = &view.theme;
+    button_bg(b, r, Hit::Downloads, view, true);
+    let center = Point::new(r.x + r.width / 2.0, r.y + r.height / 2.0);
+    let color = if d.running.is_some() || d.fresh {
+        t.accent
+    } else {
+        t.text
+    };
+    let Some(progress) = d.running else {
+        fonts.icon(b, glyph::DOWNLOAD, center, 16.0, color);
+        return;
+    };
+    fonts.icon(b, glyph::DOWNLOAD, center, 12.0, color);
+    let radius = 11.0;
+    let ring = |from: f32, sweep: f32| arc(center, radius, from, sweep);
+    let stroke = snowlark_paint::Stroke {
+        width: 2.0,
+        cap: snowlark_paint::LineCap::Round,
+        ..Default::default()
+    };
+    if let Some(track) = b.add_path(&ring(0.0, std::f32::consts::TAU)) {
+        b.stroke_path(track, t.separator, &stroke, &[], true);
+    }
+    let start = -std::f32::consts::FRAC_PI_2;
+    let (from, sweep) = match progress {
+        Some(p) => (start, p * std::f32::consts::TAU),
+        None => (start + view.spinner, std::f32::consts::FRAC_PI_2),
+    };
+    if sweep > 0.0 {
+        if let Some(done) = b.add_path(&ring(from, sweep)) {
+            b.stroke_path(done, color, &stroke, &[], true);
+        }
+    }
+}
+
+/// A circle's arc from angle `from` turning `sweep` (radians, clockwise on screen), as cubic
+/// curves of at most a quarter turn each.
+fn arc(center: Point, radius: f32, from: f32, sweep: f32) -> Vec<PathEl> {
+    let parts = (sweep.abs() / std::f32::consts::FRAC_PI_2).ceil().max(1.0) as usize;
+    let step = sweep / parts as f32;
+    let k = 4.0 / 3.0 * (step / 4.0).tan() * radius;
+    let at = |a: f32| Point::new(center.x + radius * a.cos(), center.y + radius * a.sin());
+    let mut path = vec![PathEl::MoveTo(at(from))];
+    for i in 0..parts {
+        let a0 = from + step * i as f32;
+        let a1 = a0 + step;
+        let (p0, p1) = (at(a0), at(a1));
+        path.push(PathEl::CurveTo(
+            Point::new(p0.x - k * a0.sin(), p0.y + k * a0.cos()),
+            Point::new(p1.x + k * a1.sin(), p1.y - k * a1.cos()),
+            p1,
+        ));
+    }
+    path
 }
 
 /// What the content blocker's button shows for the active tab.
@@ -1448,6 +1593,9 @@ pub fn build(view: &ChromeView, layout: &Layout, fonts: &Fonts) -> DisplayList {
     }
     if let (Some(r), Some(label)) = (layout.incognito, &view.incognito) {
         incognito_button(&mut b, r, label, view, fonts);
+    }
+    if let (Some(r), Some(d)) = (layout.downloads, view.downloads) {
+        downloads_button_paint(&mut b, r, d, view, fonts);
     }
     button_bg(&mut b, layout.menu, Hit::Menu, view, true);
     fonts.icon(
@@ -1869,6 +2017,74 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_downloads_button_shows_running_and_recent_downloads() {
+        let now = 10_000_000;
+        let min = 60_000;
+        // None at all, or only ones that ended over an hour ago: no button.
+        assert_eq!(downloads_button([], now), None);
+        assert_eq!(downloads_button([(false, 5, 5, now - 61 * min)], now), None);
+        // Ended within the hour: the button; within the minute: in the accent colour.
+        assert_eq!(
+            downloads_button([(false, 5, 5, now - 30 * min)], now),
+            Some(DownloadsButton {
+                running: None,
+                fresh: false
+            })
+        );
+        assert_eq!(
+            downloads_button(
+                [(false, 5, 5, now - 30 * min), (false, 1, 1, now - 1000)],
+                now
+            ),
+            Some(DownloadsButton {
+                running: None,
+                fresh: true
+            })
+        );
+        // Running: the share of their bytes in, or unknown when a size is.
+        assert_eq!(
+            downloads_button([(true, 25, 100, 0), (true, 25, 100, 0)], now),
+            Some(DownloadsButton {
+                running: Some(Some(0.25)),
+                fresh: false
+            })
+        );
+        assert_eq!(
+            downloads_button([(true, 25, 100, 0), (true, 5, 0, 0)], now),
+            Some(DownloadsButton {
+                running: Some(None),
+                fresh: false
+            })
+        );
+        // Its place: after the content blocker's, before an Incognito button and the menu.
+        for incognito_first in [false, true] {
+            let plain = Layout::new(1000.0, 2, 0.0, None);
+            assert_eq!(plain.downloads, None);
+            let l = if incognito_first {
+                plain.clone().with_incognito(100.0).with_downloads()
+            } else {
+                plain.clone().with_downloads().with_incognito(100.0)
+            };
+            let d = l.downloads.unwrap();
+            let i = l.incognito.unwrap();
+            assert!(l.shield.right() <= d.x && d.right() <= i.x && i.right() <= l.menu.x);
+            assert!(l.address.right() <= l.shield.x);
+            assert!(l.star.right() <= l.address.right());
+            let mid = Point::new(d.x + d.width / 2.0, d.y + d.height / 2.0);
+            assert_eq!(l.hit(mid), Hit::Downloads);
+            assert_ne!(plain.hit(mid), Hit::Downloads);
+        }
+        assert_eq!(Layout::popup(800.0).with_downloads().downloads, None);
+        // A ring arc ends where it should.
+        let ring = arc(Point::new(0.0, 0.0), 10.0, 0.0, std::f32::consts::PI);
+        assert_eq!(ring.len(), 3);
+        let PathEl::CurveTo(_, _, end) = ring[2] else {
+            panic!("{ring:?}");
+        };
+        assert!((end.x + 10.0).abs() < 1e-4 && end.y.abs() < 1e-4, "{end:?}");
+    }
+
+    #[test]
     fn incognito_button_sits_before_the_menu_and_says_how_many_windows() {
         assert_eq!(incognito_label(1), "Incognito");
         assert_eq!(incognito_label(3), "Incognito (3)");
@@ -2049,6 +2265,7 @@ mod tests {
             bar_drop: None,
             blocker: None,
             incognito: None,
+            downloads: None,
         };
         let mut b = DisplayListBuilder::new();
         crate::side_tabs::paint(&mut b, &view, &l, &f);
@@ -2108,6 +2325,7 @@ mod tests {
             bar_drop: None,
             blocker: None,
             incognito: None,
+            downloads: None,
         };
         let list = build(&view, &l, &fonts);
         assert!(list.items.is_empty(), "{} items drawn", list.items.len());
@@ -2254,6 +2472,7 @@ mod tests {
                 up: true,
             }),
             incognito: None,
+            downloads: None,
         };
         let layout =
             Layout::new(1280.0, 2, 40.0, Some(&[120.0, 80.0])).with_audio(vec![true, true]);
@@ -2281,6 +2500,37 @@ mod tests {
                 .count()
         };
         assert_eq!(fills(&incognito_list), fills(&list) + 1);
+        // The downloads button: the ring's track and progress are two stroked paths; a finished
+        // download's button has none.
+        let strokes = |l: &DisplayList| {
+            l.items
+                .iter()
+                .filter(|i| matches!(i, snowlark_paint::Item::StrokePath { .. }))
+                .count()
+        };
+        let downloads_layout = layout.clone().with_downloads();
+        let with = |d| {
+            let v = ChromeView {
+                downloads: d,
+                hover: Hit::Downloads,
+                ..view.clone()
+            };
+            let l = build(&v, &downloads_layout, &fonts);
+            l.validate().unwrap();
+            l
+        };
+        let none = with(None);
+        let running = with(Some(DownloadsButton {
+            running: Some(Some(0.4)),
+            fresh: false,
+        }));
+        assert_eq!(strokes(&running), strokes(&none) + 2);
+        let done = with(Some(DownloadsButton {
+            running: None,
+            fresh: true,
+        }));
+        assert_eq!(strokes(&done), strokes(&none));
+        assert!(done.items.len() > none.items.len());
         let suggestions = [Suggestion {
             search: false,
             title: "Hacker News".into(),

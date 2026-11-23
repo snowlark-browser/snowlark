@@ -8,9 +8,11 @@
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-use snowlark_net::{FetchEvent, NetClient, Request, ResponseHead, ResponseStream, Url};
+use snowlark_net::{
+    Client, Destination, FetchEvent, NetClient, Request, ResponseHead, ResponseStream, Url,
+};
 use snowlark_paint::window::{self, Window};
 
 use super::Browser;
@@ -58,7 +60,64 @@ impl Browser {
                 .map_or(String::new(), |r| r.as_str().to_owned()),
             tab_url,
         };
-        self.spawn_download(window, job, Fetch::Started(Box::new((head, stream))));
+        self.spawn_download(window, job, Fetch::Started(Box::new((head, stream))), false);
+    }
+
+    /// "Save image as…": the image at `url` (as the page `page` loads it), saved where the user
+    /// says, as a download of its own (it is listed with the others).
+    pub(super) fn save_image(&mut self, window: &Window, url: Url) {
+        let page = Url::parse(&self.active_url()).ok();
+        let client = Client::for_url(page.as_ref().unwrap_or(&url));
+        let request = Request::subresource(url.clone(), Destination::Image, Arc::new(client));
+        let page = page.map_or(String::new(), |p| p.as_str().to_owned());
+        let job = Job {
+            name: super::context_menu::file_name_for(&url, "image"),
+            chain: vec![url.as_str().to_owned()],
+            referrer: page.clone(),
+            tab_url: page,
+        };
+        self.spawn_download(
+            window,
+            job,
+            Fetch::Later(self.tab_ctx.net.clone(), Box::new(request)),
+            true,
+        );
+    }
+
+    /// The settings' Change button: the system's folder picker (on a thread of its own), starting
+    /// in the folder downloads go to now; the folder chosen comes back through
+    /// [`Browser::take_picked_download_dir`].
+    pub(super) fn pick_download_dir(&mut self, window: &Window) {
+        let owner = window.handle();
+        let waker = window.proxy();
+        let start = self.settings.download_folder();
+        let slot = self.picked_download_dir.clone();
+        let _ = std::thread::Builder::new()
+            .name("snowlark folder picker".into())
+            .spawn(move || {
+                if let Some(dir) = window::pick_folder_dialog(owner, start.as_deref()) {
+                    *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(dir);
+                    waker.wake();
+                }
+            });
+    }
+
+    /// Woken: the folder the user chose in the picker becomes the download folder.
+    pub(super) fn take_picked_download_dir(&mut self) {
+        let picked = self
+            .picked_download_dir
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take();
+        let Some(dir) = picked else {
+            return;
+        };
+        if self.settings.download_dir.as_ref() == Some(&dir) {
+            return;
+        }
+        self.settings.download_dir = Some(dir);
+        self.save_settings();
+        self.refresh_settings_pages();
     }
 
     /// "Retry" on a cancelled or failed download: its URL again, saved where the user says (a new
@@ -82,23 +141,40 @@ impl Browser {
         let Ok(url) = Url::parse(job.url()) else {
             return;
         };
-        self.spawn_download(window, job, Fetch::Later(self.tab_ctx.net.clone(), url));
+        self.spawn_download(
+            window,
+            job,
+            Fetch::Later(self.tab_ctx.net.clone(), Box::new(Request::navigation(url))),
+            true,
+        );
     }
 
-    fn spawn_download(&mut self, window: &Window, job: Job, fetch: Fetch) {
+    /// Runs a download on a thread of its own: saved in the download folder, or where the user
+    /// says when `save_as` (a "Save as" or a retry), when the settings ask for each file, or when
+    /// the folder cannot take it.
+    fn spawn_download(&mut self, window: &Window, job: Job, fetch: Fetch, save_as: bool) {
         let owner = window.handle();
         let downloads = self.downloads.clone();
+        let ask = save_as || self.settings.download_ask;
+        let folder = self.settings.download_folder();
         downloads
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .worker_started();
         window.set_timer(TIMER_DOWNLOADS, TICK_MS);
+        self.downloads_changed();
         let spawned = std::thread::Builder::new()
             .name("snowlark download".into())
             .spawn({
                 let downloads = downloads.clone();
                 move || {
-                    if let Some(path) = ask_where(owner, &job.name) {
+                    let reserved = if ask {
+                        None
+                    } else {
+                        folder.as_deref().and_then(|d| reserve_in(d, &job.name))
+                    };
+                    let path = reserved.or_else(|| ask_where(owner, &job.name, folder.as_deref()));
+                    if let Some(path) = path {
                         run(&downloads, job, path, fetch);
                     }
                     downloads
@@ -125,8 +201,31 @@ impl Browser {
         if changed {
             self.reload_downloads_pages();
         }
+        self.downloads_changed();
         if !busy {
             window.kill_timer(TIMER_DOWNLOADS);
+        }
+    }
+
+    /// The toolbar's downloads button follows the downloads (`chrome::downloads_button`).
+    pub(super) fn downloads_changed(&mut self) {
+        let button = {
+            let h = self.downloads.lock().unwrap_or_else(|e| e.into_inner());
+            crate::chrome::downloads_button(
+                h.entries().iter().map(|e| {
+                    (
+                        e.state == State::InProgress,
+                        e.received_bytes,
+                        e.total_bytes,
+                        e.end_time,
+                    )
+                }),
+                now_ms(),
+            )
+        };
+        if button != self.downloads_button {
+            self.downloads_button = button;
+            self.chrome_dirty = true;
         }
     }
 
@@ -222,14 +321,14 @@ impl Job {
     }
 }
 
-/// A download's response: begun (a navigation's), or to fetch once the user chose where.
+/// A download's response: begun (a navigation's), or to fetch once its file is chosen.
 enum Fetch {
     Started(Box<(ResponseHead, ResponseStream)>),
-    Later(NetClient, Url),
+    Later(NetClient, Box<Request>),
 }
 
-/// The Save As dialog, with `name` suggested (and its extension as the type).
-fn ask_where(owner: window::WindowHandle, name: &str) -> Option<PathBuf> {
+/// The Save As dialog, with `name` suggested (and its extension as the type), in `dir`.
+fn ask_where(owner: window::WindowHandle, name: &str, dir: Option<&Path>) -> Option<PathBuf> {
     let ext = name
         .rsplit_once('.')
         .map(|(_, e)| e.to_ascii_lowercase())
@@ -239,7 +338,75 @@ fn ask_where(owner: window::WindowHandle, name: &str) -> Option<PathBuf> {
         .iter()
         .map(|(d, p)| (d.as_str(), p.as_str()))
         .collect();
-    window::save_file_dialog(owner, name, &filters)
+    window::save_file_dialog(owner, name, &filters, dir)
+}
+
+/// How many numbered names ("a (1).zip" to "a (100).zip") a download tries before it asks where
+/// to save instead.
+const MAX_UNIQUE: u32 = 100;
+
+/// `name` made a safe file name for Windows: no character it refuses in a name, no trailing dots
+/// or spaces, not a device's name; "download" when nothing is left.
+fn safe_file_name(name: &str) -> String {
+    let clean: String = name
+        .chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            c if (c as u32) < 32 => '_',
+            c => c,
+        })
+        .take(200)
+        .collect();
+    let mut clean = clean.trim_start().trim_end_matches(['.', ' ']).to_owned();
+    if clean.is_empty() {
+        return "download".into();
+    }
+    let stem = clean.split('.').next().unwrap_or("").trim_end();
+    const DEVICES: [&str; 22] = [
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+        "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+    if DEVICES.iter().any(|d| d.eq_ignore_ascii_case(stem)) {
+        clean.insert(0, '_');
+    }
+    clean
+}
+
+/// The `n`th numbered form of `name`: "a (n).zip" (the number before the extension).
+fn numbered(name: &str, n: u32) -> String {
+    match name.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => format!("{stem} ({n}).{ext}"),
+        _ => format!("{name} ({n})"),
+    }
+}
+
+/// A file in `dir` for a download named `name`, made first (the folder too) so that no other
+/// download takes it: its own name, else the first numbered one no file has (neither the file nor
+/// a download's partial file of that name). `None` when the folder cannot be written or every
+/// name is taken: the user is asked instead.
+fn reserve_in(dir: &Path, name: &str) -> Option<PathBuf> {
+    std::fs::create_dir_all(dir).ok()?;
+    let name = safe_file_name(name);
+    for n in 0..=MAX_UNIQUE {
+        let candidate = dir.join(if n == 0 {
+            name.clone()
+        } else {
+            numbered(&name, n)
+        });
+        if candidate.exists() {
+            continue;
+        }
+        let made = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(partial_path(&candidate));
+        match made {
+            Ok(_) => return Some(candidate),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(_) => return None,
+        }
+    }
+    None
 }
 
 /// The partial file a download is written to until it is complete: `<file>.part`.
@@ -270,8 +437,8 @@ fn run(downloads: &Mutex<DownloadHistory>, mut job: Job, path: PathBuf, fetch: F
             let (head, stream) = *b;
             (Some(head), stream)
         }
-        Fetch::Later(net, url) => {
-            let mut stream = net.fetch(Request::navigation(url));
+        Fetch::Later(net, request) => {
+            let mut stream = net.fetch(*request);
             let mut head = None;
             while let Some(e) = stream.next_blocking() {
                 match e {
@@ -321,6 +488,8 @@ fn run(downloads: &Mutex<DownloadHistory>, mut job: Job, path: PathBuf, fetch: F
         let _ = h.save();
     };
     if let Some(why) = failed {
+        // (the partial file the folder's name was reserved with, if it was)
+        let _ = std::fs::remove_file(&partial);
         finish(State::Interrupted, Some(why));
         return;
     }
@@ -470,7 +639,7 @@ mod tests {
             &downloads,
             job(url.as_str()),
             path.clone(),
-            Fetch::Later(net.client(), url.clone()),
+            Fetch::Later(net.client(), Box::new(Request::navigation(url.clone()))),
         );
         assert_eq!(std::fs::read(&path).unwrap(), b"abcdef");
         assert!(!partial_path(&path).exists());
@@ -491,6 +660,55 @@ mod tests {
     }
 
     #[test]
+    fn a_download_without_asking_takes_a_free_name_in_the_folder() {
+        assert_eq!(safe_file_name("a<b>:c?.zip"), "a_b__c_.zip");
+        assert_eq!(safe_file_name("  report.pdf. . "), "report.pdf");
+        assert_eq!(safe_file_name("..."), "download");
+        assert_eq!(safe_file_name("con.txt"), "_con.txt");
+        assert_eq!(safe_file_name("Console.txt"), "Console.txt");
+        assert_eq!(numbered("a.zip", 2), "a (2).zip");
+        assert_eq!(numbered("archive", 1), "archive (1)");
+        assert_eq!(numbered(".hidden", 1), ".hidden (1)");
+        let dir = temp_dir("folder").join("made");
+        // The folder is made; the first name is the file's own, its partial file made at once.
+        let first = reserve_in(&dir, "a.zip").unwrap();
+        assert_eq!(first, dir.join("a.zip"));
+        assert!(partial_path(&first).exists());
+        // While that one runs, and once its file is there, the next one is numbered.
+        assert_eq!(reserve_in(&dir, "a.zip").unwrap(), dir.join("a (1).zip"));
+        std::fs::rename(partial_path(&first), &first).unwrap();
+        assert_eq!(reserve_in(&dir, "a.zip").unwrap(), dir.join("a (2).zip"));
+        // A download runs into the name it was given and its partial file goes.
+        let net = NetThread::start(NetConfig::default()).unwrap();
+        let base = serve(vec![head(3), b"xyz".to_vec()], Duration::ZERO);
+        let url = Url::parse(&format!("{base}/file")).unwrap();
+        let path = reserve_in(&dir, "b.zip").unwrap();
+        let downloads = Mutex::new(DownloadHistory::in_memory());
+        run(
+            &downloads,
+            job(url.as_str()),
+            path.clone(),
+            Fetch::Later(net.client(), Box::new(Request::navigation(url))),
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), b"xyz");
+        assert!(!partial_path(&path).exists());
+        // One that fails takes its reserved partial file with it.
+        let missing = Url::parse(&format!("{base}/nothing")).unwrap();
+        let path = reserve_in(&dir, "c.zip").unwrap();
+        run(
+            &downloads,
+            job(missing.as_str()),
+            path.clone(),
+            Fetch::Later(net.client(), Box::new(Request::navigation(missing))),
+        );
+        assert!(!path.exists() && !partial_path(&path).exists());
+        // A folder that cannot be made: the user is asked instead.
+        let file = dir.join("a.zip");
+        assert_eq!(reserve_in(&file.join("sub"), "x.zip"), None);
+        let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+    }
+
+    #[test]
     fn a_failed_or_cancelled_download_leaves_no_file() {
         let net = NetThread::start(NetConfig::default()).unwrap();
         let dir = temp_dir("fail");
@@ -503,7 +721,7 @@ mod tests {
             &downloads,
             job(missing.as_str()),
             path.clone(),
-            Fetch::Later(net.client(), missing),
+            Fetch::Later(net.client(), Box::new(Request::navigation(missing))),
         );
         {
             let h = downloads.lock().unwrap();
@@ -546,7 +764,7 @@ mod tests {
             &downloads,
             job(url.as_str()),
             path.clone(),
-            Fetch::Later(net.client(), url),
+            Fetch::Later(net.client(), Box::new(Request::navigation(url))),
         );
         canceller.join().unwrap();
         let h = downloads.lock().unwrap();

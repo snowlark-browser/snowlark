@@ -18,6 +18,8 @@ snowlark-tab = { path = "../snowlark-tab" }
 snowlark-page = { path = "../snowlark-page" }
 base64 = "0.22"
 flate2 = "1"
+# (the downloads search: text compared without its accents)
+icu_normalizer = { version = "2", default-features = false, features = ["compiled_data"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # (an update's SHA-256)

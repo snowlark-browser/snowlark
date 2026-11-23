@@ -251,6 +251,11 @@ pub struct Browser {
     history: Arc<std::sync::Mutex<History>>,
     /// The profile's downloads, shared with the downloads page and the download threads.
     downloads: Arc<std::sync::Mutex<crate::downloads::DownloadHistory>>,
+    /// The download folder chosen in the folder picker the settings' Change button opened (on a
+    /// thread of its own), until the window takes it.
+    picked_download_dir: Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
+    /// What the toolbar's downloads button showed last ([`downloads_ui::DownloadsButton`]).
+    downloads_button: Option<crate::chrome::DownloadsButton>,
     profile: Profile,
     settings: Settings,
     bookmarks: Bookmarks,
@@ -530,6 +535,8 @@ impl Browser {
             next_id: 1,
             history,
             downloads,
+            picked_download_dir: Arc::default(),
+            downloads_button: None,
             profile: profile.clone(),
             settings,
             bookmarks,
@@ -762,6 +769,11 @@ impl Browser {
                 layout.with_incognito(chrome::incognito_button_width(&self.fonts, &label))
             }
             None => layout,
+        };
+        let layout = if self.downloads_button.is_some() {
+            layout.with_downloads()
+        } else {
+            layout
         };
         layout
             .with_audio(audio)
@@ -1743,6 +1755,7 @@ impl Browser {
             bar_drop: self.bar_drop_view(),
             blocker: self.blocker_badge(),
             incognito: self.incognito_label(),
+            downloads: self.downloads_button,
         };
         let list = chrome::build(&view, &layout, &self.fonts);
         let bg = view.theme.frame;
@@ -2257,6 +2270,10 @@ impl Browser {
                 (Hit::Shield, MouseButton::Left) => {
                     self.pressed = Hit::None;
                     self.toggle_blocker_panel();
+                }
+                (Hit::Downloads, MouseButton::Left) => {
+                    self.pressed = Hit::None;
+                    self.open_downloads();
                 }
                 (Hit::Menu, MouseButton::Left) => {
                     self.pressed = Hit::None;
@@ -2985,6 +3002,8 @@ impl WindowHandler for Browser {
                 self.save_window(window, false);
                 self.save_session();
                 self.update_tick();
+                // (downloads another window started, and the button's hour running out)
+                self.downloads_changed();
             }
             Event::Timer(TIMER_HANG) => self.hang_timer(window),
             Event::Timer(TIMER_TASKS) => self.refresh_task_manager(window),
@@ -3000,6 +3019,7 @@ impl WindowHandler for Browser {
                 }
                 // (another regular window may have changed the settings or the bookmarks)
                 self.take_shared(window);
+                self.take_picked_download_dir();
                 self.drain_tab_events(window);
                 if self.current.is_none() {
                     // (chosen in the tools' window's menus)

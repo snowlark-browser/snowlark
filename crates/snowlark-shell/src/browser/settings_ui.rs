@@ -153,6 +153,7 @@ impl BrowserPages {
                     blocking: self.blocker.as_deref().map(super::blocking::blocking_info),
                     category: Category::from_path(shown.path()),
                     clear_dialog: crate::clear_data::is_clear_url(shown.path()),
+                    download_folder: st.settings.download_folder(),
                 };
                 Some(settings_html(&st.settings, st.dark, &info))
             }
@@ -258,6 +259,13 @@ impl Browser {
         }
         if pairs.iter().any(|(k, v)| k == "clearAll" && v == "1") {
             self.confirm_clear(None);
+            return;
+        }
+        if pairs
+            .iter()
+            .any(|(k, v)| k == "downloadDirChange" && v == "1")
+        {
+            self.pick_download_dir(window);
             return;
         }
         if let Some((_, host)) = pairs.iter().find(|(k, _)| k == "clearSite") {
@@ -776,6 +784,92 @@ mod tests {
         );
     }
 
+    /// The downloads page's search ignores accents, and the search field keeps its text, focus
+    /// and selection when the browser shows the page again for a running download's progress.
+    #[test]
+    fn the_downloads_search_ignores_accents_and_keeps_its_focus_through_a_reload() {
+        use crate::downloads::{DownloadHistory, Start, State};
+        let net = NetThread::start(NetConfig::default()).unwrap();
+        let downloads = Arc::new(Mutex::new(DownloadHistory::in_memory()));
+        {
+            let mut h = downloads.lock().unwrap();
+            let now = now_ms();
+            for (name, ago) in [("Café menu.pdf", 2000), ("photo.jpg", 1000)] {
+                let id = h.start(Start {
+                    target_path: std::env::temp_dir().join(name),
+                    url_chain: vec![format!("https://files.example/{}", name.replace(' ', "_"))],
+                    start_time: now - ago,
+                    ..Default::default()
+                });
+                h.finish(id, State::Cancelled, None, now);
+            }
+        }
+        let state = Arc::new(Mutex::new(InternalState {
+            downloads,
+            ..Default::default()
+        }));
+        let pages = internal_pages(
+            state,
+            Arc::new(Mutex::new(History::in_memory())),
+            net.client(),
+            None,
+        );
+        let mut d = driver_with(&net, pages);
+        let eval =
+            |d: &mut crate::page_driver::PageDriver, js: &str| d.page().eval(js, "t").unwrap();
+        d.navigate(Url::parse("snowlark://downloads/").unwrap());
+        settle(&mut d, |d| {
+            !d.info().loading && d.info().title == "Downloads"
+        });
+        let shown = "[...document.querySelectorAll('.item')].filter(i => getComputedStyle(i).display != 'none').map(i => i.querySelector('.name').textContent).join()";
+        for typed in ["cafe", "CAFÉ", "Cafe\u{301}", "café MENU"] {
+            eval(
+                &mut d,
+                &format!("var s = document.getElementById('search'); s.value = '{typed}'; s.dispatchEvent(new Event('input'))"),
+            );
+            assert_eq!(eval(&mut d, shown), "Café menu.pdf", "{typed}");
+        }
+        // The browser shows the page again (a new document: no `old` in it).
+        let show_again = |d: &mut crate::page_driver::PageDriver| {
+            d.page().eval("var old = 1", "t").unwrap();
+            let url = d.info().url.clone().unwrap();
+            d.reload(url);
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_secs(10) {
+                d.update();
+                let shown = !d.info().loading
+                    && d.page()
+                        .eval(
+                            "typeof old == 'undefined' && document.getElementById('search') ? 'y' : ''",
+                            "t",
+                        )
+                        .is_ok_and(|v| v == "y");
+                if shown {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            panic!("the page was not shown again");
+        };
+        // Typing with the caret inside the text, then the browser shows the page again.
+        eval(
+            &mut d,
+            "s.value = 'caf menu'; s.dispatchEvent(new Event('input')); s.focus(); s.setSelectionRange(3, 3)",
+        );
+        show_again(&mut d);
+        let field = "var s = document.getElementById('search'); [document.activeElement === s, s.value, s.selectionStart, s.selectionEnd].join()";
+        assert_eq!(eval(&mut d, field), "true,caf menu,3,3");
+        assert_eq!(eval(&mut d, shown), "Café menu.pdf");
+        // Unfocused: the text stays, the focus is not taken.
+        eval(
+            &mut d,
+            "s.value = 'photo'; s.dispatchEvent(new Event('input')); s.blur()",
+        );
+        show_again(&mut d);
+        assert_eq!(eval(&mut d, field), "false,photo,5,5");
+        assert_eq!(eval(&mut d, shown), "photo.jpg");
+    }
+
     /// The history page: its rows, a row's menu removing one row, the selection removing
     /// several after the confirmation; what it submits is what the browser removes.
     #[test]
@@ -939,7 +1033,7 @@ mod tests {
                 &mut d,
                 &format!("{boxes}.map(b => b.name + ':' + b.checked).join()")
             ),
-            "history:true,cookies:true,cache:true"
+            "history:true,downloads:true,cookies:true,cache:true"
         );
         assert_eq!(
             eval(&mut d, "document.querySelector('#cbd select').value"),
@@ -980,6 +1074,7 @@ mod tests {
                 history: false,
                 cookies: true,
                 cache: false,
+                downloads: false,
             })
         );
     }

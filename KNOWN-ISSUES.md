@@ -99,8 +99,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   events, and the `CSSScopeRule` interface are not implemented. (ref 45)
 
 
-- **Scroll-animated video at high display scale.** On apple.com's iPhone pages at a display scale above 100%, the
-  scroll-driven camera section's video may not show. (ref 618)
 
 ## Painting and compositing
 
@@ -228,10 +226,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 - **Scroll bar details.** A classic scroll bar is drawn for the page, but frames keep overlay bars (none drawn) and
   `scrollbar-gutter` is not implemented. (ref 8)
-- **Downloads.** Every download asks where to save it; there is no download indicator in the toolbar (the
-  downloads page, Ctrl+J, shows progress). A download cannot be paused or resumed (Retry starts it again), files are
-  not checked for danger before they are saved, and clearing browsing data does not clear the download list.
-  (ref 542)
+- **Downloads.** The toolbar's downloads button opens the downloads page; it has no bubble listing the recent
+  downloads. A download cannot be paused or resumed (Retry starts it again), and files are not checked for danger
+  before they are saved. (ref 542)
 - **Incognito windows are not finished.** They keep nothing on disk, but open the settings, history and bookmark
   pages in themselves rather than in a regular window, and lose bookmarks added in them when they close. (ref 540)
 
@@ -246,6 +243,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Other test-suite problems.** Debug-profile tests overflow their stack in `snowlark-ipc` and `snowlark-js` (ref 562);
   `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572), and once
   stopped with an access violation that did not happen again (ref 707); the WPT files
+- **Animated hero video on apple.com.** The animation at the top of apple.com's home page shows its first
+  frame and does not move. (ref 708)
   `navigation-timing/test-document-open.html` and `fetch/api/abort/general.any.html` vary from run to run
   (ref 60, 563); a headless
   Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py` can read one arm slower than the other for the same binary when the arms share a core (ref 509).

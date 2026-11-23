@@ -110,17 +110,34 @@ impl Download {
             .unwrap_or_default()
     }
 
-    /// Whether `query` (words, each of which must be found, in any case) matches the file's
-    /// path or either URL.
+    /// Whether `query` (words, each of which must be found, in any case and with or without
+    /// accents: [`search_fold`]) matches the file's path or either URL.
     pub fn matches(&self, query: &str) -> bool {
-        let path = self.target_path.to_string_lossy().to_lowercase();
-        let first = self.original_url().to_lowercase();
-        let last = self.url().to_lowercase();
+        let path = search_fold(&self.target_path.to_string_lossy());
+        let first = search_fold(self.original_url());
+        let last = search_fold(self.url());
         query.split_whitespace().all(|w| {
-            let w = w.to_lowercase();
+            let w = search_fold(w);
             path.contains(&w) || first.contains(&w) || last.contains(&w)
         })
     }
+}
+
+/// Text as the downloads search compares it: lower case, decomposed (NFD) with its combining
+/// marks left out, so "Café" and "cafe" are the same. The page's script folds what is typed the
+/// same way.
+pub fn search_fold(s: &str) -> String {
+    let lower = s.to_lowercase();
+    icu_normalizer::DecomposingNormalizerBorrowed::new_nfd()
+        .normalize(&lower)
+        .chars()
+        .filter(|&c| !is_combining_mark(c))
+        .collect()
+}
+
+/// The combining diacritical mark blocks (what the page's script also leaves out).
+fn is_combining_mark(c: char) -> bool {
+    matches!(c as u32, 0x300..=0x36F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0x20D0..=0x20FF | 0xFE20..=0xFE2F)
 }
 
 /// What a new download starts with.
@@ -334,6 +351,27 @@ impl DownloadHistory {
         self.remove_where("Cleared all".into(), now, |_| true)
     }
 
+    /// Deleting browsing data: the entries that began in `begin..end` (milliseconds since the
+    /// epoch) and are not in progress leave the list for good (Undo cannot bring them back, nor
+    /// those removed before); the files stay. Whether any went.
+    pub fn delete_started_between(&mut self, begin: i64, end: i64) -> bool {
+        let gone = |e: &Download| {
+            e.state != State::InProgress && e.start_time >= begin && e.start_time < end
+        };
+        let before = self.entries.len();
+        self.entries.retain(|e| !gone(e));
+        let undo_had = self.removals.len();
+        for r in &mut self.removals {
+            r.entries.retain(|e| !gone(e));
+        }
+        self.removals.retain(|r| !r.entries.is_empty());
+        let changed = self.entries.len() != before || self.removals.len() != undo_had;
+        if changed {
+            self.changed();
+        }
+        changed
+    }
+
     /// Puts back what the last removal took.
     pub fn undo(&mut self) -> bool {
         let Some(r) = self.removals.pop() else {
@@ -430,8 +468,8 @@ mod tests {
 
     fn start(name: &str, url: &str, at: i64) -> Start {
         Start {
-            target_path: PathBuf::from(format!("C:\\Users\\u\\Downloads\\{name}")),
-            current_path: PathBuf::from(format!("C:\\Users\\u\\Downloads\\{name}.part")),
+            target_path: PathBuf::from(format!("C:\\Downloads\\{name}")),
+            current_path: PathBuf::from(format!("C:\\Downloads\\{name}.part")),
             url_chain: vec![url.into(), format!("{url}?served")],
             referrer: "https://ref.example/".into(),
             tab_url: "https://tab.example/".into(),

@@ -49,13 +49,17 @@
     }
   });
 
-  // The search: the list follows each keystroke; the address keeps it, so the page shows it again
-  // when it is made anew.
+  // The search: the list follows each keystroke (an address's `?q=` starts it; the history API
+  // cannot change the query of an address that is not HTTP(S), so what is typed is kept for the
+  // page's next showing in the tab's session storage, below). Words are compared in any case and without their accents, as the
+  // entries' search text is (lower case, decomposed, combining marks left out).
   const search = document.getElementById('search');
   const clear = document.getElementById('clear-search');
   const empty = document.getElementById('empty');
+  const MARKS = /[̀-ͯ᪰-᫿᷀-᷿⃐-⃿︠-︯]/g;
+  const fold = (s) => s.toLowerCase().normalize('NFD').replace(MARKS, '');
   function filter() {
-    const words = search.value.toLowerCase().split(/\s+/).filter((w) => w);
+    const words = fold(search.value).split(/\s+/).filter((w) => w);
     let shown = 0;
     for (const day of document.querySelectorAll('.day')) {
       let any = false;
@@ -70,8 +74,6 @@
     empty.hidden = shown > 0;
     empty.textContent = words.length ? empty.dataset.none : empty.dataset.all;
     clear.hidden = search.value === '';
-    const q = search.value.trim();
-    history.replaceState(null, '', q ? '?q=' + encodeURIComponent(q) : 'snowlark://downloads/');
   }
   search.addEventListener('input', filter);
   search.form.addEventListener('submit', (e) => {
@@ -89,4 +91,35 @@
       filter();
     }
   });
+
+  // The browser shows the page again while downloads run (their progress) and after an action: the
+  // search field keeps its text, and its focus and selection when it had them, through that.
+  const KEPT = 'downloads-search';
+  addEventListener('pagehide', () => {
+    try {
+      const kept = { value: search.value, at: Date.now() };
+      if (document.activeElement === search) {
+        kept.start = search.selectionStart;
+        kept.end = search.selectionEnd;
+        kept.direction = search.selectionDirection;
+      }
+      sessionStorage.setItem(KEPT, JSON.stringify(kept));
+    } catch (e) {}
+  });
+  let kept = null;
+  try {
+    kept = JSON.parse(sessionStorage.getItem(KEPT));
+    sessionStorage.removeItem(KEPT);
+  } catch (e) {}
+  // (only when the page is shown again at once: not when the tab comes back to it later)
+  if (kept && typeof kept.value === 'string' && Math.abs(Date.now() - kept.at) < 5000) {
+    if (kept.value !== search.value) {
+      search.value = kept.value;
+      filter();
+    }
+    if (typeof kept.start === 'number') {
+      search.focus();
+      search.setSelectionRange(kept.start, kept.end, kept.direction || 'none');
+    }
+  }
 })();

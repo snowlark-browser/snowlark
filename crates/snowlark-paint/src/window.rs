@@ -1062,15 +1062,83 @@ impl State {
     }
 }
 
+/// The user's Downloads folder (the system's known folder), `None` when it has none.
+pub fn downloads_folder() -> Option<std::path::PathBuf> {
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::UI::Shell::{FOLDERID_Downloads, SHGetKnownFolderPath, KF_FLAG_DEFAULT};
+    // SAFETY: the known folder's path is a string the system allocated for the caller, read once
+    // and freed with the allocator it came from.
+    unsafe {
+        let p = SHGetKnownFolderPath(&FOLDERID_Downloads, KF_FLAG_DEFAULT, None).ok()?;
+        let s = p.to_string();
+        CoTaskMemFree(Some(p.0 as *const core::ffi::c_void));
+        s.ok().map(std::path::PathBuf::from)
+    }
+}
+
+/// Asks for a folder with the system's folder picker, owned by `owner`, starting in `start`.
+/// Blocks until the dialog closes, so it runs off the window's thread (it sets up COM for its
+/// own). `None` when canceled.
+pub fn pick_folder_dialog(
+    owner: WindowHandle,
+    start: Option<&std::path::Path>,
+) -> Option<std::path::PathBuf> {
+    use std::os::windows::ffi::OsStrExt as _;
+    use windows::Win32::System::Com::{
+        CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, IBindCtx,
+        CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED,
+    };
+    use windows::Win32::UI::Shell::{
+        FileOpenDialog, IFileOpenDialog, IShellItem, SHCreateItemFromParsingName,
+        FOS_FORCEFILESYSTEM, FOS_PATHMUSTEXIST, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
+    };
+    let start: Option<Vec<u16>> = start.map(|p| p.as_os_str().encode_wide().chain([0]).collect());
+    // SAFETY: COM is set up for this thread for the dialog's sake and balanced below when that
+    // succeeded; every COM object is released inside the closure, before that. The start folder's
+    // wide string outlives the call that reads it, and the chosen path is a string the dialog
+    // allocated for the caller, read once and freed with the allocator it came from.
+    unsafe {
+        let com = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
+        let chosen = (|| {
+            let dialog: IFileOpenDialog =
+                CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER).ok()?;
+            let options = dialog.GetOptions().ok()?;
+            dialog
+                .SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST)
+                .ok()?;
+            if let Some(start) = &start {
+                if let Ok(folder) = SHCreateItemFromParsingName::<_, _, IShellItem>(
+                    PCWSTR(start.as_ptr()),
+                    None::<&IBindCtx>,
+                ) {
+                    let _ = dialog.SetFolder(&folder);
+                }
+            }
+            dialog.Show(Some(owner.hwnd())).ok()?;
+            let item = dialog.GetResult().ok()?;
+            let p = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
+            let s = p.to_string();
+            CoTaskMemFree(Some(p.0 as *const core::ffi::c_void));
+            s.ok().map(std::path::PathBuf::from)
+        })();
+        if com {
+            CoUninitialize();
+        }
+        chosen
+    }
+}
+
 /// Asks where to save a file with the system's Save As dialog, owned by `owner`, offering
 /// `suggested` as the name and `filters` as (description, patterns) pairs ("PNG image",
-/// "*.png"). Blocks until the dialog closes, so it runs off the window's thread (it sets up COM
-/// for its own). `None` when canceled.
+/// "*.png"), in the folder `dir` (the system's choice when `None`). Blocks until the dialog
+/// closes, so it runs off the window's thread (it sets up COM for its own). `None` when canceled.
 pub fn save_file_dialog(
     owner: WindowHandle,
     suggested: &str,
     filters: &[(&str, &str)],
+    dir: Option<&std::path::Path>,
 ) -> Option<std::path::PathBuf> {
+    use std::os::windows::ffi::OsStrExt as _;
     use windows::core::PWSTR;
     use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
     use windows::Win32::UI::Controls::Dialogs::{
@@ -1101,6 +1169,7 @@ pub fn save_file_dialog(
     for (i, u) in clean.encode_utf16().take(1000).enumerate() {
         file[i] = u;
     }
+    let dir: Option<Vec<u16>> = dir.map(|d| d.as_os_str().encode_wide().chain([0]).collect());
     let mut ofn = OPENFILENAMEW {
         lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
         hwndOwner: owner.hwnd(),
@@ -1108,11 +1177,12 @@ pub fn save_file_dialog(
         nFilterIndex: 1,
         lpstrFile: PWSTR(file.as_mut_ptr()),
         nMaxFile: file.len() as u32,
+        lpstrInitialDir: dir.as_ref().map_or(PCWSTR::null(), |d| PCWSTR(d.as_ptr())),
         Flags: OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR,
         ..Default::default()
     };
     // SAFETY: COM is set up for this thread for the dialog's sake and balanced below when that
-    // succeeded. The structure points at the filter and file buffers, which outlive the call;
+    // succeeded. The structure points at the filter, file and folder buffers, which outlive the call;
     // nMaxFile is the file buffer's length in UTF-16 units, so the dialog writes inside it.
     unsafe {
         let com = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
