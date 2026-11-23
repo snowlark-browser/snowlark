@@ -696,11 +696,25 @@ impl<S: Style> LayoutTree<S> {
 
     fn fragment_rects(&self, node: NodeId, transforms: bool) -> Vec<Rect> {
         let tree = &self.tree;
-        let split = !tree.split_owners.is_empty()
-            && tree
-                .split_owners
-                .values()
-                .any(|owners| owners.contains(&node));
+        // (the tree's split inlines with their blocks, made once per layout: looking through
+        // every split at each read made reads of a page of split inlines quadratic)
+        let splits = (!tree.split_owners.is_empty()).then(|| {
+            self.lookup.splits(|| {
+                let mut splits = lookup::Splits::default();
+                for (&b, owners) in &tree.split_owners {
+                    let block = tree.b(b).node.filter(|&n| tree.box_of(n) == Some(b));
+                    for &owner in owners {
+                        let blocks = splits.entry(owner).or_default();
+                        if let Some(n) = block.filter(|n| !blocks.contains(n)) {
+                            blocks.push(n);
+                        }
+                    }
+                }
+                splits
+            })
+        });
+        let blocks = splits.as_ref().and_then(|s| s.get(&node));
+        let split = blocks.is_some();
         // (CSSOM View §6.1: with the transforms of the box and its ancestors applied, a box
         // becomes the rectangle bounding its transformed corners)
         let transformed = transforms && self.has_transformed_path(node);
@@ -731,101 +745,76 @@ impl<S: Style> LayoutTree<S> {
                     .collect()
             });
         }
-        // (an inline split around blocks, rare: a walk of the tree keeps the pieces and the blocks
-        // in tree order and applies the transforms)
-        let mut out = Vec::new();
-        let split_block = |n: Option<NodeId>| {
-            split
-                && n.and_then(|n| tree.box_of(n))
-                    .and_then(|b| tree.split_owners.get(&b))
-                    .is_some_and(|owners| owners.contains(&node))
+        // (an inline split around blocks: its pieces and those blocks in tree order, from the
+        // lookup, at the cost of their paths or of the index, not of the tree: an Intersection
+        // Observer target that is such an inline is read at every rendering update)
+        let Some(root) = &self.root else {
+            return Vec::new();
         };
-        // (`visit` gets the fragment's map with its own transform, and the map of its place in its
-        // parent, without it)
-        fn walk<S: Style>(
-            f: &Fragment<S>,
-            m: snowlark_paint::Matrix,
-            transformed: bool,
-            placed: (snowlark_paint::Matrix, bool),
-            transforms: bool,
-            visit: &mut impl FnMut(&Fragment<S>, &dyn Fn(Rect) -> Rect, &dyn Fn(Rect) -> Rect),
-        ) {
-            let mapper = |m: snowlark_paint::Matrix, transformed: bool| {
-                move |r: Rect| {
-                    if transformed {
-                        m.apply_rect(&r)
-                    } else {
-                        r.translate(m.dx, m.dy)
-                    }
-                }
-            };
-            visit(f, &mapper(m, transformed), &mapper(placed.0, placed.1));
-            for c in &f.children {
-                let offset = snowlark_paint::Matrix::translation(c.offset.x, c.offset.y);
-                let local = c
-                    .fragment
-                    .as_box()
-                    .filter(|_| transforms)
-                    .and_then(|b| b.used_transform(c.fragment.size));
-                let placed = (offset.then(&m), transformed);
-                match local {
-                    Some(t) => walk(
-                        &c.fragment,
-                        t.then(&offset).then(&m),
-                        true,
-                        placed,
-                        transforms,
-                        visit,
-                    ),
-                    None => walk(
-                        &c.fragment,
-                        placed.0,
-                        transformed,
-                        placed,
-                        transforms,
-                        visit,
-                    ),
-                }
+        let mut targets: smallvec::SmallVec<[NodeId; 4]> = smallvec::smallvec![node];
+        targets.extend(blocks.into_iter().flatten().copied());
+        let ancestors = || {
+            let mut set = rustc_hash::FxHashSet::default();
+            for &n in &targets {
+                set.extend(self.box_ancestor_nodes(n).unwrap_or_default());
             }
-        }
-        if let Some(root) = &self.root {
-            let mut walked = 0;
-            walk(
-                root,
-                snowlark_paint::Matrix::IDENTITY,
-                false,
-                (snowlark_paint::Matrix::IDENTITY, false),
-                transforms,
-                &mut |f, map, placed| {
-                    walked += 1;
-                    let backdrop = lookup::is_backdrop(f);
-                    let own = f.node() == Some(node);
-                    let block_piece =
-                        !own && f.as_box().is_some_and(|b| {
-                            b.flags & fragment_flags::INLINE_BOX == 0 && b.pseudo.is_none()
-                        }) && split_block(f.node());
-                    if own && !backdrop {
-                        out.push(map(Rect::new(0.0, 0.0, f.size.width, f.size.height)));
-                    } else if block_piece {
-                        // (the block's inline-axis margins count too, as in Chrome, whose inline box
-                        // holds the block's margin box on its line; the block's own transform is
-                        // left out, as for the inline's own pieces: it transforms the block, not
-                        // the inline, CSSOM View §6.1)
-                        let s = &f.as_box().expect("box fragment").style;
-                        let ml = s.margin(style::Side::Left).resolve_or_zero(0.0);
-                        let mr = s.margin(style::Side::Right).resolve_or_zero(0.0);
-                        out.push(placed(Rect::new(
-                            -ml,
-                            0.0,
-                            f.size.width + ml + mr,
-                            f.size.height,
-                        )));
+            set
+        };
+        // (each fragment with its map, its own transform applied, and the map of its place in its
+        // parent, without it)
+        fn rects<S: Style, P: lookup::Place>(
+            found: &[(P, P, &Fragment<S>)],
+            node: NodeId,
+            map: impl Fn(P, Rect) -> Rect,
+        ) -> Vec<Rect> {
+            let mut out = Vec::new();
+            for (own_place, placed, f) in found {
+                let own = f.node() == Some(node);
+                if own {
+                    if !lookup::is_backdrop(f) {
+                        out.push(map(
+                            *own_place,
+                            Rect::new(0.0, 0.0, f.size.width, f.size.height),
+                        ));
                     }
-                },
-            );
-            self.lookup.count(walked);
+                    continue;
+                }
+                let Some(b) = f
+                    .as_box()
+                    .filter(|b| b.flags & fragment_flags::INLINE_BOX == 0 && b.pseudo.is_none())
+                else {
+                    continue;
+                };
+                // (the block's inline-axis margins count too, as in Chrome, whose inline box holds
+                // the block's margin box on its line; the block's own transform is left out, as for
+                // the inline's own pieces: it transforms the block, not the inline, CSSOM View §6.1)
+                let ml = b.style.margin(style::Side::Left).resolve_or_zero(0.0);
+                let mr = b.style.margin(style::Side::Right).resolve_or_zero(0.0);
+                out.push(map(
+                    *placed,
+                    Rect::new(-ml, 0.0, f.size.width + ml + mr, f.size.height),
+                ));
+            }
+            out
         }
-        out
+        let boxes = tree.len();
+        if transforms {
+            self.lookup
+                .with_many_transformed(root, &targets, ancestors, boxes, |found| {
+                    rects(found, node, |p: lookup::Transformed, r| {
+                        if p.any {
+                            p.m.apply_rect(&r)
+                        } else {
+                            r.translate(p.m.dx, p.m.dy)
+                        }
+                    })
+                })
+        } else {
+            self.lookup
+                .with_many(root, &targets, ancestors, boxes, |found| {
+                    rects(found, node, |p: Point, r| r.translate(p.x, p.y))
+                })
+        }
     }
 
     /// The rectangles of the part of text node `node` between DOM byte offsets `start` and `end`

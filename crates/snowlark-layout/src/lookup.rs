@@ -43,12 +43,17 @@ pub(crate) trait Place: Copy + PartialEq + std::fmt::Debug {
     const ROOT: Self;
     /// The placement of `child` of a fragment placed at `self`.
     fn child<S: Style>(self, child: &FragmentChild<S>) -> Self;
+    /// [`Place::child`] without the child's own transform: where its box is put in its parent.
+    fn placed<S: Style>(self, child: &FragmentChild<S>) -> Self;
 }
 
 impl Place for Point {
     const ROOT: Self = Point::ZERO;
     fn child<S: Style>(self, c: &FragmentChild<S>) -> Self {
         Point::new(self.x + c.offset.x, self.y + c.offset.y)
+    }
+    fn placed<S: Style>(self, c: &FragmentChild<S>) -> Self {
+        self.child(c)
     }
 }
 
@@ -77,20 +82,37 @@ impl Place for Transformed {
                 m: t.then(&offset).then(&self.m),
                 any: true,
             },
-            None => Transformed {
-                m: offset.then(&self.m),
-                any: self.any,
-            },
+            None => self.placed(c),
+        }
+    }
+    fn placed<S: Style>(self, c: &FragmentChild<S>) -> Self {
+        Transformed {
+            m: Matrix::translation(c.offset.x, c.offset.y).then(&self.m),
+            any: self.any,
         }
     }
 }
 
-type Entries<S, P> = SmallVec<[(P, Arc<Fragment<S>>); 1]>;
+/// A fragment in the index: its placement, the placement of its box in its parent (without its
+/// own transform), and its place in tree order.
+struct Entry<S: Style, P: Place> {
+    at: P,
+    placed: P,
+    order: u32,
+    fr: Arc<Fragment<S>>,
+}
+
+type Entries<S, P> = SmallVec<[Entry<S, P>; 1]>;
+
+/// For each inline split around blocks (CSS 2 §9.2.1.1), the nodes of those blocks.
+pub(crate) type Splits = FxHashMap<NodeId, SmallVec<[NodeId; 2]>>;
 
 /// The lookup state of one fragment tree (reset by each layout that produces a new tree).
 pub(crate) struct Lookup<S: Style> {
     offsets: Mutex<State<S, Point>>,
     transformed: Mutex<State<S, Transformed>>,
+    /// The tree's split inlines and their blocks, made at the first read of one.
+    splits: Mutex<Option<Arc<Splits>>>,
     /// The fragments the reads since the tree was made visited (searches, index builds and the
     /// walks passed to [`Lookup::count`]): what reads cost, for tests.
     searched: AtomicUsize,
@@ -116,6 +138,7 @@ impl<S: Style> Default for Lookup<S> {
         Lookup {
             offsets: Mutex::default(),
             transformed: Mutex::default(),
+            splits: Mutex::default(),
             searched: AtomicUsize::new(0),
         }
     }
@@ -136,7 +159,17 @@ impl<S: Style> Lookup<S> {
             .transformed
             .get_mut()
             .unwrap_or_else(|e| e.into_inner()) = State::default();
+        *self.splits.get_mut().unwrap_or_else(|e| e.into_inner()) = None;
         *self.searched.get_mut() = 0;
+    }
+
+    /// The tree's split inlines and the nodes of their blocks (`make` makes them, once per tree).
+    pub(crate) fn splits(&self, make: impl FnOnce() -> Splits) -> Arc<Splits> {
+        self.splits
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get_or_insert_with(|| Arc::new(make()))
+            .clone()
     }
 
     /// The fragments the reads since the tree was made visited.
@@ -195,7 +228,7 @@ impl<S: Style> Lookup<S> {
         if let Some(index) = &st.index {
             let found: SmallVec<[(P, &Fragment<S>); 4]> = index
                 .get(&node)
-                .map(|e| e.iter().map(|(p, fr)| (*p, &**fr)).collect())
+                .map(|e| e.iter().map(|e| (e.at, &*e.fr)).collect())
                 .unwrap_or_default();
             return f(&found);
         }
@@ -238,6 +271,156 @@ impl<S: Style> Lookup<S> {
     }
 }
 
+impl<S: Style> Lookup<S> {
+    /// Runs `f` with the fragments any of `targets` generated in `root`, in tree order, each with
+    /// its offset and the offset of its box in its parent (the same). For a read that needs several
+    /// nodes' fragments in their order in the tree (an inline split around blocks and those
+    /// blocks). `ancestors` gives the nodes of the box tree ancestors of every target's principal
+    /// box; `boxes` is the number of boxes in the tree.
+    pub(crate) fn with_many<R>(
+        &self,
+        root: &Arc<Fragment<S>>,
+        targets: &[NodeId],
+        ancestors: impl FnOnce() -> FxHashSet<NodeId>,
+        boxes: usize,
+        f: impl FnOnce(&[(Point, Point, &Fragment<S>)]) -> R,
+    ) -> R {
+        self.many(&self.offsets, root, targets, ancestors, boxes, f)
+    }
+
+    /// [`Lookup::with_many`] with transforms: each fragment with the matrix from its own
+    /// coordinates to the root fragment's, and the matrix of its box's place in its parent (its own
+    /// transform left out).
+    pub(crate) fn with_many_transformed<R>(
+        &self,
+        root: &Arc<Fragment<S>>,
+        targets: &[NodeId],
+        ancestors: impl FnOnce() -> FxHashSet<NodeId>,
+        boxes: usize,
+        f: impl FnOnce(&[(Transformed, Transformed, &Fragment<S>)]) -> R,
+    ) -> R {
+        self.many(&self.transformed, root, targets, ancestors, boxes, f)
+    }
+
+    /// The fragments of `targets` from the index once there is one (each target's in tree order,
+    /// merged by their order), else by a guided search entering the targets' and their ancestors'
+    /// fragments, whose visits count towards building the index as [`Lookup::with`]'s do.
+    fn many<P: Place, R>(
+        &self,
+        state: &Mutex<State<S, P>>,
+        root: &Arc<Fragment<S>>,
+        targets: &[NodeId],
+        ancestors: impl FnOnce() -> FxHashSet<NodeId>,
+        boxes: usize,
+        f: impl FnOnce(&[(P, P, &Fragment<S>)]) -> R,
+    ) -> R {
+        let mut st = state.lock().unwrap_or_else(|e| e.into_inner());
+        if st.index.is_none() && st.visited >= boxes.max(64) {
+            let mut built = 0;
+            st.index = Some(build_index(root, &mut built));
+            self.count(built);
+        }
+        if let Some(index) = &st.index {
+            type Ordered<'a, S, P> = SmallVec<[(u32, P, P, &'a Fragment<S>); 4]>;
+            let mut found: Ordered<S, P> = targets
+                .iter()
+                .filter_map(|n| index.get(n))
+                .flatten()
+                .map(|e| (e.order, e.at, e.placed, &*e.fr))
+                .collect();
+            found.sort_unstable_by_key(|e| e.0);
+            let found: SmallVec<[(P, P, &Fragment<S>); 4]> =
+                found.into_iter().map(|(_, a, p, fr)| (a, p, fr)).collect();
+            #[cfg(debug_assertions)]
+            check_many(root, targets, &found);
+            return f(&found);
+        }
+        fn go<'a, S: Style, P: Place>(
+            fr: &'a Fragment<S>,
+            at: P,
+            placed: P,
+            targets: &[NodeId],
+            ancestors: &FxHashSet<NodeId>,
+            out: &mut SmallVec<[(P, P, &'a Fragment<S>); 4]>,
+            visited: &mut usize,
+        ) {
+            *visited += 1;
+            if fr.node().is_some_and(|n| targets.contains(&n)) {
+                out.push((at, placed, fr));
+            }
+            for c in &fr.children {
+                let enter = match c.fragment.node() {
+                    None => true,
+                    Some(n) => targets.contains(&n) || ancestors.contains(&n),
+                };
+                if enter {
+                    go(
+                        &c.fragment,
+                        at.child(c),
+                        at.placed(c),
+                        targets,
+                        ancestors,
+                        out,
+                        visited,
+                    );
+                } else {
+                    *visited += 1;
+                }
+            }
+        }
+        let ancestors = ancestors();
+        let mut found = SmallVec::new();
+        let mut visited = 0;
+        go(
+            root,
+            P::ROOT,
+            P::ROOT,
+            targets,
+            &ancestors,
+            &mut found,
+            &mut visited,
+        );
+        st.visited += visited;
+        drop(st);
+        self.count(visited);
+        #[cfg(debug_assertions)]
+        check_many(root, targets, &found);
+        f(&found)
+    }
+}
+
+/// What [`Lookup::many`] found is what a walk of the whole tree finds, in the same order and
+/// places (and the place in the parent, without the fragment's own transform).
+#[cfg(debug_assertions)]
+fn check_many<S: Style, P: Place>(
+    root: &Fragment<S>,
+    targets: &[NodeId],
+    found: &[(P, P, &Fragment<S>)],
+) {
+    type Found<S, P> = Vec<(P, P, *const Fragment<S>)>;
+    fn all<S: Style, P: Place>(
+        fr: &Fragment<S>,
+        at: P,
+        placed: P,
+        targets: &[NodeId],
+        out: &mut Found<S, P>,
+    ) {
+        if fr.node().is_some_and(|n| targets.contains(&n)) {
+            out.push((at, placed, fr as *const Fragment<S>));
+        }
+        for c in &fr.children {
+            all(&c.fragment, at.child(c), at.placed(c), targets, out);
+        }
+    }
+    let mut every = Vec::new();
+    all(root, P::ROOT, P::ROOT, targets, &mut every);
+    let got: Found<S, P> = found
+        .iter()
+        .map(|(p, q, fr)| (*p, *q, *fr as *const Fragment<S>))
+        .collect();
+    debug_assert_eq!(got, every, "the lookup missed fragments of {targets:?}");
+}
+
 /// The guided search from `fr` at `at`.
 fn search<'a, S: Style, P: Place>(
     fr: &'a Fragment<S>,
@@ -268,21 +451,31 @@ fn build_index<S: Style, P: Place>(
     root: &Arc<Fragment<S>>,
     visited: &mut usize,
 ) -> FxHashMap<NodeId, Entries<S, P>> {
-    fn go<S: Style, P: Place>(
-        fr: &Arc<Fragment<S>>,
-        at: P,
-        out: &mut FxHashMap<NodeId, Entries<S, P>>,
-        visited: &mut usize,
-    ) {
-        *visited += 1;
+    struct Walk<S: Style, P: Place> {
+        out: FxHashMap<NodeId, Entries<S, P>>,
+        /// The fragments walked so far: the next one's place in tree order.
+        walked: u32,
+    }
+    fn go<S: Style, P: Place>(fr: &Arc<Fragment<S>>, at: P, placed: P, w: &mut Walk<S, P>) {
+        let order = w.walked;
+        w.walked += 1;
         if let Some(n) = fr.node() {
-            out.entry(n).or_default().push((at, fr.clone()));
+            w.out.entry(n).or_default().push(Entry {
+                at,
+                placed,
+                order,
+                fr: fr.clone(),
+            });
         }
         for c in &fr.children {
-            go(&c.fragment, at.child(c), out, visited);
+            go(&c.fragment, at.child(c), at.placed(c), w);
         }
     }
-    let mut out = FxHashMap::default();
-    go(root, P::ROOT, &mut out, visited);
-    out
+    let mut w = Walk {
+        out: FxHashMap::default(),
+        walked: 0,
+    };
+    go(root, P::ROOT, P::ROOT, &mut w);
+    *visited += w.walked as usize;
+    w.out
 }

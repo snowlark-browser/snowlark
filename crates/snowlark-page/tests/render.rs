@@ -1687,6 +1687,33 @@ fn user_scroll_containers_leave_out_hidden_overflow() {
     assert_eq!(user[1].3, snowlark_paint::Point::new(0.0, 150.0));
 }
 
+/// The scroll containers are found once per layout (the embedder asks at every repaint), but
+/// what they report follows a scroll that did not lay out again, and a new layout's geometry.
+#[test]
+fn user_scroll_containers_follow_scrolls_and_layouts() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><body style='margin:0'>
+         <div id=a style='height:50px;overflow:auto'><div style='height:200px'></div></div>",
+    );
+    let first = page.engine().user_scroll_containers();
+    assert_eq!(first.len(), 1);
+    assert_eq!(first[0].2, snowlark_paint::Point::ZERO);
+    eval(&mut page, "document.getElementById('a').scrollTop = 30");
+    let scrolled = page.engine().user_scroll_containers();
+    assert_eq!(scrolled[0].2, snowlark_paint::Point::new(0.0, 30.0));
+    assert_eq!(scrolled[0].1, first[0].1);
+    eval(
+        &mut page,
+        "document.body.insertAdjacentHTML('afterbegin', '<div style=\"height:20px\"></div>');
+         document.body.offsetHeight",
+    );
+    let moved = page.engine().user_scroll_containers();
+    assert_eq!(moved[0].1.y, first[0].1.y + 20.0);
+    assert_eq!(moved[0].2, snowlark_paint::Point::new(0.0, 30.0));
+}
+
 #[test]
 fn parsed_nodes_moved_into_the_document_render_and_a_removed_ancestor_takes_focus() {
     let net = NetThread::start(NetConfig::default()).unwrap();

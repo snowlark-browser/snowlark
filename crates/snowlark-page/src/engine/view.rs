@@ -7,6 +7,8 @@
 //! viewport and of scroll containers (§4 `scrollTo`/`scrollBy`, §6 `scrollIntoView`, `scrollTop`),
 //! and hit testing (§5 `elementFromPoint`).
 
+use std::sync::Arc;
+
 use snowlark_bindings::generated::{ScrollBehavior, ScrollResult};
 use snowlark_bindings::rt::{Cx, JsPromise};
 use snowlark_dom::{local_name, Dom, NodeId, QuirksMode};
@@ -1773,27 +1775,42 @@ impl Engine {
     /// [`Engine::scroll_containers`] of a rendered document.
     pub(crate) fn scroll_containers_of(&self, doc: NodeId) -> Vec<(NodeId, Rect, Point, Point)> {
         self.with_doc_renderer(doc, |r, st| {
-            // One walk: each scroll container's first fragment gives its geometry (looking each
-            // up again walked the tree once per container).
-            let mut nodes: Vec<(NodeId, BoxGeometry)> = Vec::new();
-            let mut seen = std::collections::HashSet::new();
-            if let Some(root) = r.fragments() {
-                root.walk(&mut |f, at| {
-                    if let Some(b) = f.as_box() {
-                        if let Some(n) = b.node {
-                            if b.flags & fragment_flags::SCROLL_CONTAINER != 0 && seen.insert(n) {
-                                nodes.push((n, BoxGeometry::of(f, at)));
-                            }
-                        }
+            // One walk per fragment tree: each scroll container's first fragment gives its geometry
+            // (looking each up again walked the tree once per container). The embedder asks at
+            // every repaint, and a repaint without a new layout (a selection, a hover color) has
+            // the same tree.
+            let nodes: Arc<[(NodeId, BoxGeometry)]> = match r.fragments() {
+                None => Arc::from([]),
+                Some(root) => match &st.scroll_container_boxes {
+                    Some((tree, nodes)) if std::ptr::eq(tree.as_ptr(), Arc::as_ptr(root)) => {
+                        nodes.clone()
                     }
-                });
-            }
+                    _ => {
+                        let mut nodes: Vec<(NodeId, BoxGeometry)> = Vec::new();
+                        let mut seen = std::collections::HashSet::new();
+                        root.walk(&mut |f, at| {
+                            if let Some(b) = f.as_box() {
+                                if let Some(n) = b.node {
+                                    if b.flags & fragment_flags::SCROLL_CONTAINER != 0
+                                        && seen.insert(n)
+                                    {
+                                        nodes.push((n, BoxGeometry::of(f, at)));
+                                    }
+                                }
+                            }
+                        });
+                        let nodes: Arc<[(NodeId, BoxGeometry)]> = nodes.into();
+                        st.scroll_container_boxes = Some((Arc::downgrade(root), nodes.clone()));
+                        nodes
+                    }
+                },
+            };
             let dom = self.dom();
             // (positions from the start of the range: an origin at the right or bottom edge
             // makes the range negative, which the embedder's scroll bars need not know)
             nodes
-                .into_iter()
-                .filter_map(|(n, g)| {
+                .iter()
+                .filter_map(|&(n, g)| {
                     let (min, max) = element_range_at(r, &dom, n, &g)?;
                     let at = st.element_scroll.get(&n).copied().unwrap_or(Point::ZERO);
                     Some((

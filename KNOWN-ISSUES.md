@@ -219,8 +219,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Pointer and focus path.** Touch and pen input are not implemented. Autofocus, `inert` on non-HTML elements and in
   iframes, and `:focus-visible` after a click are partly missing, and `elementsFromPoint()` order is wrong for some
   SVG, table and margin cases. (ref 126)
-- **Slow text selection on large pages.** Dragging a selection on a page with many shadow roots and custom elements
-  (for example a long Reddit thread) lags behind the pointer. Not measured. (ref 92)
 
 ## Browser UI
 

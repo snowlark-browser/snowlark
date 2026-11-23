@@ -975,6 +975,107 @@ fn transformed_client_rects_cost_the_path_not_the_tree() {
     assert!(t.layout.client_rects(span).len() > 1);
 }
 
+/// An inline split around a block (CSS 2 §9.2.1.1; custom elements are inline by default and
+/// often hold blocks) finds its pieces and that block along their paths, not by a walk of the
+/// whole tree per read: an IntersectionObserver target that is one is read at every rendering
+/// update. The pieces and the block come in tree order, transformed ancestors applied.
+#[test]
+fn split_inline_client_rects_cost_the_path_not_the_tree() {
+    let mut t = T::new();
+    let r0 = t.root();
+    let moved = t.doc.block(r0, |s| {
+        s.transform = Some(snowlark_paint::Matrix::translation(10.0, 20.0));
+    });
+    let mut sections = Vec::new();
+    for _ in 0..30 {
+        let section = t.doc.block(moved, |_| {});
+        sections.push(section);
+        for j in 0..10 {
+            t.doc
+                .block(section, |s| s.height = SizeValue::px(1.0 + j as f32));
+        }
+    }
+    let p = t.doc.block(sections[20], |s| s.width = SizeValue::px(60.0));
+    let a = t.doc.span(p, |_| {});
+    t.doc.text(a, "before");
+    let d = t.doc.block(a, |s| s.height = SizeValue::px(15.0));
+    t.doc.text(a, "after");
+    t.run(200.0, 200.0);
+    for transforms in [true, false] {
+        let before = t.layout.fragments_searched();
+        let rects = if transforms {
+            t.layout.client_rects(a)
+        } else {
+            t.layout.layout_rects(a)
+        };
+        let cost = t.layout.fragments_searched() - before;
+        assert!(cost < 100, "one read visited {cost} fragments");
+        // (the piece before, the block, the piece after)
+        assert_eq!(rects.len(), 3, "{rects:?}");
+        let block = if transforms {
+            t.layout.client_rects(d)
+        } else {
+            t.layout.layout_rects(d)
+        };
+        assert_eq!(rects[1], block[0], "transforms {transforms}");
+        assert!(
+            rects[0].y < rects[1].y && rects[1].y < rects[2].y,
+            "{rects:?}"
+        );
+        assert_eq!(rects[1].x, if transforms { 10.0 } else { 0.0 });
+    }
+}
+
+/// A page of many split inlines (a comment thread of custom elements, each observed): reading
+/// each of them costs, in all, about the tree a few times (the reads' paths until the index is
+/// built, then the index), not the tree per read, nor every split per read; the index's answers
+/// are the search's.
+#[test]
+fn many_split_inlines_cost_the_tree_once() {
+    let mut t = T::new();
+    let r0 = t.root();
+    let main = t.doc.block(r0, |s| {
+        s.transform = Some(snowlark_paint::Matrix::translation(5.0, 0.0));
+    });
+    let mut inlines = Vec::new();
+    for _ in 0..300 {
+        let comment = t.doc.span(main, |_| {});
+        t.doc.text(comment, "by someone");
+        let body = t.doc.block(comment, |s| s.height = SizeValue::px(12.0));
+        t.doc.text(body, "a comment");
+        let actions = t.doc.span(comment, |_| {});
+        t.doc.block(actions, |s| s.height = SizeValue::px(4.0));
+        inlines.extend([comment, actions]);
+    }
+    t.run(400.0, 400.0);
+    let read = |t: &T, transforms: bool| -> Vec<Vec<Rect>> {
+        inlines
+            .iter()
+            .map(|&n| {
+                if transforms {
+                    t.layout.client_rects(n)
+                } else {
+                    t.layout.layout_rects(n)
+                }
+            })
+            .collect()
+    };
+    for transforms in [true, false] {
+        let before = t.layout.fragments_searched();
+        let first = read(&t, transforms);
+        let again = read(&t, transforms);
+        let cost = t.layout.fragments_searched() - before;
+        // (about 3000 fragments: building the index and the searches before it)
+        assert!(
+            cost < 20_000,
+            "reading 600 split inlines twice visited {cost} fragments"
+        );
+        assert_eq!(first, again, "the index answers as the search did");
+        assert!(first.iter().all(|r| r.len() >= 2), "{:?}", first[0]);
+        assert_eq!(first[0][0].x, if transforms { 5.0 } else { 0.0 });
+    }
+}
+
 /// A layout with nothing changed since the last one in the same viewport keeps its fragment
 /// tree (so a script's forced layout per read costs nothing); a change or another viewport lays
 /// out again.

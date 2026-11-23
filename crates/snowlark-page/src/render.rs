@@ -82,6 +82,10 @@ pub struct RenderState {
     pub scroll: Point,
     /// Scroll positions of scroll containers.
     pub element_scroll: std::collections::HashMap<NodeId, Point>,
+    /// The scroll containers of a fragment tree and the geometry of each one's first fragment,
+    /// with that tree (held weakly: only to know it again), so a repaint that did not lay out
+    /// again does not walk the tree for them ([`Engine::scroll_containers_of`]).
+    pub(crate) scroll_container_boxes: Option<ScrollContainerBoxes>,
     /// The document may look different: a rendering update is due.
     pub dirty: bool,
     /// A rendering update produced new fragments: paint again.
@@ -111,6 +115,13 @@ pub struct RenderState {
     /// top-level state's; see [`Engine::document_visible`]): true for "visible".
     pub visibility: rustc_hash::FxHashMap<NodeId, bool>,
 }
+
+/// [`RenderState::scroll_container_boxes`]: the tree, and each scroll container's node and the
+/// geometry of its first fragment, in tree order.
+pub(crate) type ScrollContainerBoxes = (
+    std::sync::Weak<snowlark_layout::Fragment<snowlark_render::RenderStyle>>,
+    Arc<[(NodeId, snowlark_layout::BoxGeometry)]>,
+);
 
 impl RenderState {
     /// The part of the document the user sees, for its animated images: the viewport, or nothing

@@ -126,6 +126,16 @@ pub struct Registration {
     pub last_update_time: Option<f64>,
 }
 
+/// `target`'s registration with `o`, which the update of intersection observations finds at
+/// position `i` (the registrations it walks were copied from the list, and nothing in the update
+/// changes it): looking each one up made an observer of many targets cost their square per update.
+fn registration(o: &mut ObserverData, i: usize, target: NodeId) -> Option<&mut Registration> {
+    if o.registrations.get(i).is_some_and(|r| r.target == target) {
+        return o.registrations.get_mut(i);
+    }
+    o.registrations.iter_mut().find(|r| r.target == target)
+}
+
 /// An `IntersectionObserver`.
 pub struct ObserverData {
     pub callback: super::held::Held<v8::Object>,
@@ -382,10 +392,10 @@ impl Engine {
             }
             // 2.1 rootBounds: the root intersection rectangle with the root margin applied.
             let root_bounds = expand(&self.root_intersection_rect(root), &root_margin);
-            for target in targets {
+            for (i, target) in targets.into_iter().enumerate() {
                 // 2.2.2-3 The delay.
                 let skip = self.io(io, |o| {
-                    let Some(reg) = o.registrations.iter_mut().find(|r| r.target == target) else {
+                    let Some(reg) = registration(o, i, target) else {
                         return true;
                     };
                     if reg
@@ -445,7 +455,7 @@ impl Engine {
                 let is_visible = false;
                 // 15-17.
                 let changed = self.io(io, |o| {
-                    let Some(reg) = o.registrations.iter_mut().find(|r| r.target == target) else {
+                    let Some(reg) = registration(o, i, target) else {
                         return false;
                     };
                     let changed = reg.previous_threshold_index != threshold_index

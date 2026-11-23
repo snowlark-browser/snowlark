@@ -67,6 +67,13 @@ pub struct PageDriver {
     /// view selected now with the page's own state parked meanwhile.
     views: std::collections::HashMap<snowlark_page::HostedWindow, ViewDoc>,
     in_view: Option<(snowlark_page::HostedWindow, ViewDoc)>,
+    /// The fragment tree [`PageDriver::read_layout`] last scanned (held weakly: only to know it
+    /// again) and whether it has fixed or sticky boxes: a repaint without a new layout (a
+    /// selection, a hover color) does not walk the tree again.
+    scanned: Option<(
+        std::sync::Weak<snowlark_layout::Fragment<snowlark_render::RenderStyle>>,
+        bool,
+    )>,
 }
 
 /// The driver's state of one top-level document shown: the page's own or a hosted window's.
@@ -319,6 +326,7 @@ impl PageDriver {
             find_sent: None,
             views: std::collections::HashMap::new(),
             in_view: None,
+            scanned: None,
         }
     }
 
@@ -560,17 +568,25 @@ impl PageDriver {
         let viewport = self.device.viewport;
         let look = engine.viewport_scrollbar();
         let bar = look.width;
+        let scanned = &mut self.scanned;
         let laid = engine.with_renderer(|r, _| {
             let root = r.fragments()?.clone();
-            let mut scan = crate::renderer_driver::Scan::default();
-            crate::renderer_driver::scan_fragments(&root, &mut scan);
+            let fixed = match scanned {
+                Some((tree, fixed)) if std::ptr::eq(tree.as_ptr(), Arc::as_ptr(&root)) => *fixed,
+                _ => {
+                    let mut scan = crate::renderer_driver::Scan::default();
+                    crate::renderer_driver::scan_fragments(&root, &mut scan);
+                    *scanned = Some((Arc::downgrade(&root), scan.fixed));
+                    scan.fixed
+                }
+            };
             Some((
                 Size::new(
                     // (the scrollport is the viewport without the bar)
                     (root.overflow.x + root.overflow.width).max(viewport.width - bar),
                     r.document_height().max(viewport.height),
                 ),
-                scan.fixed,
+                fixed,
                 r.images().clone(),
             ))
         });
