@@ -1071,6 +1071,7 @@ impl Engine {
         self.sync_marked_controls();
         let now = self.document_time(doc);
         let top = self.rendered_top() == Some(doc);
+        let priority = self.anchor_priority(doc);
         self.with_doc_renderer(doc, |r, st| {
             let probe = self.profile.as_ref().map(|_| (Instant::now(), r.stats()));
             // (CSS animations at the time script sees: rendering updates may not have run for them)
@@ -1078,10 +1079,11 @@ impl Engine {
                 r.advance_timeline_for_script(now / 1000.0);
             }
             r.set_viewport_scroll(st.scroll);
+            r.set_anchor_priority(priority);
             r.layout_for_script(st.viewport)?;
             // (CSS Scroll Anchoring 1: what the read sees is after the adjustment)
             if adjust {
-                crate::engine::view::apply_scroll_anchoring(r, st, doc, top);
+                crate::engine::view::apply_scroll_anchoring(r, st, &self.dom(), doc, top);
             }
             if let (Some(p), Some((t, before))) = (&self.profile, probe) {
                 p.forced("layout", t.elapsed(), &before, &r.stats());
@@ -1354,14 +1356,16 @@ impl Engine {
             }
             let hidden = self.render.borrow().hidden;
             let top = self.rendered_top() == Some(doc);
+            let priority = self.anchor_priority(doc);
             let laid_out = self
                 .with_doc_renderer(doc, |r, st| {
                     st.dirty = false;
                     r.set_image_animation_view(st.animation_view(hidden));
                     r.set_frame_time(r.clock_at(page_now / 1000.0));
                     r.set_viewport_scroll(st.scroll);
+                    r.set_anchor_priority(priority);
                     if r.update_rendering(st.viewport).is_some() {
-                        crate::engine::view::apply_scroll_anchoring(r, st, doc, top);
+                        crate::engine::view::apply_scroll_anchoring(r, st, &self.dom(), doc, top);
                         st.needs_paint = true;
                         true
                     } else {
@@ -1378,8 +1382,15 @@ impl Engine {
                         self.with_doc_renderer(doc, |r, st| {
                             r.set_control_state(el, state);
                             r.set_viewport_scroll(st.scroll);
+                            r.set_anchor_priority(priority);
                             r.layout(st.viewport);
-                            crate::engine::view::apply_scroll_anchoring(r, st, doc, top);
+                            crate::engine::view::apply_scroll_anchoring(
+                                r,
+                                st,
+                                &self.dom(),
+                                doc,
+                                top,
+                            );
                         });
                     }
                 }

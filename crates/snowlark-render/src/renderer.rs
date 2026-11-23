@@ -3949,6 +3949,7 @@ impl Renderer {
                     &doc.layout,
                     |n| data.styles(n),
                     self.config.device_pixel_ratio,
+                    &doc.scroll,
                 );
             }
         }
@@ -3961,10 +3962,23 @@ impl Renderer {
         self.anchoring.scroll = scroll;
     }
 
+    /// The focused element when it is editable, which CSS Scroll Anchoring 1 selects anchors
+    /// from first (a priority candidate): told before each layout.
+    pub fn set_anchor_priority(&mut self, node: Option<NodeId>) {
+        self.anchoring.priority = node;
+    }
+
     /// The scroll anchoring adjustments of the viewport (physical CSS px) the layouts since the
     /// last call made: the embedder scrolls the viewport by them (CSS Scroll Anchoring 1 §2.2).
     pub fn take_scroll_adjustment(&mut self) -> Option<Point> {
         self.anchoring.take_adjustment()
+    }
+
+    /// The scroll anchoring adjustments of scroll containers (physical CSS px, by element) the
+    /// layouts since the last call made: the embedder scrolls each by its own (CSS Scroll
+    /// Anchoring 1 §2.2).
+    pub fn take_element_scroll_adjustments(&mut self) -> Vec<(NodeId, Point)> {
+        self.anchoring.take_element_adjustments()
     }
 
     /// [`Renderer::layout`] for a script's read (`getBoundingClientRect`, `offsetWidth`...). An inline
@@ -4153,11 +4167,22 @@ impl Renderer {
             || doc.anchor_viewport != Some(viewport);
         if may_move {
             if let (Some(root), Some(port)) = (doc.fragments.as_deref(), doc.last_viewport) {
+                // (the priority candidate and its ancestors, shadow-including)
+                let data = &doc.data;
+                let chain: Vec<NodeId> = std::iter::successors(
+                    self.anchoring.priority.filter(|n| dom.is_alive(*n)),
+                    |n| dom.parent(*n).or_else(|| dom.host(*n)),
+                )
+                .filter(|n| dom.is_element(*n))
+                .collect();
                 self.anchoring.before_layout(
                     root,
                     &doc.layout,
                     port,
                     self.config.device_pixel_ratio,
+                    &doc.scroll,
+                    &chain,
+                    &|n| data.styles(n),
                 );
             }
             // §2.2.2: an element that becomes or stops being absolutely positioned.
@@ -4170,7 +4195,18 @@ impl Renderer {
                     let old = boxes.box_of(r.element).and_then(|b| boxes.get(b));
                     if let Some(new) = doc.data.styles(r.element) {
                         let old = old.map(|b| &**b.style().values());
-                        self.anchoring.position_changed(old, new);
+                        // (a scroll container's anchor: only for an element inside it)
+                        let inside = |scroller: NodeId| {
+                            let mut n = Some(r.element);
+                            while let Some(c) = n {
+                                if c == scroller {
+                                    return true;
+                                }
+                                n = dom.parent(c).or_else(|| dom.host(c));
+                            }
+                            false
+                        };
+                        self.anchoring.position_changed(old, new, inside);
                     }
                 }
             }

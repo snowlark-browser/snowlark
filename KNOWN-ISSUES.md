@@ -59,9 +59,12 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   buttons are not drawn, and the scrollbar pseudo-classes
   (`:horizontal`, `:decrement` and others) do not parse. The spin, search, slider and date parts of form controls
   parse but style nothing. (ref 627)
-- **Scroll anchoring inside scrolling boxes.** The page's own scrolling keeps what the reader sees in place
-  when content above it grows or shrinks, but a scrollable box inside the page does not yet, and a focused
-  text field or the find-in-page match is not preferred as the anchor. (ref 622)
+- **Scroll anchoring, the rest.** The page and the scrollable boxes in it keep what the reader sees in place
+  when content above it grows or shrinks, with a focused editable element preferred as the anchor. Not yet:
+  the find-in-page match as the preferred anchor, restoring the anchor on back/forward and fragment
+  navigation, a page whose scrolling starts at the right or bottom edge (right-to-left or `vertical-rl`
+  documents), and an absolutely positioned box whose containing block is outside the scrollable box.
+  (ref 622)
 - **Wheel scrolling.** A high-resolution or free-spinning wheel, and a touchpad, scroll by each step they send,
   without the smooth animation a standard wheel's notches have. (ref 686)
 - **Scroll snap.** Script scrolls, mouse wheel notches and the arrow and page keys come to rest on snap positions.

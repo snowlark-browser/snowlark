@@ -166,15 +166,55 @@ pub(crate) fn viewport_range(r: &Renderer, st: &RenderState) -> (Point, Point) {
     (Point::new(x.0, y.0), Point::new(x.1, y.1))
 }
 
-/// CSS Scroll Anchoring 1 §2.2: scrolls a rendered document's viewport by the adjustments its
-/// layouts made, clamped to its scrolling area; it is a scroll, so a `scroll` event follows. The
-/// top-level document's embedder moves its view by as much (`top`).
+/// CSS Scroll Anchoring 1 §2.2: scrolls a rendered document's viewport and scroll containers by
+/// the adjustments its layouts made, clamped to their scrolling areas; each is a scroll, so a
+/// `scroll` event follows. The top-level document's embedder moves its view by as much as the
+/// viewport moved (`top`).
 pub(crate) fn apply_scroll_anchoring(
     r: &mut Renderer,
     st: &mut RenderState,
+    dom: &Dom,
     doc: NodeId,
     top: bool,
 ) {
+    for (el, d) in r.take_element_scroll_adjustments() {
+        if !dom.is_alive(el) {
+            continue;
+        }
+        let Some((min, max)) = element_range(r, dom, el) else {
+            continue;
+        };
+        let current = st.element_scroll.get(&el).copied().unwrap_or(Point::ZERO);
+        let to = Point::new(
+            (current.x + d.x).clamp(min.x, max.x),
+            (current.y + d.y).clamp(min.y, max.y),
+        );
+        if to == current {
+            continue;
+        }
+        let by = Point::new(to.x - current.x, to.y - current.y);
+        st.element_scroll.insert(el, to);
+        r.set_scroll(el, to);
+        // (a smooth scroll under way goes on as far from the content as it was: its whole path
+        // moves)
+        for a in &mut st.smooth {
+            if a.scroller == Scroller::Element(el) {
+                let clamp = |p: Point| Point::new(p.x.clamp(min.x, max.x), p.y.clamp(min.y, max.y));
+                a.from = clamp(Point::new(a.from.x + by.x, a.from.y + by.y));
+                a.to = clamp(Point::new(a.to.x + by.x, a.to.y + by.y));
+                if let Some(c) = &mut a.curve {
+                    c.adjust(by);
+                    if c.target() != a.to {
+                        c.update_target(a.elapsed, a.to);
+                    }
+                }
+            }
+        }
+        if !st.pending_scroll.contains(&el) {
+            st.pending_scroll.push(el);
+        }
+        st.needs_paint = true;
+    }
     let Some(d) = r.take_scroll_adjustment() else {
         return;
     };
@@ -598,6 +638,29 @@ impl Engine {
     /// CSSOM View §7 `offsetTop`, `offsetLeft`, `offsetWidth`, `offsetHeight`.
     pub(crate) fn view_offset(&self, el: NodeId) -> (i32, i32, i32, i32) {
         let parent = self.view_offset_parent(el);
+        // A sticky box's offset depends on the scroll position: scroll anchoring's adjustment
+        // comes first (CSS Scroll Anchoring 1 §2.2.1, the suppression window ends).
+        let sticky_path = self
+            .with_layout_unscrolled(el, |r, _| {
+                let dom = self.dom();
+                let mut n = Some(el);
+                while let Some(c) = n {
+                    if r.element_style(c)
+                        .is_some_and(|s| s.position() == Position::Sticky)
+                    {
+                        return true;
+                    }
+                    if Some(c) == parent {
+                        break;
+                    }
+                    n = r.flat_parent(&dom, c);
+                }
+                false
+            })
+            .unwrap_or(false);
+        if sticky_path {
+            self.with_layout(el, |_, _| ());
+        }
         self.with_layout_unscrolled(el, |r, st| {
             // (css-position-3 §3.4.1: sticky boxes at their offset position)
             let sticky = |n: NodeId| r.sticky_offset(n, st.viewport, st.scroll, &st.element_scroll);
@@ -797,6 +860,12 @@ impl Engine {
         ScrollSubject::Element(el)
     }
 
+    /// CSS Scroll Anchoring 1 §2.1's priority candidate of a document: its focused element when
+    /// that is editable.
+    pub(crate) fn anchor_priority(&self, doc: NodeId) -> Option<NodeId> {
+        self.focused_element(doc).filter(|el| self.is_editable(*el))
+    }
+
     /// `el.scrollTop` / `el.scrollLeft`.
     pub(crate) fn view_scroll_position(&self, el: NodeId) -> Point {
         match self.scroll_subject(el) {
@@ -811,10 +880,20 @@ impl Engine {
                     self.with_layout(el, |_, st| st.scroll).unwrap_or(p)
                 }
             }
-            ScrollSubject::Element(e) => self
-                .with_node_renderer(e, |_, st| st.element_scroll.get(&e).copied())
-                .flatten()
-                .unwrap_or(Point::ZERO),
+            // (after layout too when scrolled: scroll anchoring may move it)
+            ScrollSubject::Element(e) => {
+                let p = self
+                    .with_node_renderer(e, |_, st| st.element_scroll.get(&e).copied())
+                    .flatten()
+                    .unwrap_or(Point::ZERO);
+                if p == Point::ZERO {
+                    p
+                } else {
+                    self.with_layout(e, |_, st| st.element_scroll.get(&e).copied())
+                        .flatten()
+                        .unwrap_or(p)
+                }
+            }
             ScrollSubject::Nothing => Point::ZERO,
         }
     }

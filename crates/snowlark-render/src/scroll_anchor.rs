@@ -2,19 +2,29 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! CSS Scroll Anchoring 1 for the viewport: when content above what the reader sees changes size,
-//! the viewport's scroll position moves with it so that the visible content stays where it is.
+//! CSS Scroll Anchoring 1: when content above what the reader sees changes size, the scroll
+//! position of the viewport, or of a scroll container, moves with it so that the visible content
+//! stays where it is.
 //!
-//! Before a layout that may move boxes, an anchor node is selected from the last layout's
-//! fragments (§2.1, the anchor node selection algorithm) and its block-start edge recorded; after
-//! the layout, the edge's movement is the scroll adjustment (§2.2), unless a suppression trigger
-//! (§2.2.2) fired in between. The anchor is selected again before each such layout: a scroll that
-//! is not an adjustment never sees a stale one (§2.1.1, invalidation). The embedder applies the
-//! adjustment ([`crate::renderer::Renderer::take_scroll_adjustment`]).
+//! Before a layout that may move boxes, an anchor node is selected for each scroller scrolled away
+//! from its origin, from the last layout's fragments (§2.1, the anchor node selection algorithm),
+//! and its block-start edge recorded relative to the scroller; after the layout, the edge's
+//! movement is the scroller's adjustment (§2.2), unless a suppression trigger (§2.2.2) fired in
+//! between. The anchor is selected again before each such layout: a scroll that is not an
+//! adjustment never sees a stale one (§2.1.1, invalidation). The embedder applies the adjustments
+//! ([`crate::renderer::Renderer::take_scroll_adjustment`],
+//! [`crate::renderer::Renderer::take_element_scroll_adjustments`]).
 //!
-//! Not done yet: priority candidates (the focused editable element, the find-in-page match),
-//! anchoring inside scroll containers other than the viewport (a nested scroll container is a
-//! candidate of its own, not descended into), and the limit re-snapping puts on adjustments.
+//! A scroll container inside a scroller is walked into with its own scroll position: what it
+//! shows is where the scroller's reader sees it.
+//!
+//! The focused editable element is a priority candidate (§2.1): when it is visible in the
+//! scroller, the walk starts from its box (the nearest of its ancestors' that is not inline).
+//!
+//! Not done yet: the find-in-page match as a priority candidate, and the limit re-snapping puts
+//! on adjustments.
+
+use std::collections::HashMap;
 
 use servo_arc::Arc as ServoArc;
 use snowlark_dom::NodeId;
@@ -27,18 +37,29 @@ use style::values::computed::PositionProperty;
 
 use crate::adapter::RenderStyle;
 
-/// Elements from the root element down, each with its computed values at the time.
+/// Elements from the scroller's (the root element for the viewport) down, each with its computed
+/// values at the time.
 type Path = Vec<(NodeId, ServoArc<ComputedValues>)>;
 
-/// The viewport's scroll anchoring state.
+/// The scroll positions of scroll containers, by element.
+pub(crate) type Scrolls = HashMap<NodeId, Point>;
+
+/// An element's computed values now (the last layout's boxes may have older ones).
+pub(crate) type Styles<'a> = &'a dyn Fn(NodeId) -> Option<&'a ComputedValues>;
+
+/// The scroll anchoring state of a document's scrollers.
 #[derive(Default)]
 pub(crate) struct Anchoring {
     /// Where the viewport is scrolled (as the embedder last said).
     pub scroll: Point,
-    /// The anchor selected before the layout under way.
-    queued: Option<Queued>,
-    /// The adjustments made since the embedder last took them (physical CSS px).
+    /// The focused element when it is editable: the priority candidate (§2.1).
+    pub priority: Option<NodeId>,
+    /// The anchors selected before the layout under way, one per scroller at most.
+    queued: Vec<Queued>,
+    /// The viewport's adjustments since the embedder last took them (physical CSS px).
     adjustment: Option<Point>,
+    /// Scroll containers' adjustments since the embedder last took them.
+    element_adjustments: Vec<(NodeId, Point)>,
 }
 
 /// The scroller's block axis, and which edge of a box is its block-start edge on it.
@@ -98,14 +119,19 @@ impl BlockEdge {
 }
 
 struct Queued {
+    /// The scroll container the anchor is for; `None` for the viewport.
+    scroller: Option<NodeId>,
     node: NodeId,
     axis: BlockEdge,
     /// The anchor's block-start edge relative to the scrollport, rounded to device pixels.
     edge: f32,
-    /// The scroll position it was selected at.
+    /// The scroller's scroll position it was selected at.
     scroll: Point,
-    /// The elements from the root element down to the anchor (itself included when it is one),
-    /// with their computed values when it was selected (§2.2.2, the first trigger).
+    /// The scroll containers between the scroller and the anchor: their scroll positions move
+    /// the anchor in the scroller.
+    between: Vec<NodeId>,
+    /// The elements from the scroller down to the anchor (itself included when it is one), with
+    /// their computed values when it was selected (§2.2.2, the first trigger).
     path: Path,
     /// A suppression trigger fired since it was selected.
     suppressed: bool,
@@ -126,34 +152,66 @@ enum Walk {
 }
 
 impl Anchoring {
-    /// The anchor node selection algorithm for the viewport, run before a layout that may move
-    /// boxes, over the last layout's fragments (`root`, laid out in a scrollport of `scrollport`).
-    /// An anchor already selected for this layout stays.
+    /// The anchor node selection algorithm for each scroller scrolled away from its origin, run
+    /// before a layout that may move boxes, over the last layout's fragments (`root`, laid out in
+    /// a viewport scrollport of `scrollport`; `scrolls` the scroll containers' positions; `styles`
+    /// the computed values now, for `overflow-anchor`). An anchor already selected for this layout
+    /// stays while its scroller has not scrolled.
+    #[allow(clippy::too_many_arguments)]
     pub fn before_layout(
         &mut self,
         root: &Fragment<RenderStyle>,
         layout: &LayoutTree<RenderStyle>,
         scrollport: Size,
         dpr: f32,
+        scrolls: &Scrolls,
+        priority: &[NodeId],
+        styles: Styles,
     ) {
-        if self
-            .queued
-            .as_ref()
-            .is_some_and(|q| q.scroll == self.scroll)
-        {
+        let viewport = self.scroll;
+        self.queued.retain(|q| match q.scroller {
+            None => q.scroll == viewport,
+            Some(el) => scrolls.get(&el).copied().unwrap_or(Point::ZERO) == q.scroll,
+        });
+        if !self.queued.iter().any(|q| q.scroller.is_none()) {
+            let s = (scrolls, priority, styles);
+            self.select_viewport(root, layout, scrollport, dpr, s);
+        }
+        // (step 2, and the third suppression trigger: a scroller at its origin has none)
+        let mut wanted: Vec<NodeId> = scrolls
+            .iter()
+            .filter(|(n, p)| {
+                **p != Point::ZERO && !self.queued.iter().any(|q| q.scroller == Some(**n))
+            })
+            .map(|(n, _)| *n)
+            .collect();
+        if wanted.is_empty() {
             return;
         }
-        self.queued = None;
+        let mut found = Vec::new();
+        scroll_containers(root, Point::ZERO, &mut wanted, &mut found);
+        for (el, f, at) in found {
+            self.select_element(el, (f, at), layout, dpr, (scrolls, priority, styles));
+        }
+    }
+
+    fn select_viewport(
+        &mut self,
+        root: &Fragment<RenderStyle>,
+        layout: &LayoutTree<RenderStyle>,
+        scrollport: Size,
+        dpr: f32,
+        state: (&Scrolls, &[NodeId], Styles),
+    ) {
         let axis = BlockEdge::of(
             layout
                 .principal_writing_mode()
                 .map_or(WritingMode::HorizontalTb, |m| m.0),
         );
-        // (step 2, and the third suppression trigger: not scrolled away from the origin)
         if axis.scroll(self.scroll) == 0.0 {
             return;
         }
-        let mut visible = Rect::new(
+        let visible = Rect::new(
             self.scroll.x,
             self.scroll.y,
             scrollport.width,
@@ -161,36 +219,86 @@ impl Anchoring {
         );
         // The optimal viewing region: the scrollport less the root's `scroll-padding` (CSS Scroll
         // Snap 1 §4.1: the viewport's is the root element's).
-        if let Some(s) = root_style(root) {
-            let (w, h) = (visible.width, visible.height);
-            let top = s.scroll_padding(Side::Top).resolve(h).max(0.0);
-            let right = s.scroll_padding(Side::Right).resolve(w).max(0.0);
-            let bottom = s.scroll_padding(Side::Bottom).resolve(h).max(0.0);
-            let left = s.scroll_padding(Side::Left).resolve(w).max(0.0);
-            visible = Rect::new(
-                visible.x + left,
-                visible.y + top,
-                (w - left - right).max(0.0),
-                (h - top - bottom).max(0.0),
-            );
+        let visible = match root_style(root) {
+            Some(s) => less_scroll_padding(visible, s),
+            None => visible,
+        };
+        let scroll = self.scroll;
+        let at = (root, Point::ZERO);
+        self.select(None, at, visible, axis, scroll, layout, dpr, state);
+    }
+
+    /// Selects the anchor of the scroll container `el`, whose box fragment `f` is at `at`.
+    fn select_element(
+        &mut self,
+        el: NodeId,
+        (f, at): (&Fragment<RenderStyle>, Point),
+        layout: &LayoutTree<RenderStyle>,
+        dpr: f32,
+        state: (&Scrolls, &[NodeId], Styles),
+    ) {
+        let (scrolls, _, styles) = state;
+        let Some(b) = f.as_box() else {
+            return;
+        };
+        // (§2.1 step 1: a scroller whose `overflow-anchor` is `none` selects no anchor)
+        if excluded(b, styles) {
+            return;
         }
+        let axis = BlockEdge::of(b.style.writing_mode());
+        let scroll = scrolls.get(&el).copied().unwrap_or(Point::ZERO);
+        if axis.scroll(scroll) == 0.0 {
+            return;
+        }
+        // Its scrollport is its padding box, moved by its scroll position over its content.
+        let pad = f.padding_rect();
+        let visible = Rect::new(
+            at.x + pad.x + scroll.x,
+            at.y + pad.y + scroll.y,
+            pad.width,
+            pad.height,
+        );
+        let visible = less_scroll_padding(visible, &b.style);
+        self.select(Some(el), (f, at), visible, axis, scroll, layout, dpr, state);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn select(
+        &mut self,
+        scroller: Option<NodeId>,
+        (f, at): (&Fragment<RenderStyle>, Point),
+        visible: Rect,
+        axis: BlockEdge,
+        scroll: Point,
+        layout: &LayoutTree<RenderStyle>,
+        dpr: f32,
+        (scrolls, priority, styles): (&Scrolls, &[NodeId], Styles),
+    ) {
         let mut finder = Finder {
             visible,
+            scrolls,
+            styles,
             path: Vec::new(),
+            between: Vec::new(),
             found: None,
         };
-        finder.find(root, Point::ZERO, true);
-        let Some((node, path)) = finder.found else {
+        if !finder.walk_from_priority(f, at, priority) {
+            finder.found = None;
+            finder.find(f, at, true);
+        }
+        let Some((node, path, between)) = finder.found else {
             return;
         };
-        let Some(edge) = axis.edge(&layout.layout_rects(node)) else {
+        let Some(edge) = relative_edge(axis, layout, scroller, node, &between, scrolls) else {
             return;
         };
-        self.queued = Some(Queued {
+        self.queued.push(Queued {
+            scroller,
             node,
             axis,
-            edge: device_round(edge - axis.scroll(self.scroll), dpr),
-            scroll: self.scroll,
+            edge: device_round(edge - axis.scroll(scroll), dpr),
+            scroll,
+            between,
             path,
             suppressed: false,
         });
@@ -198,71 +306,316 @@ impl Anchoring {
 
     /// Whether an anchor is selected for the layout under way.
     pub fn is_queued(&self) -> bool {
-        self.queued.is_some()
+        !self.queued.is_empty()
     }
 
     /// The second suppression trigger: an element in the scroller became or stopped being
     /// absolutely positioned (`old` and `new` its computed values before and after).
     /// `old` is `None` for an element that had no box (`display: none`): it becomes absolutely
-    /// positioned if it is now.
-    pub fn position_changed(&mut self, old: Option<&ComputedValues>, new: &ComputedValues) {
-        if old.is_some_and(out_of_flow) != out_of_flow(new) {
-            if let Some(q) = &mut self.queued {
+    /// positioned if it is now. `inside` says whether the element is inside a scroll container.
+    pub fn position_changed(
+        &mut self,
+        old: Option<&ComputedValues>,
+        new: &ComputedValues,
+        inside: impl Fn(NodeId) -> bool,
+    ) {
+        if old.is_some_and(out_of_flow) == out_of_flow(new) {
+            return;
+        }
+        for q in &mut self.queued {
+            if q.scroller.is_none_or(&inside) {
                 q.suppressed = true;
             }
         }
     }
 
-    /// The scroll adjustment (§2.2) after the layout: the anchor's movement, unless a suppression
-    /// trigger fired or the anchor has no box any more. `styles` gives an element's computed values
-    /// now.
+    /// The scroll adjustments (§2.2) after the layout: each anchor's movement, unless a
+    /// suppression trigger fired or the anchor has no box any more. `styles` gives an element's
+    /// computed values now.
     pub fn after_layout<'a>(
         &mut self,
         layout: &LayoutTree<RenderStyle>,
         styles: impl Fn(NodeId) -> Option<&'a ComputedValues>,
         dpr: f32,
+        scrolls: &Scrolls,
     ) {
-        let Some(q) = self.queued.take() else {
-            return;
-        };
-        if q.suppressed {
-            return;
-        }
-        let Some(edge) = q.axis.edge(&layout.layout_rects(q.node)) else {
-            return;
-        };
-        let delta = device_round(edge - q.axis.scroll(q.scroll), dpr) - q.edge;
-        if delta == 0.0 {
-            return;
-        }
-        // The first suppression trigger: a change on the path from the anchor to the scroller.
-        let changed = q
-            .path
+        let queued = std::mem::take(&mut self.queued);
+        // Inner scrollers first: an outer scroller's anchor inside an inner one is where the inner
+        // one's adjustment leaves it.
+        let depth: Vec<usize> = queued
             .iter()
-            .any(|(n, old)| styles(*n).is_some_and(|new| disabling_change(old, new)));
-        if changed {
-            return;
+            .map(|q| {
+                let s = q.scroller;
+                queued
+                    .iter()
+                    .filter(|o| s.is_some_and(|s| o.between.contains(&s)))
+                    .count()
+            })
+            .collect();
+        let mut order: Vec<usize> = (0..queued.len()).collect();
+        order.sort_by_key(|i| std::cmp::Reverse(depth[*i]));
+        let mut now = scrolls.clone();
+        for i in order {
+            let q = &queued[i];
+            if q.suppressed {
+                continue;
+            }
+            let Some(edge) = relative_edge(q.axis, layout, q.scroller, q.node, &q.between, &now)
+            else {
+                continue;
+            };
+            let delta = device_round(edge - q.axis.scroll(q.scroll), dpr) - q.edge;
+            if delta == 0.0 {
+                continue;
+            }
+            // The first suppression trigger: a change on the path from the anchor to the scroller.
+            let changed = q
+                .path
+                .iter()
+                .any(|(n, old)| styles(*n).is_some_and(|new| disabling_change(old, new)));
+            if changed {
+                continue;
+            }
+            let d = q.axis.offset(delta);
+            if let Some(el) = q.scroller {
+                let p = now.entry(el).or_insert(Point::ZERO);
+                *p = Point::new(p.x + d.x, p.y + d.y);
+            }
+            let a = match q.scroller {
+                None => self.adjustment.get_or_insert(Point::ZERO),
+                Some(el) => {
+                    let i = match self.element_adjustments.iter().position(|(n, _)| *n == el) {
+                        Some(i) => i,
+                        None => {
+                            self.element_adjustments.push((el, Point::ZERO));
+                            self.element_adjustments.len() - 1
+                        }
+                    };
+                    &mut self.element_adjustments[i].1
+                }
+            };
+            *a = Point::new(a.x + d.x, a.y + d.y);
         }
-        let d = q.axis.offset(delta);
-        let a = self.adjustment.get_or_insert(Point::ZERO);
-        *a = Point::new(a.x + d.x, a.y + d.y);
     }
 
-    /// The adjustments since the last call.
+    /// The viewport's adjustments since the last call.
     pub fn take_adjustment(&mut self) -> Option<Point> {
         self.adjustment.take()
     }
+
+    /// The scroll containers' adjustments since the last call.
+    pub fn take_element_adjustments(&mut self) -> Vec<(NodeId, Point)> {
+        std::mem::take(&mut self.element_adjustments)
+    }
 }
 
-struct Finder {
+/// The box fragments of the scroll containers in `wanted` (taken out of it as they are found),
+/// with where they are (root coordinates, unscrolled).
+fn scroll_containers<'f>(
+    f: &'f Fragment<RenderStyle>,
+    at: Point,
+    wanted: &mut Vec<NodeId>,
+    found: &mut Vec<(NodeId, &'f Fragment<RenderStyle>, Point)>,
+) {
+    if let FragmentKind::Box(b) = &f.kind {
+        if b.flags & ff::SCROLL_CONTAINER != 0 && b.pseudo.is_none() {
+            if let Some(i) = b.node.and_then(|n| wanted.iter().position(|w| *w == n)) {
+                found.push((wanted.swap_remove(i), f, at));
+            }
+        }
+    }
+    for c in &f.children {
+        if wanted.is_empty() {
+            return;
+        }
+        let p = Point::new(at.x + c.offset.x, at.y + c.offset.y);
+        scroll_containers(&c.fragment, p, wanted, found);
+    }
+}
+
+/// The block-start edge of `node` relative to its scroller's box (root coordinates for the
+/// viewport), with the scroll containers between them scrolled as they are.
+fn relative_edge(
+    axis: BlockEdge,
+    layout: &LayoutTree<RenderStyle>,
+    scroller: Option<NodeId>,
+    node: NodeId,
+    between: &[NodeId],
+    scrolls: &Scrolls,
+) -> Option<f32> {
+    let mut e = axis.edge(&layout.layout_rects(node))?;
+    for b in between {
+        e -= axis.scroll(scrolls.get(b).copied().unwrap_or(Point::ZERO));
+    }
+    if let Some(s) = scroller {
+        e -= axis.edge(&layout.layout_rects(s))?;
+    }
+    Some(e)
+}
+
+/// The optimal viewing region (§2.1): `r` less the scroller's `scroll-padding`.
+fn less_scroll_padding(r: Rect, s: &RenderStyle) -> Rect {
+    let (w, h) = (r.width, r.height);
+    let top = s.scroll_padding(Side::Top).resolve(h).max(0.0);
+    let right = s.scroll_padding(Side::Right).resolve(w).max(0.0);
+    let bottom = s.scroll_padding(Side::Bottom).resolve(h).max(0.0);
+    let left = s.scroll_padding(Side::Left).resolve(w).max(0.0);
+    Rect::new(
+        r.x + left,
+        r.y + top,
+        (w - left - right).max(0.0),
+        (h - top - bottom).max(0.0),
+    )
+}
+
+/// Excluded subtrees (§2.1): `overflow-anchor: none` (as the element's style is now), fixed and
+/// sticky boxes.
+fn excluded(b: &snowlark_layout::BoxFragment<RenderStyle>, styles: Styles) -> bool {
+    use style::computed_values::overflow_anchor::T as OverflowAnchor;
+    let now = b.node.filter(|_| b.pseudo.is_none()).and_then(styles);
+    let values = now.unwrap_or_else(|| &**b.style.values());
+    values.get_box().overflow_anchor == OverflowAnchor::None
+        || b.flags & (ff::FIXED | ff::STICKY) != 0
+}
+
+struct Finder<'s, 'y> {
     visible: Rect,
-    /// The elements from the root element down to the fragment being examined.
+    scrolls: &'s Scrolls,
+    styles: Styles<'y>,
+    /// The elements from the scroller down to the fragment being examined.
     path: Path,
-    found: Option<(NodeId, Path)>,
+    /// The scroll containers from the scroller down to the fragment being examined.
+    between: Vec<NodeId>,
+    found: Option<(NodeId, Path, Vec<NodeId>)>,
 }
 
-impl Finder {
-    /// The candidate examination algorithm for the fragment `f` at `at` (root coordinates).
+/// Where the priority candidate's box is in the scroller's walk.
+struct Located<'f> {
+    /// Its index in the priority chain (0: the focused element itself).
+    k: usize,
+    fragment: &'f Fragment<RenderStyle>,
+    at: Point,
+    path: Path,
+    between: Vec<NodeId>,
+    /// It or a box between it and the scroller is excluded (§2.1).
+    excluded: bool,
+}
+
+impl Finder<'_, '_> {
+    /// The priority candidate step (§2.1): `chain` is the focused editable element and its
+    /// ancestors, nearest first; the candidate is the first of them with a box that is not
+    /// inline. When it is in the scroller (`f` at `at`), not excluded and visible, the walk starts
+    /// from it, and the anchor is it or one of its descendants. Returns whether it did.
+    fn walk_from_priority(
+        &mut self,
+        f: &Fragment<RenderStyle>,
+        at: Point,
+        chain: &[NodeId],
+    ) -> bool {
+        if chain.is_empty() {
+            return false;
+        }
+        let mut best = None;
+        self.locate(f, at, true, chain, false, &mut best);
+        let Some(c) = best else {
+            return false;
+        };
+        if c.excluded {
+            return false;
+        }
+        self.path = c.path;
+        self.between = c.between;
+        let status = self.find(c.fragment, c.at, false);
+        self.path.clear();
+        self.between.clear();
+        matches!(status, Walk::Return | Walk::Constrain)
+    }
+
+    /// Finds the box of the nearest element of `chain` (each an ancestor of the one before, so
+    /// they lie on one path down the fragment tree: only that path is walked).
+    fn locate<'f>(
+        &mut self,
+        f: &'f Fragment<RenderStyle>,
+        at: Point,
+        top: bool,
+        chain: &[NodeId],
+        excluded_above: bool,
+        best: &mut Option<Located<'f>>,
+    ) {
+        let b = match &f.kind {
+            FragmentKind::Text(_) => return,
+            FragmentKind::Line { .. } => None,
+            FragmentKind::Box(b) => Some(b),
+        };
+        let node = b.and_then(|b| b.node);
+        let k = node.and_then(|n| chain.iter().position(|c| *c == n));
+        if !top && node.is_some() && k.is_none() {
+            return;
+        }
+        let excluded = excluded_above || (!top && b.is_some_and(|b| excluded(b, self.styles)));
+        if let (Some(k), Some(b)) = (k, b) {
+            let candidate = !top && b.pseudo.is_none() && b.flags & ff::INLINE_BOX == 0;
+            if candidate && best.as_ref().is_none_or(|l| k < l.k) {
+                *best = Some(Located {
+                    k,
+                    fragment: f,
+                    at,
+                    path: self.path.clone(),
+                    between: self.between.clone(),
+                    excluded,
+                });
+                if k == 0 {
+                    return;
+                }
+            }
+        }
+        let (shift, pushed, nested) = self.enter(f, top);
+        for c in &f.children {
+            let p = Point::new(at.x + c.offset.x - shift.x, at.y + c.offset.y - shift.y);
+            self.locate(&c.fragment, p, false, chain, excluded, best);
+        }
+        self.leave(pushed, nested);
+    }
+
+    /// Going into `f`'s children: its element onto the path, and for a scroll container inside
+    /// the scroller, the shift its scroll position gives its content.
+    fn enter(&mut self, f: &Fragment<RenderStyle>, top: bool) -> (Point, bool, bool) {
+        let FragmentKind::Box(b) = &f.kind else {
+            return (Point::ZERO, false, false);
+        };
+        let mut shift = Point::ZERO;
+        let mut nested = false;
+        if !top
+            && b.flags & ff::SCROLL_CONTAINER != 0
+            && b.flags & (ff::ROOT | ff::VIEWPORT_OVERFLOW) == 0
+        {
+            if let Some(n) = b.node {
+                shift = self.scrolls.get(&n).copied().unwrap_or(Point::ZERO);
+                self.between.push(n);
+                nested = true;
+            }
+        }
+        let pushed = match b.node {
+            Some(n) if b.pseudo.is_none() => {
+                self.path.push((n, b.style.values().clone()));
+                true
+            }
+            _ => false,
+        };
+        (shift, pushed, nested)
+    }
+
+    fn leave(&mut self, pushed: bool, nested: bool) {
+        if pushed {
+            self.path.pop();
+        }
+        if nested {
+            self.between.pop();
+        }
+    }
+
+    /// The candidate examination algorithm for the fragment `f` at `at` (the scroller's
+    /// coordinates, unscrolled); `top` for the scroller's own box.
     fn find(&mut self, f: &Fragment<RenderStyle>, at: Point, top: bool) -> Walk {
         let status = self.examine(f, at, top);
         let element = match &f.kind {
@@ -275,36 +628,23 @@ impl Finder {
             if let Some((n, s)) = element {
                 path.push((n, s.values().clone()));
             }
-            self.found = Some((node, path));
+            self.found = Some((node, path, self.between.clone()));
         }
         if matches!(status, Walk::Return | Walk::Skip) {
             return status;
         }
-        // (a scroll container inside the viewport is a candidate of its own: what it scrolls is
-        // not looked into)
-        if let FragmentKind::Box(b) = &f.kind {
-            let nested = b.flags & ff::SCROLL_CONTAINER != 0
-                && b.flags & (ff::ROOT | ff::VIEWPORT_OVERFLOW) == 0;
-            if nested && status == Walk::Constrain {
-                return status;
-            }
-        }
-        let pushed = element.is_some();
-        if let Some((n, s)) = element {
-            self.path.push((n, s.values().clone()));
-        }
+        // (a scroll container inside the scroller shows its content moved by its scroll position)
+        let (shift, pushed, nested) = self.enter(f, top);
         let mut out = status;
         for c in f.visible_children() {
-            let p = Point::new(at.x + c.offset.x, at.y + c.offset.y);
+            let p = Point::new(at.x + c.offset.x - shift.x, at.y + c.offset.y - shift.y);
             let s = self.find(&c.fragment, p, false);
             if matches!(s, Walk::Return | Walk::Constrain) {
                 out = s;
                 break;
             }
         }
-        if pushed {
-            self.path.pop();
-        }
+        self.leave(pushed, nested);
         out
     }
 
@@ -318,15 +658,11 @@ impl Finder {
                 Rect::new(at.x, at.y, f.size.width, f.size.height)
             }
             FragmentKind::Box(b) => {
-                // (the initial containing block: the scroller's own box)
-                if top && b.flags & ff::INITIAL_CONTAINING_BLOCK != 0 {
+                // (the scroller's own box: the initial containing block for the viewport)
+                if top {
                     return Walk::Continue;
                 }
-                // Excluded subtrees (§2.1): `overflow-anchor: none`, fixed and sticky boxes.
-                use style::computed_values::overflow_anchor::T as OverflowAnchor;
-                if b.style.values().get_box().overflow_anchor == OverflowAnchor::None
-                    || b.flags & (ff::FIXED | ff::STICKY) != 0
-                {
+                if excluded(b, self.styles) {
                     return Walk::Skip;
                 }
                 // (non-atomic inlines are not candidates, nor are boxes the DOM does not have)
