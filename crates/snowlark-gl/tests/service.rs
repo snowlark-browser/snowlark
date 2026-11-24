@@ -42,7 +42,7 @@ fn pixel(rb: &snowlark_gl::Readback, x: u32, y: u32) -> [u8; 4] {
 fn a_cleared_drawing_buffer_is_presented_then_cleared() {
     let mut s = service();
     s.create_context(1, &plain(), 4, 3).unwrap();
-    s.submit(&[
+    s.submit(vec![
         (1, C::ClearColor([1.0, 0.0, 0.0, 1.0])),
         (1, C::Clear(COLOR)),
     ]);
@@ -66,7 +66,7 @@ fn a_preserved_drawing_buffer_keeps_its_pixels() {
         ..plain()
     };
     s.create_context(1, &a, 2, 2).unwrap();
-    s.submit(&[
+    s.submit(vec![
         (1, C::ClearColor([0.0, 0.0, 1.0, 1.0])),
         (1, C::Clear(COLOR)),
     ]);
@@ -83,7 +83,7 @@ fn triangle(s: &mut Service) -> i32 {
         .iter()
         .flat_map(|f| f.to_le_bytes())
         .collect();
-    s.submit(&[
+    s.submit(vec![
         (1, C::CreateShader(1, VERTEX_SHADER)),
         (1, C::ShaderSource(1, VS.into())),
         (1, C::CompileShader(1)),
@@ -113,7 +113,7 @@ fn a_triangle_draws_and_reads_back() {
     s.create_context(1, &plain(), 8, 8).unwrap();
     let c = triangle(&mut s);
     assert!(c >= 0);
-    s.submit(&[
+    s.submit(vec![
         (1, C::Uniformf(c, 4, vec![0.0, 1.0, 0.0, 1.0])),
         (1, C::DrawArrays(TRIANGLES, 0, 3)),
     ]);
@@ -135,7 +135,7 @@ fn shaders_are_checked_as_webgl_requires() {
     let mut s = service();
     s.create_context(1, &plain(), 1, 1).unwrap();
     // WebGL 1.0 §6.20: identifiers starting with webgl_ are reserved.
-    s.submit(&[
+    s.submit(vec![
         (1, C::CreateShader(1, VERTEX_SHADER)),
         (
             1,
@@ -169,7 +169,7 @@ fn reads_are_bounded_by_the_client_buffer() {
 fn unknown_ids_and_malformed_commands_do_nothing() {
     let mut s = service();
     s.create_context(1, &plain(), 2, 2).unwrap();
-    s.submit(&[
+    s.submit(vec![
         // ids the client never created, and a context that does not exist
         (1, C::BindBuffer(ARRAY_BUFFER, 99)),
         (1, C::Delete(Kind::Texture, 7)),
@@ -189,7 +189,7 @@ fn contexts_keep_their_own_state_and_resize() {
     let mut s = service();
     s.create_context(1, &plain(), 2, 2).unwrap();
     s.create_context(2, &plain(), 3, 3).unwrap();
-    s.submit(&[
+    s.submit(vec![
         (1, C::ClearColor([1.0, 1.0, 1.0, 1.0])),
         (2, C::ClearColor([0.0, 1.0, 0.0, 1.0])),
         (1, C::Clear(COLOR)),
@@ -224,7 +224,7 @@ fn attributes_are_granted() {
     assert!(created.limits.max_texture_size >= 2048);
     assert!(created.limits.max_vertex_attribs >= 8);
     // alpha: false reads back opaque
-    s.submit(&[
+    s.submit(vec![
         (1, C::ClearColor([0.0, 0.0, 0.0, 0.0])),
         (1, C::Clear(COLOR)),
     ]);

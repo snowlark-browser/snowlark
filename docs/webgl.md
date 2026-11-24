@@ -10,7 +10,7 @@ and 2.0 (Khronos), HTML §4.12.5 (`getContext`), OpenGL ES 2.0 and 3.0, EGL 1.5.
 |---|---|---|
 | `WebGLRenderingContext` and its objects | `snowlark-page` (`engine/webgl.rs`), page thread | The client: WebGL's own checks, object ids, the state script reads back as objects, encoding |
 | The protocol | `snowlark-gl` (`protocol.rs`) | Plain-data messages: `Command` (no answer), `Query` → `Reply`, `present` → `Readback` |
-| The service | `snowlark-gl` (`service.rs`, `ffi.rs`) | Runs the messages on ANGLE: one EGL display, a context and a pbuffer drawing buffer per canvas |
+| The service | `snowlark-gl` (`thread.rs`, `service.rs`, `ffi.rs`), the process's WebGL thread | Runs the messages on ANGLE: one EGL display, a context and a pbuffer drawing buffer per canvas |
 | ANGLE | `libEGL.dll`, `libGLESv2.dll` beside the executable | OpenGL ES 2.0/3.0 and EGL over Direct3D 11, with WebGL's validation and shader translator |
 
 The bindings are generated from `idl/webgl1.idl` like every other interface; the page crate never calls OpenGL,
@@ -29,9 +29,17 @@ recorded first (an object of another context, a deleted object, a wrong typed ar
 
 ## Where the service runs
 
-Today the service runs in the page's own process, on the page thread: the renderer process in the window, the
-process itself in the headless modes. That is the same place canvas 2D draws on its Direct3D device today, and it
-needs no new process boundary for the first stages.
+Today the service runs in the page's own process: the renderer process in the window, the process itself in the
+headless modes. It needs no new process boundary for the first stages.
+
+Within the process, every context runs on one thread, the WebGL thread (`thread.rs`), whatever page or page thread
+made it. ANGLE opens one display per process for each kind of device, and all its contexts share that display's
+Direct3D 11 device and immediate context, which must not be used from several threads at once: contexts driven
+from two page threads together (two tabs on threads of one process, parallel tests) corrupt each other's work,
+fail to be made, or wait forever inside the driver. A page's `Service` sends the thread the protocol's messages, as
+a GPU process's clients do: batches without waiting, queries and `present` waiting for the answer. Context ids are
+renumbered process-wide on the way, so each page still numbers its own from 1. The thread is started by the first
+service and lives as long as the process.
 
 The end state is the GPU process (`docs/process-isolation.md`, M7). A sandboxed renderer will have no Direct3D
 device (M6), so before the renderer sandbox is turned on the service must run in the GPU process: the batch

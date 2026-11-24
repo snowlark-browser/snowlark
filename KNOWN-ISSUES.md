@@ -240,7 +240,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   build (its `update` and `updateend` events arrive after the check) and passes in optimised builds. (ref 56, 91, 560)
 - **Other test-suite problems.** Debug-profile tests overflow their stack in `snowlark-ipc` and `snowlark-js` (ref 562);
   `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572), and now and then
-  stop with an access violation (ref 707), and their WebGL tests can hang when the machine is loaded (ref 730); the WPT files
+  stop with an access violation (ref 707), and their `discarded_frames` tests can fail when two copies run at
+  once (ref 750), as can timing tests of audio and media on a heavily loaded machine (ref 751); the WPT files
   `navigation-timing/test-document-open.html` and `fetch/api/abort/general.any.html` vary from run to run
   (ref 60, 563); a headless
   Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py` can read one arm slower than the other for the same binary when the arms share a core (ref 509).

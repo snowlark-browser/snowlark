@@ -9,11 +9,12 @@
 mod ffi;
 pub mod protocol;
 mod service;
+mod thread;
 
 pub use protocol::{
     Attributes, Backend, Command, ContextId, Created, Kind, Query, Readback, Reply,
 };
-pub use service::Service;
+pub use thread::Service;
 
 /// Whether ANGLE's libraries are where the service looks for them.
 pub fn available() -> bool {

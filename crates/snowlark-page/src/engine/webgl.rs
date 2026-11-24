@@ -435,7 +435,7 @@ impl Engine {
             return;
         }
         if let Some(mut b) = self.gl_backend() {
-            b.submit(&batch);
+            b.submit(batch);
         }
     }
 

@@ -5,6 +5,7 @@
 //! The crate's integration tests: one binary, each file a module.
 
 mod service;
+mod threads;
 
 #[test]
 fn every_test_file_is_listed() {

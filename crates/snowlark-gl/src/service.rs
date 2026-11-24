@@ -64,28 +64,19 @@ struct Context {
     names: HashMap<(Kind, u32), u32>,
 }
 
-/// ANGLE on one Direct3D 11 device, and the contexts on it.
-pub struct Service {
+/// ANGLE on one Direct3D 11 device, and the contexts on it. Used from one thread only: the
+/// process's WebGL thread ([`crate::Service`]).
+pub(crate) struct Device {
     angle: Angle,
     display: EGLDisplay,
     contexts: HashMap<ContextId, Context>,
     current: Option<ContextId>,
 }
 
-impl Service {
-    /// The service as `SNOWLARK_WEBGL` asks: `off` (no WebGL), `warp` (Direct3D's software
-    /// rasterizer), otherwise the graphics card.
-    pub fn from_env() -> Result<Service, String> {
-        match std::env::var("SNOWLARK_WEBGL").as_deref() {
-            Ok("off") => Err("WebGL is off (SNOWLARK_WEBGL=off)".into()),
-            Ok("warp") => Service::new(true),
-            _ => Service::new(false),
-        }
-    }
-
+impl Device {
     /// Loads ANGLE and opens its display: the graphics card, or WARP (Direct3D's software
     /// rasterizer) when `warp`.
-    pub fn new(warp: bool) -> Result<Service, String> {
+    pub(crate) fn new(warp: bool) -> Result<Device, String> {
         let angle = load()?;
         let mut attrs = vec![
             EGL_PLATFORM_ANGLE_TYPE_ANGLE,
@@ -116,12 +107,17 @@ impl Service {
         }
         // SAFETY: a constant enum.
         unsafe { (e.eglBindAPI)(EGL_OPENGL_ES_API) };
-        Ok(Service {
+        Ok(Device {
             angle,
             display,
             contexts: HashMap::new(),
             current: None,
         })
+    }
+
+    /// Another display made its context current on this thread: this one's is not any more.
+    pub(crate) fn forget_current(&mut self) {
+        self.current = None;
     }
 
     fn config_attrib(&self, config: EGLConfig, attr: EGLint) -> EGLint {
@@ -830,7 +826,7 @@ impl Service {
     }
 }
 
-impl Backend for Service {
+impl Backend for Device {
     fn create_context(
         &mut self,
         id: ContextId,
@@ -968,8 +964,8 @@ impl Backend for Service {
         }
     }
 
-    fn submit(&mut self, batch: &[(ContextId, Command)]) {
-        for (id, cmd) in batch {
+    fn submit(&mut self, batch: Vec<(ContextId, Command)>) {
+        for (id, cmd) in &batch {
             if self.make_current(*id) {
                 self.execute(*id, cmd);
             }
@@ -1025,13 +1021,12 @@ impl Backend for Service {
     }
 }
 
-impl Drop for Service {
+impl Drop for Device {
     fn drop(&mut self) {
         let ids: Vec<ContextId> = self.contexts.keys().copied().collect();
         for id in ids {
             self.destroy(id);
         }
-        // (the display is the process's one ANGLE display, shared by every service in it, so it
-        // is never terminated)
+        // (the display is the process's one ANGLE display of its kind, so it is never terminated)
     }
 }

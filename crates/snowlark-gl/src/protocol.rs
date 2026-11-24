@@ -234,8 +234,8 @@ pub struct Readback {
     pub rgba: Vec<u8>,
 }
 
-/// Where a page's contexts run: in its own process today ([`crate::Service`]), across a process
-/// boundary later. Every call is one message.
+/// Where a page's contexts run: on its process's WebGL thread today ([`crate::Service`]), across a
+/// process boundary later. Every call is one message.
 pub trait Backend {
     /// A context with a drawing buffer of `width` × `height` (at least 1 × 1).
     fn create_context(
@@ -249,7 +249,7 @@ pub trait Backend {
     fn resize(&mut self, id: ContextId, width: u32, height: u32);
     fn destroy(&mut self, id: ContextId);
     /// Commands in order, each for its context.
-    fn submit(&mut self, batch: &[(ContextId, Command)]);
+    fn submit(&mut self, batch: Vec<(ContextId, Command)>);
     fn query(&mut self, id: ContextId, query: &Query) -> Reply;
     /// The drawing buffer for the rendering; then, unless the context preserves it, the buffer is
     /// cleared (WebGL 1.0 §2.2).
