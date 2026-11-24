@@ -61,6 +61,16 @@ NON_RUST = [
         "sources but not their license files, so the texts are not reproduced here.",
     },
     {
+        "name": "ANGLE",
+        "version": "the commit in tools/angle/pin.txt",
+        "license": "BSD-3-Clause",
+        "home": "https://chromium.googlesource.com/angle/angle",
+        "note": "OpenGL ES implementation WebGL runs on, over Direct3D 11: libEGL.dll and "
+        "libGLESv2.dll, built from source and loaded at run time from the program's folder. "
+        "Its license is at https://chromium.googlesource.com/angle/angle/+/main/LICENSE; the "
+        "code it links from its own third_party folder keeps its own licenses there.",
+    },
+    {
         "name": "uBlock Origin scriptlets and redirect resources",
         "version": "",
         "license": "GPL-3.0",

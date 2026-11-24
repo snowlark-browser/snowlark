@@ -21,6 +21,14 @@ Patched copies, taken through `[patch.crates-io]` in `Cargo.toml`. Each keeps it
 The V8 library itself is not in the repository (`docs/v8-build.md`); V8 is under a BSD-style licence, and the
 notices file lists the libraries it links.
 
+## ANGLE (WebGL)
+
+WebGL runs on [ANGLE](https://chromium.googlesource.com/angle/angle), the OpenGL ES implementation over Direct3D 11,
+under the BSD 3-Clause licence. It is not in the repository: `tools/angle/build.ps1` builds the commit pinned in
+`tools/angle/pin.txt` from its official source, and the browser loads the two libraries it makes, `libEGL.dll` and
+`libGLESv2.dll`, from its own folder at run time (`docs/webgl.md`). The code ANGLE links from its own
+`third_party` folder keeps its licences there.
+
 ## Specifications' Web IDL (`idl/`)
 
 The `.idl` files are the IDL fragments of the W3C and WHATWG specifications as extracted by
