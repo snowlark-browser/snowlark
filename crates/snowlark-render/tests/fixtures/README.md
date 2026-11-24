@@ -33,3 +33,12 @@
   The GIF loops forever (NETSCAPE2.0 loop count 0), the APNG plays twice, the WebP once;
   `anim-default.png`'s default image (yellow) is not one of its frames; `anim-move.gif`'s second and
   third frames are 20 px wide pieces with transparent pixels where nothing changed.
+- `p3-patches.png`, `p3-patches.jpg`, `p3-patches.webp`, `gamma-1.png`: colour-managed images made by
+  `make_decoder_fixtures.py` (written for this repository; Pillow 12.3 and NumPy). The first three are 32 × 8:
+  four 8 × 8 patches, (255, 0, 0), (0, 255, 0), (200, 100, 100) and (128, 128, 128), tagged with a Display P3
+  ICC profile the script builds from the colour space's definition (primaries, D65 white adapted to D50,
+  the sRGB transfer). In sRGB they show as (255, 0, 0), (0, 255, 0), (215, 93, 97) and (128, 128, 128).
+  `gamma-1.png` is 8 × 8 of gray 128 with `gAMA` 1.0 and no `cHRM`: (188, 188, 188) in sRGB.
+  The same script makes `orient-6.jpg` (a progressive JPEG stored 16 × 8, red | blue, with EXIF orientation 6:
+  shown 8 × 16, red above blue) and `cmyk.jpg` (Adobe's inverted CMYK, 16 × 8: cyan, then 50% black; shown as
+  (0, 255, 255) and (127, 127, 127)).

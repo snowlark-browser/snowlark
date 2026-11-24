@@ -2,9 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Images through WIC: decoding (PNG, JPEG, BMP, ICO, WebP and others where Windows has the codec;
-//! animated GIF, APNG and WebP with their frames composited, see [`crate::animation`]) to premultiplied BGRA pixels, the store display lists refer to images
-//! by, and PNG encoding of rendered pixmaps.
+//! Images: decoding to premultiplied BGRA pixels (PNG, JPEG, GIF and WebP in Rust with their colour
+//! profiles applied, `crate::decoders`; BMP, ICO, TIFF and the others Windows has a codec for
+//! through WIC; animated GIF, APNG and WebP with their frames composited, see
+//! [`crate::animation`]), the store display lists refer to images by, and PNG encoding of
+//! rendered pixmaps.
 //!
 //! Decoded pixels are plain Rust memory (`Send + Sync`); each rasterizer uploads them to its own
 //! Direct2D bitmaps. A still image's EXIF orientation is applied to its pixels when it is decoded
@@ -22,8 +24,10 @@ use windows::Win32::System::Com::StructuredStorage::{PropVariantClear, PROPVARIA
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::System::Variant::{VT_UI1, VT_UI2};
 
-use crate::animation::{self, Blend, Canvas, Dispose, Region, Timing};
+use crate::animation::{self, Blend, Canvas, Region, Timing};
+use crate::color_profile::ColorTransform;
 use crate::com;
+use crate::decoders::{self, Format, GifDecoder};
 use crate::display_list::ImageId;
 use crate::geom::Color;
 
@@ -131,6 +135,54 @@ pub fn decode(bytes: &[u8]) -> Result<DecodedImage> {
 
 /// [`decode`] keeping an animation's frames when they take at most `budget` bytes.
 fn decode_with_budget(bytes: &[u8], budget: u64) -> Result<DecodedImage> {
+    let Some(format) = decoders::sniff(bytes) else {
+        // (BMP, ICO, TIFF and the formats Windows has a codec for)
+        return decode_wic(bytes);
+    };
+    let kind = match format {
+        Format::Png => animation::parse_apng(bytes)
+            .filter(|a| a.frames.len() > 1)
+            .map(|a| Kind::Apng(a, None)),
+        Format::Gif => Some(Kind::Gif(None)),
+        Format::Webp => animation::parse_webp_animation(bytes).map(Kind::Webp),
+        Format::Jpeg => None,
+    };
+    if let Some(kind) = kind {
+        // (the still image when the animation doesn't decode)
+        match decode_animation(Arc::from(bytes), kind, budget) {
+            Ok(image) => return Ok(image),
+            Err(e) if format != Format::Png => return Err(e),
+            Err(_) => {}
+        }
+    }
+    let (frame, orientation) = match format {
+        Format::Png => (
+            decoders::png(bytes, None)?.0,
+            png_exif_orientation(bytes).unwrap_or(1),
+        ),
+        Format::Jpeg => (decoders::jpeg(bytes)?, exif_orientation(bytes).unwrap_or(1)),
+        // (no EXIF orientation for WebP, as in other engines)
+        Format::Webp => (decoders::webp(bytes)?, 1),
+        Format::Gif => return Err(E_INVALIDARG.into()),
+    };
+    let mut image = DecodedImage::still(oriented(frame, orientation));
+    image.orientation = orientation;
+    Ok(image)
+}
+
+/// `frame` as shown with EXIF `orientation`, without a copy when it is upright.
+fn oriented(frame: Frame, orientation: u8) -> Frame {
+    if (2..=8).contains(&orientation) {
+        orient(&frame, orientation)
+    } else {
+        frame
+    }
+}
+
+/// Decodes a still image (the first frame of an animation) through WIC: what [`decode`] does for
+/// the formats it has no decoder of its own for (BMP, ICO, TIFF, and others Windows has a codec
+/// for), and the decoders' benchmark compares against for the rest. No colour profile is applied.
+pub fn decode_wic(bytes: &[u8]) -> Result<DecodedImage> {
     let wic = factory()?;
     // SAFETY: the stream reads `bytes`, which outlive every use of the stream and decoder below (all
     // pixels are copied out before returning). Metadata PROPVARIANTs are cleared after reading.
@@ -151,24 +203,6 @@ fn decode_with_budget(bytes: &[u8], budget: u64) -> Result<DecodedImage> {
             .and_then(|r| read_u16(&r, "System.Photo.Orientation"))
             .filter(|o| (1..=8).contains(o))
             .unwrap_or(1) as u8;
-        let kind = if container == GUID_ContainerFormatGif && count > 1 {
-            Some(Kind::Gif)
-        } else if container == GUID_ContainerFormatPng {
-            animation::parse_apng(bytes)
-                .filter(|a| a.frames.len() > 1)
-                .map(Kind::Apng)
-        } else if container == GUID_ContainerFormatWebp && count > 1 {
-            animation::parse_webp_animation(bytes).map(Kind::Webp)
-        } else {
-            None
-        };
-        if let Some(kind) = kind {
-            // (the still image when the animation doesn't decode)
-            if let Ok(mut image) = decode_animation(&wic, Arc::from(bytes), kind, budget) {
-                image.orientation = orientation;
-                return Ok(image);
-            }
-        }
         let frame = if container == GUID_ContainerFormatIco && count > 1 {
             // An icon holds several sizes: the largest.
             let mut best = (0u64, 0u32);
@@ -182,13 +216,8 @@ fn decode_with_budget(bytes: &[u8], budget: u64) -> Result<DecodedImage> {
         } else {
             to_frame(&wic, &first, 0)?
         };
-        // (WIC reads JPEG and TIFF orientation; a PNG's `eXIf` chunk is read here)
-        let orientation = if orientation == 1 && container == GUID_ContainerFormatPng {
-            png_exif_orientation(bytes).unwrap_or(1)
-        } else {
-            orientation
-        };
-        let mut image = DecodedImage::still(orient(&frame, orientation));
+        // (WIC reads TIFF's orientation)
+        let mut image = DecodedImage::still(oriented(frame, orientation));
         image.orientation = orientation;
         Ok(image)
     }
@@ -344,21 +373,24 @@ fn tiff_orientation(tiff: &[u8]) -> Option<u8> {
     None
 }
 
-/// An animation's frames: all of them when they fit `budget`, else the first.
-fn decode_animation(
-    wic: &IWICImagingFactory,
-    bytes: Arc<[u8]>,
-    kind: Kind,
-    budget: u64,
-) -> Result<DecodedImage> {
-    let mut decoder = FrameDecoder::with_kind(wic.clone(), bytes.clone(), kind)?;
+/// An animation's frames: all of them when they fit `budget`, else the first. A GIF or animated
+/// WebP of one frame (or whose later frames don't decode) is a still image; an APNG's is its
+/// `IDAT` image, which the caller decodes.
+fn decode_animation(bytes: Arc<[u8]>, kind: Kind, budget: u64) -> Result<DecodedImage> {
+    let still_of_one = !matches!(kind, Kind::Apng(..));
+    let mut decoder = FrameDecoder::with_kind(bytes.clone(), kind)?;
     let frame_bytes = decoder.width as u64 * decoder.height as u64 * 4;
     let mut timing = decoder.timing.clone();
-    let streamed = frame_bytes * timing.frames() as u64 > budget;
+    let streamed = timing.frames() > 1 && frame_bytes * timing.frames() as u64 > budget;
     let mut frames = Vec::new();
     let wanted = if streamed { 1 } else { timing.frames() };
     for i in 0..wanted {
-        match decoder.frame(i) {
+        let frame = if i + 1 == wanted {
+            decoder.last_frame(i)
+        } else {
+            decoder.frame(i)
+        };
+        match frame {
             Ok(f) => frames.push(f),
             // (frames that don't decode end the animation; without a first one there is none)
             Err(e) if i == 0 => return Err(e),
@@ -366,6 +398,11 @@ fn decode_animation(
         }
     }
     if frames.len() < 2 && !streamed {
+        if still_of_one {
+            let mut frame = frames.remove(0);
+            frame.delay_ms = 0;
+            return Ok(DecodedImage::still(frame));
+        }
         return Err(E_INVALIDARG.into());
     }
     if !streamed {
@@ -387,24 +424,23 @@ fn decode_animation(
     })
 }
 
-/// The animated formats and what their frames need beyond WIC.
+/// The animated formats, with the decoder each keeps between frames (`None` until the first
+/// frame, and again when it starts over).
 enum Kind {
-    /// WIC decodes each frame's own rectangle; composition and the loop count are ours.
-    Gif,
-    /// WIC does not decode APNG frames: each is made a PNG of its own ([`animation::Apng`]).
-    Apng(animation::Apng),
-    /// WIC composites WebP frames; durations and the loop count are ours.
+    /// The `gif` crate decodes each frame's own rectangle; composition and the loop count are ours.
+    Gif(Option<Box<GifDecoder>>),
+    /// Each frame is made a PNG of its own ([`animation::Apng`]) for the PNG decoder; the colour
+    /// conversion the file asks for is worked out once.
+    Apng(animation::Apng, Option<Option<ColorTransform>>),
+    /// Each frame is made a WebP of its own ([`animation::WebpAnimation::frame_webp`]) for the
+    /// WebP decoder; composition is ours.
     Webp(animation::WebpAnimation),
 }
 
 /// Decodes an animation's frames one after another (composited to full size, as they show): what
 /// keeps an animation too big to hold every frame playing. Frames come in order; asking for an
-/// earlier one starts again from the first. Lives on one thread (it holds WIC objects).
+/// earlier one starts again from the first.
 pub struct FrameDecoder {
-    // (the WIC objects go before the bytes they read)
-    decoder: Option<IWICBitmapDecoder>,
-    _stream: Option<IWICStream>,
-    wic: IWICImagingFactory,
     kind: Kind,
     bytes: Arc<[u8]>,
     width: u32,
@@ -418,79 +454,43 @@ pub struct FrameDecoder {
 impl FrameDecoder {
     /// A decoder of an animated image's file (as [`Animation::encoded`] holds it).
     pub fn new(bytes: Arc<[u8]>) -> Result<FrameDecoder> {
-        let wic = factory()?;
-        let kind = if bytes.starts_with(b"GIF") {
-            Kind::Gif
-        } else if let Some(a) = animation::parse_apng(&bytes) {
-            Kind::Apng(a)
-        } else if let Some(w) = animation::parse_webp_animation(&bytes) {
-            Kind::Webp(w)
-        } else {
-            return Err(E_INVALIDARG.into());
+        let kind = match decoders::sniff(&bytes) {
+            Some(Format::Gif) => Kind::Gif(None),
+            Some(Format::Png) => {
+                Kind::Apng(animation::parse_apng(&bytes).ok_or(E_INVALIDARG)?, None)
+            }
+            Some(Format::Webp) => {
+                Kind::Webp(animation::parse_webp_animation(&bytes).ok_or(E_INVALIDARG)?)
+            }
+            _ => return Err(E_INVALIDARG.into()),
         };
-        FrameDecoder::with_kind(wic, bytes, kind)
+        FrameDecoder::with_kind(bytes, kind)
     }
 
-    fn with_kind(wic: IWICImagingFactory, bytes: Arc<[u8]>, kind: Kind) -> Result<FrameDecoder> {
-        // SAFETY: the stream reads `bytes`, which this decoder keeps alive (and unmoved: an `Arc`'s
-        // data never moves) for as long as it keeps the stream and decoder, which drop first.
-        // Metadata PROPVARIANTs are cleared after reading; out pointers are locals.
-        unsafe {
-            let (decoder, stream) = match kind {
-                Kind::Apng(_) => (None, None),
-                _ => {
-                    let stream = wic.CreateStream()?;
-                    stream.InitializeFromMemory(&bytes)?;
-                    let decoder = wic.CreateDecoderFromStream(
-                        &stream,
-                        std::ptr::null(),
-                        WICDecodeMetadataCacheOnDemand,
-                    )?;
-                    (Some(decoder), Some(stream))
-                }
-            };
-            let (width, height, timing) = match &kind {
-                Kind::Gif => {
-                    let d = decoder.as_ref().ok_or(E_INVALIDARG)?;
-                    let screen = d.GetMetadataQueryReader()?;
-                    let first = d.GetFrame(0)?;
-                    let (fw, fh) = size_of(&first)?;
-                    let w = read_u16(&screen, "/logscrdesc/Width").map_or(fw, |v| v as u32);
-                    let h = read_u16(&screen, "/logscrdesc/Height").map_or(fh, |v| v as u32);
-                    let mut delays = Vec::new();
-                    for i in 0..d.GetFrameCount()? {
-                        let meta = d.GetFrame(i)?.GetMetadataQueryReader()?;
-                        delays.push(read_u16(&meta, "/grctlext/Delay").unwrap_or(0) as u32 * 10);
-                    }
-                    let timing = Timing::new(delays, animation::gif_plays(&bytes));
-                    (w.max(1), h.max(1), timing)
-                }
-                Kind::Apng(a) => (a.width, a.height, Timing::new(a.delays(), a.plays)),
-                Kind::Webp(anim) => {
-                    let d = decoder.as_ref().ok_or(E_INVALIDARG)?;
-                    let (w, h) = size_of(&d.GetFrame(0)?)?;
-                    let count = d.GetFrameCount()? as usize;
-                    // (WIC's frames are the ones that count)
-                    let delays = (0..count).map(|i| anim.durations.get(i).copied().unwrap_or(0));
-                    (w, h, Timing::new(delays, anim.plays))
-                }
-            };
-            if width == 0 || height == 0 || width as u64 * height as u64 > MAX_PIXELS {
-                return Err(E_OUTOFMEMORY.into());
+    fn with_kind(bytes: Arc<[u8]>, kind: Kind) -> Result<FrameDecoder> {
+        let (width, height, timing) = match &kind {
+            Kind::Gif(_) => {
+                let layout = decoders::gif_layout(bytes.clone())?;
+                let timing = Timing::new(layout.delays, animation::gif_plays(&bytes));
+                (layout.width, layout.height, timing)
             }
-            Ok(FrameDecoder {
-                decoder,
-                _stream: stream,
-                wic,
-                kind,
-                bytes,
-                width,
-                height,
-                timing,
-                canvas: Canvas::new(0, 0),
-                next: 0,
-            })
-        }
+            Kind::Apng(a, _) => (a.width, a.height, Timing::new(a.delays(), a.plays)),
+            Kind::Webp(a) => (
+                a.width,
+                a.height,
+                Timing::new(a.durations.iter().copied(), a.plays),
+            ),
+        };
+        decoders::check_size(width, height)?;
+        Ok(FrameDecoder {
+            kind,
+            bytes,
+            width,
+            height,
+            timing,
+            canvas: Canvas::new(0, 0),
+            next: 0,
+        })
     }
 
     /// The animation's frame timeline.
@@ -502,19 +502,8 @@ impl FrameDecoder {
     /// the animation).
     fn default_image(&self) -> Result<Option<Frame>> {
         match &self.kind {
-            Kind::Apng(a) if !a.default_is_first => {
-                let wic = &self.wic;
-                // SAFETY: as in `decode`: the stream reads `self.bytes`, alive for the call.
-                unsafe {
-                    let stream = wic.CreateStream()?;
-                    stream.InitializeFromMemory(&self.bytes)?;
-                    let d = wic.CreateDecoderFromStream(
-                        &stream,
-                        std::ptr::null(),
-                        WICDecodeMetadataCacheOnDemand,
-                    )?;
-                    Ok(Some(to_frame(wic, &d.GetFrame(0)?, 0)?))
-                }
+            Kind::Apng(a, _) if !a.default_is_first => {
+                Ok(Some(decoders::png(&self.bytes, None)?.0))
             }
             _ => Ok(None),
         }
@@ -522,6 +511,31 @@ impl FrameDecoder {
 
     /// Frame `index` composited to full size (with its duration).
     pub fn frame(&mut self, index: usize) -> Result<Frame> {
+        self.draw_to(index)?;
+        Ok(Frame {
+            width: self.width,
+            height: self.height,
+            pixels: self.canvas.pixels.clone(),
+            delay_ms: self.timing.delay(index),
+        })
+    }
+
+    /// [`FrameDecoder::frame`] for the last frame asked of this decoder: its pixels are moved out
+    /// rather than copied (a later call starts again from the first frame).
+    fn last_frame(&mut self, index: usize) -> Result<Frame> {
+        self.draw_to(index)?;
+        let canvas = std::mem::replace(&mut self.canvas, Canvas::new(0, 0));
+        Ok(Frame {
+            width: self.width,
+            height: self.height,
+            pixels: canvas.pixels,
+            delay_ms: self.timing.delay(index),
+        })
+    }
+
+    /// Draws the frames up to `index` into the canvas (from the first, when `index` comes before
+    /// the one drawn last).
+    fn draw_to(&mut self, index: usize) -> Result<()> {
         if index >= self.timing.frames() {
             return Err(E_INVALIDARG.into());
         }
@@ -532,79 +546,62 @@ impl FrameDecoder {
             } else {
                 self.canvas.reset();
             }
+            if let Kind::Gif(d) = &mut self.kind {
+                *d = None;
+            }
         }
-        while self.next < index {
+        while self.next <= index {
             self.draw_next()?;
         }
-        self.draw_next()?;
-        Ok(Frame {
-            width: self.width,
-            height: self.height,
-            pixels: self.canvas.pixels.clone(),
-            delay_ms: self.timing.delay(index),
-        })
+        Ok(())
     }
 
     /// Draws frame `self.next` into the canvas.
     fn draw_next(&mut self) -> Result<()> {
         let i = self.next;
-        // SAFETY: WIC calls on this thread's objects, which read `self.bytes` (alive) or a local
-        // PNG that outlives its stream and decoder; out pointers are locals; metadata PROPVARIANTs
-        // are cleared after reading.
-        unsafe {
-            match &self.kind {
-                Kind::Gif => {
-                    let d = self.decoder.as_ref().ok_or(E_INVALIDARG)?;
-                    let source = d.GetFrame(i as u32)?;
-                    let meta = source.GetMetadataQueryReader()?;
-                    let left = read_u16(&meta, "/imgdesc/Left").unwrap_or(0) as u32;
-                    let top = read_u16(&meta, "/imgdesc/Top").unwrap_or(0) as u32;
-                    let dispose = match read_u16(&meta, "/grctlext/Disposal").unwrap_or(0) {
-                        2 => Dispose::Background,
-                        3 => Dispose::Previous,
-                        _ => Dispose::None,
-                    };
-                    let piece = to_frame(&self.wic, &source, 0)?;
-                    let at = Region {
-                        x: left,
-                        y: top,
-                        width: piece.width,
-                        height: piece.height,
-                    };
-                    // (source-over: GIF pixels are fully opaque or fully transparent)
-                    self.canvas
-                        .draw(&piece.pixels, piece.width, at, Blend::Over, dispose);
+        match &mut self.kind {
+            Kind::Gif(decoder) => {
+                if decoder.is_none() {
+                    *decoder = Some(Box::new(decoders::gif_decoder(self.bytes.clone(), true)?));
                 }
-                Kind::Apng(a) => {
-                    let f = &a.frames[i];
-                    let png = a.frame_png(&self.bytes, i);
-                    let stream = self.wic.CreateStream()?;
-                    stream.InitializeFromMemory(&png)?;
-                    let d = self.wic.CreateDecoderFromStream(
-                        &stream,
-                        std::ptr::null(),
-                        WICDecodeMetadataCacheOnDemand,
-                    )?;
-                    let piece = to_frame(&self.wic, &d.GetFrame(0)?, 0)?;
-                    drop(d);
-                    drop(stream);
-                    let at = Region {
-                        x: f.x,
-                        y: f.y,
-                        width: piece.width.min(f.width),
-                        height: piece.height.min(f.height),
-                    };
-                    self.canvas
-                        .draw(&piece.pixels, piece.width, at, f.blend, f.dispose);
+                let d = decoder.as_mut().ok_or(E_INVALIDARG)?;
+                let f = decoders::gif_next(d)?.ok_or(E_INVALIDARG)?;
+                // (source-over where the frame has transparent pixels: the others are opaque)
+                let blend = if f.transparent {
+                    Blend::Over
+                } else {
+                    Blend::Source
+                };
+                self.canvas
+                    .draw(&f.pixels, f.at.width, f.at, blend, f.dispose);
+            }
+            Kind::Apng(a, color) => {
+                let f = &a.frames[i];
+                let png = a.frame_png(&self.bytes, i);
+                let (piece, own) = decoders::png(&png, color.as_ref().map(Option::as_ref))?;
+                if color.is_none() {
+                    *color = Some(own);
                 }
-                Kind::Webp(_) => {
-                    let d = self.decoder.as_ref().ok_or(E_INVALIDARG)?;
-                    let f = to_frame(&self.wic, &d.GetFrame(i as u32)?, 0)?;
-                    if (f.width, f.height) != (self.width, self.height) {
-                        return Err(E_INVALIDARG.into());
-                    }
-                    self.canvas.pixels = f.pixels;
-                }
+                let at = Region {
+                    x: f.x,
+                    y: f.y,
+                    width: piece.width.min(f.width),
+                    height: piece.height.min(f.height),
+                };
+                self.canvas
+                    .draw(&piece.pixels, piece.width, at, f.blend, f.dispose);
+            }
+            Kind::Webp(a) => {
+                let f = &a.frames[i];
+                let piece = decoders::webp(&a.frame_webp(&self.bytes, i))?;
+                let at = Region {
+                    x: f.x,
+                    y: f.y,
+                    width: piece.width.min(f.width),
+                    height: piece.height.min(f.height),
+                };
+                self.canvas
+                    .draw(&piece.pixels, piece.width, at, f.blend, f.dispose);
             }
         }
         self.next = i + 1;
@@ -1137,6 +1134,207 @@ mod tests {
         }
         // (what canvas drawImage draws)
         assert_eq!(img.default_frame().pixel(3, 3), Color::rgb(255, 255, 0));
+    }
+
+    /// The colour at (x, y), each channel within `tolerance` of `want`.
+    fn assert_near(f: &Frame, (x, y): (u32, u32), want: [u8; 3], tolerance: u8, what: &str) {
+        let c = f.pixel(x, y);
+        let got = [c.r, c.g, c.b];
+        let near = got
+            .iter()
+            .zip(want)
+            .all(|(g, w)| g.abs_diff(w) <= tolerance);
+        assert!(near, "{what} at ({x}, {y}): {got:?}, want {want:?}");
+        assert_eq!(c.a, 255, "{what}");
+    }
+
+    #[test]
+    fn icc_profiles_are_converted_to_srgb() {
+        // A Display P3 profile on PNG (iCCP), JPEG (APP2) and WebP (ICCP): the sRGB values are
+        // what other engines paint for these files.
+        let want = [[255, 0, 0], [0, 255, 0], [215, 93, 97], [128, 128, 128]];
+        for (name, tolerance) in [
+            ("p3-patches.png", 1),
+            ("p3-patches.jpg", 2),
+            ("p3-patches.webp", 1),
+        ] {
+            let img = decode(&fixture(name)).unwrap();
+            assert_eq!((img.width(), img.height()), (32, 8), "{name}");
+            for (i, w) in want.iter().enumerate() {
+                assert_near(&img.frames[0], (i as u32 * 8 + 4, 4), *w, tolerance, name);
+            }
+        }
+    }
+
+    #[test]
+    fn cmyk_jpeg_is_read_as_inverted_cmyk() {
+        // Cyan (C 255) and 50% black (K 128), as Adobe stores them: other engines paint (0, 255, 255)
+        // and (127, 127, 127).
+        let img = decode(&fixture("cmyk.jpg")).unwrap();
+        assert_eq!((img.width(), img.height()), (16, 8));
+        assert_near(&img.frames[0], (4, 4), [0, 255, 255], 2, "cyan");
+        assert_near(&img.frames[0], (12, 4), [127, 127, 127], 2, "gray");
+    }
+
+    #[test]
+    fn png_gamma_without_chromaticities_is_applied() {
+        // gAMA 1.0: 128 is half the light, which sRGB stores as 188.
+        let img = decode(&fixture("gamma-1.png")).unwrap();
+        assert_near(&img.frames[0], (4, 4), [188, 188, 188], 1, "gamma-1.png");
+    }
+
+    #[test]
+    fn progressive_jpeg_with_exif_orientation() {
+        // Stored 16 x 8, red | blue, orientation 6: shown 8 x 16, red above blue.
+        let bytes = fixture("orient-6.jpg");
+        assert_eq!(exif_orientation(&bytes), Some(6));
+        let img = decode(&bytes).unwrap();
+        assert_eq!(img.orientation, 6);
+        assert_eq!((img.width(), img.height()), (8, 16));
+        assert_near(&img.frames[0], (4, 3), [255, 0, 0], 8, "top");
+        assert_near(&img.frames[0], (4, 12), [0, 0, 255], 8, "bottom");
+        let raw = img.unoriented().unwrap();
+        assert_eq!((raw.width(), raw.height()), (16, 8));
+        assert_near(&raw.frames[0], (3, 4), [255, 0, 0], 8, "stored left");
+    }
+
+    /// A PNG of `width` x 1 pixels of the given colour type and depth, with `extra` chunks
+    /// (`PLTE`, `tRNS`) before its data.
+    fn png_of(
+        color: png::ColorType,
+        depth: png::BitDepth,
+        width: u32,
+        data: &[u8],
+        palette: Option<&[u8]>,
+        trns: Option<&[u8]>,
+    ) -> Vec<u8> {
+        let mut out = Vec::new();
+        {
+            let mut e = png::Encoder::new(&mut out, width, 1);
+            e.set_color(color);
+            e.set_depth(depth);
+            if let Some(p) = palette {
+                e.set_palette(p.to_vec());
+            }
+            if let Some(t) = trns {
+                e.set_trns(t.to_vec());
+            }
+            let mut w = e.write_header().unwrap();
+            w.write_image_data(data).unwrap();
+        }
+        out
+    }
+
+    #[test]
+    fn png_color_types_decode_to_premultiplied_bgra() {
+        use png::{BitDepth, ColorType};
+        let px = |img: &DecodedImage, x: u32| {
+            let c = img.frames[0].pixel(x, 0);
+            [c.r, c.g, c.b, c.a]
+        };
+        // gray 8, gray + alpha, RGB 16 (high bytes kept), palette with tRNS, gray 1-bit
+        let gray = decode(&png_of(
+            ColorType::Grayscale,
+            BitDepth::Eight,
+            2,
+            &[0, 200],
+            None,
+            None,
+        ))
+        .unwrap();
+        assert_eq!(
+            [px(&gray, 0), px(&gray, 1)],
+            [[0, 0, 0, 255], [200, 200, 200, 255]]
+        );
+        let ga = decode(&png_of(
+            ColorType::GrayscaleAlpha,
+            BitDepth::Eight,
+            1,
+            &[200, 128],
+            None,
+            None,
+        ))
+        .unwrap();
+        // (un-premultiplied again: 100 * 255 / 128 = 199)
+        assert_eq!(px(&ga, 0), [199, 199, 199, 128]);
+        // (stored premultiplied: 200 * 128 / 255 = 100)
+        assert_eq!(&ga.frames[0].pixels, &[100, 100, 100, 128]);
+        let rgb16 = decode(&png_of(
+            ColorType::Rgb,
+            BitDepth::Sixteen,
+            1,
+            &[0xff, 0x00, 0x80, 0x10, 0x00, 0xff],
+            None,
+            None,
+        ))
+        .unwrap();
+        assert_eq!(px(&rgb16, 0), [255, 128, 0, 255]);
+        let indexed = decode(&png_of(
+            ColorType::Indexed,
+            BitDepth::Eight,
+            2,
+            &[0, 1],
+            Some(&[255, 0, 0, 0, 0, 255]),
+            Some(&[0]),
+        ))
+        .unwrap();
+        assert_eq!(
+            [px(&indexed, 0), px(&indexed, 1)],
+            [[0, 0, 0, 0], [0, 0, 255, 255]]
+        );
+        let bits = decode(&png_of(
+            ColorType::Grayscale,
+            BitDepth::One,
+            2,
+            &[0b0100_0000],
+            None,
+            None,
+        ))
+        .unwrap();
+        assert_eq!(
+            [px(&bits, 0), px(&bits, 1)],
+            [[0, 0, 0, 255], [255, 255, 255, 255]]
+        );
+    }
+
+    #[test]
+    fn png_chunks_with_wrong_crcs_are_read() {
+        // A 1 x 1 PNG whose IDAT CRC is wrong (a web-platform test's, which expects it to load,
+        // as it does in other engines).
+        let png: [u8; 70] = [
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48,
+            0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
+            0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78,
+            0xda, 0x63, 0xfc, 0xcf, 0xc0, 0x50, 0x0f, 0x00, 0x03, 0x85, 0x01, 0x80, 0x5a, 0x34,
+            0x7d, 0x6b, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        let img = decode(&png).unwrap();
+        assert_eq!((img.width(), img.height()), (1, 1));
+    }
+
+    #[test]
+    fn truncated_and_oversized_files_are_refused() {
+        let png = fixture("p3-patches.png");
+        assert!(decode(&png[..png.len() / 2]).is_err());
+        let jpg = fixture("p3-patches.jpg");
+        assert!(decode(&jpg[..20]).is_err());
+        let webp = fixture("p3-patches.webp");
+        assert!(decode(&webp[..30]).is_err());
+        assert!(decode(b"GIF89a").is_err());
+        // a PNG header claiming 100 000 x 100 000 pixels
+        let mut huge = png_of(
+            png::ColorType::Grayscale,
+            png::BitDepth::Eight,
+            1,
+            &[0],
+            None,
+            None,
+        );
+        huge[16..20].copy_from_slice(&100_000u32.to_be_bytes());
+        huge[20..24].copy_from_slice(&100_000u32.to_be_bytes());
+        let crc = crc32fast::hash(&huge[12..29]);
+        huge[29..33].copy_from_slice(&crc.to_be_bytes());
+        assert!(decode(&huge).is_err());
     }
 
     #[test]

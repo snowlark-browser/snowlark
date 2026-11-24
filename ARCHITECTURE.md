@@ -55,7 +55,9 @@ crates/
                    (ClearType, system fonts).
   snowlark-paint     Display list → Direct2D on a per-tab raster thread, tiles, compositor with
                    DirectComposition; the DirectWrite TextEngine (shaping lives here, not in layout, so
-                   layout → paint is the dependency and painting a fragment tree is layout's job). WIC images.
+                   layout → paint is the dependency and painting a fragment tree is layout's job). Images
+                   decoded in Rust (PNG, JPEG, GIF, WebP) with their colour profiles applied (qcms); WIC for
+                   BMP, ICO, TIFF and the other formats Windows has a codec for.
                    Every web font goes through OTS (`web_font`) before DirectWrite reads it, in the renderer
                    and again on the raster side.
   snowlark-ots-sys   OTS, the OpenType Sanitizer, and the WOFF 2.0 decoder it uses, compiled from vendor/ots and

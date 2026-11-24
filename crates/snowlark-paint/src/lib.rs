@@ -9,7 +9,10 @@
 //! - [`text`]: [`TextEngine`] on DirectWrite: font lists from CSS family lists, web fonts from memory,
 //!   shaping to glyphs with clusters and break opportunities, fallback, metrics.
 //! - [`text_cache`]: [`TextCache`]: shaped runs, and shaping per word, for text shaped again.
-//! - [`image`]: WIC decoding into an [`ImageStore`] that display lists refer to by [`ImageId`].
+//! - [`image`]: decoding (PNG, JPEG, GIF and WebP in Rust, `decoders`; the other formats through
+//!   WIC) into an [`ImageStore`] that display lists refer to by [`ImageId`].
+//! - [`color_profile`]: images' colour spaces (ICC profiles, PNG `cICP`, `gAMA` and `cHRM`)
+//!   converted to sRGB.
 //! - [`animation`]: animated images' frame timeline, container parsing and frame composition.
 //! - [`raster`]: [`HeadlessRenderer`] (software, WIC bitmap) and the painter both paths share.
 //! - [`gpu`]: the shared [`Gpu`] device and per-thread [`TileRasterizer`]s painting 512 px tiles.
@@ -28,9 +31,11 @@ pub mod animation;
 pub mod autoscroll_cursor;
 pub mod canvas;
 pub mod canvas_thread;
+pub mod color_profile;
 mod com;
 pub mod compositor;
 pub mod cursors;
+mod decoders;
 pub mod demo;
 pub mod display_list;
 pub mod drop_target;

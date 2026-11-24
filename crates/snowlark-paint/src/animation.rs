@@ -187,13 +187,33 @@ pub fn gif_plays(bytes: &[u8]) -> Option<u32> {
     }
 }
 
-/// An animated WebP's loop and durations (the WebP container, RFC 9649 §2.7: `ANIM` and `ANMF`).
+/// An animated WebP's loop, durations and frames (the WebP container, RFC 9649 §2.7: `ANIM` and
+/// `ANMF`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WebpAnimation {
     /// `None`: forever (loop count 0).
     pub plays: Option<u32>,
     /// Each frame's duration (ms, as the file gives it).
     pub durations: Vec<u32>,
+    pub width: u32,
+    pub height: u32,
+    pub frames: Vec<WebpFrame>,
+}
+
+/// One frame of an animated WebP (RFC 9649 §2.7.1.1, `ANMF`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WebpFrame {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    /// Alpha-blending (`Over`) or not (`Source`).
+    pub blend: Blend,
+    /// Disposed to the background (`Background`: transparent, as other engines do, whatever the
+    /// `ANIM` background colour) or kept (`None`).
+    pub dispose: Dispose,
+    /// The frame's image chunks (`ALPH`, then `VP8 ` or `VP8L`), headers and padding included.
+    data: Range<usize>,
 }
 
 /// The animation of an extended-format WebP with the animation flag; `None` for other files.
@@ -201,29 +221,83 @@ pub fn parse_webp_animation(bytes: &[u8]) -> Option<WebpAnimation> {
     if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WEBP" {
         return None;
     }
+    let u24 = |d: &[u8]| u32::from_le_bytes([d[0], d[1], d[2], 0]);
     let mut i = 12;
     let mut animated = false;
     let mut plays = None;
+    let (mut width, mut height) = (0, 0);
     let mut durations = Vec::new();
+    let mut frames = Vec::new();
     while i + 8 <= bytes.len() {
         let tag = &bytes[i..i + 4];
         let size = u32::from_le_bytes(bytes[i + 4..i + 8].try_into().ok()?) as usize;
         let data = bytes.get(i + 8..(i + 8).checked_add(size)?)?;
         match tag {
-            b"VP8X" => animated = data.first().is_some_and(|f| f & 0x02 != 0),
+            b"VP8X" if data.len() >= 10 => {
+                animated = data[0] & 0x02 != 0;
+                width = u24(&data[4..7]) + 1;
+                height = u24(&data[7..10]) + 1;
+            }
             b"ANIM" if data.len() >= 6 => {
                 let loops = u16::from_le_bytes([data[4], data[5]]) as u32;
                 plays = if loops == 0 { None } else { Some(loops) };
             }
             b"ANMF" if data.len() >= 16 => {
-                durations.push(u32::from_le_bytes([data[12], data[13], data[14], 0]));
+                durations.push(u24(&data[12..15]));
+                let flags = data[15];
+                frames.push(WebpFrame {
+                    x: u24(&data[0..3]) * 2,
+                    y: u24(&data[3..6]) * 2,
+                    width: u24(&data[6..9]) + 1,
+                    height: u24(&data[9..12]) + 1,
+                    blend: if flags & 0x02 != 0 {
+                        Blend::Source
+                    } else {
+                        Blend::Over
+                    },
+                    dispose: if flags & 0x01 != 0 {
+                        Dispose::Background
+                    } else {
+                        Dispose::None
+                    },
+                    data: i + 8 + 16..i + 8 + size,
+                });
             }
             _ => {}
         }
         // (chunks are padded to an even size)
         i += 8 + size + (size & 1);
     }
-    (animated && !durations.is_empty()).then_some(WebpAnimation { plays, durations })
+    (animated && !durations.is_empty()).then_some(WebpAnimation {
+        plays,
+        durations,
+        width,
+        height,
+        frames,
+    })
+}
+
+impl WebpAnimation {
+    /// Frame `i` as a still WebP file of its own, for a WebP decoder: its `VP8 `/`VP8L` chunk in
+    /// the simple format, or, with an `ALPH` chunk, in the extended format with the alpha flag.
+    pub fn frame_webp(&self, bytes: &[u8], i: usize) -> Vec<u8> {
+        let f = &self.frames[i];
+        let chunks = &bytes[f.data.clone()];
+        let alpha = chunks.starts_with(b"ALPH");
+        let mut body = b"WEBP".to_vec();
+        if alpha {
+            body.extend_from_slice(b"VP8X");
+            body.extend_from_slice(&10u32.to_le_bytes());
+            body.extend_from_slice(&[0x10, 0, 0, 0]);
+            body.extend_from_slice(&(f.width - 1).to_le_bytes()[..3]);
+            body.extend_from_slice(&(f.height - 1).to_le_bytes()[..3]);
+        }
+        body.extend_from_slice(chunks);
+        let mut out = b"RIFF".to_vec();
+        out.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        out.extend_from_slice(&body);
+        out
+    }
 }
 
 /// What happens to a frame's area after it showed (APNG `dispose_op`, GIF disposal method).
@@ -746,22 +820,40 @@ mod tests {
         let mut body = b"WEBP".to_vec();
         webp_chunk(&mut body, b"VP8X", &[0x02, 0, 0, 0, 9, 0, 0, 9, 0, 0]);
         webp_chunk(&mut body, b"ANIM", &[0, 0, 0, 0, 3, 0]);
-        for d in [70u32, 0] {
-            let mut f = vec![0u8; 16];
-            f[12..15].copy_from_slice(&d.to_le_bytes()[..3]);
+        // frame 1: 10 x 10 at (0, 0), blended, kept; frame 2: 4 x 6 at (2, 4), not blended,
+        // disposed
+        for (d, at, flags) in [
+            (70u32, [0u8, 0, 0, 0, 0, 0, 9, 0, 0, 9, 0, 0], 0u8),
+            (0, [1, 0, 0, 2, 0, 0, 3, 0, 0, 5, 0, 0], 3),
+        ] {
+            let mut f = at.to_vec();
+            f.extend_from_slice(&d.to_le_bytes()[..3]);
+            f.push(flags);
             f.extend_from_slice(b"VP8L\x01\x00\x00\x00\x2f\x00");
             webp_chunk(&mut body, b"ANMF", &f);
         }
         let mut file = b"RIFF".to_vec();
         file.extend_from_slice(&(body.len() as u32).to_le_bytes());
         file.extend_from_slice(&body);
+        let a = parse_webp_animation(&file).unwrap();
+        assert_eq!((a.plays, &a.durations[..]), (Some(3), &[70, 0][..]));
+        assert_eq!((a.width, a.height), (10, 10));
+        let f = &a.frames;
+        assert_eq!((f[0].x, f[0].y, f[0].width, f[0].height), (0, 0, 10, 10));
+        assert_eq!((f[0].blend, f[0].dispose), (Blend::Over, Dispose::None));
+        assert_eq!((f[1].x, f[1].y, f[1].width, f[1].height), (2, 4, 4, 6));
         assert_eq!(
-            parse_webp_animation(&file),
-            Some(WebpAnimation {
-                plays: Some(3),
-                durations: vec![70, 0]
-            })
+            (f[1].blend, f[1].dispose),
+            (Blend::Source, Dispose::Background)
         );
+        // a frame alone: the simple format around its chunk (padded to an even size)
+        let still = a.frame_webp(&file, 1);
+        assert_eq!(&still[..4], b"RIFF");
+        assert_eq!(
+            u32::from_le_bytes(still[4..8].try_into().unwrap()) as usize,
+            still.len() - 8
+        );
+        assert_eq!(&still[8..], b"WEBPVP8L\x01\x00\x00\x00\x2f\x00");
         assert_eq!(parse_webp_animation(b"RIFF\0\0\0\0WEBPVP8 "), None);
     }
 

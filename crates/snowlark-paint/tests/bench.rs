@@ -174,3 +174,46 @@ fn image_copy() {
     let copy = best(|| drop(std::hint::black_box(pixels.clone())));
     println!("{} MB copied in {copy:.2} ms", pixels.len() >> 20);
 }
+
+/// Decoding speed of each image in the folder `SNOWLARK_DECODE_BENCH` names, through the decoders
+/// pages use ([`image::decode`]) and through WIC ([`image::decode_wic`]), and the largest channel
+/// difference between the two. Without the variable it prints how to make such a folder.
+#[test]
+#[ignore]
+fn image_decode() {
+    let Some(dir) = std::env::var_os("SNOWLARK_DECODE_BENCH") else {
+        println!("set SNOWLARK_DECODE_BENCH to a folder of PNG, JPEG, GIF and WebP files");
+        return;
+    };
+    let mut files: Vec<_> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    files.sort();
+    for path in files {
+        let bytes = std::fs::read(&path).unwrap();
+        let ours = image::decode(&bytes).unwrap();
+        let wic = image::decode_wic(&bytes).unwrap();
+        let (a, b) = (&ours.frames[0], &wic.frames[0]);
+        let diff = if (a.width, a.height) == (b.width, b.height) {
+            a.pixels
+                .iter()
+                .zip(&b.pixels)
+                .map(|(x, y)| x.abs_diff(*y))
+                .max()
+                .unwrap_or(0)
+                .to_string()
+        } else {
+            format!("size {}x{} vs {}x{}", a.width, a.height, b.width, b.height)
+        };
+        let t_ours = best(|| drop(std::hint::black_box(image::decode(&bytes).unwrap())));
+        let t_wic = best(|| drop(std::hint::black_box(image::decode_wic(&bytes).unwrap())));
+        let name = path.file_name().unwrap().to_string_lossy();
+        println!(
+            "{name:28} {}x{}: {t_ours:7.2} ms, WIC {t_wic:7.2} ms ({:.2}x); max difference {diff}",
+            a.width,
+            a.height,
+            t_ours / t_wic
+        );
+    }
+}

@@ -2118,6 +2118,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33cb294fe86a74cbcf50d4445b37da762029549ebeea341421c7c70370f86cac"
 
 [[package]]
+name = "qcms"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edecfcd5d755a5e5d98e24cf43113e7cdaec5a070edd0f6b250c03a573da30fa"
+
+[[package]]
 name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2984,6 +2990,10 @@ dependencies = [
  "crc32fast",
  "flate2",
  "fontdb",
+ "gif",
+ "image-webp",
+ "png",
+ "qcms",
  "rustc-hash",
  "serde",
  "smallvec",
@@ -2993,6 +3003,8 @@ dependencies = [
  "windows-core",
  "windows-future",
  "windows-numerics",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
