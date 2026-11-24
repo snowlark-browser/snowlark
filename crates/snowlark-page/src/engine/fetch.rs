@@ -1211,6 +1211,17 @@ impl Engine {
     }
 
     fn api_fetch_done(&self, cx: &mut Cx, job: ApiJob, r: Result<(), String>) {
+        // (a request that succeeded may have been a sign-in by script: the password manager
+        // watches the login form the user typed in from now on)
+        if r.is_ok()
+            && !matches!(job.owner, JobOwner::Beacon)
+            && job
+                .head
+                .as_ref()
+                .is_some_and(|h| (200..300).contains(&h.status))
+        {
+            self.password_submission_may_follow(None);
+        }
         if let (Some(resp), JobOwner::Fetch { realm, .. }) = (job.response, &job.owner) {
             // The Response is script's already: its body ends, or errors with a TypeError when
             // the fetch failed after its head.

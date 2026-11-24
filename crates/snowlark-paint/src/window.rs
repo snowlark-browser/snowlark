@@ -1181,6 +1181,276 @@ pub fn verify_user(owner: WindowHandle, message: &str) -> UserVerification {
     }
 }
 
+/// The signed-in user's account name as the local account database knows it (`MACHINE\name`
+/// or `DOMAIN\name`).
+fn sam_user_name() -> Option<Vec<u16>> {
+    use windows::Win32::Security::Authentication::Identity::{GetUserNameExW, NameSamCompatible};
+    let mut buf = [0u16; 514];
+    let mut len = buf.len() as u32;
+    // SAFETY: `buf` holds `len` UTF-16 units; the call writes at most that many and sets `len`
+    // to the name's length without its terminator.
+    let ok = unsafe {
+        GetUserNameExW(
+            NameSamCompatible,
+            Some(windows::core::PWSTR(buf.as_mut_ptr())),
+            &mut len,
+        )
+    };
+    ok.then(|| buf[..(len as usize).min(buf.len())].to_vec())
+}
+
+/// The account part of [`sam_user_name`] (after the backslash), NUL-terminated.
+fn local_user_name() -> Option<Vec<u16>> {
+    let full = sam_user_name()?;
+    let start = full
+        .iter()
+        .position(|&c| c == u16::from(b'\\'))
+        .map_or(0, |i| i + 1);
+    let mut name = full[start..].to_vec();
+    name.push(0);
+    Some(name)
+}
+
+/// Whether this machine is joined to a domain (whose accounts always have a password).
+pub fn domain_joined() -> bool {
+    use windows::Win32::NetworkManagement::NetManagement::{
+        NetApiBufferFree, NetGetJoinInformation, NetSetupDomainName, NETSETUP_JOIN_STATUS,
+    };
+    let mut name = windows::core::PWSTR::null();
+    let mut status = NETSETUP_JOIN_STATUS(0);
+    // SAFETY: the call allocates `name`, freed here when it succeeded.
+    unsafe {
+        let err = NetGetJoinInformation(windows::core::PCWSTR::null(), &mut name, &mut status);
+        if err != 0 {
+            return false;
+        }
+        let _ = NetApiBufferFree(Some(name.0 as *const core::ffi::c_void));
+    }
+    status == NetSetupDomainName
+}
+
+/// When the signed-in user's Windows password was last changed (milliseconds since the Unix
+/// epoch), `None` when the account database does not say.
+pub fn password_changed_ms() -> Option<i64> {
+    use windows::Win32::NetworkManagement::NetManagement::{
+        NetApiBufferFree, NetUserGetInfo, USER_INFO_1,
+    };
+    let name = local_user_name()?;
+    let mut info: *mut u8 = std::ptr::null_mut();
+    // SAFETY: `name` is NUL-terminated; on success `info` points at a USER_INFO_1 the call
+    // allocated, read once and freed here.
+    let age_s = unsafe {
+        let err = NetUserGetInfo(
+            windows::core::PCWSTR::null(),
+            windows::core::PCWSTR(name.as_ptr()),
+            1,
+            &mut info,
+        );
+        if err != 0 || info.is_null() {
+            return None;
+        }
+        let age = (*(info as *const USER_INFO_1)).usri1_password_age;
+        let _ = NetApiBufferFree(Some(info as *const core::ffi::c_void));
+        age
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_millis() as i64;
+    Some(now - i64::from(age_s) * 1000)
+}
+
+/// Whether the signed-in user's Windows password is blank: a local logon with an empty password
+/// either succeeds or is refused only because blank passwords may not log on that way. A failed
+/// try counts as a wrong password for the account, so callers remember the answer.
+pub fn password_blank() -> bool {
+    use windows::Win32::Foundation::{
+        CloseHandle, GetLastError, ERROR_ACCOUNT_RESTRICTION, HANDLE,
+    };
+    use windows::Win32::Security::{
+        LogonUserW, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT,
+    };
+    let Some(name) = local_user_name() else {
+        return false;
+    };
+    let dot = [u16::from(b'.'), 0];
+    let empty = [0u16];
+    let mut token = HANDLE::default();
+    // SAFETY: the strings are NUL-terminated; a token the call returns is closed here.
+    unsafe {
+        let ok = LogonUserW(
+            windows::core::PCWSTR(name.as_ptr()),
+            windows::core::PCWSTR(dot.as_ptr()),
+            windows::core::PCWSTR(empty.as_ptr()),
+            LOGON32_LOGON_INTERACTIVE,
+            LOGON32_PROVIDER_DEFAULT,
+            &mut token,
+        );
+        if ok.is_ok() {
+            let _ = CloseHandle(token);
+            return true;
+        }
+        GetLastError() == ERROR_ACCOUNT_RESTRICTION
+    }
+}
+
+/// The `TOKEN_USER` of `token`, in a buffer of its own (8-byte aligned).
+fn token_user(token: windows::Win32::Foundation::HANDLE) -> Option<Vec<u64>> {
+    use windows::Win32::Security::{GetTokenInformation, TokenUser};
+    let mut len = 0u32;
+    // SAFETY: the first call only asks for the size; the second writes at most `len` bytes into
+    // a buffer of at least that size.
+    unsafe {
+        let _ = GetTokenInformation(token, TokenUser, None, 0, &mut len);
+        if len == 0 {
+            return None;
+        }
+        let mut buf = vec![0u64; (len as usize).div_ceil(8)];
+        GetTokenInformation(
+            token,
+            TokenUser,
+            Some(buf.as_mut_ptr() as *mut core::ffi::c_void),
+            len,
+            &mut len,
+        )
+        .ok()?;
+        Some(buf)
+    }
+}
+
+/// Asks for the signed-in user's Windows sign-in (password, or whatever else the prompt offers),
+/// in the system's credential prompt owned by `owner` with `caption` and `message`, and checks it
+/// with a logon that is the current user's: the prompt lets the user switch account, which does
+/// not count. Up to three tries. What the user typed is in the browser's memory only for the
+/// check, and wiped after it. Blocks until the prompt closes, so it runs off the window's thread.
+pub fn verify_sign_in(owner: WindowHandle, caption: &str, message: &str) -> UserVerification {
+    use windows::Win32::Foundation::{CloseHandle, ERROR_CANCELLED, HANDLE, LUID};
+    use windows::Win32::Security::Authentication::Identity::{
+        LsaConnectUntrusted, LsaDeregisterLogonProcess, LsaFreeReturnBuffer, LsaLogonUser,
+        LSA_STRING, SECURITY_LOGON_TYPE,
+    };
+    use windows::Win32::Security::Credentials::{
+        CredUIPromptForWindowsCredentialsW, CREDUIWIN_ENUMERATE_CURRENT_USER, CREDUI_INFOW,
+    };
+    use windows::Win32::Security::{AllocateLocallyUniqueId, EqualSid, QUOTA_LIMITS, TOKEN_QUERY};
+    use windows::Win32::Security::{TOKEN_SOURCE, TOKEN_USER};
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    const TRIES: u32 = 3;
+    const ORIGIN: &[u8] = b"Snowlark\0";
+    let caption: Vec<u16> = caption.encode_utf16().chain([0]).collect();
+    let message: Vec<u16> = message.encode_utf16().chain([0]).collect();
+
+    // SAFETY: every handle opened here is closed here (the process token, the LSA connection, a
+    // logon's token); the prompt's buffer is wiped and freed after each try; the strings outlive
+    // the calls that read them; the owner is the browser's window, alive while it waits.
+    unsafe {
+        let mut own = HANDLE::default();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut own).is_err() {
+            return UserVerification::Unavailable;
+        }
+        let me = token_user(own);
+        let _ = CloseHandle(own);
+        let Some(me) = me else {
+            return UserVerification::Unavailable;
+        };
+        let mut lsa = HANDLE::default();
+        if LsaConnectUntrusted(&mut lsa).is_err() {
+            return UserVerification::Unavailable;
+        }
+        let origin = LSA_STRING {
+            Length: (ORIGIN.len() - 1) as u16,
+            MaximumLength: ORIGIN.len() as u16,
+            Buffer: windows::core::PSTR(ORIGIN.as_ptr() as *mut u8),
+        };
+        let info = CREDUI_INFOW {
+            cbSize: std::mem::size_of::<CREDUI_INFOW>() as u32,
+            hwndParent: owner.hwnd(),
+            pszMessageText: windows::core::PCWSTR(message.as_ptr()),
+            pszCaptionText: windows::core::PCWSTR(caption.as_ptr()),
+            hbmBanner: Default::default(),
+        };
+        let mut outcome = UserVerification::Refused;
+        let mut last_error = 0u32;
+        for _ in 0..TRIES {
+            let mut package = 0u32;
+            let mut buf: *mut core::ffi::c_void = std::ptr::null_mut();
+            let mut size = 0u32;
+            let err = CredUIPromptForWindowsCredentialsW(
+                Some(&info),
+                last_error,
+                &mut package,
+                None,
+                0,
+                &mut buf,
+                &mut size,
+                None,
+                CREDUIWIN_ENUMERATE_CURRENT_USER,
+            );
+            if err != 0 {
+                if err != ERROR_CANCELLED.0 {
+                    outcome = UserVerification::Unavailable;
+                }
+                break;
+            }
+            let mut source = TOKEN_SOURCE::default();
+            for (d, s) in source.SourceName.iter_mut().zip(b"Snowlark") {
+                *d = *s as i8;
+            }
+            let mut same = false;
+            if AllocateLocallyUniqueId(&mut source.SourceIdentifier).is_ok() {
+                let mut profile: *mut core::ffi::c_void = std::ptr::null_mut();
+                let mut profile_len = 0u32;
+                let mut luid = LUID::default();
+                let mut token = HANDLE::default();
+                let mut quotas = QUOTA_LIMITS::default();
+                let mut sub = 0i32;
+                let status = LsaLogonUser(
+                    lsa,
+                    &origin,
+                    SECURITY_LOGON_TYPE::Interactive,
+                    package,
+                    buf,
+                    size,
+                    None,
+                    &source,
+                    &mut profile,
+                    &mut profile_len,
+                    &mut luid,
+                    &mut token,
+                    &mut quotas,
+                    &mut sub,
+                );
+                if !profile.is_null() {
+                    let _ = LsaFreeReturnBuffer(profile);
+                }
+                if status.is_ok() {
+                    if let Some(them) = token_user(token) {
+                        let me = &*(me.as_ptr() as *const TOKEN_USER);
+                        let them = &*(them.as_ptr() as *const TOKEN_USER);
+                        same = EqualSid(me.User.Sid, them.User.Sid).is_ok();
+                    }
+                    let _ = CloseHandle(token);
+                }
+            }
+            // (volatile, so the wipe is not dropped as a store to memory about to be freed)
+            for i in 0..size as usize {
+                std::ptr::write_volatile((buf as *mut u8).add(i), 0);
+            }
+            CoTaskMemFree(Some(buf as *const core::ffi::c_void));
+            if same {
+                outcome = UserVerification::Verified;
+                break;
+            }
+            // The prompt shows "the user name or password is incorrect" on the next try.
+            last_error = windows::Win32::Foundation::ERROR_LOGON_FAILURE.0;
+        }
+        let _ = LsaDeregisterLogonProcess(lsa);
+        outcome
+    }
+}
+
 /// Asks where to save a file with the system's Save As dialog, owned by `owner`, offering
 /// `suggested` as the name and `filters` as (description, patterns) pairs ("PNG image",
 /// "*.png"), in the folder `dir` (the system's choice when `None`). Blocks until the dialog

@@ -1435,6 +1435,8 @@ impl Engine {
         self.focus_fixup(cx, &self.rendered_documents());
         // Intersection Observer: "run the update intersection observations steps".
         self.update_intersection_observations(cx);
+        // (the password manager: a login form that left the rendering after a sign-in by script)
+        self.password_forms_after_layout();
         // CSS Font Loading "update the font loading status".
         self.update_fonts_ready(cx);
         self.update_font_waiters(cx);

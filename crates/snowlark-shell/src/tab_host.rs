@@ -221,6 +221,8 @@ pub struct TabHost {
     /// Counts the documents the tab's top level has had: each commit of a new one, whichever
     /// renderer it is in.
     documents: u64,
+    /// The top level's current document came from an HTTP error response (status 400 or more).
+    http_error: bool,
     /// The compositor's scroll positions: where the viewport is when a navigation leaves an entry.
     scroll: SharedScroll,
     /// Whether the renderer's thread gets anywhere, and the way to stop its script.
@@ -408,6 +410,7 @@ impl TabHost {
             session: SessionHistory::default(),
             navigations: 0,
             documents: 0,
+            http_error: false,
             scroll,
             live,
             process: None,
@@ -865,6 +868,7 @@ impl TabHost {
     /// Commits a fetched response in the tab's renderer: the entry, then the body handed over.
     fn commit_fetched(&mut self, nav: Navigation, head: ResponseHead) {
         self.commit_entry(&nav, head.url());
+        self.http_error = head.status >= 400;
         let body = self.hand_over(nav.stream);
         let view_source = nav.view_source.then(|| nav.url.clone());
         self.send(TabCommand::Commit(Box::new(Commit {
@@ -1105,6 +1109,13 @@ impl TabHost {
     fn new_document(&mut self, navigation: u64) {
         self.session.set_document(navigation, 0);
         self.documents += 1;
+        self.http_error = false;
+    }
+
+    /// Whether the top level's current document came from an HTTP error response (400 or more):
+    /// a login submitted before it failed, whatever the page shows.
+    pub fn http_error(&self) -> bool {
+        self.http_error
     }
 
     /// The current entry's URL.

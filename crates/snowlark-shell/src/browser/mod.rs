@@ -257,9 +257,9 @@ pub struct Browser {
     /// thread of its own), until the window takes it.
     picked_download_dir: Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
     /// The OS's answer to the confirmation a Reveal on the passwords page asked for (on a thread
-    /// of its own): the login it was for and how it ended, until the window takes it.
-    password_verification:
-        Arc<std::sync::Mutex<Option<(u64, snowlark_paint::window::UserVerification)>>>,
+    /// of its own): the login it was for, how it ended and the blank-password check it leaves for
+    /// the settings, until the window takes it.
+    password_verification: Arc<std::sync::Mutex<Option<passwords_page_ui::RevealAnswer>>>,
     /// What the toolbar's downloads button showed last ([`downloads_ui::DownloadsButton`]).
     downloads_button: Option<crate::chrome::DownloadsButton>,
     profile: Profile,

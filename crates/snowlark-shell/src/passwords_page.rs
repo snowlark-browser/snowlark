@@ -22,8 +22,9 @@ pub const PASSWORDS_PAGE: &str = "snowlark://passwords/";
 /// (milliseconds).
 pub const REVEAL_WINDOW_MS: i64 = 60_000;
 
-/// What the page says when Windows Hello is not set up.
-pub const NOT_SET_UP: &str = "Set up Windows Hello to reveal passwords";
+/// What the page says when Windows could confirm the user neither with Windows Hello nor with
+/// its sign-in prompt.
+pub const NOT_SET_UP: &str = "Windows could not confirm it's you, so passwords cannot be revealed";
 
 const SCRIPT: &str = include_str!("passwords_page.js");
 
@@ -63,6 +64,8 @@ pub enum Action {
     Delete(u64),
     /// Take a site off the Never list.
     NeverRemove(String),
+    /// Turn "Offer to save passwords" on or off.
+    Offer(bool),
 }
 
 /// The action of a request to the apply address (`op=<name>&id=<n>` or `op=never-remove&origin=<o>`).
@@ -74,6 +77,7 @@ pub fn action(query: &str) -> Option<Action> {
         ("reveal", Some(id)) => Action::Reveal(id),
         ("delete", Some(id)) => Action::Delete(id),
         ("never-remove", _) => Action::NeverRemove(get("origin").filter(|o| !o.is_empty())?.into()),
+        ("offer", _) => Action::Offer(get("on")? == "1"),
         _ => return None,
     })
 }
@@ -91,13 +95,15 @@ const SEARCH: &str =
 const KEY: &str = "<svg viewBox='0 0 24 24' aria-hidden=true><circle cx='8' cy='15' r='3.5'/><path d='M10.5 12.5L20 3M16 7l3 3M13.5 9.5l2 2'/></svg>";
 
 /// The page. `store` is `None` in an Incognito window. `revealed` are the logins whose passwords
-/// the user may see now; `notice` is a line at the top (why a reveal did not happen).
+/// the user may see now; `notice` is a line at the top (why a reveal did not happen); `offer` is
+/// the "Offer to save passwords" setting.
 pub fn passwords_html(
     store: Option<&mut PasswordStore>,
     revealed: &[u64],
     notice: Option<&str>,
     query: &str,
     dark: bool,
+    offer: bool,
 ) -> String {
     let mut list = String::new();
     let mut shown = 0;
@@ -170,6 +176,16 @@ pub fn passwords_html(
     } else {
         format!("<section id=never><h2>Never saved</h2>{never}</section>")
     };
+    let offer_html = if incognito {
+        String::new()
+    } else {
+        format!(
+            "<label class='item offer'><span class=who>Offer to save passwords</span>\
+<input type=checkbox id=offer data-op=offer data-on={next}{checked}></label>",
+            next = if offer { 0 } else { 1 },
+            checked = if offer { " checked" } else { "" },
+        )
+    };
     let searching = !query.is_empty();
     let empty_text = if total > 0 && searching {
         "No search results found"
@@ -200,6 +216,7 @@ h2{{font:500 13px 'Segoe UI',sans-serif;color:var(--muted);margin:24px 0 8px}}\
 .pw{{flex:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:1px}}.plain{{font:13px Consolas,monospace;letter-spacing:0;user-select:all}}\
 .controls{{flex:none;display:flex;gap:8px}}\
 button.text{{border:0;border-radius:16px;padding:6px 14px;font:500 13px 'Segoe UI',sans-serif;background:transparent;color:var(--accent);box-shadow:0 0 0 1px var(--line);cursor:pointer}}button.text:hover{{background:var(--hover)}}\
+.offer{{margin-top:16px;cursor:pointer}}.offer input{{width:18px;height:18px;margin:0 8px 0 0;accent-color:var(--accent)}}\
 .empty{{text-align:center;color:var(--muted);font-size:16px;padding:96px 0}}\
 @media (max-width:820px){{header .brand{{width:auto}}header .brand span{{display:none}}.spacer{{display:none}}}}\
 </style></head><body><header><div class=brand>{KEY}<span>Passwords</span></div>\
@@ -207,7 +224,7 @@ button.text{{border:0;border-radius:16px;padding:6px 14px;font:500 13px 'Segoe U
 <input id=search name=q type=search value='{q}' placeholder='Search passwords' aria-label='Search passwords' autocomplete=off spellcheck=false>\
 <button id=clear-search type=button aria-label='Clear search'{clear_hidden}>&#x2715;</button></form></div>\
 <div class=spacer></div></header>\
-<main>{message}{notice_html}<section id=list>{list}</section>\
+<main>{message}{notice_html}{offer_html}<section id=list>{list}</section>\
 <p class=empty id=empty data-none='No search results found' data-all='Saved passwords appear here'{empty_hidden}>{empty_text}</p>\
 {never_html}</main><script>{SCRIPT}</script></body></html>",
         q = escape_html(query),
@@ -280,13 +297,13 @@ mod tests {
     #[test]
     fn logins_are_listed_without_their_passwords_unless_revealed() {
         let (mut s, a, b) = store();
-        let page = passwords_html(Some(&mut s), &[], None, "", false);
+        let page = passwords_html(Some(&mut s), &[], None, "", false, true);
         assert!(page.contains("example.com") && page.contains("shop.example"));
         assert!(page.contains(&format!("data-op=reveal data-id={a}")));
         assert!(page.contains(&format!("data-op=delete data-id={b}")));
         assert!(!page.contains("hunter2-secret") && !page.contains("tr0ub4dor-secret"));
         // Only the revealed login's password is on the page.
-        let page = passwords_html(Some(&mut s), &[b], None, "", true);
+        let page = passwords_html(Some(&mut s), &[b], None, "", true, true);
         assert!(page.contains("tr0ub4dor-secret"));
         assert!(!page.contains("hunter2-secret"));
         assert!(!page.contains(&format!("data-op=reveal data-id={b}")));
@@ -298,7 +315,7 @@ mod tests {
     fn what_is_shown_is_escaped() {
         let (mut s, _, _) = store();
         s.add_never("https://x.example/<i>");
-        let page = passwords_html(Some(&mut s), &[], Some("a <u>"), "<s>", false);
+        let page = passwords_html(Some(&mut s), &[], Some("a <u>"), "<s>", false, true);
         assert!(page.contains("&lt;b&gt;bob"));
         assert!(!page.contains("<b>bob"));
         assert!(page.contains("a &lt;u&gt;"));
@@ -311,7 +328,7 @@ mod tests {
     fn the_search_hides_what_does_not_match_and_the_never_list_has_remove() {
         let (mut s, a, b) = store();
         s.add_never("https://never.example");
-        let page = passwords_html(Some(&mut s), &[], None, "SHOP", false);
+        let page = passwords_html(Some(&mut s), &[], None, "SHOP", false, true);
         assert!(page.contains(&format!("id=p{a} data-search='example.com\nann' hidden>")));
         assert!(
             page.contains(&format!("id=p{b} data-search='shop.example\n<b>bob'>"))
@@ -321,18 +338,38 @@ mod tests {
         );
         assert!(page.contains("<h2>Never saved</h2>"));
         assert!(page.contains("data-op=never-remove data-origin='https://never.example'"));
-        let none = passwords_html(Some(&mut s), &[], None, "zebra", false);
+        let none = passwords_html(Some(&mut s), &[], None, "zebra", false, true);
         assert!(none.contains(">No search results found</p>"));
         assert!(!none.contains("id=empty data-none='No search results found' data-all='Saved passwords appear here' hidden"));
     }
 
     #[test]
+    fn offer_to_save_is_a_toggle_on_the_page() {
+        let (mut s, _, _) = store();
+        let on = passwords_html(Some(&mut s), &[], None, "", false, true);
+        assert!(on.contains("Offer to save passwords"));
+        assert!(on.contains("id=offer data-op=offer data-on=0 checked>"));
+        let off = passwords_html(Some(&mut s), &[], None, "", false, false);
+        assert!(off.contains("id=offer data-op=offer data-on=1>"));
+        assert!(!passwords_html(None, &[], None, "", false, true).contains("id=offer"));
+        assert_eq!(action("op=offer&on=0"), Some(Action::Offer(false)));
+        assert_eq!(action("op=offer&on=1"), Some(Action::Offer(true)));
+        assert_eq!(action("op=offer"), None);
+        // On unless the user turned it off, and kept in the settings file.
+        let defaults: crate::settings::Settings = serde_json::from_str("{}").unwrap();
+        assert!(defaults.offer_passwords);
+        let off: crate::settings::Settings =
+            serde_json::from_str(r#"{"offerPasswords":false}"#).unwrap();
+        assert!(!off.offer_passwords);
+    }
+
+    #[test]
     fn the_empty_and_incognito_and_unreadable_states() {
         let mut empty = PasswordStore::in_memory(Box::new(Xor));
-        let page = passwords_html(Some(&mut empty), &[], None, "", false);
+        let page = passwords_html(Some(&mut empty), &[], None, "", false, true);
         assert!(page.contains(">Saved passwords appear here</p>"));
         assert!(!page.contains("<h2>Never saved</h2>") && !page.contains("class=note"));
-        let incognito = passwords_html(None, &[], None, "", false);
+        let incognito = passwords_html(None, &[], None, "", false, true);
         assert!(incognito.contains("Saved passwords are not available in an Incognito window."));
         // A store whose key this Windows user cannot unwrap.
         struct Refuses;
@@ -354,9 +391,10 @@ mod tests {
             .unwrap();
         on_disk.save().unwrap();
         let mut lost = PasswordStore::load(&file, Box::new(Refuses));
-        let page = passwords_html(Some(&mut lost), &[], None, "", false);
+        let page = passwords_html(Some(&mut lost), &[], None, "", false, true);
         assert!(
-            !passwords_html(Some(&mut on_disk), &[], None, "", false).contains("cannot be read")
+            !passwords_html(Some(&mut on_disk), &[], None, "", false, true)
+                .contains("cannot be read")
         );
         assert!(page.contains("The saved passwords cannot be read by this Windows user."));
         let _ = std::fs::remove_dir_all(&dir);

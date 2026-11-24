@@ -158,7 +158,7 @@ impl BrowserPages {
                 ))
             }
             InternalKind::Passwords => {
-                let (dark, store, revealed, notice) = {
+                let (dark, store, revealed, notice, offer) = {
                     let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
                     let fresh = st
                         .passwords_verified_ms
@@ -172,6 +172,7 @@ impl BrowserPages {
                             Vec::new()
                         },
                         st.passwords_notice.clone(),
+                        st.settings.offer_passwords,
                     )
                 };
                 let mut guard = store
@@ -183,6 +184,7 @@ impl BrowserPages {
                     notice.as_deref(),
                     &crate::passwords_page::query_of(&shown),
                     dark,
+                    offer,
                 ))
             }
             InternalKind::Settings | InternalKind::About => {

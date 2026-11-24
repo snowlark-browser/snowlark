@@ -180,6 +180,7 @@ impl Engine {
     }
 
     pub(crate) fn note_same_document(&self, doc: NodeId, url: &str, push: bool, index: usize) {
+        self.password_submission_may_follow(Some(doc));
         if !self.browser_navigates() || self.document() != Some(doc) {
             return;
         }

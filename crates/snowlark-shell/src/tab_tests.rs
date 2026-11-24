@@ -3043,6 +3043,78 @@ fn a_login_whose_form_comes_back_is_not_offered() {
     assert_eq!(saved, None);
 }
 
+/// The same login answered with an HTTP error whose page has no login form: it failed, and
+/// nothing is offered.
+#[test]
+fn a_login_answered_with_an_http_error_is_not_offered() {
+    let body = "<!doctype html><title>oops</title>Something went wrong.";
+    let (_, saved) = log_in_through_the_window(
+        format!(
+            "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\
+             Connection: close\r\n\r\n{body}",
+            body.len()
+        ),
+        "oops",
+    );
+    assert_eq!(saved, None);
+}
+
+/// A sign-in by script without a navigation (the page reports that the login form the user typed
+/// in left after a request): judged at once, a login to save, and no earlier submission of the
+/// tab waits on after it.
+#[test]
+fn a_sign_in_in_place_is_offered_at_once() {
+    use snowlark_page::passwords::{FieldData, FormData, PasswordEvent};
+    let origin = serve_answers_at(
+        "127.0.0.1:0",
+        vec![("/", html_answer("<!doctype html><title>app</title>app"))],
+    );
+    let (ctx, _net, rx, _comp_rx) = remote_context();
+    let mut tab = spawn(
+        1,
+        ctx,
+        DEVICE,
+        Url::parse(&format!("{origin}/")).unwrap(),
+        crate::page_driver::PageDriver::factory(),
+    );
+    let deadline = Instant::now() + std::time::Duration::from_secs(20);
+    while tab.state.title != "app" {
+        match rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+            Ok((_, e)) => drive(&mut tab, &e),
+            Err(e) => panic!("no page: {e}"),
+        }
+    }
+    let field = |id: u64, kind: &str, name: &str, value: &str| FieldData {
+        id,
+        kind: kind.into(),
+        name: name.into(),
+        value: value.into(),
+        user_typed: true,
+        focusable: true,
+        ..Default::default()
+    };
+    let form = FormData {
+        form: 1,
+        action: String::new(),
+        fields: vec![
+            field(2, "text", "user", "alice"),
+            field(3, "password", "pw", "pw1"),
+        ],
+    };
+    let mut logins = crate::passwords::PendingLogins::default();
+    assert_eq!(
+        logins.hear(&tab, &PasswordEvent::Submitted(form.clone())),
+        None
+    );
+    assert!(!logins.is_empty(), "a submission waits for the next page");
+    let p = logins
+        .hear(&tab, &PasswordEvent::SubmittedInPlace(form))
+        .expect("a login to save at once");
+    assert_eq!(p.origin, origin);
+    assert_eq!((p.username.as_str(), p.password.as_str()), ("alice", "pw1"));
+    assert!(logins.is_empty());
+}
+
 fn html_answer(body: &str) -> String {
     format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",

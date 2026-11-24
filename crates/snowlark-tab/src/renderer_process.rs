@@ -785,8 +785,10 @@ pub(crate) fn check_event(
     if let TabEvent::Passwords(p) = event {
         use snowlark_page::passwords::PasswordEvent;
         let forms = match p {
-            PasswordEvent::Submitted(f) => std::slice::from_ref(f),
-            PasswordEvent::Rendered(v) => v.as_slice(),
+            PasswordEvent::Submitted(f) | PasswordEvent::SubmittedInPlace(f) => {
+                std::slice::from_ref(f)
+            }
+            PasswordEvent::Rendered(v) | PasswordEvent::Added(v) => v.as_slice(),
         };
         if forms.len() > MAX_PASSWORD_FORMS
             || forms.iter().any(|f| f.fields.len() > MAX_PASSWORD_FIELDS)

@@ -474,13 +474,23 @@ impl PendingLogins {
                 }
                 None
             }
+            // (a sign-in by script without a navigation: the form left, the login succeeded)
+            PasswordEvent::SubmittedInPlace(form) => {
+                let origin = page_origin(tab.current_url()?, tab.site())?;
+                let p = pending_login(&origin, form)?;
+                self.0.retain(|(t, ..)| *t != tab.id);
+                Some(p)
+            }
+            // (forms added after `load`: the document was judged by its `load` report)
+            PasswordEvent::Added(_) => None,
             PasswordEvent::Rendered(forms) => {
                 let k = self
                     .0
                     .iter()
                     .position(|(t, at, _)| *t == tab.id && tab.documents() > *at)?;
                 let (.., p) = self.0.remove(k);
-                (!login_failed(&p, forms)).then_some(p)
+                // (an HTTP error answered the login, or its form is back: it failed)
+                (!tab.http_error() && !login_failed(&p, forms)).then_some(p)
             }
         }
     }

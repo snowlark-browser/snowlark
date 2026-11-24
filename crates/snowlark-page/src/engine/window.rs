@@ -1863,6 +1863,9 @@ impl Engine {
             .is_some_and(|doc| self.has_transient_activation(doc));
         let replace = replace || (loading && !activated);
         if !self.navigate_to_fragment(window, &url, replace) {
+            if let Some(doc) = self.document_of_window(window) {
+                self.password_probable_navigation(doc);
+            }
             let history = if replace {
                 super::frames::HistoryHandling::Replace
             } else {

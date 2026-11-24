@@ -9,6 +9,7 @@
   const apply = (target) => {
     let url = 'snowlark://passwords/apply?op=' + target.dataset.op;
     if (target.dataset.id !== undefined) url += '&id=' + encodeURIComponent(target.dataset.id);
+    if (target.dataset.on !== undefined) url += '&on=' + encodeURIComponent(target.dataset.on);
     if (target.dataset.origin !== undefined) {
       url += '&origin=' + encodeURIComponent(target.dataset.origin);
     }

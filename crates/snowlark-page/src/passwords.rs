@@ -75,11 +75,20 @@ impl FormData {
 /// What the page tells the browser about its top-level document's login forms.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PasswordEvent {
-    /// A form passed its `submit` event and is navigating: its fields with their values.
+    /// A form passed its `submit` event and is navigating, or the login form the user typed in
+    /// before script began a navigation: its fields with their values. The next document judges
+    /// it.
     Submitted(FormData),
+    /// The login form the user typed in left the rendering after one of the page's requests
+    /// succeeded or its URL changed in place: a sign-in by script, without a navigation. Its
+    /// fields with the values the user had typed.
+    SubmittedInPlace(FormData),
     /// The document finished loading: its forms that have a password field, without values (an
     /// empty list is news too: the page after a login has none).
     Rendered(Vec<FormData>),
+    /// Forms with a password field that script added after the document's `load`, without values:
+    /// for filling only (the document was judged by its `load` report).
+    Added(Vec<FormData>),
 }
 
 /// A saved login the browser fills into a document of `origin`.

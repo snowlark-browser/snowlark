@@ -72,6 +72,11 @@ features = [
     "Win32_UI_Shell_Common",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Security",
+    # The Windows sign-in prompt where Windows Hello is not set up, checked as the current user's
+    # logon (`window::verify_sign_in`), and whether the account has a password at all.
+    "Win32_Security_Authentication_Identity",
+    "Win32_Security_Credentials",
+    "Win32_NetworkManagement_NetManagement",
     # The password store's key (`os_crypt`).
     "Win32_Security_Cryptography",
     "Win32_Storage_FileSystem",

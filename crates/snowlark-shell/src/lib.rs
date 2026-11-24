@@ -57,6 +57,7 @@ pub mod popup;
 pub mod profile;
 #[cfg(test)]
 mod protocol_tests;
+pub mod reauth;
 pub mod restore;
 pub mod restore_bubble;
 pub mod scroll;

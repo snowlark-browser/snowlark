@@ -21,6 +21,33 @@ pub(crate) struct PasswordForms {
     pub events: Vec<PasswordEvent>,
     /// Fields holding a suggested value until the next user activation.
     pub gated: Vec<NodeId>,
+    /// The login form the user last typed in, for a sign-in by script.
+    typed: Option<Typed>,
+    /// The top-level document whose `load` reported its login forms, and the forms reported
+    /// since (each by its first password field).
+    loaded: Option<NodeId>,
+    reported: Vec<u64>,
+    /// An `input` was inserted into it since: look for new login forms after layout.
+    inserted: bool,
+}
+
+/// What names a reported form: its first password field.
+fn form_key(form: &FormData) -> u64 {
+    form.fields
+        .iter()
+        .find(|f| f.kind == "password")
+        .map_or(0, |f| f.id)
+}
+
+/// The login form (or the fields outside any form) of the top-level document the user last
+/// typed in, with its values as they were then: what a page that signs in by script (a request,
+/// then a new page or the form taken away) submitted.
+struct Typed {
+    doc: NodeId,
+    data: FormData,
+    /// A request of the page succeeded, or the document changed its URL in place, since the
+    /// user typed: from now on the form leaving the rendering means it was submitted.
+    armed: bool,
 }
 
 /// The input types whose fields the password manager looks at.
@@ -129,10 +156,104 @@ impl Engine {
             .into_iter()
             .find(FormData::has_password_field)
         {
-            self.password_forms
-                .borrow_mut()
-                .events
-                .push(PasswordEvent::Submitted(data));
+            let mut state = self.password_forms.borrow_mut();
+            state.typed = None;
+            state.events.push(PasswordEvent::Submitted(data));
+        }
+    }
+
+    /// The user changed the text of `el` (or a fill became the field's value): when its form
+    /// in the top-level document has a password field, that form is the one a sign-in by script
+    /// would submit, with its values now. Typing in another form forgets it.
+    pub(crate) fn password_field_edited(&self, el: NodeId) {
+        if !self.password_forms_on() {
+            return;
+        }
+        let doc = self.dom().node_document(el);
+        if self.document() != Some(doc)
+            || !self.dom().is_html_element_named(el, &local_name!("input"))
+            || !text_like(&self.input_type(el).unwrap_or_default())
+        {
+            return;
+        }
+        let form = self.form_owner_of(el).map_or(0, NodeId::to_bits);
+        let data = self
+            .password_form_data(doc, None, true)
+            .into_iter()
+            .find(|f| f.form == form)
+            .filter(FormData::has_password_field);
+        self.password_forms.borrow_mut().typed = data.map(|data| Typed {
+            doc,
+            data,
+            armed: false,
+        });
+    }
+
+    /// Script of `doc` began a navigation of the top-level document to another document (not a
+    /// link the user followed, not a form submission, which reports itself): the login form the
+    /// user typed in, if any, was probably submitted. The next page judges it.
+    pub(crate) fn password_probable_navigation(&self, doc: NodeId) {
+        if !self.password_forms_on() || self.document() != Some(doc) {
+            return;
+        }
+        let mut state = self.password_forms.borrow_mut();
+        if let Some(t) = state.typed.take().filter(|t| t.doc == doc) {
+            state.events.push(PasswordEvent::Submitted(t.data));
+        }
+    }
+
+    /// One of the page's requests (`fetch`, `XMLHttpRequest`) succeeded, or the top-level
+    /// document `doc` changed its URL in place (`pushState`, a fragment): if the login form the
+    /// user typed in leaves the rendering from now on, it was submitted. Checked after layout
+    /// ([`Engine::password_forms_after_layout`]).
+    pub(crate) fn password_submission_may_follow(&self, doc: Option<NodeId>) {
+        if !self.password_forms_on() {
+            return;
+        }
+        let top = self.document();
+        if doc.is_some() && doc != top {
+            return;
+        }
+        if let Some(t) = self.password_forms.borrow_mut().typed.as_mut() {
+            if Some(t.doc) == top {
+                t.armed = true;
+            }
+        }
+    }
+
+    /// After layout: an armed login form that no longer has a field in the rendering (removed,
+    /// hidden, disabled) was submitted by script without a navigation. A form of a document that
+    /// is no longer the top-level one is forgotten.
+    pub(crate) fn password_forms_after_layout(&self) {
+        if !self.password_forms_on() {
+            return;
+        }
+        self.password_forms_added();
+        let (doc, ids) = {
+            let state = self.password_forms.borrow();
+            let Some(t) = state.typed.as_ref().filter(|t| t.armed) else {
+                return;
+            };
+            let ids: Vec<u64> = t.data.fields.iter().map(|f| f.id).collect();
+            (t.doc, ids)
+        };
+        if self.document() != Some(doc) {
+            self.password_forms.borrow_mut().typed = None;
+            return;
+        }
+        let shown = ids.into_iter().filter_map(NodeId::from_bits).any(|el| {
+            let present = {
+                let dom = self.dom();
+                dom.is_alive(el) && dom.is_connected(el) && dom.node_document(el) == doc
+            };
+            present && !super::html::is_disabled(&self.dom(), el) && self.being_rendered(el)
+        });
+        if shown {
+            return;
+        }
+        let mut state = self.password_forms.borrow_mut();
+        if let Some(t) = state.typed.take() {
+            state.events.push(PasswordEvent::SubmittedInPlace(t.data));
         }
     }
 
@@ -146,10 +267,57 @@ impl Engine {
             .into_iter()
             .filter(FormData::has_password_field)
             .collect();
-        self.password_forms
-            .borrow_mut()
-            .events
-            .push(PasswordEvent::Rendered(forms));
+        let mut state = self.password_forms.borrow_mut();
+        state.loaded = Some(doc);
+        state.reported = forms.iter().map(form_key).collect();
+        state.inserted = false;
+        state.events.push(PasswordEvent::Rendered(forms));
+    }
+
+    /// An `input` was connected to a document: after the top-level document reported its forms
+    /// at `load`, login forms script adds are looked for after layout.
+    pub(crate) fn password_input_inserted(&self, el: NodeId) {
+        if !self.password_forms_on() {
+            return;
+        }
+        let doc = self.dom().node_document(el);
+        let mut state = self.password_forms.borrow_mut();
+        if state.loaded == Some(doc) {
+            state.inserted = true;
+        }
+    }
+
+    /// After layout, once inputs were inserted after `load`: the top-level document's login forms
+    /// not reported before, without values ([`PasswordEvent::Added`]).
+    fn password_forms_added(&self) {
+        let doc = {
+            let mut state = self.password_forms.borrow_mut();
+            if !std::mem::take(&mut state.inserted) {
+                return;
+            }
+            match state.loaded {
+                Some(doc) => doc,
+                None => return,
+            }
+        };
+        if self.document() != Some(doc) {
+            return;
+        }
+        let forms: Vec<FormData> = {
+            let state = self.password_forms.borrow();
+            let reported = state.reported.clone();
+            drop(state);
+            self.password_form_data(doc, None, false)
+                .into_iter()
+                .filter(|f| f.has_password_field() && !reported.contains(&form_key(f)))
+                .collect()
+        };
+        if forms.is_empty() {
+            return;
+        }
+        let mut state = self.password_forms.borrow_mut();
+        state.reported.extend(forms.iter().map(form_key));
+        state.events.push(PasswordEvent::Added(forms));
     }
 
     /// Fills a saved login the browser sent: only into the top-level document when its origin is

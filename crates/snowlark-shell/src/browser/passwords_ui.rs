@@ -35,7 +35,7 @@ impl Browser {
         if let Some(p) = self.pending_logins.hear(tab, &e) {
             self.login_succeeded(p);
         }
-        if let PasswordEvent::Rendered(forms) = e {
+        if let PasswordEvent::Rendered(forms) | PasswordEvent::Added(forms) = e {
             let fill = {
                 let mut s = store.lock().unwrap();
                 choose_fill(&mut s, &origin, &forms)
@@ -68,6 +68,8 @@ impl Browser {
                 }
                 return;
             }
+            // ("Offer to save passwords" off: no prompt; saved logins still fill)
+            Offer::Update(_) | Offer::Save if !self.settings.offer_passwords => return,
             Offer::Update(id) => Some(id),
             Offer::Save => None,
         };

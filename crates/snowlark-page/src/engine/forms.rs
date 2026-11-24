@@ -1016,6 +1016,7 @@ impl Engine {
                 c.editor = None;
             });
         }
+        self.password_field_edited(el);
     }
 
     /// HTML §4.10.21.1 suffering from bad input: a number field holds text that does not convert to
@@ -2421,6 +2422,17 @@ impl Engine {
             }
         }
         if !marks.is_empty() {
+            // (the password manager: a login form script adds after `load`)
+            let input = {
+                let dom = self.dom();
+                marks
+                    .iter()
+                    .copied()
+                    .find(|&d| dom.is_html_element_named(d, &local_name!("input")))
+            };
+            if let Some(el) = input {
+                self.password_input_inserted(el);
+            }
             self.mark_form_states(&marks);
         }
     }

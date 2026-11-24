@@ -13,7 +13,7 @@ disk, what pages can observe, and the stages it is built in.
 | Store and encryption | `snowlark-shell::passwords` (data), the OS key calls in `snowlark-paint::os_crypt` | the browser process owns the profile; `unsafe` OS calls stay in a crate allowed to hold them |
 | Filling | the browser decides, the page applies (`TabCommand`) | the browser picks the credential; the page only puts it in the named fields |
 | `snowlark://passwords` | `snowlark-shell` (an internal page, like downloads and history) | browser UI |
-| Reauthentication before reveal | `snowlark-paint::window::verify_user` (OS prompt), asked by the shell | an OS call on the browser's window |
+| Reauthentication before reveal | the order of checks in `snowlark-shell::reauth`; the OS prompts in `snowlark-paint::window` (`verify_user`, `verify_sign_in`) | OS calls on the browser's window |
 
 ### Extraction in the page
 
@@ -25,14 +25,16 @@ it owns, or, for fields outside any form, one form per document. The description
 and the frame's URL as the page sees them; the browser does not trust either for any decision about which
 site a credential belongs to.
 
-The page sends two things, and only in a browsing context that is the tab's top-level document (frames are
+The page sends these, and only in a browsing context that is the tab's top-level document (frames are
 for a later stage):
 
 - **Submitted**: when HTML's form submission algorithm passes the `submit` event and reaches navigation (a
   submission whose event was cancelled sends nothing, as nothing was submitted), the form with values.
 - **Rendered**: after the `load` event of a document, the forms that contain a password field, without
-  values (an empty list too: the page after a login usually has none). Forms that script adds after
-  `load` are reported from stage S2 on.
+  values (an empty list too: the page after a login usually has none).
+- **Added**: after that, when inputs were inserted into the document, the login forms not reported
+  before, without values, found after layout in the next rendering update (each form once, named by its
+  first password field). The browser fills them as it fills a Rendered form; they judge no submission.
 
 ### Parsing (browser side)
 
@@ -69,9 +71,12 @@ confirmation, or nothing when no password field was found.
    credential keeps the count of the document that submitted it; the page reports a submission before the
    navigation it begins. When a later document reports Rendered, the browser compares: if the pending form is
    on the new page again (the same field names in a form with a password field), the login failed and the
-   pending credential is dropped (from S2: likewise when the navigation's response was an HTTP error).
+   pending credential is dropped; likewise when the new document came from an HTTP error response (status
+   400 or more), whatever it shows.
    Otherwise the login is taken to have succeeded.
-3. On success the browser looks the origin up in the store:
+3. On success the browser looks the origin up in the store (with "Offer to save passwords" off, a
+   toggle at the top of `snowlark://passwords`, setting `offerPasswords`, on by default, nothing is
+   offered; saved logins still fill and a used one still has its last-used time updated):
    - the origin is on the *never* list: nothing;
    - the same username with the same password is saved: its last-used time is updated, no prompt;
    - the same username with another password: an **update** prompt;
@@ -81,12 +86,25 @@ confirmation, or nothing when no password field was found.
    submission over HTTP from a page whose origin had HTTPS on the same host is not offered (the downgrade
    could be a network attacker's).
 
-Submissions by script that do not navigate (a fetch followed by the form being removed or hidden) are
-recognised from the form disappearing after a submission without navigation; that is a later stage.
+**Sign-ins by script.** The page remembers the login form of the top-level document the user last
+typed in (the form, or the fields outside any form, that has a password field), with its values as of
+the last keystroke; typing in another form forgets it, and so does a new document. It is reported:
+
+- as **Submitted** when script of that document begins a navigation of the top-level document to
+  another document (`location`), judged by the next document as above. A link the user follows and a
+  reload are not submissions; a form's own submission reports itself.
+- as **SubmittedInPlace** when, after one of the page's requests (`fetch`, asynchronous
+  `XMLHttpRequest`) succeeded with a 2xx status or the document changed its URL in place (`pushState`,
+  `replaceState`, a fragment), none of the form's fields is in the rendering any more (removed, hidden,
+  disabled), checked after layout in each rendering update. The browser takes it as a successful login
+  at once: nothing waits for a next document, and a submission of the tab still waiting is dropped.
+
+A request that failed, or a form that stays, is no sign-in. Values script set without the user typing
+are never reported.
 
 ### Filling
 
-1. The page sends Rendered. The browser parses each form in filling mode and looks up saved logins whose
+1. The page sends Rendered (or Added). The browser parses each form in filling mode and looks up saved logins whose
    origin is the tab's committed top-level origin (exactly the same scheme, host and port in this stage).
 2. It fills on load only when all of these hold: the parsed form has a current-password field (a sign-up
    form with only new-password fields is not filled), the password field is empty, the origin is secure
@@ -108,6 +126,7 @@ recognised from the form disappearing after a submission without navigation; tha
 | Message | Direction | Contents |
 |---|---|---|
 | `TabEvent::PasswordFormSubmitted` | renderer → browser | one form's field facts with values |
+| `PasswordEvent::SubmittedInPlace` (in `TabEvent::Passwords`) | renderer → browser | the same, for a sign-in by script without a navigation |
 | `TabEvent::PasswordFormsRendered` | renderer → browser | forms' field facts, no values |
 | `TabCommand::FillPassword` | browser → renderer | origin, two field ids, username, password |
 
@@ -138,7 +157,7 @@ the file no longer decrypts. Usernames are not encrypted (they are shown in the 
 reauthentication). A store that does not decrypt (another user's or machine's copy) keeps its entries but
 offers none of them for filling; the passwords page says they cannot be read.
 
-The OS calls (`CryptProtectData` and `CryptUnprotectData` in `os_crypt`, the reauthentication prompt in
+The OS calls (`CryptProtectData` and `CryptUnprotectData` in `os_crypt`, the reauthentication prompts in
 `window`) are in `snowlark-paint`, the crate that already holds the browser window's other OS calls (folder picker,
 downloads folder) and is one of those allowed `unsafe`.
 
@@ -147,11 +166,24 @@ privileged service) needs an installer and a service; it is noted for when there
 
 ## Reauthentication
 
-Revealing a password on `snowlark://passwords` asks the OS to confirm the user first: Windows Hello
-(`UserConsentVerifier`, face, fingerprint or PIN), in a prompt owned by the browser window. A success is
-remembered for 60 seconds, so revealing several passwords asks once. Deleting needs no reauthentication.
-The browser never sees what the user entered. Where Windows Hello is not set up, passwords cannot be
-revealed in S1; S2 adds the Windows sign-in prompt for the current user as the fallback.
+Revealing a password on `snowlark://passwords` asks the OS to confirm the user first
+(`snowlark-shell::reauth::confirm_user`, with the OS calls behind its `SystemAuth` trait):
+
+1. Windows Hello (`UserConsentVerifier`, face, fingerprint or PIN), in a prompt owned by the browser
+   window. Its answer stands when Hello is set up; the browser never sees what the user entered.
+2. Where Hello is not set up: an account with no Windows password, on a machine not joined to a domain,
+   has nothing to confirm with and passes. Whether the password is blank is found by a local logon with an
+   empty password; a failed try counts against the account, so the answer is kept in the settings
+   (`osPassword`) with the password's last change, and asked again only after the password changes. A
+   domain account, or one whose password age the OS does not report, always has a password.
+3. Otherwise the Windows sign-in prompt (`CredUIPromptForWindowsCredentials` for the current user, up to
+   three tries). What the user entered is checked with an interactive LSA logon whose token must be the
+   current user's (the prompt lets the user switch account, which does not count), then wiped and freed:
+   the browser holds the sign-in only for that check. A canceled prompt refuses; a prompt that cannot
+   run leaves the page saying the password cannot be revealed.
+
+A success is remembered for 60 seconds, so revealing several passwords asks once. Deleting needs no
+reauthentication. CSV export (a later S2 step) asks the same way.
 
 ## What pages can observe
 
@@ -168,13 +200,14 @@ revealed in S1; S2 adds the Windows sign-in prompt for the current user as the f
 - **S1** Detect login and sign-up forms; offer save, update and never after a successful submission; the
   encrypted store; fill same-origin saved logins on load; `snowlark://passwords` (list, search, delete,
   reveal behind OS reauthentication); "Passwords" in Delete browsing data.
-- **S2** Forms that script adds after `load`; an HTTP error after a submission counts as a failed login;
-  the Windows sign-in prompt where Windows Hello is not set up; an "Offer to save passwords" setting;
+- **S2** Done: forms that script adds after `load`; an HTTP error after a submission counts as a failed
+  login; the Windows sign-in prompt where Windows Hello is not set up; an "Offer to save passwords"
+  setting; submissions by script (a script navigation, or the form leaving after a request). Still to do:
   import and export CSV (the common `name,url,username,password,note` columns; export behind
   reauthentication); a choice under the field when several logins match, and for related domains (the same
   registrable domain, filled only on the user's click); `navigator.credentials.get/store` for password
-  credentials backed by the store (with the user's mediation); submissions by script without navigation;
-  frames (same-origin with the top-level document first).
+  credentials backed by the store (with the user's mediation); frames (same-origin with the top-level
+  document first).
 - **S3** Password generation for `new-password` fields (a strong random password offered in the choice
   under the field, saved when the form submits).
 - **S4** Checking saved passwords against breach lists, and passkeys (a platform authenticator for

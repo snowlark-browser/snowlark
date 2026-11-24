@@ -39,8 +39,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `vertical-align` offers are open. (ref 36)
 - **Buttons.** `ruby-*` and `run-in` displays are not parsed. An absolutely positioned button is not sized as a replaced
   element, and `align-self: normal` still stretches a button that is a flex or grid item. (ref 216)
-- **Smaller layout differences.** A flex container holding a `display: none` image counts that image's size, and a
-  visually hidden absolutely positioned span in an inline-flex label reports an empty rect. (ref 31)
+- **Smaller layout differences.** Wikipedia's logo link is laid out 12px taller than in other browsers. (ref 31)
 - **Geometry under transforms.** For Intersection Observer, a frame's container is placed by its untransformed content
   box. (ref 99)
 - **Geometry reads near split inlines.** An inline box split around a block still walks the tree on geometry reads,
@@ -80,8 +79,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   descriptors, `size-adjust`, metric override descriptors, `font-display` periods, `FontFaceSet` loading events, and
   lazy loading of faces nothing uses. Request modifiers on a `src` URL are not parsed. (ref 68)
 - **Animations.** Replacing the effect of a CSS animation (`animation.effect = ...`) does nothing: the element keeps
-  the CSS animation's values. Script animations on pseudo-elements do not reach the cascade.
-  An animation of zero duration never starts: it fills nothing and fires no events. (ref 115, 33, 651)
+  the CSS animation's values. Script animations on pseudo-elements do not reach the cascade. (ref 115, 33)
 - **Highlight pseudo-elements.** A `text-decoration` declared on `::selection` is not painted, and a selected
   image or other replaced element that is positioned gets no highlight.
   `::highlight()` and `::search-text` are not parsed. (ref 502)
@@ -150,10 +148,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   arrive. WebGL objects are freed only with the page. The release package does not carry WebGL's libraries yet.
   (ref 117, 682, 700, 701)
 - **Service workers.** `navigator.serviceWorker` and the Cache API are not implemented. Pages that check for service
-  workers print a warning. (ref 127)
+  workers print a warning. (ref 33)
 - **IndexedDB.** Names with lone surrogates are not supported, there is no storage partitioning by top-level site,
   no quota and no `close` event, a database's contents are read into memory on first use, and transactions,
-  connections and cursors are not garbage collected. (ref 49, 89)
+  connections and cursors are not garbage collected. (ref 49)
 - **Web Audio output device change.** An `AudioContext` stops with an `error` event when the default output device
   changes or is removed, instead of moving to the new device. (ref 125)
 
@@ -217,9 +215,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   until the element is in a document. (ref 709)
 - **Long lines in some text areas.** Text typed into some text areas (GitHub's comment box) runs off the
   right edge instead of wrapping. (ref 723)
-- **Saving passwords after a sign-in by script.** Snowlark does not yet offer to save the password when a
-  page signs in by script without submitting its form (a request followed by a new page, or the form
-  removed). (ref 728)
 
 ## Editing and input
 
@@ -239,15 +234,13 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## Tooling
 
-- **Windows-subsystem build exits with failure when profiling.** `snowlark.exe` exits with a failure status when
-  `SNOWLARK_PROFILE=1` is set and stderr is a pipe, after writing its output. `snowlark-cli.exe` works. (ref 54)
 - **Debug-build test timeouts.** The IndexedDB test `finished_requests_are_collected` times out in a debug build, and the
   deep-tree test `a_deep_tree_overflows_one_renderer_only` returns early in debug builds because the debug renderer is
   too slow to crash. The Media Source test `an_append_ends_once_however_the_media_side_reports_it` fails in a debug
   build (its `update` and `updateend` events arrive after the check) and passes in optimised builds. (ref 56, 91, 560)
 - **Other test-suite problems.** Debug-profile tests overflow their stack in `snowlark-ipc` and `snowlark-js` (ref 562);
-  `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572), and once
-  stopped with an access violation that did not happen again (ref 707); the WPT files
+  `snowlark-page`'s integration tests can exit with code 2170 after all of them pass (ref 572), and now and then
+  stop with an access violation (ref 707), and their WebGL tests can hang when the machine is loaded (ref 730); the WPT files
   `navigation-timing/test-document-open.html` and `fetch/api/abort/general.any.html` vary from run to run
   (ref 60, 563); a headless
   Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py` can read one arm slower than the other for the same binary when the arms share a core (ref 509).

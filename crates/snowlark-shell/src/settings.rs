@@ -187,6 +187,13 @@ pub struct Settings {
     pub download_dir: Option<PathBuf>,
     /// Ask where to save each file before downloading (off: saved in the download folder).
     pub download_ask: bool,
+    /// Whether the Windows account's password was blank when last checked, and when it had
+    /// changed then ([`crate::reauth`]): the check is redone only after the password changes.
+    pub os_password: Option<crate::reauth::BlankCheck>,
+    /// "Offer to save passwords": after a successful login, offer to save or update it (saved
+    /// logins fill either way).
+    #[serde(default = "yes")]
+    pub offer_passwords: bool,
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,
 }
@@ -217,6 +224,8 @@ impl Default for Settings {
             update_check: None,
             download_dir: None,
             download_ask: false,
+            os_password: None,
+            offer_passwords: true,
             other: Default::default(),
         }
     }

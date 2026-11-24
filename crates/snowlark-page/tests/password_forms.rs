@@ -417,6 +417,238 @@ mod page {
         assert!(page.run_until_settled(Duration::from_secs(5)));
         assert_eq!(eval(&mut page, "p.value"), "page");
     }
+
+    #[test]
+    fn a_login_form_script_adds_after_load_is_reported_once() {
+        let mut page = page_with("<!doctype html><body><p>app</p>", true);
+        assert!(rendered(&page).is_empty());
+        eval(
+            &mut page,
+            "document.body.insertAdjacentHTML('beforeend', \
+             '<form id=f><input id=u name=user><input id=p name=pass type=password></form>'); \
+             u.value = 'x'",
+        );
+        assert!(page.run_until_settled(Duration::from_secs(5)));
+        let added = page.engine().take_password_events();
+        let forms = match added.as_slice() {
+            [PasswordEvent::Added(forms)] => forms.clone(),
+            other => panic!("one report of added forms, not {other:?}"),
+        };
+        assert_eq!(forms.len(), 1);
+        assert!(forms[0].fields.iter().all(|f| f.value.is_empty()));
+        // More inputs, in the same form or none with a password: nothing new to report.
+        eval(
+            &mut page,
+            "f.append(document.createElement('input')); \
+             document.body.append(document.createElement('input'))",
+        );
+        assert!(page.run_until_settled(Duration::from_secs(5)));
+        assert!(page.engine().take_password_events().is_empty());
+        // The form is filled like one that was there at `load`.
+        assert!(page
+            .engine()
+            .fill_password(&fill_for(&forms[0], "https://login.example")));
+    }
+
+    /// Sign-ins by script: a server with the login page at `/`, `/ok` answering 200 and `/bad`
+    /// 401, and the page loaded from it with the user's typing in its two fields.
+    mod by_script {
+        use std::io::{BufRead, BufReader, Write};
+        use std::net::TcpListener;
+
+        use snowlark_page::keyboard::KeyInput;
+        use snowlark_page::passwords::FormData;
+
+        use super::*;
+
+        fn serve() -> String {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let addr = listener.local_addr().unwrap();
+            std::thread::spawn(move || {
+                for stream in listener.incoming() {
+                    let Ok(mut stream) = stream else { continue };
+                    let mut reader = BufReader::new(stream.try_clone().unwrap());
+                    let mut first = String::new();
+                    let _ = reader.read_line(&mut first);
+                    loop {
+                        let mut h = String::new();
+                        if reader.read_line(&mut h).is_err() || h == "\r\n" || h.is_empty() {
+                            break;
+                        }
+                    }
+                    let target = first.split(' ').nth(1).unwrap_or("/");
+                    let (status, body) = match target {
+                        "/" => ("200 OK", LOGIN),
+                        "/bad" => ("401 Unauthorized", "no"),
+                        _ => ("200 OK", "<!doctype html><title>ok</title>ok"),
+                    };
+                    let _ = stream.write_all(
+                        format!(
+                            "HTTP/1.1 {status}\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\
+                             Connection: close\r\n\r\n{body}",
+                            body.len()
+                        )
+                        .as_bytes(),
+                    );
+                }
+            });
+            format!("http://{addr}")
+        }
+
+        fn typed_login() -> Page {
+            static NET: std::sync::OnceLock<NetThread> = std::sync::OnceLock::new();
+            let net = NET.get_or_init(|| NetThread::start(NetConfig::default()).unwrap());
+            let mut page = Page::new(PageOptions {
+                net: Some(net.client()),
+                viewport: (800, 600),
+                render: Some(RenderSetup::new().unwrap()),
+                password_forms: true,
+                ..Default::default()
+            });
+            page.navigate(url::Url::parse(&format!("{}/", serve())).unwrap());
+            page.run_until(std::time::Instant::now() + Duration::from_secs(10), |p| {
+                p.load_complete()
+            });
+            assert!(page.run_until_settled(Duration::from_secs(5)));
+            let _ = rendered(&page);
+            for (y, text) in [(15.0, "alice"), (45.0, "pw1")] {
+                let at = Point::new(20.0, y);
+                let none = Modifiers::default();
+                page.pointer_moved(at, none);
+                page.pointer_pressed(at, 0, none, 1);
+                page.pointer_released(at, 0, none, 1);
+                for c in text.chars() {
+                    let k = KeyInput {
+                        vk: c.to_ascii_uppercase() as u16,
+                        scan: 0,
+                        text: Some(c),
+                        mods: none,
+                        repeat: false,
+                        paste: None,
+                        paste_html: None,
+                    };
+                    page.key_down(&k);
+                    page.key_char(c, &k);
+                    page.key_up(&k);
+                }
+            }
+            assert!(page.run_until_settled(Duration::from_secs(5)));
+            assert_eq!(eval(&mut page, "u.value + '|' + p.value"), "alice|pw1");
+            assert!(page.engine().take_password_events().is_empty());
+            page
+        }
+
+        /// Runs `js`, which sets the title to "done" when it is through, and what follows it (a
+        /// rendering update): the page's reports.
+        fn run(page: &mut Page, js: &str) -> Vec<PasswordEvent> {
+            eval(page, js);
+            page.run_until(std::time::Instant::now() + Duration::from_secs(5), |p| {
+                p.eval("document.title", "t.js").is_ok_and(|t| t == "done")
+            });
+            assert!(page.run_until_settled(Duration::from_secs(5)));
+            page.engine().take_password_events()
+        }
+
+        fn values(f: &FormData) -> Vec<&str> {
+            f.fields.iter().map(|f| f.value.as_str()).collect()
+        }
+
+        #[test]
+        fn a_sign_in_by_fetch_that_takes_the_form_away_is_reported() {
+            let mut page = typed_login();
+            let events = run(
+                &mut page,
+                "fetch('/ok').then(r => r.text()).then(() => { f.remove(); document.title = 'done' })",
+            );
+            assert_eq!(eval(&mut page, "document.title"), "done");
+            match events.as_slice() {
+                [PasswordEvent::SubmittedInPlace(f)] => assert_eq!(values(f), ["alice", "pw1"]),
+                other => panic!("one sign-in in place, not {other:?}"),
+            }
+        }
+
+        #[test]
+        fn a_form_hidden_after_an_xhr_is_reported() {
+            let mut page = typed_login();
+            let events = run(
+                &mut page,
+                "const x = new XMLHttpRequest(); x.open('POST', '/ok');\
+                 x.onload = () => setTimeout(() => { f.style.display = 'none'; document.title = 'done' }, 50);\
+                 x.send('a=b')",
+            );
+            assert_eq!(eval(&mut page, "document.title"), "done");
+            assert!(
+                matches!(events.as_slice(), [PasswordEvent::SubmittedInPlace(_)]),
+                "{events:?}"
+            );
+        }
+
+        #[test]
+        fn a_failed_request_is_no_sign_in() {
+            let mut page = typed_login();
+            let events = run(
+                &mut page,
+                "fetch('/bad').then(() => { f.remove(); document.title = 'done' })",
+            );
+            assert_eq!(eval(&mut page, "document.title"), "done");
+            assert!(events.is_empty(), "{events:?}");
+        }
+
+        #[test]
+        fn a_form_that_stays_is_no_sign_in() {
+            let mut page = typed_login();
+            let events = run(
+                &mut page,
+                "fetch('/ok').then(() => { document.title = 'done' })",
+            );
+            assert_eq!(eval(&mut page, "document.title"), "done");
+            assert!(events.is_empty(), "{events:?}");
+        }
+
+        #[test]
+        fn a_script_navigation_after_typing_is_a_probable_submission() {
+            let mut page = typed_login();
+            eval(&mut page, "location.href = '/next'");
+            let events = page.engine().take_password_events();
+            match events.as_slice() {
+                [PasswordEvent::Submitted(f)] => assert_eq!(values(f), ["alice", "pw1"]),
+                other => panic!("one submission, not {other:?}"),
+            }
+        }
+
+        #[test]
+        fn typing_in_another_form_forgets_the_login_form() {
+            let mut page = typed_login();
+            eval(
+                &mut page,
+                "document.body.insertAdjacentHTML('afterbegin', \
+                 '<form><input id=q style=\"display:block;height:30px;width:200px\"></form>')",
+            );
+            assert!(page.run_until_settled(Duration::from_secs(5)));
+            let at = Point::new(20.0, 15.0);
+            let none = Modifiers::default();
+            page.pointer_pressed(at, 0, none, 1);
+            page.pointer_released(at, 0, none, 1);
+            let k = KeyInput {
+                vk: u16::from(b'S'),
+                scan: 0,
+                text: Some('s'),
+                mods: none,
+                repeat: false,
+                paste: None,
+                paste_html: None,
+            };
+            page.key_down(&k);
+            page.key_char('s', &k);
+            page.key_up(&k);
+            assert_eq!(eval(&mut page, "q.value"), "s");
+            let events = run(
+                &mut page,
+                "fetch('/ok').then(() => { f.remove(); document.title = 'done' })",
+            );
+            assert!(events.is_empty(), "{events:?}");
+        }
+    }
 }
 
 #[test]
