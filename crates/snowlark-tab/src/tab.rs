@@ -1819,6 +1819,11 @@ impl TabRenderer {
             // tells it as the page's)
             return;
         }
+        // (a form's submission is reported before the navigation it begins: the browser takes
+        // the login as the document that submitted it, before any response can commit)
+        for e in self.driver.take_password_events() {
+            self.event(TabEvent::Passwords(e));
+        }
         for begin in self.driver.take_begun_navigations() {
             self.event(TabEvent::BeginNavigation(Box::new(begin)));
         }
@@ -1833,9 +1838,6 @@ impl TabRenderer {
         }
         for on in self.driver.take_fullscreen_asks() {
             self.event(TabEvent::Fullscreen(on));
-        }
-        for e in self.driver.take_password_events() {
-            self.event(TabEvent::Passwords(e));
         }
         for e in self.driver.take_devtools() {
             self.event(TabEvent::Devtools(Box::new(e)));

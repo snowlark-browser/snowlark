@@ -14,7 +14,10 @@ use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM, NONCE_LEN};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
-use snowlark_page::passwords::{parse, FormData, Mode, PasswordFill};
+use snowlark_page::passwords::{parse, FormData, Mode, PasswordEvent, PasswordFill};
+use snowlark_tab::tab::TabId;
+
+use crate::tab_host::TabHost;
 
 use crate::downloads::now_ms;
 
@@ -425,8 +428,6 @@ pub struct PendingLogin {
     pub password_element: String,
     /// The form's shape, to recognise it on the next page (a failed login).
     pub signature: Vec<(bool, String)>,
-    /// A document committed since the submission.
-    pub committed: bool,
 }
 
 /// The login a form submitted on `origin` establishes, if it is one.
@@ -443,13 +444,66 @@ pub fn pending_login(origin: &str, form: &FormData) -> Option<PendingLogin> {
         password: form.fields[pw].value.clone(),
         password_element: form.fields[pw].element_name().to_owned(),
         signature: form.signature(),
-        committed: false,
     })
 }
 
 /// Whether the page after a submission shows the submitted form again: the login failed.
 pub fn login_failed(pending: &PendingLogin, rendered: &[FormData]) -> bool {
     rendered.iter().any(|f| f.signature() == pending.signature)
+}
+
+/// The logins submitted in the window's tabs, each waiting for the page after it: with the tab
+/// and the count of its documents ([`TabHost::documents`]) when the form was submitted.
+#[derive(Debug, Default)]
+pub struct PendingLogins(Vec<(TabId, u64, PendingLogin)>);
+
+impl PendingLogins {
+    /// What tab `tab`'s page reported: a successful login, when this is the page that judges one.
+    ///
+    /// A submission waits for the first load report of a document after the one that submitted
+    /// it, however that document came (a navigation the browser fetched and committed, in this
+    /// renderer or another, or one the page made by itself). The submitting document's own report
+    /// (its `load` came late) is not one.
+    pub fn hear(&mut self, tab: &TabHost, e: &PasswordEvent) -> Option<PendingLogin> {
+        match e {
+            PasswordEvent::Submitted(form) => {
+                let origin = page_origin(tab.current_url()?, tab.site())?;
+                if let Some(p) = pending_login(&origin, form) {
+                    self.0.retain(|(t, ..)| *t != tab.id);
+                    self.0.push((tab.id, tab.documents(), p));
+                }
+                None
+            }
+            PasswordEvent::Rendered(forms) => {
+                let k = self
+                    .0
+                    .iter()
+                    .position(|(t, at, _)| *t == tab.id && tab.documents() > *at)?;
+                let (.., p) = self.0.remove(k);
+                (!login_failed(&p, forms)).then_some(p)
+            }
+        }
+    }
+
+    /// The tab's renderer was replaced, the tab numbered `to` now: its submission goes on
+    /// waiting (a cross-site redirect after a login, say).
+    pub fn moved(&mut self, from: TabId, to: TabId) {
+        for (t, ..) in &mut self.0 {
+            if *t == from {
+                *t = to;
+            }
+        }
+    }
+
+    /// Tab `tab` closed.
+    pub fn closed(&mut self, tab: TabId) {
+        self.0.retain(|(t, ..)| *t != tab);
+    }
+
+    /// Whether no login waits.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 /// What fills on load into the forms a page of `origin` rendered: the one saved login for the

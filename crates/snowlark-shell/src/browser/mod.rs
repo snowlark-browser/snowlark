@@ -392,7 +392,7 @@ pub struct Browser {
         crate::passwords::PendingLogin,
     )>,
     /// Submitted logins waiting for the next page of their tab.
-    pending_logins: Vec<(TabId, crate::passwords::PendingLogin)>,
+    pending_logins: crate::passwords::PendingLogins,
     /// The saved passwords (`None` in an Incognito window: it neither saves nor fills).
     passwords: Option<Arc<std::sync::Mutex<crate::passwords::PasswordStore>>>,
     /// The updates' prompt (`update_ui`).
@@ -631,7 +631,7 @@ impl Browser {
             offer: None,
             restore_bubble: None,
             password_bubble: None,
-            pending_logins: Vec::new(),
+            pending_logins: Default::default(),
             passwords,
             update_bubble: None,
             fullscreen: Default::default(),
@@ -894,6 +894,10 @@ impl Browser {
             tab.swap_renderer(id, ctx, device, renderer);
         });
         self.comp.send(CompMsg::RemoveTab(old));
+        // (a login submitted before the swap is judged by the new renderer's document)
+        if let Some(new) = self.tabs.get(i).map(|e| e.tab.id) {
+            self.pending_logins.moved(old, new);
+        }
         // (the icon was the old site's page's; the new document reports its own)
         if let Some(e) = self.tabs.get_mut(i) {
             if let Some(f) = e.favicon.take() {
@@ -1130,6 +1134,7 @@ impl Browser {
         }
         if let Some(e) = self.tabs.remove(i) {
             self.comp.send(CompMsg::RemoveTab(e.tab.id));
+            self.pending_logins.closed(e.tab.id);
             if let Some(f) = e.favicon {
                 self.images.remove(f);
             }
@@ -1426,7 +1431,6 @@ impl Browser {
                         self.exit_tab_fullscreen(window);
                     }
                     self.tabs.get_mut(i).unwrap().tab.committed(url, scroll);
-                    self.password_committed(id);
                     self.chrome_dirty = true;
                 }
                 TabEvent::DocumentUrl { url, navigation } => {

@@ -217,8 +217,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   until the element is in a document. (ref 709)
 - **Long lines in some text areas.** Text typed into some text areas (GitHub's comment box) runs off the
   right edge instead of wrapping. (ref 723)
-- **Saving passwords on some sites.** Snowlark does not yet offer to save the password after signing
-  in on some sites, such as Hacker News. (ref 727)
+- **Saving passwords after a sign-in by script.** Snowlark does not yet offer to save the password when a
+  page signs in by script without submitting its form (a request followed by a new page, or the form
+  removed). (ref 728)
 
 ## Editing and input
 

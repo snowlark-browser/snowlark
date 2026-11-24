@@ -64,7 +64,10 @@ confirmation, or nothing when no password field was found.
    message, and parses the form in saving mode. A form with a password value becomes the tab's *pending
    credential*: origin, username and its field name, the password (the new password when there is one) and
    its field name, and the form's field names to recognise the form later.
-2. The tab navigates. When the next document reports Rendered, the browser compares: if the pending form is
+2. The tab navigates. The browser counts the documents each tab's top level has had (every commit of a new
+   document, whether the browser fetched it or the page made it, in whichever renderer), and the pending
+   credential keeps the count of the document that submitted it; the page reports a submission before the
+   navigation it begins. When a later document reports Rendered, the browser compares: if the pending form is
    on the new page again (the same field names in a form with a password field), the login failed and the
    pending credential is dropped (from S2: likewise when the navigation's response was an HTTP error).
    Otherwise the login is taken to have succeeded.
@@ -73,7 +76,8 @@ confirmation, or nothing when no password field was found.
    - the same username with the same password is saved: its last-used time is updated, no prompt;
    - the same username with another password: an **update** prompt;
    - otherwise: a **save** prompt (Save, Never for this site, the close button dismisses).
-4. A pending credential lives until the tab commits a second document after it, or the tab closes. A
+4. A pending credential lives until a later document's Rendered judges it, the tab submits another, or the
+   tab closes; it follows the tab to a new renderer (a cross-site redirect after the login). A
    submission over HTTP from a page whose origin had HTTPS on the same host is not offered (the downgrade
    could be a network attacker's).
 

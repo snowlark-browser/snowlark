@@ -1820,7 +1820,24 @@ fn serve_html(pages: Vec<(&'static str, &'static str)>) -> String {
 
 /// `serve_html` on `addr` (another loopback address is another site).
 fn serve_html_at(addr: &str, pages: Vec<(&'static str, String)>) -> String {
-    use std::io::{BufRead, Write};
+    let answers = pages
+        .into_iter()
+        .map(|(p, body)| {
+            (
+                p,
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                ),
+            )
+        })
+        .collect();
+    serve_answers_at(addr, answers)
+}
+
+/// Serves each path's whole HTTP answer (status line, headers and body), whatever the method.
+fn serve_answers_at(addr: &str, pages: Vec<(&'static str, String)>) -> String {
+    use std::io::{BufRead, Read, Write};
     let listener = std::net::TcpListener::bind(addr).unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
     std::thread::spawn(move || {
@@ -1831,19 +1848,28 @@ fn serve_html_at(addr: &str, pages: Vec<(&'static str, String)>) -> String {
                 let mut reader = std::io::BufReader::new(conn.try_clone().unwrap());
                 let mut first = String::new();
                 let _ = reader.read_line(&mut first);
+                let mut body_len = 0;
                 loop {
                     let mut line = String::new();
                     if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
                         break;
                     }
+                    if let Some((name, value)) = line.split_once(':') {
+                        if name.eq_ignore_ascii_case("content-length") {
+                            body_len = value.trim().parse().unwrap_or(0);
+                        }
+                    }
                 }
+                // (a request's body is read, so closing the connection does not reset it)
+                let mut body = vec![0; body_len];
+                let _ = reader.read_exact(&mut body);
                 let path = first.split(' ').nth(1).unwrap_or("").to_owned();
                 let answer = match pages.iter().find(|(p, _)| *p == path) {
-                    Some((_, body)) => format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                        body.len()
-                    ),
-                    None => "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+                    Some((_, answer)) => answer.clone(),
+                    None => {
+                        "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                            .into()
+                    }
                 };
                 let _ = conn.write_all(answer.as_bytes());
             });
@@ -2905,12 +2931,11 @@ fn a_login_saved_after_its_submission_fills_the_form_again() {
             _ => None,
         })
         .expect("the submission was reported");
-    let mut pending = pending_login(&o, &submitted).unwrap();
+    let pending = pending_login(&o, &submitted).unwrap();
     assert_eq!(
         (pending.username.as_str(), pending.password.as_str()),
         ("alice", "pw1")
     );
-    pending.committed = true;
     // The welcome page's report: no login form, so the login worked.
     let deadline = Instant::now() + std::time::Duration::from_secs(20);
     let after = loop {
@@ -2965,4 +2990,138 @@ fn a_login_saved_after_its_submission_fills_the_form_again() {
     assert_eq!(tab.state.title, "v:|");
     click(&tab, Point::new(400.0, 300.0));
     hear_until(&mut tab, "v:alice|pw1", &mut reports);
+}
+
+/// A tab's events as the window takes them for the password manager (`browser/passwords_ui.rs`):
+/// the host's own (navigation) and the page's reports; a login the window would offer to save.
+fn window_hears_passwords(
+    tab: &mut TabHost,
+    logins: &mut crate::passwords::PendingLogins,
+    e: TabEvent,
+) -> Option<crate::passwords::PendingLogin> {
+    match e {
+        TabEvent::Passwords(p) => logins.hear(tab, &p),
+        e => {
+            drive(tab, &e);
+            None
+        }
+    }
+}
+
+/// A login shaped like a common one: two forms posting to `login` with the same field names (log
+/// in, create account), no `autocomplete`; the submission is answered with a redirect to a page
+/// with no password field, which the browser fetches and the renderer commits. The login is
+/// judged by that page, and is one to save.
+#[test]
+fn a_login_posted_and_redirected_is_offered_for_saving() {
+    let (origin, saved) = log_in_through_the_window(
+        "HTTP/1.1 302 Found\r\nLocation: news\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            .into(),
+        "news",
+    );
+    let p = saved.expect("a login to save");
+    assert_eq!(p.origin, origin);
+    assert_eq!((p.username.as_str(), p.password.as_str()), ("alice", "pw1"));
+    assert_eq!(
+        (p.username_element.as_str(), p.password_element.as_str()),
+        ("acct", "pw")
+    );
+}
+
+/// The same login answered with its form again (a wrong password): the wait ends, and nothing
+/// is offered.
+#[test]
+fn a_login_whose_form_comes_back_is_not_offered() {
+    let (_, saved) = log_in_through_the_window(
+        html_answer(
+            "<!doctype html><title>bad</title>Bad login.\
+            <form action=login method=post><input type=hidden name=goto value=news>\
+            <input type=text name=acct> <input type=password name=pw> <input type=submit></form>",
+        ),
+        "bad",
+    );
+    assert_eq!(saved, None);
+}
+
+fn html_answer(body: &str) -> String {
+    format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    )
+}
+
+/// Submits a login form, by a click, on a page shaped like a common login page; the POST gets
+/// `answer` and ends at a page titled `title`. The page's origin, and the login the window would
+/// offer to save once the submission was judged.
+fn log_in_through_the_window(
+    answer: String,
+    title: &str,
+) -> (String, Option<crate::passwords::PendingLogin>) {
+    use snowlark_page::passwords::PasswordEvent;
+    const LOGIN: &str = "<!doctype html><title>login</title>\
+        <style>body{margin:0}#go{position:absolute;left:0;top:0;width:100px;height:40px}</style>\
+        <form action=login method=post><input type=hidden name=goto value=news>\
+        <input type=text name=acct> <input type=password name=pw> <input id=go type=submit value=login></form>\
+        <form action=login method=post><input type=hidden name=creating value=t>\
+        <input type=text name=acct> <input type=password name=pw> <input type=submit value='create account'></form>\
+        <script>onload=()=>{const f=document.forms[0];f.acct.value='alice';f.pw.value='pw1';\
+        document.title='ready'}</script>";
+    let origin = serve_answers_at(
+        "127.0.0.1:0",
+        vec![
+            ("/login?goto=news", html_answer(LOGIN)),
+            ("/login", answer),
+            (
+                "/news",
+                html_answer("<!doctype html><title>news</title>signed in"),
+            ),
+        ],
+    );
+    let (ctx, _net, rx, _comp_rx) = remote_context();
+    let login = Url::parse(&format!("{origin}/login?goto=news")).unwrap();
+    let mut tab = spawn(
+        1,
+        ctx,
+        DEVICE,
+        login,
+        crate::page_driver::PageDriver::factory(),
+    );
+    let mut logins = crate::passwords::PendingLogins::default();
+    let mut saved = None;
+    let mut submitted = false;
+    let mut hear_until = |tab: &mut TabHost, done: &dyn Fn(&TabHost, bool, bool) -> bool| {
+        let deadline = Instant::now() + std::time::Duration::from_secs(20);
+        while !done(tab, submitted, logins.is_empty()) {
+            let left = deadline.saturating_duration_since(Instant::now());
+            match rx.recv_timeout(left) {
+                Ok((_, e)) => {
+                    submitted |= matches!(e, TabEvent::Passwords(PasswordEvent::Submitted(_)));
+                    if let Some(p) = window_hears_passwords(tab, &mut logins, e) {
+                        saved = Some(p);
+                    }
+                }
+                Err(e) => panic!(
+                    "waited in vain (title {:?}, submitted {submitted}, pending {logins:?}): {e}",
+                    tab.state.title
+                ),
+            }
+        }
+    };
+    hear_until(&mut tab, &|t, _, _| t.state.title == "ready");
+    tab.send(TabCommand::Pointer(Pointer::Down(
+        Point::new(10.0, 10.0),
+        snowlark_paint::input::MouseButton::Left,
+        Default::default(),
+        1,
+    )));
+    tab.send(TabCommand::Pointer(Pointer::Up(
+        Point::new(10.0, 10.0),
+        snowlark_paint::input::MouseButton::Left,
+        Default::default(),
+    )));
+    // (judged: the submission was heard, the next page is shown, and nothing waits)
+    hear_until(&mut tab, &|t, sub, none_waits| {
+        sub && none_waits && t.state.title == title
+    });
+    (origin, saved)
 }

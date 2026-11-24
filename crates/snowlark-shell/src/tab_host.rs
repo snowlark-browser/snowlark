@@ -218,6 +218,9 @@ pub struct TabHost {
     session: SessionHistory,
     /// Numbers the navigations sent to the renderer ([`TabState::navigations`]).
     navigations: u64,
+    /// Counts the documents the tab's top level has had: each commit of a new one, whichever
+    /// renderer it is in.
+    documents: u64,
     /// The compositor's scroll positions: where the viewport is when a navigation leaves an entry.
     scroll: SharedScroll,
     /// Whether the renderer's thread gets anywhere, and the way to stop its script.
@@ -404,6 +407,7 @@ impl TabHost {
             thread,
             session: SessionHistory::default(),
             navigations: 0,
+            documents: 0,
             scroll,
             live,
             process: None,
@@ -658,7 +662,7 @@ impl TabHost {
             if entry == EntryAt::Commit {
                 self.enter_now(&url);
             }
-            self.session.set_document(self.navigations, 0);
+            self.new_document(self.navigations);
             self.load(url, restore, reload);
             return;
         };
@@ -667,7 +671,7 @@ impl TabHost {
             if entry == EntryAt::Commit {
                 self.enter_now(&url);
             }
-            self.session.set_document(self.navigations, 0);
+            self.new_document(self.navigations);
             // An `about:` document the engine makes (its origin is its initiator's); the rest
             // the renderer serves (the start page, `snowlark:`, an unsupported scheme's error).
             let own = url.scheme() == "about" && url.as_str() != START_PAGE;
@@ -929,7 +933,7 @@ impl TabHost {
         } else if self.session.current().is_some_and(|e| e.url != url) {
             self.session.replace_url(url.clone());
         }
-        self.session.set_document(nav.number, 0);
+        self.new_document(nav.number);
         self.state.url = url.to_string();
         self.state.loading = true;
     }
@@ -1062,6 +1066,7 @@ impl TabHost {
         let mut new = TabHost::start(id, context, scroll, device, renderer);
         new.session = std::mem::take(&mut self.session);
         new.navigations = self.navigations;
+        new.documents = self.documents;
         new.swap = self.swap.take();
         new.state = TabState {
             url: self.state.url.clone(),
@@ -1090,6 +1095,18 @@ impl TabHost {
         self.site.as_deref()
     }
 
+    /// How many documents the tab's top level has had (each new one counts, in whichever
+    /// renderer): what tells a document from the ones before it.
+    pub fn documents(&self) -> u64 {
+        self.documents
+    }
+
+    /// A new document for the current entry, of the navigation numbered `navigation`.
+    fn new_document(&mut self, navigation: u64) {
+        self.session.set_document(navigation, 0);
+        self.documents += 1;
+    }
+
     /// The current entry's URL.
     pub fn current_url(&self) -> Option<&Url> {
         self.session.current().map(|e| &e.url)
@@ -1103,7 +1120,7 @@ impl TabHost {
         }
         self.session.save_scroll(scroll);
         self.session.push(url);
-        self.session.set_document(self.navigations, 0);
+        self.new_document(self.navigations);
     }
 
     /// [`TabEvent::DocumentUrl`](crate::tab::TabEvent::DocumentUrl): where the current entry's
@@ -1117,7 +1134,7 @@ impl TabHost {
         if self.view.is_some() && self.session.current().is_none() {
             // (a view's first document is the page's doing: its entry starts the history)
             self.session.push(url);
-            self.session.set_document(self.navigations, 0);
+            self.new_document(self.navigations);
             return;
         }
         if navigation == self.navigations && self.session.current().is_some_and(|e| e.url != url) {
