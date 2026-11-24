@@ -18,6 +18,7 @@ use snowlark_bindings::generated::{
 };
 use snowlark_bindings::rt::{self, Cx, DomStr, Handle, JsObject, JsValue, ToJs};
 use snowlark_dom::NodeId;
+use snowlark_gl::pixels;
 use snowlark_gl::protocol::Limits;
 use snowlark_gl::{Attributes, Backend, Command, ContextId, Kind, Query, Reply};
 
@@ -108,6 +109,7 @@ pub struct ContextObj {
     textures: Vec<[Option<Handle>; 2]>,
     attrib_buffers: Vec<Option<Handle>>,
     pack_alignment: i32,
+    unpack_alignment: i32,
     flip_y: bool,
     premultiply_alpha: bool,
     colorspace_conversion: u32,
@@ -247,6 +249,15 @@ fn to_frame(rb: &snowlark_gl::Readback, a: &Attributes) -> snowlark_paint::image
         pixels,
         delay_ms: 0,
     }
+}
+
+/// BGRA pixels as RGBA.
+pub(crate) fn bgra_to_rgba(bgra: &[u8]) -> Vec<u8> {
+    let mut out = bgra.to_vec();
+    for px in out.as_chunks_mut::<4>().0 {
+        px.swap(0, 2);
+    }
+    out
 }
 
 fn js<T: ToJs + ?Sized>(cx: &mut Cx, v: &T) -> JsValue {
@@ -508,6 +519,130 @@ impl Engine {
         self.gl_ctx(this, |c| c.lost)
     }
 
+    /// The context's unpack parameters (`pixelStorei`).
+    fn gl_unpack(&self, this: Handle) -> pixels::Unpack {
+        self.gl_ctx(this, |c| pixels::Unpack {
+            flip_y: c.flip_y,
+            premultiply_alpha: c.premultiply_alpha,
+            alignment: c.unpack_alignment as u32,
+        })
+    }
+
+    /// `UNPACK_FLIP_Y_WEBGL` and `UNPACK_PREMULTIPLY_ALPHA_WEBGL` applied to the bytes of an
+    /// `ArrayBufferView` upload (WebGL 1.0 §5.14.8: they apply to every upload).
+    fn gl_unpack_view(
+        &self,
+        this: Handle,
+        bytes: &mut [u8],
+        width: i32,
+        height: i32,
+        format: u32,
+        type_: u32,
+    ) {
+        let unpack = self.gl_unpack(this);
+        if (unpack.flip_y || unpack.premultiply_alpha) && width > 0 && height > 0 {
+            pixels::unpack_view(bytes, width as u32, height as u32, format, type_, unpack);
+        }
+    }
+
+    /// The pixels of a `TexImageSource` (WebGL 1.0 §5.14.8): width, height, RGBA top row first,
+    /// and whether they are premultiplied. `Err(None)` for a source with nothing to upload yet (an
+    /// image not decoded or broken), `Err(Some(_))` the exception for one script may not read;
+    /// `Ok(None)` for one this engine cannot read yet (a video's frame lives on the graphics card
+    /// the media pipeline decodes to).
+    #[allow(clippy::type_complexity)]
+    fn tex_source_pixels(
+        &self,
+        cx: &mut Cx,
+        source: &g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+    ) -> Result<Option<(u32, u32, Vec<u8>, bool)>, Option<rt::Error>> {
+        use g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement as S;
+        match source {
+            S::ImageData(h) => {
+                let (w, hh, data) = self.image_data_bytes(cx, *h).ok_or(None)?;
+                Ok(Some((w, hh, data, false)))
+            }
+            S::HTMLImageElement(h) => {
+                let el = self.n(*h);
+                let decoded = self
+                    .with_node_renderer(el, |r, _| r.image_pixels(el))
+                    .flatten()
+                    .ok_or(None)?;
+                // WebGL 1.0 §5.14.8: an image that is not CORS-same-origin throws (HTML's
+                // origin-clean rules).
+                let cors_mode = self
+                    .dom()
+                    .attr(
+                        el,
+                        &snowlark_dom::ns!(),
+                        &snowlark_dom::LocalName::from("crossorigin"),
+                    )
+                    .is_some();
+                let readable = self
+                    .with_node_renderer(el, |r, _| r.image_readable(el, cors_mode))
+                    .unwrap_or(false);
+                if !readable {
+                    return Err(Some(super::exception(
+                        rt::ExceptionName::SecurityError,
+                        "The image is cross-origin and not shared by CORS",
+                    )));
+                }
+                // (the image canvas drawImage draws: an animation's default image)
+                let frame = decoded.default_frame();
+                if frame.pixels.len() != frame.width as usize * frame.height as usize * 4 {
+                    return Err(None);
+                }
+                Ok(Some((
+                    frame.width,
+                    frame.height,
+                    bgra_to_rgba(&frame.pixels),
+                    true,
+                )))
+            }
+            S::HTMLCanvasElement(h) => {
+                let (w, hh, rgba) = self.canvas_source_pixels(self.n(*h)).ok_or(None)?;
+                Ok(Some((w, hh, rgba, true)))
+            }
+            S::HTMLVideoElement(_) => Ok(None),
+        }
+    }
+
+    /// `texImage2D` or `texSubImage2D` from a `TexImageSource`: the source's pixels packed as
+    /// `format` and `type_` with the context's unpack parameters, sent as the command `upload` makes
+    /// for the source's size. A format and type with no upload is sent without pixels, for the
+    /// service to refuse with the error OpenGL ES gives.
+    fn tex_from_source(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        source: &g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        format: u32,
+        type_: u32,
+        upload: impl FnOnce(i32, i32, Option<Vec<u8>>) -> Command,
+    ) -> rt::Result<()> {
+        if self.gl_lost(this) {
+            return Ok(());
+        }
+        let (w, h, data, premultiplied) = match self.tex_source_pixels(cx, source) {
+            Ok(Some(p)) => p,
+            Ok(None) => return Ok(()),
+            Err(Some(e)) => return Err(e),
+            Err(None) => {
+                self.gl_error(this, c::INVALID_VALUE);
+                return Ok(());
+            }
+        };
+        let src = pixels::Rgba8 {
+            width: w,
+            height: h,
+            data: &data,
+            premultiplied,
+        };
+        let bytes = pixels::pack(&src, format, type_, self.gl_unpack(this));
+        self.gl_send(this, upload(w as i32, h as i32, bytes));
+        Ok(())
+    }
+
     fn gl_create(&self, this: Handle, kind: Kind, shader_type: u32) -> Handle {
         let id = self.gl_ctx(this, |c| {
             c.next_object += 1;
@@ -665,6 +800,7 @@ impl Engine {
                 textures: vec![[None, None]; units],
                 attrib_buffers: vec![None; attribs],
                 pack_alignment: 4,
+                unpack_alignment: 4,
                 flip_y: false,
                 premultiply_alpha: false,
                 colorspace_conversion: c::BROWSER_DEFAULT_WEBGL,
@@ -2041,10 +2177,13 @@ impl WebGLRenderingContextBaseImpl for Engine {
                 }
             }
             _ => {
-                if pname == c::PACK_ALIGNMENT && [1, 2, 4, 8].contains(&param) {
-                    self.gl_ctx(this, |c| c.pack_alignment = param);
+                if [1, 2, 4, 8].contains(&param) {
+                    if pname == c::PACK_ALIGNMENT {
+                        self.gl_ctx(this, |c| c.pack_alignment = param);
+                    } else if pname == c::UNPACK_ALIGNMENT {
+                        self.gl_ctx(this, |c| c.unpack_alignment = param);
+                    }
                 }
-                let _ = c::UNPACK_ALIGNMENT;
                 self.gl_send(this, Command::PixelStorei(pname, param));
             }
         }
@@ -2636,7 +2775,10 @@ impl WebGLRenderingContextOverloadsImpl for Engine {
         type_: u32,
         pixels: Option<View>,
     ) -> rt::Result<()> {
-        let bytes = pixels.map(|p| view_bytes(cx, view_object!(&p, Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView)));
+        let mut bytes = pixels.map(|p| view_bytes(cx, view_object!(&p, Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView)));
+        if let Some(b) = &mut bytes {
+            self.gl_unpack_view(this, b, width, height, format, type_);
+        }
         self.gl_send(
             this,
             Command::TexImage2D(
@@ -2655,17 +2797,18 @@ impl WebGLRenderingContextOverloadsImpl for Engine {
     }
     fn tex_image2_d_target_level_internalformat_format_type_source(
         &self,
-        _cx: &mut Cx,
-        _this: Handle,
-        _target: u32,
-        _level: i32,
-        _internalformat: i32,
-        _format: u32,
-        _type_: u32,
-        _source: g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        cx: &mut Cx,
+        this: Handle,
+        target: u32,
+        level: i32,
+        internalformat: i32,
+        format: u32,
+        type_: u32,
+        source: g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
     ) -> rt::Result<()> {
-        // (uploads from images, canvases, video and ImageData are the next stage)
-        Ok(())
+        self.tex_from_source(cx, this, &source, format, type_, |w, h, bytes| {
+            Command::TexImage2D(target, level, internalformat, w, h, 0, format, type_, bytes)
+        })
     }
     fn tex_sub_image2_d_target_level_xoffset_yoffset_width_height_format_type_pixels(
         &self,
@@ -2685,7 +2828,8 @@ impl WebGLRenderingContextOverloadsImpl for Engine {
             self.gl_error(this, c::INVALID_VALUE);
             return Ok(());
         };
-        let bytes = view_bytes(cx, view_object!(&pixels, Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView));
+        let mut bytes = view_bytes(cx, view_object!(&pixels, Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView));
+        self.gl_unpack_view(this, &mut bytes, width, height, format, type_);
         self.gl_send(
             this,
             Command::TexSubImage2D(
@@ -2696,18 +2840,29 @@ impl WebGLRenderingContextOverloadsImpl for Engine {
     }
     fn tex_sub_image2_d_target_level_xoffset_yoffset_format_type_source(
         &self,
-        _cx: &mut Cx,
-        _this: Handle,
-        _target: u32,
-        _level: i32,
-        _xoffset: i32,
-        _yoffset: i32,
-        _format: u32,
-        _type_: u32,
-        _source: g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        cx: &mut Cx,
+        this: Handle,
+        target: u32,
+        level: i32,
+        xoffset: i32,
+        yoffset: i32,
+        format: u32,
+        type_: u32,
+        source: g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
     ) -> rt::Result<()> {
-        // (as texImage2D from a source: the next stage)
-        Ok(())
+        self.tex_from_source(cx, this, &source, format, type_, |w, h, bytes| {
+            Command::TexSubImage2D(
+                target,
+                level,
+                xoffset,
+                yoffset,
+                w,
+                h,
+                format,
+                type_,
+                bytes.unwrap_or_default(),
+            )
+        })
     }
     fn uniform1fv(
         &self,

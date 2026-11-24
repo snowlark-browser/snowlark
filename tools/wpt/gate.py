@@ -302,6 +302,37 @@ def write_flaky(flaky, runs_from, path=FLAKY, merge=True):
     return data
 
 
+def flaky_from_verdicts(verdicts):
+    """The flakes a gate's re-check proved: a loss the branch passed when re-run alone ('recovered'), or one
+    the baseline binary also failed when re-run though the baseline run passed it ('unresolved'): either way
+    one binary gave both results. Real losses are not flakes."""
+    subtests, reftests = {}, set()
+    for (path, name), v in verdicts.items():
+        if v not in ('recovered', 'unresolved'):
+            continue
+        if name == 'reftest':
+            reftests.add(path)
+        else:
+            subtests.setdefault(path, set()).add(name)
+    return {'subtests': {k: sorted(v) for k, v in sorted(subtests.items())}, 'reftests': sorted(reftests)}
+
+
+def learn_flaky(verdicts, run_label, path=FLAKY):
+    """Adds the flakes a re-check proved to the flake list, so later gates report them apart. Returns how
+    many subtests and reftests were new."""
+    found = flaky_from_verdicts(verdicts)
+    if not path or not (found['subtests'] or found['reftests']):
+        return 0
+    old = load_flaky(path)
+    known_sub = {(p, n) for p, names in old.get('subtests', {}).items() for n in names}
+    known_ref = set(old.get('reftests', []))
+    new = sum(1 for p, names in found['subtests'].items() for n in names if (p, n) not in known_sub)
+    new += sum(1 for p in found['reftests'] if p not in known_ref)
+    if new:
+        write_flaky(found, [f'gate re-check of {run_label}'], path, merge=True)
+    return new
+
+
 def build_flaky(paths, out=FLAKY, merge=True):
     flaky = flaky_from_runs([load(p) for p in paths])
     data = write_flaky(flaky, [os.path.basename(p) for p in paths], out, merge)
@@ -471,7 +502,7 @@ def show(items, P, limit, verdicts=None):
 
 
 def run_compare(baseline, run, flaky_path=FLAKY, recheck_n=0, exe=None, base_exe=None, allow_set_diff=False, limit=60,
-                have_slot=False):
+                have_slot=False, learn=True):
     """The whole compare step; returns the exit status."""
     base_path, meta = resolve_baseline(baseline)
     run_path = resolve_run(run)
@@ -506,6 +537,11 @@ def run_compare(baseline, run, flaky_path=FLAKY, recheck_n=0, exe=None, base_exe
                   flush=True)
             verdicts = recheck(result['real'], exe, base_exe, recheck_n, have_slot=have_slot)
     real, unresolved = print_report(result, label, os.path.basename(run_path), verdicts, limit)
+    if verdicts and learn:
+        added = learn_flaky(verdicts, os.path.basename(run_path), flaky_path)
+        if added:
+            print(f'\nflake list: {added} new flaky subtests/reftests from this re-check added to '
+                  f'{os.path.basename(flaky_path)} (commit it with the merge)')
     status = 1 if real or unresolved else 0
     differ = result['only_base'] or result['only_run']
     if skipped:
@@ -528,6 +564,7 @@ def main(argv=None):
     c.add_argument('run')
     c.add_argument('--flaky', default=FLAKY)
     c.add_argument('--recheck', type=int, default=3, metavar='N', help='re-run each lost file alone N times (default 3; 0 = off)')
+    c.add_argument('--no-learn-flaky', action='store_true', help='do not add the flakes the re-check proves to the flake list')
     c.add_argument('--exe', help='the binary that made the run (needed for --recheck)')
     c.add_argument('--base-exe', help='the baseline binary (default: the one the baseline records, if unchanged)')
     c.add_argument('--allow-set-diff', action='store_true')
@@ -545,7 +582,8 @@ def main(argv=None):
     a = ap.parse_args(argv)
     try:
         if a.cmd == 'compare':
-            return run_compare(a.baseline, a.run, a.flaky, a.recheck, a.exe, a.base_exe, a.allow_set_diff, a.limit)
+            return run_compare(a.baseline, a.run, a.flaky, a.recheck, a.exe, a.base_exe, a.allow_set_diff, a.limit,
+                               learn=not a.no_learn_flaky)
         if a.cmd == 'save-baseline':
             meta = save_baseline(a.name, resolve_run(a.results), a.exe, a.commit)
             print(json.dumps(meta, indent=1))

@@ -34,7 +34,7 @@ use style::properties::ComputedValues;
 use style::values::computed as c;
 
 use crate::adapter::RenderStyle;
-use crate::env::{FontAliases, ImageTable, LoadedImage, StyleEnv, WebFace};
+use crate::env::{FontAliases, ImageTable, LoadedImage, PixelAccess, StyleEnv, WebFace};
 use crate::fetch::{decode_stylesheet, Arrival, Fetcher, Purpose};
 use crate::metrics::TextMetrics;
 use crate::source::{stylo_pseudo, DocumentStyles, ImageState};
@@ -1829,6 +1829,22 @@ impl Renderer {
                         } else {
                             snowlark_paint::image::decode(&body).ok().map(add)
                         };
+                        // Whether script may read the pixels: every URL of the fetch same-origin (a
+                        // no-cors fetch's response turns opaque at a cross-origin redirect: Fetch
+                        // §4.4), else shared by the response's CORS headers.
+                        let access = if head.url_list.iter().all(|u| same_origin(&doc.url, u))
+                            && same_origin(&doc.url, &a.url)
+                        {
+                            PixelAccess::SameOrigin
+                        } else if cors_shared(&doc.url, &head.headers) {
+                            PixelAccess::CorsShared
+                        } else {
+                            PixelAccess::None
+                        };
+                        let loaded = loaded.map(|mut l| {
+                            l.access = access;
+                            l
+                        });
                         match loaded {
                             Some(image) => UrlImage::Loaded(image),
                             None => {
@@ -5954,6 +5970,19 @@ impl Renderer {
         doc.control_states.insert(node, state);
         doc.changes.restyled.push(ElementChange::reconstruct(node));
         true
+    }
+
+    /// Whether script may read the pixels of the image an `<img>` shows (HTML: the image is
+    /// "CORS-same-origin"), the element fetching in CORS mode when `cors_mode` (its `crossorigin`
+    /// attribute is set); false while it shows none.
+    pub fn image_readable(&self, node: NodeId, cors_mode: bool) -> bool {
+        let Some(doc) = self.doc.as_deref() else {
+            return false;
+        };
+        match doc.img_state.get(&node) {
+            Some(ImageState::Loaded(i)) => i.access.readable(cors_mode),
+            _ => false,
+        }
     }
 
     /// The decoded pixels an `<img>` shows (for `drawImage`).

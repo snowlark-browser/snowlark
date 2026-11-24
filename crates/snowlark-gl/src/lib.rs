@@ -7,6 +7,7 @@
 //! about pages, and nothing in the page crates calls OpenGL.
 
 mod ffi;
+pub mod pixels;
 pub mod protocol;
 mod service;
 mod thread;

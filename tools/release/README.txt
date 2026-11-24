@@ -14,7 +14,8 @@ System:  Windows 10 or Windows 11, 64-bit (x64)
 Running it
 ----------
 
-Unzip the folder anywhere and start snowlark.exe. There is no installer.
+Unzip the folder anywhere and start snowlark.exe. There is no installer. Keep libEGL.dll and
+libGLESv2.dll next to snowlark.exe: WebGL (3D graphics in pages) uses them.
 
 Windows SmartScreen may show "Windows protected your PC" the first time, while a new build earns
 its reputation. Choose "More info", then "Run anyway".

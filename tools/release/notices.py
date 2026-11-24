@@ -21,6 +21,11 @@ What it covers, and where each part comes from:
   checkout at the commit vendor/v8 is taken from; tools/v8-pgo builds the pinned library from it).
   V8_PARTS lists them: the libraries in the static library's link list (its `rusty_v8.ninja`) and
   the headers V8's own sources include from third_party/.
+- ANGLE (libEGL.dll and libGLESv2.dll, shipped beside the program) and the third-party code its
+  build links into libGLESv2 (`--angle-src`: the checkout tools/angle/build.ps1 builds the commit
+  tools/angle/pin.txt names from). ANGLE_PARTS lists them: the link inputs of libGLESv2.dll
+  (`ninja -C out/Release -t query libGLESv2.dll`, walked through the static libraries it names),
+  each with the licence file its README.chromium names.
 
 The registry source must be downloaded (the crate cache dev.ps1 builds with: tools/devenv.py cargo_home).
 The script fails when a licence file it expects is missing, rather than writing an incomplete file.
@@ -106,6 +111,36 @@ V8_RUST_CRATES = [
     "stable_deref_trait", "temporal_capi", "temporal_rs", "timezone_provider", "tinystr",
     "utf16_iter", "utf8_iter", "write16", "writeable", "yoke", "zerofrom", "zerotrie", "zerovec",
     "zoneinfo64",
+]
+
+# The ANGLE checkout tools/angle/build.ps1 builds from, and the commit it must be at.
+DEFAULT_ANGLE_SRC = devenv.dev_dir() / "angle" / "src"
+ANGLE_PIN = ROOT / "tools" / "angle" / "pin.txt"
+
+# (name, licence, home, files relative to the ANGLE checkout, note): ANGLE itself and what its build
+# links into libGLESv2.dll with the Direct3D 11 back end only (tools/angle/build.ps1's arguments).
+# A part whose licence text is already given in this section names it in its note instead.
+ANGLE_PARTS = [
+    ("ANGLE", "BSD-3-Clause", "https://chromium.googlesource.com/angle/angle", ["LICENSE"], ""),
+    ("Khronos EGL and OpenGL ES headers", "Apache-2.0", "https://registry.khronos.org/",
+     [], "The text of the Apache License 2.0 is given under Abseil below."),
+    ("xxHash", "BSD-2-Clause", "https://github.com/Cyan4973/xxHash",
+     ["src/common/third_party/xxhash/src/LICENSE"], ""),
+    ("volk", "MIT", "https://github.com/zeux/volk", ["src/third_party/volk/src/LICENSE.md"], ""),
+    ("Abseil", "Apache-2.0", "https://abseil.io/", ["third_party/abseil-cpp/LICENSE"], ""),
+    ("astc-encoder", "Apache-2.0", "https://github.com/ARM-software/astc-encoder",
+     ["third_party/astc-encoder/src/LICENSE.txt"], ""),
+    ("Perfetto", "Apache-2.0 and others (see text)", "https://perfetto.dev/",
+     ["third_party/perfetto/LICENSE"], ""),
+    ("zlib", "Zlib", "https://github.com/madler/zlib", ["third_party/zlib/LICENSE"], ""),
+    ("zlib compression utilities (third_party/zlib/google)", "BSD-3-Clause",
+     "https://chromium.googlesource.com/chromium/src/third_party/zlib/", ["buildtools/LICENSE"], ""),
+    ("libc++", "Apache-2.0 WITH LLVM-exception", "https://libcxx.llvm.org/",
+     ["third_party/libc++/src/LICENSE.TXT"], ""),
+    ("LLVM libc (shared headers)", "Apache-2.0 WITH LLVM-exception", "https://libc.llvm.org/",
+     ["third_party/llvm-libc/src/LICENSE.TXT"], ""),
+    ("compiler-rt builtins", "Apache-2.0 WITH LLVM-exception", "https://compiler-rt.llvm.org/",
+     [], "The licence text is the one given under libc++ above."),
 ]
 
 MIT_TEXT = """Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
@@ -230,13 +265,28 @@ def crate_texts(md):
     return out, sorted(mpl), len(pkgs)
 
 
-def write(out_path, v8_src):
+def git_head(path):
+    return subprocess.run(["git", "-C", str(path), "rev-parse", "HEAD"], capture_output=True,
+                          text=True).stdout.strip()
+
+
+def angle_commit():
+    for line in ANGLE_PIN.read_text(encoding="utf-8").splitlines():
+        if line.startswith("commit="):
+            return line.split("=", 1)[1].strip()
+    sys.exit(f"{ANGLE_PIN} names no commit")
+
+
+def write(out_path, v8_src, angle_src):
     md = credits.metadata()
     groups, mpl, ncrates = crate_texts(md)
-    head = subprocess.run(["git", "-C", str(v8_src), "rev-parse", "HEAD"], capture_output=True,
-                          text=True).stdout.strip()
+    head = git_head(v8_src)
     if head != V8_COMMIT:
         sys.exit(f"{v8_src} is at {head or 'no commit'}, not {V8_COMMIT} (vendor/v8's commit)")
+    angle = angle_commit()
+    head = git_head(angle_src)
+    if head != angle:
+        sys.exit(f"{angle_src} is at {head or 'no commit'}, not {angle} (tools/angle/pin.txt)")
     lines = []
     w = lines.append
     w("Snowlark: third-party software notices")
@@ -247,15 +297,16 @@ def write(out_path, v8_src):
     w("Contents")
     w("  1. Source code of Mozilla Public License 2.0 components")
     w("  2. V8 and the libraries it includes")
-    w("  3. Other C++ libraries")
-    w("  4. The Rust standard library")
-    w(f"  5. Rust crates ({ncrates}), grouped by licence")
+    w("  3. ANGLE (libEGL.dll, libGLESv2.dll) and the libraries it includes")
+    w("  4. Other C++ libraries")
+    w("  5. The Rust standard library")
+    w(f"  6. Rust crates ({ncrates}), grouped by licence")
     w("")
     w(RULE)
     w("1. Source code of Mozilla Public License 2.0 components")
     w(RULE)
     w("")
-    w("These components are licensed under the Mozilla Public License 2.0 (its text is in part 5,")
+    w("These components are licensed under the Mozilla Public License 2.0 (its text is in part 6,")
     w("under MPL-2.0). Their source code is available at the addresses below. Stylo is included in")
     w("modified form; the published source is the complete source of the version included here,")
     w("with a list of the changes.")
@@ -303,7 +354,28 @@ def write(out_path, v8_src):
         w(text.rstrip("\n"))
     w("")
     w(RULE)
-    w("3. Other C++ libraries")
+    w("3. ANGLE (libEGL.dll, libGLESv2.dll) and the libraries it includes")
+    w(RULE)
+    w("")
+    w("ANGLE (https://chromium.googlesource.com/angle/angle, commit")
+    w(f"{angle}), the OpenGL ES implementation WebGL runs on, is")
+    w("built from its unmodified source into libEGL.dll and libGLESv2.dll, which ship beside the")
+    w("program. libGLESv2.dll includes the libraries below.")
+    for name, lic, home, files, note in ANGLE_PARTS:
+        w("")
+        w(THIN)
+        w(f"{name}  ({home})")
+        w(f"Licence: {lic}")
+        w(THIN)
+        if note:
+            w("")
+            w(note)
+        for f in files:
+            w("")
+            w(file_text(angle_src / f).rstrip("\n"))
+    w("")
+    w(RULE)
+    w("4. Other C++ libraries")
     w(RULE)
     w("")
     w("These libraries are compiled from their unmodified source into the program.")
@@ -318,7 +390,7 @@ def write(out_path, v8_src):
             w(file_text(ROOT / f).rstrip("\n"))
     w("")
     w(RULE)
-    w("4. The Rust standard library")
+    w("5. The Rust standard library")
     w(RULE)
     w("")
     w("The Rust standard library (https://www.rust-lang.org/) is linked into the program. It is")
@@ -332,7 +404,7 @@ def write(out_path, v8_src):
         w(file_text(lic / f).rstrip("\n"))
     w("")
     w(RULE)
-    w(f"5. Rust crates ({ncrates}), grouped by licence")
+    w(f"6. Rust crates ({ncrates}), grouped by licence")
     w(RULE)
     for group, entries in groups:
         names = sorted({c for _, cs in entries for c in cs}, key=str.lower)
@@ -354,15 +426,16 @@ def write(out_path, v8_src):
     data = "\r\n".join(lines) + "\r\n"
     Path(out_path).write_bytes(data.encode("utf-8"))
     print(f"{out_path}: {ncrates} crates in {len(groups)} licence groups, "
-          f"{len(V8_PARTS)} V8 parts, {len(data) // 1024} KB")
+          f"{len(V8_PARTS)} V8 parts, {len(ANGLE_PARTS)} ANGLE parts, {len(data) // 1024} KB")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
     ap.add_argument("--v8-src", type=Path, default=DEFAULT_V8_SRC)
+    ap.add_argument("--angle-src", type=Path, default=DEFAULT_ANGLE_SRC)
     a = ap.parse_args()
-    write(a.out, a.v8_src)
+    write(a.out, a.v8_src, a.angle_src)
 
 
 if __name__ == "__main__":

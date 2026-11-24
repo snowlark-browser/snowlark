@@ -304,12 +304,39 @@ impl Engine {
             }
             S::HTMLCanvasElement(h) => {
                 let el = self.n(*h);
-                let ctx = self.canvases.borrow().get(&el).copied()?;
-                self.ctx(ctx, |c| c.canvas.snapshot())
+                match self.canvases.borrow().get(&el).copied() {
+                    Some(ctx) => self.ctx(ctx, |c| c.canvas.snapshot()),
+                    // (a WebGL canvas draws its drawing buffer as it is now)
+                    None => cv::pixmap_from_frame(&self.webgl_snapshot(el)?),
+                }
             }
             // (an SVG `image` element's image is not exposed to canvas yet)
             S::HTMLVideoElement(_) | S::SVGImageElement(_) => None,
         }
+    }
+
+    /// A canvas element's pixels as a WebGL texture upload reads them (WebGL 1.0 §5.14.8): its 2D
+    /// bitmap, its WebGL drawing buffer as it is now, or, with no context, transparent black of
+    /// its size. Width, height and premultiplied RGBA, the top row first.
+    pub(crate) fn canvas_source_pixels(&self, el: NodeId) -> Option<(u32, u32, Vec<u8>)> {
+        if let Some(ctx) = self.canvases.borrow().get(&el).copied() {
+            let pm = self.ctx(ctx, |c| c.canvas.snapshot())?;
+            return Some((pm.width(), pm.height(), pm.data().to_vec()));
+        }
+        if self.has_webgl(el) {
+            let frame = self.webgl_snapshot(el)?;
+            return Some((
+                frame.width,
+                frame.height,
+                super::webgl::bgra_to_rgba(&frame.pixels),
+            ));
+        }
+        let (w, h) = self.canvas_size(el);
+        // (a quarter of a gigabyte at most: no device takes a texture larger than 16384 x 4096)
+        if w as u64 * h as u64 * 4 > 1 << 28 {
+            return None;
+        }
+        Some((w, h, vec![0; w as usize * h as usize * 4]))
     }
 
     fn style_value(

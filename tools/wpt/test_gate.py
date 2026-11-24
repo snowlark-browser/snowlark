@@ -300,6 +300,36 @@ class Rechecks(unittest.TestCase):
             status = gate.run_compare(base, run, flaky_path=None, recheck_n=1, exe='b.exe', base_exe='a.exe')
         self.assertEqual(status, 1)
 
+    def test_a_recheck_adds_the_flakes_it_proved_and_not_real_losses(self):
+        verdicts = {('/dom/a.html', 'x'): 'recovered', ('/dom/a.html', 'y'): 'real',
+                    ('/dom/b.html', 'z'): 'unresolved', ('/css/r.html', 'reftest'): 'recovered'}
+        self.assertEqual(gate.flaky_from_verdicts(verdicts),
+                         {'subtests': {'/dom/a.html': ['x'], '/dom/b.html': ['z']}, 'reftests': ['/css/r.html']})
+        path = os.path.join(self.dir, 'flaky.json')
+        json.dump({'subtests': {'/dom/a.html': ['x']}, 'reftests': []}, open(path, 'w'))
+        self.assertEqual(gate.learn_flaky(verdicts, 'run.jsonl', path), 2)
+        data = json.load(open(path))
+        self.assertEqual(data['subtests'], {'/dom/a.html': ['x'], '/dom/b.html': ['z']})
+        self.assertEqual(data['reftests'], ['/css/r.html'])
+        self.assertIn('gate re-check of run.jsonl', data['from'])
+        self.assertEqual(gate.learn_flaky(verdicts, 'again.jsonl', path), 0)
+
+    def test_a_learned_flake_is_reported_apart_by_the_next_gate(self):
+        base = write(self.dir, 'base.jsonl', [th('/dom/a.html', passed=['x'])])
+        run = write(self.dir, 'run.jsonl', [th('/dom/a.html', failed=['x'])])
+        path = os.path.join(self.dir, 'flaky.json')
+        with mock.patch.object(gate, 'recheck', lambda *a, **k: {('/dom/a.html', 'x'): 'unresolved'}):
+            self.assertEqual(gate.run_compare(base, run, flaky_path=path, recheck_n=1, exe='b.exe', base_exe='a.exe'), 1)
+        self.assertEqual(gate.run_compare(base, run, flaky_path=path), 0)
+
+    def test_learning_can_be_turned_off(self):
+        base = write(self.dir, 'base.jsonl', [th('/dom/a.html', passed=['x'])])
+        run = write(self.dir, 'run.jsonl', [th('/dom/a.html', failed=['x'])])
+        path = os.path.join(self.dir, 'flaky.json')
+        with mock.patch.object(gate, 'recheck', lambda *a, **k: {('/dom/a.html', 'x'): 'recovered'}):
+            gate.run_compare(base, run, flaky_path=path, recheck_n=1, exe='b.exe', base_exe='a.exe', learn=False)
+        self.assertFalse(os.path.exists(path))
+
     def test_recovered_losses_do_not_fail_the_gate(self):
         base = write(self.dir, 'base.jsonl', [th('/dom/a.html', passed=['x'])])
         run = write(self.dir, 'run.jsonl', [th('/dom/a.html', failed=['x'])])

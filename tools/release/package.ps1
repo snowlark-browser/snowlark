@@ -4,10 +4,13 @@
 
 # Builds the preview release zip of the browser (shipped as Snowlark):
 #
-#     .\tools\release\package.ps1 [-OutDir <dev dir>\release] [-SkipBuild] [-AllowOther]
+#     .\tools\release\package.ps1 [-OutDir <dev dir>\release] [-SkipBuild] [-AllowOther [-NoSign]]
 #
 # From a clean checkout at the newest origin/main it makes a `--release` build, then packs
 #     snowlark.exe               target\release\snowlark.exe (no PDB, no snowlark-cli)
+#     libEGL.dll, libGLESv2.dll  ANGLE, which WebGL runs on: the libraries tools\angle\pin.txt pins
+#                                (the build copies them beside the executable; their SHA-256 must be
+#                                the pinned one)
 #     THIRD-PARTY-NOTICES.txt    tools\release\notices.py
 #     README.txt                 tools\release\README.txt with the build's date and revision
 # into <OutDir>\snowlark-preview-<date>-<sha>.zip, writes its SHA-256 beside it in
@@ -19,13 +22,15 @@
 # script reads the revision the executable was built from and stops on another one), under the
 # release name built into it.
 # -AllowOther packs a checkout that is not the newest origin/main, or not clean (for trying the
-# script out; never for a zip that is published).
+# script out; never for a zip that is published). With it, -NoSign leaves the files unsigned even
+# when a signing certificate is set.
 #
 # The MPL-2.0 source that goes with a release is exported by tools\release\stylo_source.py.
 param(
     [string]$OutDir = '',
     [switch]$SkipBuild,
-    [switch]$AllowOther
+    [switch]$AllowOther,
+    [switch]$NoSign
 )
 . (Join-Path $PSScriptRoot '..\devenv.ps1')
 if (-not $OutDir) { $OutDir = Join-Path (Get-DevDir) 'release' }
@@ -88,25 +93,45 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
 Copy-Item $exe (Join-Path $stage 'snowlark.exe')
 
+# ANGLE's two libraries, as the build put them beside the executable, checked against the pin: a
+# library built with another toolchain or SDK, or of another commit, is not the one the notices and
+# the published build instructions describe.
+$pin = @{}
+foreach ($line in Get-Content (Join-Path $root 'tools\angle\pin.txt')) {
+    if ($line -match '^([A-Za-z0-9-]+)=(.+)$') { $pin[$matches[1]] = $matches[2].Trim() }
+}
+$libraries = @('libEGL', 'libGLESv2')
+foreach ($f in $libraries) {
+    $lib = Join-Path $root "target\release\$f.dll"
+    if (-not (Test-Path $lib)) { throw "no $lib (build ANGLE with tools\angle\build.ps1, then rebuild)" }
+    $hash = (Get-FileHash $lib -Algorithm SHA256).Hash.ToLower()
+    if ($hash -ne $pin["$f-sha256"] -and -not $AllowOther) {
+        throw "$lib has SHA-256 $hash, not the one tools\angle\pin.txt pins ($($pin["$f-sha256"]))"
+    }
+    Copy-Item $lib (Join-Path $stage "$f.dll")
+}
+
 # Code signing, when SNOWLARK_SIGN_CERT names a code-signing certificate (its SHA-1 thumbprint) in the
 # user's certificate store; a cloud or smart-card key may ask its owner to approve. The signature is
 # SHA-256 with an RFC 3161 timestamp (SNOWLARK_SIGN_TIMESTAMP, Certum's by default), and is verified.
+# The executable and ANGLE's libraries are signed.
 $signCert = Get-DevSetting 'SNOWLARK_SIGN_CERT'
-if ($signCert) {
+if ($NoSign -and -not $AllowOther) { throw '-NoSign is only for trying the script out (with -AllowOther)' }
+if ($signCert -and -not $NoSign) {
     $timestamp = Get-DevSetting 'SNOWLARK_SIGN_TIMESTAMP' 'http://time.certum.pl'
     $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
         Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName | Select-Object -Last 1
     if (-not $signtool) { throw 'signtool.exe not found (install the Windows SDK)' }
-    $signed = Join-Path $stage 'snowlark.exe'
+    $files = @('snowlark.exe') + ($libraries | ForEach-Object { "$_.dll" }) | ForEach-Object { Join-Path $stage $_ }
     $ErrorActionPreference = 'Continue'
-    & $signtool.FullName sign /sha1 $signCert /fd sha256 /tr $timestamp /td sha256 /d 'Snowlark' /du 'https://snowlark.org' $signed
+    & $signtool.FullName sign /sha1 $signCert /fd sha256 /tr $timestamp /td sha256 /d 'Snowlark' /du 'https://snowlark.org' @files
     $code = $LASTEXITCODE
-    if ($code -eq 0) { & $signtool.FullName verify /pa $signed | Out-Null; $code = $LASTEXITCODE }
+    if ($code -eq 0) { & $signtool.FullName verify /pa @files | Out-Null; $code = $LASTEXITCODE }
     $ErrorActionPreference = 'Stop'
-    if ($code -ne 0) { throw "signing or verifying $signed failed ($code)" }
-    "signed:  $((Get-AuthenticodeSignature $signed).SignerCertificate.Subject)"
+    if ($code -ne 0) { throw "signing or verifying $($files -join ', ') failed ($code)" }
+    "signed:  $((Get-AuthenticodeSignature $files[0]).SignerCertificate.Subject) ($($files.Count) files)"
 } else {
-    'signed:  no (set SNOWLARK_SIGN_CERT to sign)'
+    if ($NoSign) { 'signed:  no (-NoSign)' } else { 'signed:  no (set SNOWLARK_SIGN_CERT to sign)' }
 }
 
 if (-not $env:CARGO_HOME) { $env:CARGO_HOME = Get-CargoHome }

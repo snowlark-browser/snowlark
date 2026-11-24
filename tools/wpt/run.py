@@ -1084,6 +1084,8 @@ def main():
                         help='run N times (results <name>-r1.. ) and add what differed to flaky.json')
     parser.add_argument('--recheck', type=int, default=3, metavar='N',
                         help='--gate: re-run each file with a loss alone N times before calling it real (0 = off)')
+    parser.add_argument('--no-learn-flaky', action='store_true',
+                        help='--gate: do not add the flakes the re-check proves to tools/wpt/flaky.json')
     parser.add_argument('--base-exe', default=None, help='--gate: the baseline binary for the re-runs (default: the one the baseline records)')
     parser.add_argument('--no-compare', action='store_true', help='--gate: only run, do not compare')
     parser.add_argument('--allow-set-diff', action='store_true', help='--gate: a changed test set does not fail the comparison')
@@ -1147,7 +1149,8 @@ def main():
         print(f'baseline {meta["name"]} saved: {meta["files"]} files, commit {meta["commit"]}, binary {meta["binary"] and meta["binary"]["size"]} bytes')
     if baseline is not None and not args.no_compare:
         status = gate.run_compare(baseline[0], paths[-1], recheck_n=args.recheck, exe=exe, base_exe=args.base_exe,
-                                  allow_set_diff=args.allow_set_diff, have_slot=True)
+                                  allow_set_diff=args.allow_set_diff, have_slot=True,
+                                  learn=not args.no_learn_flaky)
         sys.exit(status)
 
 

@@ -33,6 +33,30 @@ pub struct LoadedImage {
     /// An SVG image's variant for an embedding element of a dark used color scheme, whose document
     /// answers `prefers-color-scheme` so (CSS Color Adjust 1 §2.3).
     pub dark: Option<ImageId>,
+    /// Who may read the image's pixels (HTML's origin-clean rules: WebGL texture uploads).
+    pub access: PixelAccess,
+}
+
+/// Whether script may read an image's pixels: a same-origin image (or a `data:` one), or a
+/// cross-origin image whose response shares it by its CORS headers, to an element that fetches in
+/// CORS mode (HTML "CORS-same-origin"). Unknown is never readable.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PixelAccess {
+    #[default]
+    None,
+    SameOrigin,
+    CorsShared,
+}
+
+impl PixelAccess {
+    /// Whether an element that fetches in CORS mode (`crossorigin` set) or not may read it.
+    pub fn readable(self, cors_mode: bool) -> bool {
+        match self {
+            PixelAccess::SameOrigin => true,
+            PixelAccess::CorsShared => cors_mode,
+            PixelAccess::None => false,
+        }
+    }
 }
 
 impl LoadedImage {
@@ -44,6 +68,7 @@ impl LoadedImage {
             unoriented: None,
             cors_only: false,
             dark: None,
+            access: PixelAccess::None,
         }
     }
 
@@ -55,6 +80,7 @@ impl LoadedImage {
             unoriented: None,
             cors_only: false,
             dark: None,
+            access: PixelAccess::None,
         }
     }
 
@@ -69,6 +95,7 @@ impl LoadedImage {
                 unoriented: None,
                 cors_only: false,
                 dark: None,
+                access: self.access,
             },
             _ => self,
         }
@@ -99,6 +126,7 @@ impl LoadedImage {
             unoriented: self.unoriented.map(|(id, n)| (id, scaled(n))),
             cors_only: self.cors_only,
             dark: self.dark,
+            access: self.access,
         }
     }
 }

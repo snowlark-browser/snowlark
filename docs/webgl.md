@@ -74,8 +74,12 @@ SwiftShader or capture) into `<SNOWLARK_DEV_DIR>\angle\<name>`. `dev.ps1` hands 
 `SNOWLARK_ANGLE_DIR`, and `snowlark-gl`'s build script copies the two libraries beside the built executables. The
 libraries are loaded when the first WebGL context is made, from the executable's folder; without them
 `getContext("webgl")` returns null and nothing else changes. ANGLE is under a BSD licence. The release package
-does not carry the two libraries yet: `tools/release/package.ps1` has to add them, and `tools/release/notices.py`
-the notices of ANGLE and of what it compiles into `libGLESv2`, before a release has WebGL.
+carries the two libraries beside `snowlark.exe` (`tools/release/package.ps1` refuses ones whose hashes are not the
+pinned ones and signs them with the executable), and `THIRD-PARTY-NOTICES.txt` has a part for ANGLE and the code
+`libGLESv2` links: Abseil, astc-encoder, Perfetto, zlib, xxHash, volk, libc++, LLVM libc and compiler-rt
+(`tools/release/notices.py` reads their licence files from the ANGLE checkout at the pinned commit; the list is
+the link inputs of `libGLESv2.dll`, `ninja -C out/Release -t query libGLESv2.dll`, and is checked again when the
+pin moves).
 
 Measured on the pinned commit: `libEGL.dll` 0.5 MB and `libGLESv2.dll` 5.6 MB (6.1 MB together, release, line
 tables); a clean build of the two libraries takes about 4 minutes on 8 jobs after the checkout (about 14 GB with
@@ -99,6 +103,27 @@ The readback is the first stage's cost: a copy from the graphics card every fram
 shares the drawing buffer as a Direct3D 11 texture (ANGLE's `EGL_ANGLE_d3d_texture_client_buffer` or a shared
 handle with a keyed mutex, as video frames already reach the compositor), double-buffered so the page draws into
 one while the compositor samples the other.
+
+## Texture uploads
+
+`texImage2D` and `texSubImage2D` take an `ArrayBufferView` or a `TexImageSource` (WebGL 1.0 §5.14.8). The client
+turns either into bytes of the format and type the call names (`snowlark-gl`'s `pixels`), so the service only ever
+uploads bytes:
+
+- `UNPACK_FLIP_Y_WEBGL` and `UNPACK_PREMULTIPLY_ALPHA_WEBGL` are applied on the client and never reach ANGLE; they
+  apply to `ArrayBufferView` uploads too. `UNPACK_ALIGNMENT` reaches ANGLE; a source's rows are padded to it, so a
+  source is read as packed rows whatever its value is.
+- The sources: `ImageData` (straight alpha); `<img>` (the decoded image, premultiplied, as `drawImage` draws it:
+  an animation's default image); a 2D canvas (its bitmap); a WebGL canvas (its drawing buffer as it is now, read
+  back without clearing: after the rendering update presented a buffer that is not preserved, that is the cleared
+  buffer); a canvas without a context (transparent black of its size). An `<img>` with nothing decoded is
+  `INVALID_VALUE`. A premultiplied source uploaded without `UNPACK_PREMULTIPLY_ALPHA_WEBGL` has its alpha divided
+  out, which loses precision where alpha is low (other engines decode the image again unpremultiplied).
+- Not yet: `<video>` (its frames are on the graphics card the media pipeline decodes to; the call does nothing),
+  `ImageBitmap` and `OffscreenCanvas` (not implemented), `UNPACK_COLORSPACE_CONVERSION_WEBGL` set to `NONE` (images
+  are uploaded with their colour profile applied either way).
+
+`drawImage` of a WebGL canvas into a 2D canvas draws its drawing buffer the same way.
 
 ## Security
 
@@ -130,6 +155,9 @@ a WebGL page waits for each canvas's frame at the rendering update, as it does f
 | S2 | Texture uploads from images, canvases, video, `ImageData` (with `UNPACK_FLIP_Y`, premultiply, colour space conversion); the drawing buffer as a shared texture; `drawImage` and `texImage2D` of a WebGL canvas | Image and video textures; WebGL canvases inside 2D canvases |
 | S3 | Extensions (`OES_*`, `EXT_*`, `WEBGL_*` as ANGLE offers them in WebGL mode), `WEBGL_lose_context` and the context events and restore; WebGL 2 (`WebGL2RenderingContext`, an OpenGL ES 3.0 context) | Sites that need extensions or WebGL 2 (map viewers, 3D libraries) |
 | S4 | Conformance: WPT `webgl/` and the Khronos WebGL conformance suite where it runs; `OffscreenCanvas` and WebGL in workers; the service in the GPU process | The conformance counts; WebGL with the renderer sandbox on |
+
+S2 so far: uploads from `ImageData`, images and canvases with the unpack parameters, and WebGL canvases in 2D
+ones (above); left: video frames, colour space conversion `NONE`, and the drawing buffer as a shared texture.
 
 Known gaps of S1 besides the later stages: GL objects are freed with the page, not when script drops the last
 reference; a canvas removed from the document keeps its context until the page goes.
