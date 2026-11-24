@@ -36,6 +36,7 @@ mod discarded_frames;
 mod dispatch_path;
 mod drag_and_drop;
 mod editing;
+mod element_reflection;
 mod elements_from_point;
 mod eme;
 mod exec_command;

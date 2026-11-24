@@ -1950,6 +1950,64 @@ impl Engine {
             .map(node_handle)
     }
 
+    /// Element reflection for `FrozenArray<Element>?` (HTML §2.6.1, "get the attr-associated elements"): the
+    /// explicitly set elements that are still in the shadow-including ancestors' trees; without any, the
+    /// elements whose IDs are the tokens of the content attribute (null without the attribute).
+    pub(crate) fn element_ref_list(
+        &self,
+        el: NodeId,
+        attr_name: &'static str,
+    ) -> Option<Vec<Handle>> {
+        let explicit = self
+            .html
+            .borrow()
+            .element_refs
+            .get(&(el, attr_name))
+            .cloned();
+        let dom = self.dom();
+        if let Some(list) = explicit {
+            return Some(
+                list.into_iter()
+                    .filter(|&e| {
+                        dom.is_alive(e)
+                            && dom.is_shadow_including_inclusive_ancestor_of(dom.root(e), el)
+                    })
+                    .map(node_handle)
+                    .collect(),
+            );
+        }
+        let value = attr(&dom, el, &LocalName::from(attr_name))?;
+        let root = dom.root(el);
+        let mut found = Vec::new();
+        for token in value.split(|c: char| matches!(c, ' ' | '\t' | '\n' | '\x0c' | '\r')) {
+            if token.is_empty() {
+                continue;
+            }
+            if let Some(d) = dom
+                .descendants(root)
+                .find(|&d| dom.is_element(d) && attr(&dom, d, &local_name!("id")) == Some(token))
+            {
+                found.push(node_handle(d));
+            }
+        }
+        Some(found)
+    }
+
+    /// The attributes whose explicitly set elements are dropped when the content attribute changes (HTML
+    /// §2.6.1: "attribute change steps").
+    pub(crate) const ELEMENT_REF_ATTRS: [&'static str; 10] = [
+        "aria-activedescendant",
+        "aria-controls",
+        "aria-describedby",
+        "aria-details",
+        "aria-errormessage",
+        "aria-flowto",
+        "aria-labelledby",
+        "aria-owns",
+        "popovertarget",
+        "commandfor",
+    ];
+
     pub(crate) fn set_element_ref(
         &self,
         cx: &mut Cx,
@@ -1964,11 +2022,12 @@ impl Engine {
             }
             Some(h) => {
                 let target = self.n(h);
+                // (the content attribute first: changing it drops the explicitly set elements)
+                self.set_attr(cx, el, attr_name, "");
                 self.html
                     .borrow_mut()
                     .element_refs
                     .insert((el, attr_name), vec![target]);
-                self.set_attr(cx, el, attr_name, "");
             }
         }
     }
@@ -2002,8 +2061,7 @@ macro_rules! aria_refs {
                         .internals_refs(this, $attr)
                         .map(|v| v.into_iter().map(node_handle).collect());
                 }
-                let el = self.n(this);
-                self.html.borrow().element_refs.get(&(el, $attr)).map(|v| v.iter().copied().map(node_handle).collect())
+                self.element_ref_list(self.n(this), $attr)
             }
             fn $set(&self, cx: &mut Cx, this: Handle, value: Option<Vec<Handle>>) -> rt::Result<()> {
                 if self.is_internals(this) {
@@ -2019,8 +2077,9 @@ macro_rules! aria_refs {
                     }
                     Some(v) => {
                         let nodes: Vec<NodeId> = v.into_iter().map(|h| self.n(h)).collect();
-                        self.html.borrow_mut().element_refs.insert((el, $attr), nodes);
+                        // (the content attribute first: changing it drops the explicitly set elements)
                         self.set_attr(cx, el, $attr, "");
+                        self.html.borrow_mut().element_refs.insert((el, $attr), nodes);
                     }
                 }
                 Ok(())

@@ -608,6 +608,13 @@ impl Engine {
                     {
                         self.dialog_open_changed(element, new_value.is_some());
                     }
+                    // (HTML §2.6.1: a changed content attribute drops the explicitly set elements)
+                    if let Some(key) = Engine::ELEMENT_REF_ATTRS
+                        .iter()
+                        .find(|a| **a == &*local_name)
+                    {
+                        self.html.borrow_mut().element_refs.remove(&(element, *key));
+                    }
                     if &*local_name == "popover" {
                         self.popover_attribute_changed(
                             cx,
