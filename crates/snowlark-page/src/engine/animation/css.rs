@@ -50,6 +50,7 @@ impl Engine {
             css: Some(css),
             css_key: Some(key.clone()),
             css_controlled: false,
+            css_effect: Some(effect),
             id: String::new(),
             timeline: Some(timeline),
             effect: Some(effect),
@@ -79,7 +80,8 @@ impl Engine {
             a.model.pending_playback_rate = None;
             a.model.pending_play = false;
             a.model.pending_pause = false;
-            a.effect
+            // (an effect script set keeps its own timing)
+            a.effect.filter(|&e| Some(e) == a.css_effect)
         });
         if let Some(e) = effect {
             self.effect_mut(e, |e| e.timing = t.timing.clone());

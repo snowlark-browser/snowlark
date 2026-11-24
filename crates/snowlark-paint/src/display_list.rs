@@ -1479,16 +1479,20 @@ impl DisplayList {
     }
 
     /// Every image the list draws: its image items', its video items' frames and its SVG filters'
-    /// `feImage`s (an image drawn twice is there twice).
+    /// `feImage`s, and those of its patterns' tiles (an image drawn twice is there twice).
     pub fn images(&self) -> impl Iterator<Item = ImageId> + '_ {
-        let items = self.items.iter().filter_map(|item| match *item {
-            Item::Image { image, .. }
-            | Item::Video {
-                image: Some(image), ..
-            } => Some(image),
-            _ => None,
-        });
-        items.chain(self.filters.iter().flat_map(FilterOp::images))
+        fn own(list: &DisplayList) -> impl Iterator<Item = ImageId> + '_ {
+            let items = list.items.iter().filter_map(|item| match *item {
+                Item::Image { image, .. }
+                | Item::Video {
+                    image: Some(image), ..
+                } => Some(image),
+                _ => None,
+            });
+            items.chain(list.filters.iter().flat_map(FilterOp::images))
+        }
+        // (a pattern's tile holds no patterns of its own)
+        own(self).chain(self.patterns.iter().flat_map(|p| own(&p.list)))
     }
 
     /// Where the images `wanted` accepts are drawn (in a video item too): each drawing's bounds as
@@ -1843,8 +1847,18 @@ impl DisplayList {
                                 .is_some_and(|j| !items[i..j].iter().any(Item::is_video)),
                             _ => false,
                         });
+                    // (a fixed group straight inside a sticky piece that is outside every group:
+                    // placed by the viewport alone, it is cut out of the sticky piece, which goes
+                    // on after it)
+                    let fixed_in_sticky = matches!(k, LayerKind::Fixed)
+                        && matches!(ctx.kind, Some(LayerKind::Sticky(_)))
+                        && contexts.len() == 2
+                        && ctx.groups.is_empty()
+                        && reads != Backdrops::Held
+                        && !inline_open;
                     let split = (match k {
                         LayerKind::Pinned => false,
+                        LayerKind::Fixed if fixed_in_sticky => true,
                         // (also in a composited box with no clip, transform or opacity around it,
                         // which `will-change` alone makes)
                         LayerKind::Fixed | LayerKind::Sticky(_) => {
@@ -1906,6 +1920,26 @@ impl DisplayList {
                         let shows = layer_end(i).is_none_or(|j| shows_anything(&items[i + 1..j]));
                         if shows && (matches!(k, LayerKind::Pinned) || (moves && !in_moving)) {
                             out.pinned = true;
+                            if out.pin_why.is_none() {
+                                let reason = if matches!(k, LayerKind::Pinned) {
+                                    "marked pinned"
+                                } else if reads == Backdrops::Held {
+                                    "backdrop filter held in a group"
+                                } else if under_readers {
+                                    "under content with a backdrop filter"
+                                } else if inline_open {
+                                    "inside a layer left in place"
+                                } else if !ctx.state.0.is_empty() {
+                                    "inside a composited piece"
+                                } else {
+                                    "inside groups"
+                                };
+                                out.pin_why = Some(PinWhy {
+                                    reason,
+                                    at: i,
+                                    end: layer_end(i).unwrap_or(items.len()),
+                                });
+                            }
                         }
                         layers.push(Role::Inline);
                         continue;
@@ -2028,6 +2062,65 @@ impl DisplayList {
         flush(&mut current, contexts.last().unwrap(), resumed, &mut out);
         out.merge_plain_pieces();
         out
+    }
+
+    /// For diagnostics: the layer group that pins this list (from [`DisplayList::split_layers`]),
+    /// its kind, the groups open around it (outermost first) and the bounds of what it draws in
+    /// the list's coordinates.
+    pub fn describe_pin(&self, why: &PinWhy) -> String {
+        let mut open: Vec<&'static str> = Vec::new();
+        for item in self.items.iter().take(why.at) {
+            match item {
+                Item::PushClipRect { .. } => open.push("clip"),
+                Item::PushClipRoundedRect { .. } => open.push("rounded clip"),
+                Item::PushClipPath { .. } => open.push("clip path"),
+                Item::PushTransform { .. } => open.push("transform"),
+                Item::PushOpacity { .. } => open.push("opacity"),
+                Item::PushFilter { .. } => open.push("filter"),
+                Item::PushMask { .. } => open.push("mask"),
+                Item::PushPlus => open.push("plus-lighter"),
+                Item::PushLayer { kind } => open.push(match kind {
+                    LayerKind::Fixed => "fixed layer",
+                    LayerKind::Sticky(_) => "sticky layer",
+                    LayerKind::Pinned => "pinned layer",
+                    LayerKind::Composited(_) => "composited layer",
+                }),
+                Item::PopClip
+                | Item::PopTransform
+                | Item::PopOpacity
+                | Item::PopFilter
+                | Item::PopMask
+                | Item::PopPlus
+                | Item::PopLayer => {
+                    open.pop();
+                }
+                _ => {}
+            }
+        }
+        let kind = match self.items.get(why.at) {
+            Some(Item::PushLayer { kind }) => format!("{kind:?}"),
+            _ => "?".into(),
+        };
+        let mut rects = Vec::new();
+        self.item_bounds(&Matrix::IDENTITY, &mut rects);
+        let mut bounds: Option<Rect> = None;
+        let end = why.end.min(self.items.len());
+        for (item, r) in self.items[why.at..end].iter().zip(&rects[why.at..end]) {
+            if item.is_drawing() && r.width > 0.0 && r.height > 0.0 {
+                bounds = Some(bounds.map_or(*r, |b| b.union(r)));
+            }
+        }
+        let b = bounds.unwrap_or_default();
+        format!(
+            "{} ({kind}, {} items) in [{}] at {:.0},{:.0} {:.0}x{:.0}",
+            why.reason,
+            end - why.at,
+            open.join(", "),
+            b.x,
+            b.y,
+            b.width,
+            b.height
+        )
     }
 
     /// Takes out the backdrop filter a piece of a split list starts with
@@ -2330,6 +2423,18 @@ pub struct SplitList {
     pub layers: Vec<SplitLayer>,
     /// Some content can only be shown right by painting the list again at each scroll position.
     pub pinned: bool,
+    /// When pinned, the first layer group that pins it and why (for diagnostics:
+    /// [`DisplayList::describe_pin`]).
+    pub pin_why: Option<PinWhy>,
+}
+
+/// The layer group that pins a split list ([`SplitList::pin_why`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PinWhy {
+    pub reason: &'static str,
+    /// The group's push item and its pop (or the list's end), in the list split.
+    pub at: usize,
+    pub end: usize,
 }
 
 impl SplitList {

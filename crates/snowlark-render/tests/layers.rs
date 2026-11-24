@@ -121,3 +121,52 @@ fn a_sticky_box_in_a_transformed_clip_stays_pinned() {
     );
     assert!(split.pinned);
 }
+
+/// A fixed box painted by a sticky header's stacking context (a chat button in the header's
+/// markup): placed by the viewport alone (CSS Positioned Layout 3 §3.2, its containing block is the
+/// viewport), it is a fixed piece of its own between the header's pieces, in paint order, and the
+/// page is not pinned.
+#[test]
+fn a_fixed_box_in_a_sticky_stacking_context_is_a_fixed_piece() {
+    let split = split(
+        "<div style='position: sticky; top: 0; z-index: 5; height: 50px; background: red'>
+           <div style='height: 10px; background: lime'></div>
+           <div style='position: fixed; right: 0; bottom: 0; width: 40px; height: 40px;
+                       background: blue'></div>
+           <div style='position: relative; height: 10px; background: yellow'></div>
+         </div>
+         <div style='height: 2000px'></div>",
+    );
+    assert!(!split.pinned);
+    let kinds: Vec<_> = split
+        .layers
+        .iter()
+        .map(|l| match l.kind {
+            Some(LayerKind::Sticky(_)) => "sticky",
+            Some(LayerKind::Fixed) => "fixed",
+            None => "page",
+            Some(_) => "other",
+        })
+        .collect();
+    assert_eq!(kinds, ["sticky", "fixed", "sticky"]);
+    let fixed = &split.layers[1];
+    assert!(fixed.state.0.is_empty());
+    assert!(fixed.list.items.iter().any(|i| matches!(
+        i,
+        Item::FillRect { rect, .. } if *rect == Rect::new(360.0, 260.0, 40.0, 40.0)
+    )));
+}
+
+/// The same fixed box under an opacity group of the sticky box stays where it is painted: the
+/// page is pinned.
+#[test]
+fn a_fixed_box_under_a_sticky_boxs_opacity_stays_pinned() {
+    let split = split(
+        "<div style='position: sticky; top: 0; z-index: 5; height: 50px; opacity: 0.5'>
+           <div style='position: fixed; right: 0; bottom: 0; width: 40px; height: 40px;
+                       background: blue'></div>
+         </div>
+         <div style='height: 2000px'></div>",
+    );
+    assert!(split.pinned);
+}

@@ -3647,6 +3647,50 @@ impl StyleEngine {
         found
     }
 
+    /// Script replaced the effect of the CSS animation `key` names (`replaced`), or gave it back its
+    /// own (Web Animations 1 §4.5.3): while replaced, its keyframes do not apply (the page samples the
+    /// new effect with its script animations). Returns whether it was found. Its element restyles.
+    pub fn css_effect_replaced(
+        &mut self,
+        dom: &Dom,
+        data: &mut StyleData,
+        key: &crate::web_animations::CssKey,
+        replaced: bool,
+    ) -> bool {
+        if key.transition {
+            return false;
+        }
+        let set_key = AnimationSetKey::new(opaque_node(key.element), key.pseudo);
+        let found = {
+            let mut sets = self.animations.sets.write();
+            let Some(set) = sets.get_mut(&set_key) else {
+                return false;
+            };
+            let mut n = 0;
+            let mut found = false;
+            for a in set.animations.iter_mut() {
+                if *a.name != *key.name {
+                    continue;
+                }
+                let index = n;
+                n += 1;
+                if index == key.index {
+                    a.effect_replaced = replaced;
+                    found = true;
+                }
+            }
+            if found {
+                set.dirty = true;
+            }
+            found
+        };
+        if found && dom.is_alive(key.element) && data.slot(key.element).is_some() {
+            add_hint(data, key.element, RestyleHint::RESTYLE_SELF);
+            mark_ancestors_dirty(dom, data, key.element);
+        }
+        found
+    }
+
     /// Whether a CSS animation or transition event may come at a later scan: something started,
     /// was canceled, or has not ended (the caller keeps asking for rendering updates).
     pub fn css_events_pending(&self) -> bool {

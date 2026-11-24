@@ -38,11 +38,11 @@ files is set by environment variables (`tools/devenv.py` reads them, falling bac
 Build the browser first (`.\dev.ps1 build --profile iter`), then:
 
 ```bash
-python tools/wpt/run.py dom/nodes --snowlark target/iter/snowlark.exe --no-reftests
+python tools/wpt/run.py dom/nodes --snowlark target/iter/snowlark.exe
 ```
 
 ```bash
-python tools/wpt/run.py --all --snowlark target/iter/snowlark.exe --jobs auto --no-reftests
+python tools/wpt/run.py --all --snowlark target/iter/snowlark.exe --jobs auto
 ```
 
 Without `--snowlark` the runner tests `target/iter/snowlark.exe` of this checkout. `run.py` starts `wptserve` if it
@@ -90,12 +90,12 @@ false alarms.
 
 ```bash
 # a merge check: the branch's suite minus the files that cannot lose, compared with the baseline
-python tools/wpt/run.py --gate --baseline main --snowlark <branch snowlark.exe> --jobs auto --no-reftests
+python tools/wpt/run.py --gate --baseline main --snowlark <branch snowlark.exe> --jobs auto
 # whenever main moves: a gate run of main, stored as the next baseline (the skipped files are copied in
 # from the baseline it was gated by, so the stored one covers the suite); 6-11 minutes instead of 30
-python tools/wpt/run.py --gate --baseline main --snowlark <main snowlark.exe> --jobs auto --save-baseline main-<commit> --no-reftests
+python tools/wpt/run.py --gate --baseline main --snowlark <main snowlark.exe> --jobs auto --save-baseline main-<commit>
 # now and then (a full run shows gains in the files the gate skips, which a gate never sees)
-python tools/wpt/run.py --all --snowlark <main snowlark.exe> --jobs auto --save-baseline main-<commit> --no-reftests
+python tools/wpt/run.py --all --snowlark <main snowlark.exe> --jobs auto --save-baseline main-<commit>
 ```
 
 - **The skip rule.** A testharness file is skipped if in the baseline it passed zero subtests: nothing passed, so

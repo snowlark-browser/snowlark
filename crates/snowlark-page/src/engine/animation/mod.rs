@@ -95,6 +95,10 @@ pub struct AnimationData {
     pub css_key: Option<snowlark_style::web_animations::CssKey>,
     /// Script drove it: its model leads and stylo's animation follows ([`Engine::css_follow_model`]).
     pub css_controlled: bool,
+    /// A `CSSAnimation`'s or `CSSTransition`'s own effect, which shows stylo's keyframes and timing.
+    /// While script has set another effect, stylo's animation applies nothing and the page samples
+    /// the effect it set ([`Engine::css_replaced_effect_samples`]).
+    pub css_effect: Option<Handle>,
     pub id: String,
     pub timeline: Option<Handle>,
     pub effect: Option<Handle>,
@@ -649,6 +653,7 @@ impl Engine {
             css: None,
             css_key: None,
             css_controlled: false,
+            css_effect: None,
             id: String::new(),
             timeline: None,
             effect: None,
@@ -713,6 +718,8 @@ impl Engine {
             self.effect_mut(e, |e| e.animation = Some(anim));
         }
         self.anim_mut(anim, |a| a.effect = effect);
+        self.css_effect_changed(anim);
+        self.animations.borrow_mut().dirty = true;
         self.with_model(cx, anim, |m, env, notes| {
             m.update_finished_state(env, false, false, notes);
             Ok(())
@@ -1337,6 +1344,14 @@ impl Engine {
         let mut per_doc: FxHashMap<NodeId, Vec<EffectSample>> = FxHashMap::default();
         // (SMIL animations go first: they sit below script animations in the composite order)
         self.smil_effect_samples(&mut per_doc);
+        // (then the effects script set on CSS animations: CSS animations sort before script
+        // animations, CSS Animations 2 §4.2)
+        for (doc, sample) in self.css_replaced_effect_samples() {
+            per_doc
+                .entry(doc)
+                .or_insert_with(|| self.animations.borrow_mut().spare.pop().unwrap_or_default())
+                .push(sample);
+        }
         for a in list {
             let (effect, removed) =
                 self.anim(a, |a| (a.effect, a.replace_state == ReplaceState::Removed));
@@ -1381,6 +1396,56 @@ impl Engine {
                 self.animations.borrow_mut().spare.push(old);
             }
         }
+    }
+
+    /// The effects script set on `CSSAnimation` objects in place of their own (Web Animations 1
+    /// §4.5.3), with their documents, in the order the objects were made. Stylo's animation applies
+    /// nothing for them ([`Engine::css_effect_changed`]).
+    fn css_replaced_effect_samples(&self) -> Vec<(NodeId, EffectSample)> {
+        let mut objects: Vec<Handle> = {
+            let st = self.animations.borrow();
+            st.css.values().copied().collect()
+        };
+        objects.sort_by_key(|h| h.get());
+        let mut out = Vec::new();
+        for a in objects {
+            let (effect, own) = self.anim(a, |a| (a.effect, a.css_effect));
+            let Some(effect) = effect.filter(|&e| Some(e) != own) else {
+                continue;
+            };
+            let Some(mut sample) = self.effect_sample(effect, false) else {
+                continue;
+            };
+            // (stylo's animation stays the one a compositor may run, and it applies nothing)
+            sample.compositor = None;
+            let dom = self.dom();
+            if !dom.is_alive(sample.target) {
+                continue;
+            }
+            out.push((dom.node_document(sample.target), sample));
+        }
+        out
+    }
+
+    /// Script set the effect of a `CSSAnimation`: stylo's animation applies its keyframes only while
+    /// the object's effect is its own.
+    pub(crate) fn css_effect_changed(&self, h: Handle) {
+        let Some(key) = self.anim(h, |a| a.css_key.clone()) else {
+            return;
+        };
+        let replaced = self.anim(h, |a| a.effect != a.css_effect);
+        let doc = {
+            let dom = self.dom();
+            if !dom.is_alive(key.element) {
+                return;
+            }
+            dom.node_document(key.element)
+        };
+        self.with_doc_renderer(doc, |r, st| {
+            r.css_effect_replaced(&key, replaced);
+            st.dirty = true;
+        });
+        self.animations.borrow_mut().dirty = true;
     }
 
     /// Freed objects leave the animation lists.

@@ -265,6 +265,20 @@ impl AlgoConstants {
         }
         cross_available_space
     }
+
+    /// Snowlark patch: the size the items' percentages resolve against. A row container's height
+    /// that its parent imposed but did not make definite (a flex item that is not stretched, whose
+    /// height comes from its contents, css-flexbox-1 §9.8) is indefinite, so an item's percentage
+    /// height behaves as `auto` (CSS2 §10.5), as in a block container of auto height. Upstream
+    /// resolved it against that height.
+    #[inline]
+    fn percent_basis(&self) -> Size<Option<f32>> {
+        if self.is_row && !self.has_definite_cross_size {
+            self.node_inner_size.with_cross(self.dir, None)
+        } else {
+            self.node_inner_size
+        }
+    }
 }
 
 /// Computes the layout of a box according to the flexbox algorithm
@@ -916,9 +930,9 @@ fn generate_anonymous_flex_items(
     // is definite. A known main size which is derived from the container's own content is treated
     // as indefinite here.
     let percent_resolution_size = if constants.known_main_size_is_definite {
-        constants.node_inner_size
+        constants.percent_basis()
     } else {
-        constants.node_inner_size.with_main(constants.dir, None)
+        constants.percent_basis().with_main(constants.dir, None)
     };
 
     // Allocate once, for the child count, when the first item is generated (some children may not generate one)
@@ -1094,7 +1108,7 @@ fn determine_flex_base_size(
 
         // Parent size for child sizing
         let cross_axis_parent_size = constants.node_inner_size.cross(dir);
-        let child_parent_size = Size::from_cross(dir, cross_axis_parent_size);
+        let child_parent_size = Size::from_cross(dir, constants.percent_basis().cross(dir));
 
         // Available space for child sizing (excluding the child's margins)
         // Min/max sizes transferred through the aspect ratio are taken into account here
@@ -2211,7 +2225,7 @@ fn determine_hypothetical_cross_size(
                         height: if constants.is_row { child_cross } else { child.target_size.height.into() },
                     },
                     known_dimensions_are_definite: item_known_dimension_definiteness(constants, child),
-                    parent_size: constants.node_inner_size,
+                    parent_size: constants.percent_basis(),
                     available_space: Size {
                         width: if constants.is_row { child_available_main } else { child_available_cross },
                         height: if constants.is_row { child_available_cross } else { child_available_main },
@@ -2283,7 +2297,7 @@ fn calculate_children_base_lines(
                         },
                     },
                     known_dimensions_are_definite: item_known_dimension_definiteness(constants, child),
-                    parent_size: constants.node_inner_size,
+                    parent_size: constants.percent_basis(),
                     // The available space passed to the child excludes the child's margins
                     available_space: Size {
                         width: if constants.is_row {
@@ -2793,7 +2807,7 @@ fn calculate_flex_item(
     constants: &AlgoConstants,
 ) {
     let container_size = constants.container_size;
-    let node_inner_size = constants.node_inner_size;
+    let node_inner_size = constants.percent_basis();
     let direction = constants.dir;
     let layout_direction = constants.layout_direction;
     let item_known_dimension_definiteness = item_known_dimension_definiteness(constants, item);

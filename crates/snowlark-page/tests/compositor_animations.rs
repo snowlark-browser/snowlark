@@ -651,3 +651,59 @@ fn changes_to_compositor_animations_reach_the_next_frame() {
     }
     assert!(failed.is_empty(), "\n{}", failed.join("\n"));
 }
+
+/// Web Animations 1 §4.5.3: setting a `CSSAnimation`'s effect replaces what it applies. The CSS
+/// keyframes stop applying and the new effect applies (`null`: nothing); the animation's own
+/// effect set back brings them back. An opacity animation a compositor could run is replaced too.
+#[test]
+fn replacing_the_effect_of_a_css_animation_replaces_its_values() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = Page::new(PageOptions {
+        net: Some(net.client()),
+        viewport: (800, 600),
+        render: Some(RenderSetup::new().unwrap()),
+        ..Default::default()
+    });
+    page.load_html(
+        "<!doctype html><style>
+           @keyframes k { from, to { width: 10px } }
+           @keyframes f { from, to { opacity: .2 } }
+           #t { width: 100px; height: 10px; animation: k 100s }
+           #o { width: 10px; height: 10px; background: teal; animation: f 100s }
+         </style><div id=t></div><div id=o></div>",
+        &url::Url::parse("http://example.test/").unwrap(),
+    );
+    assert!(page.run_until_settled(Duration::from_secs(10)), "settles");
+    page.update_the_rendering();
+    page.engine().paint(Point::ZERO, 1.0).unwrap();
+    let width = |page: &mut Page, js: &str| {
+        eval(
+            page,
+            &format!("(() => {{ const t = document.getElementById('t'); {js}; return getComputedStyle(t).width }})()"),
+        )
+    };
+    assert_eq!(
+        width(
+            &mut page,
+            "window.a = t.getAnimations()[0]; window.own = a.effect"
+        ),
+        "10px"
+    );
+    let replaced = "a.effect = new KeyframeEffect(t, [{ width: '50px' }, { width: '50px' }], \
+                    { duration: 100000 })";
+    assert_eq!(width(&mut page, replaced), "50px");
+    page.update_the_rendering();
+    assert_eq!(width(&mut page, ""), "50px", "after a rendering update");
+    assert_eq!(width(&mut page, "a.effect = null"), "100px");
+    assert_eq!(width(&mut page, "a.effect = own"), "10px");
+    assert_eq!(
+        eval(
+            &mut page,
+            "var o = document.getElementById('o'); var b = o.getAnimations()[0];
+             b.effect = new KeyframeEffect(o, [{ opacity: .7 }, { opacity: .7 }],
+                                           { duration: 100000 });
+             getComputedStyle(o).opacity",
+        ),
+        "0.7"
+    );
+}

@@ -1128,6 +1128,21 @@ impl<S: Style> Tree<'_, '_, S> {
                                     resolve_height(s.height(), parent_size.height, inset_v, sizing)
                                 });
                             }
+                            if kw.is_none()
+                                && avail.width == AvailableSpace::MinContent
+                                && (in_grid || crate::replaced::is_control(cx.tree.b(id)))
+                            {
+                                // css-sizing-3 §5.2.1c: a replaced box's min-content contribution
+                                // with a cyclic percentage `width` (a grid item in an intrinsic
+                                // track), as the block contributions have it. For a flex item
+                                // this measure is its content size suggestion (css-flexbox-1
+                                // §4.5), where engines compress a form control but keep an
+                                // image's natural width.
+                                kw = crate::replaced::min_content_percent_width(
+                                    cx.tree.b(id),
+                                    inset_h,
+                                );
+                            }
                             let content = crate::replaced::content_size(
                                 cx,
                                 id,

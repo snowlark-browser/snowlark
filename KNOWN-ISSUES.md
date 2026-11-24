@@ -39,7 +39,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `vertical-align` offers are open. (ref 36)
 - **Buttons.** `ruby-*` and `run-in` displays are not parsed. An absolutely positioned button is not sized as a replaced
   element, and `align-self: normal` still stretches a button that is a flex or grid item. (ref 216)
-- **Smaller layout differences.** Wikipedia's logo link is laid out 12px taller than in other browsers. (ref 31)
 - **Geometry under transforms.** For Intersection Observer, a frame's container is placed by its untransformed content
   box. (ref 99)
 - **Geometry reads near split inlines.** An inline box split around a block still walks the tree on geometry reads,
@@ -78,8 +77,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Fonts.** Missing: matching on `font-stretch` and `unicode-range` when selecting faces, `font-variation-settings`
   descriptors, `size-adjust`, metric override descriptors, `font-display` periods, `FontFaceSet` loading events, and
   lazy loading of faces nothing uses. Request modifiers on a `src` URL are not parsed. (ref 68)
-- **Animations.** Replacing the effect of a CSS animation (`animation.effect = ...`) does nothing: the element keeps
-  the CSS animation's values. Script animations on pseudo-elements do not reach the cascade. (ref 115, 33)
+- **Animations.** After a CSS animation's effect is replaced (`animation.effect = ...`), its events and finished
+  state still follow the CSS timing, and later changes to its `animation-*` properties still reach it. Script
+  animations on pseudo-elements do not reach the cascade. (ref 115, 33)
 - **Highlight pseudo-elements.** A `text-decoration` declared on `::selection` is not painted, and a selected
   image or other replaced element that is positioned gets no highlight.
   `::highlight()` and `::search-text` are not parsed. (ref 502)

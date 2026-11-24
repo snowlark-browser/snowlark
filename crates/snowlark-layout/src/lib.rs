@@ -404,6 +404,18 @@ impl<S: Style> LayoutTree<S> {
                     });
                 }
             }
+            // A fixed box's containing block is the viewport, not the document's scrolling box:
+            // it adds nothing to the document's scrollable overflow (CSS Overflow 3 §2.2 counts
+            // the boxes a box is the containing block of; CSS Positioned Layout 3 §2.1.1), so a
+            // page whose fixed body holds it all cannot be scrolled. Its paint bounds still count.
+            if c.fragment
+                .as_box()
+                .is_some_and(|b| b.style.position() == style::Position::Fixed)
+            {
+                let mut ignored = Rect::ZERO;
+                add_overflow(&mut ignored, &mut bounds, c);
+                continue;
+            }
             add_overflow(&mut overflow, &mut bounds, c);
         }
         let root_style = self.tree.b(root).style.with_view(logical::Flip::IDENTITY);
@@ -1019,6 +1031,7 @@ pub fn paint_part<S: Style>(
         groups: 0,
         in_layer: false,
         in_fixed: false,
+        sticky_base: None,
         port: None,
         device_scale,
         sticky_cb: Default::default(),
@@ -1071,6 +1084,7 @@ fn hit_test_into<S: Style>(root: &Fragment<S>, options: &PaintOptions, sink: &mu
         groups: 0,
         in_layer: false,
         in_fixed: false,
+        sticky_base: None,
         port: None,
         device_scale: 1.0,
         sticky_cb: Default::default(),
@@ -1103,6 +1117,7 @@ pub fn caret_position<S: Style>(
             groups: 0,
             in_layer: false,
             in_fixed: false,
+            sticky_base: None,
             port: None,
             device_scale: 1.0,
             sticky_cb: Default::default(),
@@ -1134,6 +1149,7 @@ pub fn caret_rect<S: Style>(
         groups: 0,
         in_layer: false,
         in_fixed: false,
+        sticky_base: None,
         port: None,
         device_scale: 1.0,
         sticky_cb: Default::default(),

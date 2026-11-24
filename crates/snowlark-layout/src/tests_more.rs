@@ -1060,3 +1060,87 @@ fn a_buttons_content_is_centered_in_the_block_axis() {
     assert_eq!(top(tall), 0.0);
     assert_eq!(top(div), 0.0);
 }
+
+#[test]
+fn a_percentage_width_resolves_against_zero_in_a_min_content_contribution() {
+    // css-sizing-3 §5.2.1c and §5.2.2: in the min-content contribution of a replaced box (a text
+    // field among them) a percentage `width` resolves against zero, so `100%` contributes its
+    // border and padding (then `min-width`), and `calc(50% + 50px)` 50px (the spec's example). An
+    // image's percentage contributes nothing, as engines do. Checked in a grid's min-content track
+    // and in a `width: min-content` block.
+    let field = || {
+        control(
+            ControlKind::TextField {
+                text: "".into(),
+                placeholder: false,
+                size: 20,
+            },
+            true,
+        )
+    };
+    let calc = SizeValue::LengthPercentage(LengthPercentage::linear(50.0, Some(0.5)));
+    let case = |grid: bool, content: ReplacedContent, f: &dyn Fn(&mut TestStyle)| {
+        let mut t = T::new();
+        let r0 = t.root();
+        let container = t.doc.block(r0, |s| {
+            if grid {
+                s.display = Display::GRID;
+                s.width = SizeValue::px(500.0);
+                s.grid_template_columns = crate::tests_grid::tracks(vec![TrackListItem::Track(
+                    TrackSize::Breadth(TrackBreadth::MinContent),
+                )]);
+            } else {
+                s.width = SizeValue::MinContent;
+            }
+        });
+        let item = t.doc.element(container, "input", |s| {
+            s.display = Display::BLOCK;
+            f(s);
+        });
+        t.doc.replace(item, content);
+        let f = t.run(800.0, 600.0);
+        rect(&f, item).width
+    };
+    let full_width = |s: &mut TestStyle| {
+        s.width = SizeValue::percent(100.0);
+        s.min_width = SizeValue::px(2.0);
+    };
+    let calc_width = |s: &mut TestStyle| s.width = calc;
+    let image = || ReplacedContent::image(snowlark_paint::ImageId(1), 100.0, 50.0);
+    let button = || {
+        control(
+            ControlKind::Button {
+                label: "Send".into(),
+            },
+            true,
+        )
+    };
+    for grid in [true, false] {
+        assert_eq!(case(grid, field(), &full_width), 2.0, "grid {grid}");
+        // a 50px track or container, of which the field takes 50% + 50px
+        assert_eq!(case(grid, field(), &calc_width), 75.0, "grid {grid}");
+        // a 0px one: the image is 50px
+        assert_eq!(case(grid, image(), &calc_width), 50.0, "grid {grid}");
+        // A button-like input is not compressible: it contributes its natural width.
+        let natural = case(grid, button(), &|_| {});
+        assert!(natural > 2.0);
+        assert_eq!(case(grid, button(), &full_width), natural, "grid {grid}");
+    }
+    // A flex item's content size suggestion (css-flexbox-1 §4.5) keeps an image's natural width:
+    // `width: 100%; flex: 0 0 10px` in a 100px container stays 100px wide (WPT
+    // css-flexbox/flex-aspect-ratio-img-row-017.html).
+    let mut t = T::new();
+    let r0 = t.root();
+    let flex = t.doc.block(r0, |s| {
+        s.display = Display::FLEX;
+        s.width = SizeValue::px(100.0);
+    });
+    let img = t.doc.element(flex, "img", |s| {
+        s.width = SizeValue::percent(100.0);
+        s.flex_shrink = 0.0;
+        s.flex_basis = FlexBasis::LengthPercentage(LengthPercentage::px(10.0));
+    });
+    t.doc.replace(img, image());
+    let f = t.run(800.0, 600.0);
+    assert_eq!(rect(&f, img).width, 100.0);
+}

@@ -3525,6 +3525,27 @@ impl Renderer {
             .css_animation_keyframes(&dom, &doc.data, element, name)
     }
 
+    /// Script replaced a CSS animation's effect, or gave it back (see
+    /// [`snowlark_style::StyleEngine::css_effect_replaced`]).
+    pub fn css_effect_replaced(
+        &mut self,
+        key: &snowlark_style::web_animations::CssKey,
+        replaced: bool,
+    ) -> bool {
+        let Some(doc) = self.doc.as_deref_mut() else {
+            return false;
+        };
+        let dom_rc = doc.dom.clone();
+        let dom = dom_rc.borrow();
+        let found = doc
+            .engine
+            .css_effect_replaced(&dom, &mut doc.data, key, replaced);
+        if found {
+            doc.needs_restyle = true;
+        }
+        found
+    }
+
     /// Script controls a CSS animation or transition (see [`snowlark_style::StyleEngine::css_control`]).
     pub fn css_control(
         &mut self,

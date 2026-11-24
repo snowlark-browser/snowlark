@@ -1091,10 +1091,26 @@ impl Engine {
         if name.is_empty() {
             return None;
         }
-        let child = self
-            .child_windows(window)
-            .into_iter()
-            .find(|&w| self.window_name(w) == name)?;
+        // The first child window by its name, in tree order of the containers: found from the
+        // containers themselves, not a walk of the document (script asks the global for names on
+        // every lookup of a global it does not define, and pages with ad frames do so all the time).
+        let doc = self.document_of_window(window)?;
+        let child = {
+            let dom = self.dom();
+            let f = self.frames.borrow();
+            f.by_container
+                .iter()
+                .filter(|&(&c, &id)| {
+                    !f.list[id].discarded
+                        && f.list[id].name == name
+                        && dom.is_alive(c)
+                        && dom.node_document(c) == doc
+                        && dom.root(c) == doc
+                })
+                .map(|(&c, &id)| (c, f.list[id].window))
+                .min_by(|a, b| dom.tree_order(a.0, b.0))
+                .map(|(_, w)| w)
+        }?;
         let same_origin = {
             let f = self.frames.borrow();
             let (o, c) = (f.origins.get(&window)?, f.origins.get(&child)?);

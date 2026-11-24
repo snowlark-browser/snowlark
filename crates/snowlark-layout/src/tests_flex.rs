@@ -544,3 +544,62 @@ fn safe_static_position_falls_back_only_when_overflowing_the_containing_block() 
     let f = t.run(400.0, 400.0);
     assert_eq!(rect(&f, abs).x, 95.0);
 }
+
+#[test]
+fn a_percentage_height_in_a_flex_item_that_is_not_stretched_is_auto() {
+    // css-flexbox-1 §9.8: a flex item's cross size is definite when it is stretched (or its own style
+    // makes it so); otherwise its height comes from its contents and is indefinite, so a percentage
+    // height inside it behaves as `auto` (CSS2 §10.5). A row flex container `inner`, an item of
+    // `outer`, holds a 50px box and an item with `height: 100%` whose content is 38px tall.
+    fn case(outer_style: impl FnOnce(&mut TestStyle)) -> (f32, f32) {
+        let mut t = T::new();
+        let r0 = t.root();
+        let outer = t.doc.block(r0, |s| {
+            s.display = Display::FLEX;
+            outer_style(s);
+        });
+        let inner = t.doc.block(outer, |s| {
+            s.display = Display::FLEX;
+            s.align_items = Align::Center;
+        });
+        t.doc.block(inner, |s| {
+            s.width = SizeValue::px(32.0);
+            s.height = SizeValue::px(50.0);
+        });
+        let item = t.doc.block(inner, |s| {
+            s.display = Display::FLEX;
+            s.height = SizeValue::percent(100.0);
+            s.margin = [
+                LengthPercentageAuto::px(6.0),
+                LengthPercentageAuto::px(0.0),
+                LengthPercentageAuto::px(6.0),
+                LengthPercentageAuto::px(0.0),
+            ];
+        });
+        t.doc.block(item, |s| {
+            s.width = SizeValue::px(140.0);
+            s.height = SizeValue::px(38.0);
+        });
+        let f = t.run(400.0, 400.0);
+        (rect(&f, inner).height, rect(&f, item).height)
+    }
+    // Centred in the outer container: `inner` is 50px from its contents; the item is 38px, not 50.
+    assert_eq!(case(|s| s.align_items = Align::Center), (50.0, 38.0));
+    // The same in a multi-line container and in one whose own height is definite.
+    assert_eq!(
+        case(|s| {
+            s.align_items = Align::Center;
+            s.flex_wrap = FlexWrap::Wrap;
+        }),
+        (50.0, 38.0)
+    );
+    assert_eq!(
+        case(|s| {
+            s.align_items = Align::Center;
+            s.height = SizeValue::px(80.0);
+        }),
+        (50.0, 38.0)
+    );
+    // Stretched, `inner`'s height is definite and the item's 100% resolves against it.
+    assert_eq!(case(|_| {}), (50.0, 50.0));
+}

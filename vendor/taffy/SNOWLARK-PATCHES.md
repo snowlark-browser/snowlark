@@ -63,6 +63,11 @@ the source; `git log -p vendor/taffy` shows the diff.
     percentage padding and border resolved to zero there in a row container. css-flexbox-1 §4.2 resolves
     them against the container's inner width, as `FlexItem::padding` is; the difference is added to the
     measured base size and min-content size (`pb_correction`). Upstream measured them as zero.
+13. **Percentage heights in a row container whose height is not definite** (`compute/flexbox.rs`,
+    `AlgoConstants::percent_basis`): a height its parent imposed without making it definite (a flex item
+    that is not stretched, sized from its contents, css-flexbox-1 §9.8) is not a basis for the items'
+    percentage heights and min/max heights, nor the parent size their own layout resolves against; they
+    behave as `auto` (CSS2 §10.5). Upstream resolved them against that height.
 
 To move to a newer taffy: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `.\dev.ps1 test --release --package snowlark-layout`.

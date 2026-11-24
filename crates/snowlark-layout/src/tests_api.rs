@@ -1556,8 +1556,8 @@ fn fixed_backgrounds_are_positioned_in_the_viewport() {
 fn a_gradient_repeated_along_an_axis_it_does_not_change_on_is_one_item() {
     // CSS Backgrounds 3 §3.4: `repeat-x` tiles a 1px-wide vertical gradient across the box. Its
     // tiles meet edge to edge and each is the same at every x, so together they are the gradient
-    // over the whole row: one item, not one a pixel. A horizontal gradient differs along x, and
-    // stays one item a tile.
+    // over the whole row: one item, not one a pixel. A horizontal gradient differs along x: its
+    // 200 tiles are one pattern fill of the gradient in a 1px tile.
     let gradient = |angle: f32| {
         Image::LinearGradient(Arc::new(LinearGradient {
             angle,
@@ -1601,23 +1601,87 @@ fn a_gradient_repeated_along_an_axis_it_does_not_change_on_is_one_item() {
         &PaintOptions::viewport(Size::new(200.0, 200.0)),
         &mut b,
     );
-    let gradients: Vec<snowlark_paint::Rect> = b
-        .build()
+    let list = b.build();
+    let gradients = |items: &[Item]| -> Vec<snowlark_paint::Rect> {
+        items
+            .iter()
+            .filter_map(|i| match i {
+                Item::LinearGradient { rect, .. } => Some(*rect),
+                _ => None,
+            })
+            .collect()
+    };
+    assert_eq!(
+        gradients(&list.items),
+        [snowlark_paint::Rect::new(0.0, 0.0, 200.0, 50.0)]
+    );
+    let fills: Vec<_> = list
         .items
         .iter()
         .filter_map(|i| match i {
-            Item::LinearGradient { rect, .. } => Some(*rect),
+            Item::FillPattern { rect, pattern, .. } => Some((*rect, *pattern)),
             _ => None,
         })
         .collect();
-    assert_eq!(gradients.len(), 1 + 200, "{gradients:?}");
+    assert_eq!(fills.len(), 1, "{fills:?}");
     assert_eq!(
-        gradients[0],
-        snowlark_paint::Rect::new(0.0, 0.0, 200.0, 50.0)
+        fills[0].0,
+        snowlark_paint::Rect::new(0.0, 50.0, 200.0, 50.0)
     );
+    let p = &list.patterns[fills[0].1 as usize];
+    assert_eq!(p.tile, Size::new(1.0, 50.0));
     assert_eq!(
-        gradients[1],
-        snowlark_paint::Rect::new(0.0, 50.0, 1.0, 50.0)
+        gradients(&p.list.items),
+        [snowlark_paint::Rect::new(0.0, 0.0, 1.0, 50.0)]
+    );
+}
+
+#[test]
+fn a_small_image_repeated_over_a_large_box_is_one_pattern_fill() {
+    // CSS Backgrounds 3 §3.4: a 4px image repeated over a 400×300 box is 7500 tiles edge to
+    // edge: one pattern fill of the image in a 4px tile over the box, not an item per tile.
+    let mut t = T::new();
+    let r0 = t.root();
+    t.doc.block(r0, |s| {
+        s.width = SizeValue::px(400.0);
+        s.height = SizeValue::px(300.0);
+        s.background_layers = vec![BackgroundLayer {
+            image: Image::raster(snowlark_paint::ImageId(7), 4.0, 4.0),
+            ..BackgroundLayer::default()
+        }];
+    });
+    let f = t.run(800.0, 600.0);
+    let mut b = DisplayListBuilder::new();
+    paint_with(
+        &f,
+        &t.text,
+        &PaintOptions::viewport(Size::new(800.0, 600.0)),
+        &mut b,
+    );
+    let list = b.build();
+    assert!(!list.items.iter().any(|i| matches!(i, Item::Image { .. })));
+    let fills: Vec<_> = list
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            Item::FillPattern { rect, pattern, .. } => Some((*rect, *pattern)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(fills.len(), 1);
+    assert_eq!(
+        fills[0].0,
+        snowlark_paint::Rect::new(0.0, 0.0, 400.0, 300.0)
+    );
+    let p = &list.patterns[fills[0].1 as usize];
+    assert_eq!(p.tile, Size::new(4.0, 4.0));
+    assert_eq!(
+        p.list
+            .items
+            .iter()
+            .filter(|i| matches!(i, Item::Image { .. }))
+            .count(),
+        1
     );
 }
 

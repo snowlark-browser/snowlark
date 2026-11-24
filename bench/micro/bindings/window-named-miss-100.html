@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>bindings/window-named-miss-100</title>
+<!-- Look up 100 names the global does not define, in a document of 2000 elements with three
+     child frames: each lookup asks the Window's named properties (HTML named access on the Window
+     object), as script does for every global it tests for. -->
+<body>
+<div id="host"></div>
+<iframe></iframe><iframe></iframe><iframe name="ad"></iframe>
+<script src="../resources/runner.js"></script>
+<script>
+document.getElementById('host').innerHTML =
+  MicroBench.repeat(500, (i) => '<div><p><span>' + i + '</span><b></b></p></div>');
+const names = [];
+for (let i = 0; i < 100; i++) names.push('notDefined' + i);
+let n = 0;
+MicroBench.run({
+  run() {
+    for (let i = 0; i < names.length; i++) {
+      if (window[names[i]] === undefined) n++;
+    }
+  },
+});
+</script>

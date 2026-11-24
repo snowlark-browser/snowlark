@@ -280,6 +280,41 @@ pub(crate) fn natural_content_width<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> 
     .0
 }
 
+/// Whether the replaced box is a form control.
+pub(crate) fn is_control<S: Style>(b: &LayoutBox<S>) -> bool {
+    matches!(&b.data, BoxData::Replaced(c) if c.control.is_some())
+}
+
+/// The border-box width a replaced box with a percentage `width` contributes to a min-content size
+/// (css-sizing-3 §5.2.1c), or `None` when its `width` has no percentage. A form control's percentage
+/// resolves against zero (§5.2.2's compressible elements: `calc(50% + 50px)` contributes 50px, as
+/// the spec's example has it), except a button-like input's (`button`, `submit`, `reset`, `color`,
+/// `file`), which is not compressible: `None`, its natural width. An image or other replaced content
+/// contributes its border and padding only, as engines do.
+pub(crate) fn min_content_percent_width<S: Style>(b: &LayoutBox<S>, pb: f32) -> Option<f32> {
+    if !percent_size(b.style.width()) {
+        return None;
+    }
+    let control = match &b.data {
+        BoxData::Replaced(c) => c.control.as_ref(),
+        _ => None,
+    };
+    if control.is_some_and(|c| {
+        matches!(
+            c.kind,
+            ControlKind::Button { .. } | ControlKind::Color(_) | ControlKind::File { .. }
+        )
+    }) {
+        return None;
+    }
+    Some(if control.is_some() {
+        crate::sizing::resolve_height(b.style.width(), Some(0.0), pb, b.style.box_sizing())
+            .unwrap_or(pb)
+    } else {
+        pb
+    })
+}
+
 /// The border-box min/max-content contributions (CSS Sizing 3 §5.2: a replaced box with a percentage
 /// or auto width contributes its natural size; `max-width: 100%`-style compressible cases give zero
 /// min-content).
@@ -301,9 +336,14 @@ pub(crate) fn contribution_widths<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> (f
         true,
     );
     let w = w + e.pb_h();
-    let percent_width = percent_size(b.style.width())
-        || matches!(b.style.max_width(), MaxSizeValue::LengthPercentage(lp) if lp.has_percent());
-    let min = if percent_width { e.pb_h() } else { w };
+    let min = if let Some(min) = min_content_percent_width(b, e.pb_h()) {
+        min.min(w)
+    } else if matches!(b.style.max_width(), MaxSizeValue::LengthPercentage(lp) if lp.has_percent())
+    {
+        e.pb_h()
+    } else {
+        w
+    };
     (min, w)
 }
 

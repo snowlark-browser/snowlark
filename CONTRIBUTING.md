@@ -128,14 +128,14 @@ Conformance work is done by spec area and measured with WPT. `tools/wpt/run.py` 
 reftests in Snowlark and summarises them per area; [tools/wpt/README.md](tools/wpt/README.md) has the details.
 
 ```powershell
-python tools/wpt/run.py dom/nodes css/css-flexbox --snowlark target/iter/snowlark.exe --jobs auto --no-reftests
+python tools/wpt/run.py dom/nodes css/css-flexbox --snowlark target/iter/snowlark.exe --jobs auto
 ```
 
 The merge check compares a run, subtest by subtest, with a stored baseline, re-runs apparent losses alone and
 exits non-zero on a real one:
 
 ```powershell
-python tools/wpt/run.py --gate --baseline <name> --snowlark target/iter/snowlark.exe --jobs auto --no-reftests
+python tools/wpt/run.py --gate --baseline <name> --snowlark target/iter/snowlark.exe --jobs auto
 ```
 
 A baseline comes from a gate or full run of `main` (`--save-baseline <name>`). Known flaky subtests are listed

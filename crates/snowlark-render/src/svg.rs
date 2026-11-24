@@ -885,6 +885,39 @@ impl SvgImages {
                         store, at, pass, image, dest, src, rendering, &m, &clip, layers,
                     );
                 }
+                // (a pattern fill's images, a background repeated over many tiles: drawn in the
+                // tile's space, through the fill's transform)
+                Item::FillPattern {
+                    pattern, transform, ..
+                } => {
+                    let m = transform.then(stack.last().unwrap());
+                    let Some(p) = list.patterns.get_mut(*pattern as usize) else {
+                        continue;
+                    };
+                    for inner in p.list.items.iter_mut() {
+                        if let Item::Image {
+                            image,
+                            dest,
+                            src,
+                            rendering,
+                            ..
+                        } = inner
+                        {
+                            self.resolve_one(
+                                store,
+                                at,
+                                pass,
+                                image,
+                                dest,
+                                src,
+                                rendering,
+                                &m,
+                                &snowlark_paint::Rect::infinite(),
+                                layers,
+                            );
+                        }
+                    }
+                }
                 // (an SVG filter's `feImage`s: drawn where the filter's content is)
                 Item::PushFilter { filters: range, .. }
                 | Item::BackdropFilter { filters: range, .. } => {

@@ -617,6 +617,9 @@ pub(crate) struct Painter<'k, K> {
     pub in_layer: bool,
     /// Painting the content of a layer attached to the viewport ([`LayerKind::Fixed`]).
     pub in_fixed: bool,
+    /// Painting the content of a sticky layer that is outside every group: `groups` when it was
+    /// pushed (a fixed box in it, with no group opened since, is a fixed layer of its own).
+    pub sticky_base: Option<u32>,
     /// The scrollport of the nearest scroll container around what is being painted (`None`: the
     /// viewport's).
     pub port: Option<Rect>,
@@ -930,13 +933,17 @@ impl<K> Painter<'_, K> {
             && self.groups == 0
             && !self.in_layer
             && matches!(d.anchor, Anchor::Sticky(_));
+        // A fixed box painted by a sticky box's stacking context, with nothing but the sticky
+        // layer around it, is placed by the viewport alone: a layer of its own between the sticky
+        // layer's pieces, in the same paint order.
+        let in_sticky = !d.doc_clip && self.sticky_base == Some(self.groups);
         let layer = match d.anchor {
             _ if !self.layers => None,
             Anchor::Scroll => None,
             // (a fixed box painted in a fixed box's layer, whose stacking context it belongs to,
             // stays in place with it)
             Anchor::Viewport if self.in_fixed && !d.doc_clip => None,
-            Anchor::Viewport if free => Some(LayerKind::Fixed),
+            Anchor::Viewport if free || in_sticky => Some(LayerKind::Fixed),
             Anchor::Sticky(c) if free || clipped => Some(LayerKind::Sticky(c)),
             _ => Some(LayerKind::Pinned),
         };
@@ -952,15 +959,21 @@ impl<K> Painter<'_, K> {
         if let Some(kind) = layer {
             self.sink.push_layer(kind);
         }
-        let was = (self.in_layer, self.in_fixed);
+        let was = (self.in_layer, self.in_fixed, self.sticky_base);
         self.in_layer = was.0 || layer.is_some();
         self.in_fixed = match layer {
             Some(LayerKind::Fixed) => true,
             Some(_) => false,
             None => was.1,
         };
+        self.sticky_base = match layer {
+            // (a sticky layer outside every group: the compositor moves it alone)
+            Some(LayerKind::Sticky(_)) if !was.0 && self.groups == opened => Some(self.groups),
+            Some(_) => None,
+            None => was.2,
+        };
         self.paint_deferred_content(d, adopted, split.map_or(&d.clip, |(_, inside)| inside));
-        (self.in_layer, self.in_fixed) = was;
+        (self.in_layer, self.in_fixed, self.sticky_base) = was;
         if layer.is_some() {
             self.sink.pop_layer();
         }
@@ -3576,6 +3589,36 @@ fn paint_image_layers(
             Some((y, h)) if constant_along(&layer.image, false) => (vec![y], h),
             _ => (ys, size.height),
         };
+        // Many tiles left (a small image repeated over a large box) are one pattern fill: the
+        // image drawn once in a tile of its size and repeated over the tiles' span, not an item
+        // per tile (a few pixels' dots repeated over a page are tens of thousands of tiles). An
+        // axis with one tile limits the fill to it; `space` leaves gaps a pattern does not have.
+        let extent = |starts: &[f32], step: f32, repeat: BackgroundRepeat| match starts {
+            [one] => Some((*one, step)),
+            _ => span(starts, step, repeat),
+        };
+        if xs.len() * ys.len() > PATTERN_TILES {
+            if let (Some((x, w)), Some((y, h))) = (
+                extent(&xs, width, layer.repeat.0),
+                extent(&ys, height, layer.repeat.1),
+            ) {
+                let mut tile = DisplayListBuilder::new();
+                draw_image(
+                    &mut tile,
+                    &layer.image,
+                    Rect::new(0.0, 0.0, width, height),
+                    rendering,
+                );
+                out.fill_pattern(
+                    Rect::new(x, y, w, h),
+                    Size::new(width, height),
+                    Matrix::translation(x, y),
+                    tile.build(),
+                );
+                out.pop_clip();
+                continue;
+            }
+        }
         for &y in &ys {
             for &x in &xs {
                 draw_image(out, &layer.image, Rect::new(x, y, width, height), rendering);
@@ -3584,6 +3627,9 @@ fn paint_image_layers(
         out.pop_clip();
     }
 }
+
+/// Above this many tiles a background layer is painted as one pattern fill.
+const PATTERN_TILES: usize = 64;
 
 /// Whether `image` is the same at every point along the x axis (`horizontal`) or the y axis, at
 /// any size: a color, or a linear gradient whose line runs along the other axis (its colors vary

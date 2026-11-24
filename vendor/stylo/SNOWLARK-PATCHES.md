@@ -550,5 +550,11 @@ the source; `git log -p vendor/stylo` shows the diff.
    selector against the element, where the selectors crate's stateless pseudo-element matching refuses any
    pseudo-class after the pseudo-element.
 
+96. **A CSS animation whose effect script replaced** (`servo/animation.rs`, Web Animations 1 §4.5.3, CSS
+   Animations 2 §4.1): `Animation::effect_replaced`, set through the page's `CSSAnimation` object, makes the
+   animation apply no keyframes (`get_property_declaration_at_time`) and animate no property
+   (`properties_changed()` is empty, so no compositor runs it); its timing still runs. It survives the
+   animation's updates from a new style (`update_from_other`).
+
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

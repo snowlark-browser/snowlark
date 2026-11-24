@@ -766,3 +766,27 @@ fn custom_scroll_bars_are_drawn_in_their_space() {
     });
     assert_eq!(thumb, Some(snowlark_paint::Rect::new(92.0, 0.0, 8.0, 40.0)));
 }
+
+#[test]
+fn fixed_boxes_add_nothing_to_the_documents_scrollable_overflow() {
+    // A page that locks scrolling by fixing its body (as consent dialogs do): the fixed box's
+    // containing block is the viewport, so the document cannot scroll to its content (CSS
+    // Overflow 3 §2.2). An absolutely positioned box of the initial containing block still counts.
+    let mut t = T::new();
+    let r0 = t.root();
+    let fixed = t.doc.block(r0, |s| {
+        s.position = Position::Fixed;
+        s.width = SizeValue::px(100.0);
+        s.height = SizeValue::px(5000.0);
+    });
+    let f = t.run(800.0, 600.0);
+    assert_eq!(rect(&f, fixed).height, 5000.0);
+    assert_eq!(f.overflow.bottom(), 600.0);
+    t.doc.block(r0, |s| {
+        s.position = Position::Absolute;
+        s.width = SizeValue::px(100.0);
+        s.height = SizeValue::px(3000.0);
+    });
+    let f = t.run(800.0, 600.0);
+    assert_eq!(f.overflow.bottom(), 3000.0);
+}

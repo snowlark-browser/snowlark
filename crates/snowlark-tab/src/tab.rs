@@ -878,6 +878,9 @@ struct TabRenderer {
     repaint: bool,
     /// `SNOWLARK_TAB_STATS=1`: a line per batch of input with the time it took.
     stats: bool,
+    /// With `stats`: the last reason printed for a pinned list.
+    pin_why: Option<String>,
+    big_list: usize,
     /// Tells the window when a pass of the loop starts and ends ([`Liveness`]).
     live: Arc<Liveness>,
     /// The views of the page's windows the browser shows as tabs of their own
@@ -1172,6 +1175,8 @@ fn run(
         last_frame: None,
         repaint: false,
         stats,
+        pin_why: None,
+        big_list: 0,
         live,
         views: Vec::new(),
         attached: Vec::new(),
@@ -2075,6 +2080,32 @@ impl TabRenderer {
             snowlark_paint::layer_animation::fit_budget(&mut list.animations);
             let split = list.split_layers();
             attempt += 1;
+            if self.stats {
+                let why = split.pin_why.as_ref().map(|w| list.describe_pin(w));
+                if why != self.pin_why {
+                    if let Some(w) = &why {
+                        eprintln!("[tab {}] pinned: {w}", self.id);
+                    }
+                    self.pin_why = why;
+                }
+                if list.items.len() > 100_000 && list.items.len() > self.big_list * 11 / 10 {
+                    self.big_list = list.items.len();
+                    let mut kinds: std::collections::HashMap<String, usize> = Default::default();
+                    for item in &list.items {
+                        let d = format!("{item:?}");
+                        let k = d.split([' ', '(', '{']).next().unwrap_or("").to_owned();
+                        *kinds.entry(k).or_default() += 1;
+                    }
+                    let mut kinds: Vec<_> = kinds.into_iter().collect();
+                    kinds.sort_by_key(|k| std::cmp::Reverse(k.1));
+                    kinds.truncate(8);
+                    eprintln!(
+                        "[tab {}] list of {} items: {kinds:?}",
+                        self.id,
+                        list.items.len()
+                    );
+                }
+            }
             self.pinned = split.pinned;
             if split.pinned != pinned && attempt < 2 {
                 continue;
