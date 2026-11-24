@@ -6,10 +6,10 @@
 
     python tools/wpt/run.py dom url encoding            # those directories of the WPT checkout
     python tools/wpt/run.py dom/nodes --jobs 4
-    python tools/wpt/run.py --all                       # every directory in AREAS below
+    python tools/wpt/run.py --all                       # every directory with tests, and every variant (--variants)
 
-The WPT checkout is SNOWLARK_WPT (default: `wpt` next to this repository; tools/devenv.py), sparse-checked-out
-with the directories to test plus resources/, common/, tools/ and docs/commands.json. wptserve is started if it
+The WPT checkout is SNOWLARK_WPT (default: `wpt` next to this repository; tools/devenv.py); a run needs the
+directories it tests plus resources/, common/, tools/ and docs/commands.json. wptserve is started if it
 isn't running (tools/wpt/serve-config.json: http on 8000, web-platform.test mapped to 127.0.0.1 inside
 Snowlark through SNOWLARK_HOST_RESOLVER_RULES, so the system's hosts file stays untouched).
 
@@ -19,6 +19,7 @@ Reftests (see REFTESTS.md) run after the testharness tests with the engine's `--
 
 Merge checks (see README.md, gate.py):
     python tools/wpt/run.py --gate --baseline <name> --snowlark <exe> --jobs auto   # the suite minus files that cannot lose
+    python tools/wpt/run.py --gate --affected --baseline <name> --snowlark <exe>    # only the directories the branch can change
     python tools/wpt/run.py --gate --baseline <old> --save-baseline <new> --snowlark <main exe>   # the next baseline, from a gate run
     python tools/wpt/run.py --all --save-baseline <name> --snowlark <exe>           # a full run as a baseline (now and then)
     python tools/wpt/run.py css/css-grid --repeat 3 --snowlark <exe>                # repeat runs: updates flaky.json
@@ -45,9 +46,15 @@ HOST_RULES = 'MAP *.web-platform.test 127.0.0.1, MAP web-platform.test 127.0.0.1
 WPT_CA = os.path.join(WPT, 'tools', 'certs', 'cacert.pem')
 
 
+# `.h2.` files load from wptserve's HTTP/2 port (TLS with ALPN, the same test CA).
+H2_BASE = 'https://web-platform.test:9000'
+
+
 def full_url(path):
-    """The URL a test path loads from: https for `.https.` files (only listed with --https), else http."""
-    return (HTTPS_BASE if '.https.' in path.split('?')[0] else BASE) + path
+    """The URL a test path loads from: HTTP/2 for `.h2.` files, https for `.https.` files (both only listed with
+    --https or --variants), else http."""
+    plain = path.split('?')[0]
+    return (H2_BASE if '.h2.' in plain else HTTPS_BASE if '.https.' in plain else BASE) + path
 
 
 def url_path(url):
@@ -78,9 +85,110 @@ def meta_lines(js):
     return [m.groups() for m in re.finditer(r'^//\s*META:\s*(\w+)=(.*)$', js, re.M)]
 
 
-def tests_in(area, skip_slow=False, https=False):
+# Top-level directories of the checkout that hold no tests of the suite (support code, the WebDriver tests, which
+# need a driver, and tooling).
+NOT_AREAS = {'resources', 'common', 'tools', 'docs', 'webdriver', 'conformance-checkers', '_venv3', 'node_modules'}
+
+
+def all_areas():
+    """Every directory with tests, for `--all`: AREAS (the curated list, which keeps the finer split of css/ and
+    html/ in the summaries), then each top-level directory of the checkout it does not cover, and the
+    subdirectories of css/ and html/ (and of the other directories AREAS only partly names) it leaves out."""
+    covered = set(AREAS)
+
+    def partly(path):
+        return any(a.startswith(path + '/') for a in covered)
+
+    out = list(AREAS)
+
+    def add_missing(rel):
+        root = os.path.join(WPT, rel) if rel else WPT
+        try:
+            names = sorted(os.listdir(root))
+        except OSError:
+            return
+        for name in names:
+            child = f'{rel}/{name}' if rel else name
+            if name.startswith('.') or name in SKIP_DIRS or (not rel and name in NOT_AREAS):
+                continue
+            if not os.path.isdir(os.path.join(root, name)):
+                continue
+            if child in covered:
+                continue
+            if partly(child):
+                add_missing(child)
+            else:
+                out.append(child)
+
+    add_missing('')
+    return out
+
+
+# The globals a `.any.js` file runs in (its `// META: global=` line), as the WPT manifest names them: the
+# suffix of the test URL (`.any.<global>.html` unless given). The default is a window and a dedicated worker; a
+# keyword that stands for several (`worker`, `shadowrealm`) lists them. (tools/manifest/sourcefile.py)
+ANY_SUFFIX = {'window': '.any.html', 'dedicatedworker': '.any.worker.html', 'dedicatedworker-module': '.any.worker-module.html',
+              'shadowrealm-in-serviceworker': '.https.any.shadowrealm-in-serviceworker.html',
+              'shadowrealm-in-audioworklet': '.https.any.shadowrealm-in-audioworklet.html'}
+ANY_GLOBALS = {'window', 'window-module', 'serviceworker', 'serviceworker-module', 'sharedworker', 'sharedworker-module',
+               'dedicatedworker', 'dedicatedworker-module', 'worker-module', 'shadowrealm-in-window',
+               'shadowrealm-in-shadowrealm', 'shadowrealm-in-dedicatedworker', 'shadowrealm-in-sharedworker',
+               'shadowrealm-in-serviceworker', 'shadowrealm-in-audioworklet'}
+ANY_LONGHAND = {'worker': {'dedicatedworker', 'sharedworker', 'serviceworker'},
+                'shadowrealm': {'shadowrealm-in-window', 'shadowrealm-in-shadowrealm', 'shadowrealm-in-dedicatedworker',
+                                'shadowrealm-in-sharedworker', 'shadowrealm-in-serviceworker', 'shadowrealm-in-audioworklet'}}
+
+
+def any_globals(value):
+    """The globals a `// META: global=` value (all such lines joined by commas; '' without one) selects."""
+    if not value:
+        return {'window', 'dedicatedworker'}
+    out = set()
+    for item in (v.strip() for v in value.split(',')):
+        out |= ANY_LONGHAND.get(item, {item} if item in ANY_GLOBALS else set())
+    return out
+
+
+def any_url(rel, global_name):
+    """The URL of `a/b.any.js` (rel) in a global, as the manifest forms it."""
+    url = rel.replace('.any.', '.')
+    suffix = ANY_SUFFIX.get(global_name, f'.any.{global_name}.html')
+    if '.https.' in url and suffix.startswith('.https.'):
+        url = url.replace('.https.', '.')
+    elif '.h2.' in url and suffix.startswith('.h2.'):
+        url = url.replace('.h2.', '.')
+    return '/' + url[:-3] + suffix
+
+
+TEST262_FRONTMATTER = re.compile(r'/\*---(.*)---\*/', re.S)
+
+
+def test262_url(rel, text):
+    """The URL of a test262 test (a `.js` file under a `test262` directory) as the manifest forms it, or None for a
+    file that is not one (no frontmatter, or a `_FIXTURE.js`). `.test262[-module|.strict].html` is served by
+    wptserve around the file. (tools/manifest/test262.py)"""
+    if rel.endswith('_FIXTURE.js'):
+        return None
+    m = TEST262_FRONTMATTER.search(text)
+    if not m:
+        return None
+    flags = set()
+    inline = re.search(r'^flags:\s*\[([^\]]*)\]', m.group(1), re.M)
+    if inline:
+        flags = {f.strip() for f in inline.group(1).split(',')}
+    else:
+        block = re.search(r'^flags:[ \t]*\r?\n((?:[ \t]+-[^\n]*\n?)+)', m.group(1), re.M)
+        if block:
+            flags = {line.strip()[1:].strip() for line in block.group(1).splitlines()}
+    suffix = '.test262' + ('-module' if 'module' in flags else '.strict' if 'onlyStrict' in flags else '') + '.html'
+    return '/' + rel[:-3] + suffix
+
+
+def tests_in(area, skip_slow=False, https=False, variants=False):
     """(url, long) for each testharness test in an area that runs in a window over plain http (and, with
-    `https`, the `.https.` ones over https)."""
+    `https`, the `.https.` ones over https). With `variants` every file the manifest lists: the `.https.` and
+    `.h2.` ones, and each global of a `.any.js` file (shared and service workers, module workers, ShadowRealm)."""
+    https = https or variants
     root = os.path.join(WPT, area)
     # An area is a directory, or a single test file.
     walk = os.walk(root) if os.path.isdir(root) else [(os.path.dirname(root), [], [os.path.basename(root)])]
@@ -91,32 +199,41 @@ def tests_in(area, skip_slow=False, https=False):
             rel = os.path.relpath(path, WPT).replace('\\', '/')
             if skip_slow and any(rel.startswith(prefix) for prefix in SLOW):
                 continue
-            if '-manual' in name or ('.https.' in name and not https) or '.h2.' in name or '.serviceworker.' in name or '.sharedworker.' in name:
+            if '-manual' in name or ('.https.' in name and not https):
+                continue
+            if not variants and ('.h2.' in name or '.serviceworker.' in name or '.sharedworker.' in name):
                 continue
             try:
                 text = open(path, encoding='utf-8', errors='replace').read()
             except OSError:
                 continue
-            if name.endswith(('.any.js', '.window.js', '.worker.js')):
+            if variants and name.endswith('.js') and 'test262' in rel.split('/')[:-1]:
+                url = test262_url(rel, text)
+                if url:
+                    yield url, False
+            elif name.endswith(('.any.js', '.window.js', '.worker.js')):
                 metas = meta_lines(text)
                 # .any.js runs in each global its META says (by default a window and a dedicated worker:
                 # x.any.html and x.any.worker.html); .window.js in a window, .worker.js in a dedicated worker.
                 scopes = {g.strip() for v in (v for k, v in metas if k == 'global') for g in v.split(',')}
-                if name.endswith('.any.js'):
+                if name.endswith('.any.js') and variants:
+                    urls = [any_url(rel, g) for g in sorted(any_globals(','.join(v for k, v in metas if k == 'global')))
+                            if g != 'jsshell']
+                elif name.endswith('.any.js'):
                     if not scopes: scopes = {'window', 'dedicatedworker'}
                     urls = (['/' + rel[:-3] + '.html'] if 'window' in scopes else []) + \
                            (['/' + rel[:-3] + '.worker.html'] if scopes & {'worker', 'dedicatedworker'} else [])
                 else:
                     urls = ['/' + rel[:-3] + '.html']
                 long = any(k == 'timeout' and v.strip() == 'long' for k, v in metas)
-                variants = [v.strip() for k, v in metas if k == 'variant'] or ['']
+                query_variants = [v.strip() for k, v in metas if k == 'variant'] or ['']
                 for url in urls:
-                    for v in variants:
+                    for v in query_variants:
                         yield url + v, long
             elif name.endswith(('.html', '.htm')) and '/resources/testharness.js' in text:
                 long = bool(re.search(r'<meta\s+name=["\']?timeout["\']?\s+content=["\']?long', text, re.I))
-                variants = re.findall(r'<meta\s+name=["\']?variant["\']?\s+content=["\']([^"\']*)', text, re.I) or ['']
-                for v in variants:
+                query_variants = re.findall(r'<meta\s+name=["\']?variant["\']?\s+content=["\']([^"\']*)', text, re.I) or ['']
+                for v in query_variants:
                     yield '/' + rel + v, long
 
 
@@ -463,7 +580,10 @@ def evaluate_reftest(test, size, shots, shot_dir):
 def keep_failure(test, outcome, size, shots, shot_dir, failures_dir):
     """The screenshots of a test that did not pass, and where they differ, for a person to look at."""
     from PIL import Image, ImageChops
-    folder = os.path.join(failures_dir, re.sub(r'[^\w.-]+', '_', test.strip('/')))
+    name = re.sub(r'[^\w.-]+', '_', test.strip('/'))
+    if len(name) > 100:  # (a long query string would pass the path length limit)
+        name = name[:90] + '-' + hashlib.sha1(test.encode()).hexdigest()[:8]
+    folder = os.path.join(failures_dir, name)
     os.makedirs(folder, exist_ok=True)
     pair = outcome.get('pair')
     urls = [pair[0], pair[2]] if pair else [test]
@@ -549,25 +669,41 @@ def area_of(path, areas):
                 path.split('/')[1])
 
 
-def server_running():
+H2_PORT = 9000
+
+
+def port_open(port):
     try:
-        with socket.create_connection(('127.0.0.1', 8000), timeout=1):
+        with socket.create_connection(('127.0.0.1', port), timeout=1):
             return True
     except OSError:
         return False
 
 
-def start_server():
+def server_running():
+    return port_open(8000)
+
+
+def start_server(h2=True):
+    """Starts wptserve unless it is running. With `h2` it also serves HTTP/2 (port 9000, for the `.h2.` files);
+    if it will not start that way, it is started without and the `.h2.` files fail."""
     if server_running():
         return None
-    log = open(os.path.join(STATE, 'results', 'wptserve.log'), 'w')
-    proc = subprocess.Popen([sys.executable, 'wpt.py', 'serve', '--no-h2', '--config', os.path.join(HERE, 'serve-config.json')],
-                            cwd=WPT, stdout=log, stderr=subprocess.STDOUT)
-    for _ in range(120):
-        if server_running():
-            return proc
-        time.sleep(0.5)
-    raise SystemExit('wptserve did not start; see Tests/wpt/results/wptserve.log')
+    for with_h2 in ([True, False] if h2 else [False]):
+        log = open(os.path.join(STATE, 'results', 'wptserve.log'), 'w')
+        proc = subprocess.Popen([sys.executable, 'wpt.py', 'serve', '--config', os.path.join(HERE, 'serve-config.json')]
+                                + ([] if with_h2 else ['--no-h2']), cwd=WPT, stdout=log, stderr=subprocess.STDOUT)
+        for _ in range(120):
+            if server_running():
+                if h2 and not with_h2:
+                    print('warning: wptserve would not start with HTTP/2: the .h2. files will fail', file=sys.stderr)
+                return proc
+            if proc.poll() is not None:
+                break
+            time.sleep(0.5)
+        if proc.poll() is None:
+            proc.terminate()
+    raise SystemExit(f'wptserve did not start; see {os.path.join(STATE, "results", "wptserve.log")}')
 
 
 def find_browser(explicit):
@@ -614,6 +750,38 @@ def work_root():
     return devenv.setting('SNOWLARK_WPT_WORK', str(devenv.dev_dir() / 'wpt-work'))
 
 
+STALL_SECONDS = 300  # a test is stopped by the engine's watchdog after at most its timeout and 20 s: a process silent this long is hung
+
+
+class Finished:
+    """What run_watched returns: the process's stderr, its exit code and whether it was stopped for hanging."""
+    def __init__(self, stderr, returncode, hung):
+        self.stderr, self.returncode, self.hung = stderr, returncode, hung
+
+
+def run_watched(cmd, env, progress_path, stderr_path, stall=STALL_SECONDS, poll=2.0):
+    """Runs `cmd`, killing it (and its children) when neither its results file (`progress_path`) nor its stderr
+    has grown for `stall` seconds, so one deadlocked page costs one test and a few minutes, not the chunk."""
+    with open(stderr_path, 'wb') as err:
+        proc = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=err)
+        last, seen = time.time(), (-1, -1)
+        hung = False
+        while proc.poll() is None:
+            time.sleep(poll)
+            try:
+                now = (os.path.getsize(progress_path) if os.path.exists(progress_path) else 0, os.path.getsize(stderr_path))
+            except OSError:
+                now = seen
+            if now != seen:
+                seen, last = now, time.time()
+            elif time.time() - last > stall:
+                hung = True
+                subprocess.run(['taskkill', '/PID', str(proc.pid), '/T', '/F'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                proc.wait()
+    with open(stderr_path, 'rb') as f:
+        return Finished(f.read(), proc.returncode, hung)
+
+
 def run_chunk(exe, chunk, out_path, work, index, https=False):
     """Runs a list of tests in one Snowlark process, restarting after the test that crashed it."""
     # A profile of its own (cookies, HSTS), so tests never touch the user's.
@@ -630,13 +798,16 @@ def run_chunk(exe, chunk, out_path, work, index, https=False):
             os.remove(part)
         # (WPT expects Ahem installed, as the reftest runs do: the engine installs the file given with --font;
         # an older binary ignores the extra arguments)
-        proc = subprocess.run([exe, '--wpt', list_path, part] + (['--font', AHEM] if os.path.exists(AHEM) else []), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                              timeout=max(600, 90 * len(remaining)))
+        proc = run_watched([exe, '--wpt', list_path, part] + (['--font', AHEM] if os.path.exists(AHEM) else []), env, part,
+                           os.path.join(work, f'stderr-{index}.txt'))
         done = {}
         if os.path.exists(part):
             with open(part, encoding='utf-8') as f:
                 for line in f:
-                    r = json.loads(line)
+                    try:
+                        r = json.loads(line)
+                    except ValueError:
+                        continue  # (a line cut by a kill)
                     done[r['url']] = r
         started = [u.strip() for u in re.findall(r'^\[start\] (.*)$', proc.stderr.decode('utf-8', 'replace'), re.M)]
         with open(out_path, 'a', encoding='utf-8') as out:
@@ -646,7 +817,8 @@ def run_chunk(exe, chunk, out_path, work, index, https=False):
             if next_remaining and started and started[-1] not in done:
                 crashed = started[-1]
                 tail = proc.stderr.decode('utf-8', 'replace').strip().splitlines()[-3:]
-                out.write(json.dumps({'url': crashed, 'ms': 0, 'result': {'status': 1, 'message': 'CRASH: ' + ' / '.join(tail)[:300], 'tests': []}}) + '\n')
+                label = f'HANG (no output for {STALL_SECONDS} s, process killed)' if proc.hung else 'CRASH'
+                out.write(json.dumps({'url': crashed, 'ms': 0, 'result': {'status': 1, 'message': label + ': ' + ' / '.join(tail)[:300], 'tests': []}}) + '\n')
                 next_remaining = [(u, l) for u, l in next_remaining if full_url(u) != crashed]
             elif next_remaining and done:
                 # The process died between tests (after finishing one): go on with the rest, and say so.
@@ -787,7 +959,8 @@ def run_once(args, areas, name, jobs, baseline, exe):
         os.remove(sidecar)  # (a stale one would tell compare that files were skipped)
 
     tests = [] if args.reftests_only else \
-        [t for a in areas for t in tests_in(a, skip_slow=not any(a.startswith(prefix) for prefix in SLOW), https=args.https)]
+        [t for a in areas for t in tests_in(a, skip_slow=not any(a.startswith(prefix) for prefix in SLOW), https=args.https,
+                                            variants=args.variants)]
     import gate
     if baseline is not None:
         total = len(tests)
@@ -797,10 +970,22 @@ def run_once(args, areas, name, jobs, baseline, exe):
               f'({reasons["timeout"]} timed out, {reasons["slow"]} took {gate.SLOW_MS // 1000} s or more, {reasons["failed"]} '
               f'finished or errored sooner); reftests all run')
         with open(sidecar, 'w', encoding='utf-8') as f:
+            # `scope`: with --affected, the directories gated; the baseline's files elsewhere are not compared.
             json.dump({'baseline': baseline[0], 'baseline_path': baseline[2], 'slow_ms': gate.SLOW_MS,
-                       'skipped': dict(skipped)}, f)
-    print(f'{len(tests)} test files in {", ".join(areas)}')
-    server = start_server()
+                       'skipped': dict(skipped), 'scope': list(areas) if args.affected else None}, f)
+    server = start_server(h2=args.variants)
+    # What cannot run here is listed, not counted as failing: the `.h2.` files need the HTTP/2 port, which a
+    # wptserve started elsewhere (without it) does not serve.
+    not_runnable = {}
+    if args.variants and not port_open(H2_PORT):
+        h2 = [t[0] for t in tests if '.h2.' in t[0].split('?')[0]]
+        if h2:
+            tests = [t for t in tests if t[0] not in set(h2)]
+            not_runnable['no HTTP/2 server: the wptserve on port 8000 was started without it (port 9000 is closed)'] = h2
+            print(f'not run: {len(h2)} .h2. files (no HTTP/2 server on port {H2_PORT})')
+    with open(os.path.join(STATE, 'results', name + '.notrunnable.json'), 'w', encoding='utf-8') as f:
+        json.dump(not_runnable, f, indent=1)
+    print(f'{len(tests)} test files in {", ".join(areas[:6])}' + (f' and {len(areas) - 6} more' if len(areas) > 6 else ''))
     print('using', exe)
     reftests = not args.no_reftests and 'net10.0' not in exe
     if not reftests and not args.no_reftests:
@@ -814,7 +999,7 @@ def run_once(args, areas, name, jobs, baseline, exe):
         out = os.path.join(work, f'out-{i}.jsonl')
         if os.path.exists(out):
             os.remove(out)
-        t = threading.Thread(target=run_chunk, args=(exe, chunk, out, work, i, args.https))
+        t = threading.Thread(target=run_chunk, args=(exe, chunk, out, work, i, args.https or args.variants))
         t.start()
         threads.append((t, out))
     for t, _ in threads:
@@ -831,7 +1016,7 @@ def run_once(args, areas, name, jobs, baseline, exe):
             for line in lines:
                 f.write(json.dumps(line) + '\n')
         print(f'reftests: {time.time() - ref_started:.0f} s')
-    total, ref_total = summarise(results, summary, areas, args.https)
+    total, ref_total = summarise(results, summary, areas, args.https and not args.variants)
     if tests:
         print(f'{total[2]} / {total[3]} subtests pass ({100 * total[2] / max(1, total[3]):.1f}%) in {total[0]} files, '
               f'{harness_seconds:.0f} s')
@@ -877,6 +1062,16 @@ def main():
     parser.add_argument('--reftests-only', action='store_true', help='reftests only')
     parser.add_argument('--https', action='store_true',
                         help='also run the .https. files, over https (results named <name>-https)')
+    parser.add_argument('--variants', action='store_true',
+                        help='also the files that need more of the server or the browser: .https. over https, .h2. over HTTP/2, and '
+                             'every global of a .any.js file (shared and service workers, module workers, ShadowRealm); '
+                             'implied by --all and --gate')
+    parser.add_argument('--affected', action='store_true',
+                        help='--gate: only the directories the branch can change (tools/wpt/areas-by-crate.json; affected.py says '
+                             'which and why); the full gate stays the backstop')
+    parser.add_argument('--base', default='origin/main', help='--affected: what the branch is compared with (its merge base with it)')
+    parser.add_argument('--changed', nargs='+', metavar='PATH', default=None,
+                        help='--affected: these repository paths instead of the diff of the branch (to see or time a gate)')
     parser.add_argument('--gate', action='store_true',
                         help='the merge check: the areas (default all) minus testharness files that passed nothing in the '
                              'baseline; then compares with it (gate.py compare)')
@@ -893,15 +1088,31 @@ def main():
     parser.add_argument('--no-compare', action='store_true', help='--gate: only run, do not compare')
     parser.add_argument('--allow-set-diff', action='store_true', help='--gate: a changed test set does not fail the comparison')
     args = parser.parse_args()
-    areas = AREAS if (args.all or (args.gate and not args.areas)) else args.areas
+    sys.path.insert(0, HERE)
+    areas = all_areas() if (args.all or (args.gate and not args.areas)) else args.areas
     if not areas:
         parser.error('name some WPT directories, or --all')
+    # The whole-suite runs are the baselines' kind: everything the manifest lists. A run of named directories
+    # stays what it was (http, a window and a dedicated worker) unless it asks for more.
+    args.variants = args.variants or args.all or args.gate
+    if args.affected:
+        if not (args.gate and not args.areas):
+            parser.error('--affected goes with --gate and no named directories')
+        import affected
+        every = list(areas)
+        areas, why = affected.plan(args.changed if args.changed is not None else affected.changed_files(args.base), every)
+        affected.describe(areas, why, every)
+        if not areas:
+            print('gate: nothing the branch changes can alter a page: nothing to run')
+            return
     if args.repeat < 1:
         parser.error('--repeat needs at least 1')
     os.makedirs(os.path.join(STATE, 'results'), exist_ok=True)
     os.makedirs(work_root(), exist_ok=True)
     name = args.name or ('all' if args.all else 'gate' if args.gate and not args.areas else '_'.join(a.replace('/', '-') for a in areas))
-    if args.https and not name.endswith('-https'):
+    if args.affected:
+        name = 'gate-affected'
+    if args.https and not args.variants and not name.endswith('-https'):
         name += '-https'  # never compared with an http-only run of the same name
     baseline = None
     sys.path.insert(0, HERE)
@@ -930,6 +1141,9 @@ def main():
     if args.save_baseline:
         import gate
         meta = gate.save_baseline(args.save_baseline, paths[-1], exe, args.commit)
+        side = os.path.splitext(paths[-1])[0] + '.notrunnable.json'
+        if os.path.isfile(side):  # (what the run could not start travels with the baseline: parity.py reads it)
+            shutil.copyfile(side, os.path.join(gate.BASELINES, args.save_baseline + '.notrunnable.json'))
         print(f'baseline {meta["name"]} saved: {meta["files"]} files, commit {meta["commit"]}, binary {meta["binary"] and meta["binary"]["size"]} bytes')
     if baseline is not None and not args.no_compare:
         status = gate.run_compare(baseline[0], paths[-1], recheck_n=args.recheck, exe=exe, base_exe=args.base_exe,

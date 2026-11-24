@@ -113,6 +113,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## DOM and HTML
 
+- **Two web-platform tests stop the page.** `acid3/numbered-tests.html` panics on a node used after its tree was freed, and a test that sets an `HTMLOptionsCollection`'s `length` to a huge value does not return in time. (ref 749)
 - **Text controls.** A textarea does not scroll its own long text, by script or by the user (ref 65).
 - **Selection across shadow trees.** A selection cannot keep its two ends in different trees, so dragging across a
   shadow boundary and `getComposedRanges()` crossing ranges do not work as in other browsers. (ref 62)
@@ -123,6 +124,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## Scripting and bindings
 
+- **A dynamic `import()` of the module that is evaluating crashes the process.** Fifteen ECMAScript test suite files under `dynamic-import` end in a V8 fatal error ("Module in unexpected status Evaluating"). (ref 748)
 - **Cross-origin objects.** `[[SetPrototypeOf]]` and `[[PreventExtensions]]` on a cross-origin object throw a
   `SecurityError` instead of returning false. A receiver that is not the object itself is not detected for
   `CrossOriginGet`/`Set`. Same-origin `Location` is an ordinary object (it lacks the specified default properties),

@@ -9,21 +9,14 @@ report script the engine serves are in `crates/snowlark/src/cli/wpt/`.
 ## Setup (once)
 
 The WPT checkout is the folder named by `SNOWLARK_WPT` (default: a folder `wpt` next to this repository). It is
-sparse and shallow:
+shallow, and complete: `--all` runs every directory with tests (about 170,000 files, 0.5 GB of working tree):
 
 ```bash
-git clone --depth 1 --filter=blob:none --sparse https://github.com/web-platform-tests/wpt.git ../wpt
+git clone --depth 1 --filter=blob:none https://github.com/web-platform-tests/wpt.git ../wpt
 ```
 
-```bash
-git -C ../wpt sparse-checkout set resources common tools dom url encoding domparsing custom-elements shadow-dom css/selectors css/cssom css/css-flexbox css/css-display css/css-cascade css/css-variables html/semantics html/dom html/syntax html/webappapis/timers html/webappapis/microtask-queuing html/browsers/the-window-object webidl fetch/api streams FileAPI hr-time intersection-observer uievents console webstorage xhr
-```
-
-```bash
-git -C ../wpt sparse-checkout add --skip-checks docs/commands.json
-```
-
-Add a directory with `git -C ../wpt sparse-checkout add <dir>` before running its area. Where the runner puts its
+(A sparse checkout, `--sparse` and `git sparse-checkout set <dirs> resources common tools docs/commands.json`, runs
+the directories named on the command line, but a whole-suite run and the baselines need all of them.) Where the runner puts its
 files is set by environment variables (`tools/devenv.py` reads them, falling back to a folder named by
 `SNOWLARK_DEV_DIR`):
 
@@ -56,6 +49,8 @@ the core count). Results go to `<state>/results/<name>.jsonl` (one line per test
 | `--jobs N` or `auto` | worker processes; `auto` takes 16 when no other WPT run holds a slot, 8 when one does |
 | `--no-reftests` / `--reftests-only` | testharness tests only / reftests only (see `REFTESTS.md`) |
 | `--https` | also run the `.https.` files over https (results are named `<name>-https` and never compared with http-only runs) |
+| `--variants` | everything the manifest lists: the `.https.` files over https, `.h2.` over HTTP/2 (port 9000), every global of a `.any.js` file (shared and service workers, module workers, ShadowRealm) and the test262 files under `third_party`; implied by `--all` and `--gate` |
+| `--affected [--base REV]` | with `--gate`: only the directories the branch can change, see below |
 | `--gate`, `--baseline`, `--save-baseline`, `--recheck`, `--base-exe`, `--no-compare`, `--allow-set-diff` | the merge gate, below |
 | `--repeat N` | run N times and add what differed to `flaky.json` |
 | `--commit` | commit id recorded with a saved baseline (default: HEAD of the current directory) |
@@ -73,8 +68,12 @@ How it fits together:
   only.
 - `--font`: `run.py` passes WPT's `fonts/Ahem.ttf` to `snowlark --wpt`, so testharness files that use Ahem measure
   the same text on every run.
-- Not run: workers' own test types and the `encoding/legacy-mb-*` variants (only when named directly: thousands of
-  60-second tests).
+- Not run: the `encoding/legacy-mb-*` variants (only when named directly: thousands of 60-second tests), manual
+  tests, crashtests and the WebDriver tests (`webdriver/`, which need a driver).
+- A file the run cannot start is listed in `results/<name>.notrunnable.json` with the reason (for example the `.h2.`
+  files when the wptserve that is running was started without HTTP/2), is not run, and `parity.py` counts it apart from
+  failures. A process that prints nothing for five minutes is killed and its current test recorded as a `HANG`; the run
+  goes on.
 - Machine-wide slots (`SNOWLARK_SLOTS`) can queue concurrent WPT runs so they do not oversubscribe a machine;
   `SNOWLARK_NO_SLOTS=1` skips the queue.
 
@@ -129,8 +128,34 @@ python tools/wpt/run.py --all --snowlark <main snowlark.exe> --jobs auto --save-
   and timeouts (80% of its test-time is in 4% of its files), so 16 processes cost the fast files about 7% and halve
   the wall time.
 
+### The affected gate
+
+A full gate runs the whole suite (everything the baseline can lose). `--affected` runs only the directories the
+branch can change:
+
+```bash
+python tools/wpt/run.py --gate --affected --baseline <name> --snowlark <branch snowlark.exe> --jobs auto
+python tools/wpt/affected.py            # what the branch's diff gates and why, without running anything
+```
+
+`affected.py` reads `areas-by-crate.json`: the files the branch changes (against its merge base with `--base`,
+default `origin/main`, plus untracked files) are matched by longest path prefix to the directories whose results
+they can change. The style, layout, DOM, page, render, paint, bindings and IDL crates, Stylo, `idl/`, the build files
+and the runner itself gate everything but the engine-only directories (`wasm`, `third_party`); the JavaScript engine
+(`snowlark-js`, V8, `tools/v8-pgo/`) gates those too; the network crate gates the fetch family and the document
+loading areas; media, audio, GL, IndexedDB and the font sanitizer have their own groups; notes, tests and the
+browser window's crate gate nothing. A path the map does not know gates everything. The run prints each gated
+directory and why, compares only inside them (the baseline's files elsewhere are out of scope, not missing), and
+a baseline saved from such a run takes the other directories' lines from the baseline it was gated by.
+
+A restricted rule is a claim about the crate's dependents too, so `test_affected.py` fails when a crate gains a
+dependent the rule does not list, or a crate has no rule. The map is a judgement, not a proof: keep a full gate as
+the backstop (every few merges, and whenever a baseline is refreshed).
+
 What the gate cannot see: a skipped file cannot lose, but it cannot gain either (gains in slow, wholly failing files
 appear only in full runs); a file new to the branch has no baseline, so it runs but is not compared; a subtest that
 is on the flake list can hide a real regression of that one subtest.
 
-`python tools/wpt/test_gate.py` runs the tests of the skip rule, the comparison, the flake list and baselines.
+`python tools/wpt/test_gate.py` runs the tests of the skip rule, the comparison, the flake list and baselines;
+`test_runner.py` those of what the runner starts (directories, globals of `.any.js` files, URLs, the hang watch) and
+`test_affected.py` those of the affected gate's map.

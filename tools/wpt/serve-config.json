@@ -5,6 +5,7 @@
   "ports": {
     "http": [8000, 8001],
     "https": [8443, 8444],
+    "h2": [9000],
     "http-local": ["auto"],
     "http-public": ["auto"],
     "https-local": ["auto"],

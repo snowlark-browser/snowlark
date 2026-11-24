@@ -15,15 +15,17 @@ summary is cached under `<state>/parity-cache/`. Our side is a full run of `run.
 
 Counting: a file with subtests counts its subtests; a file without (a reftest, a single-page test) counts as one
 test, passing when its status is PASS or OK. The gap of a file is max(0, Chrome's passing - ours passing), summed per
-directory: the subtests Chrome passes and we do not. Chrome's files are put in one of five groups:
+directory: the subtests Chrome passes and we do not. Chrome's files are put in one of six groups:
 
-  ran      the file is in our results.
-  variant  its directory is one our runner covers and the file is in the checkout, but our run has no result for
-           it (`.https.`, workers, `.h2.`, service workers: variants `run.py` does not start without options).
-  unrun    the file is in the checkout, but its directory is not one of `run.py`'s AREAS.
-  absent   its directory is not in the sparse checkout (Chrome's whole count is the gap).
-  newer    a directory we cover, a file that is not in the checkout: the checkout is older than Chrome's run, so it
-           is left out of the gap.
+  ran          the file is in our results.
+  notrunnable  the run listed it as one it could not start (`<results>.notrunnable.json` beside the results, with the
+               reason): counted apart, not as failing.
+  variant      its directory is one the runner covers and the file is in the checkout, but our run has no result for
+               it (a URL the runner does not form: a variant it does not know, a `.https.` reftest).
+  unrun        the file is in the checkout, but its directory is not one the runner covers.
+  absent       its directory is not in the checkout (Chrome's whole count is the gap).
+  newer        a directory we cover, a file that is not in the checkout: the checkout is older than Chrome's run, so it
+               is left out of the gap.
 
 Crashtests, manual tests and `webdriver/` are not measured. The "mech" column is a path heuristic (files under
 `parsing/`, `-computed`, `-valid`, `-invalid`, `idlharness` and `interfaces`: parsing, computed values and IDL
@@ -56,10 +58,10 @@ VIRTUAL = re.compile(r'^(.*?\.(?:any|window|worker))(?:\.[A-Za-z0-9-]+)*\.html$'
 
 
 def areas():
-    """`run.py`'s AREAS: the directories a full run covers."""
+    """The directories a full run covers (run.py's `all_areas()`)."""
     sys.path.insert(0, HERE)
     import run
-    return list(run.AREAS)
+    return run.all_areas()
 
 
 def checkout_commit():
@@ -132,6 +134,8 @@ def our_results(name):
         sys.exit('no results for ' + str(name))
     out = {}
     for line in open(path, encoding='utf-8'):
+        if not line.strip():
+            continue
         d = json.loads(line)
         res = d.get('result') or {}
         tests = res.get('tests') or []
@@ -143,6 +147,16 @@ def our_results(name):
     return out, path
 
 
+def not_runnable(path):
+    """({test path: reason}) from the file the run wrote beside its results (`<name>.notrunnable.json`)."""
+    side = os.path.splitext(path)[0] + '.notrunnable.json'
+    if not os.path.isfile(side):
+        return {}
+    with open(side, encoding='utf-8') as f:
+        data = json.load(f)
+    return {re.sub(r'^https?://[^/]+', '', p): reason for reason, paths in data.items() for p in paths}
+
+
 def on_disk(path):
     """Whether the checkout has the source of a test URL path (`foo.any.html` comes from `foo.any.js`)."""
     path = path.split('?')[0].split('#')[0]
@@ -152,9 +166,11 @@ def on_disk(path):
     return bool(m and os.path.exists(WPT + m.group(1) + '.js'))
 
 
-def classify(path, ours, covered):
+def classify(path, ours, covered, skipped=()):
     if path in ours:
         return 'ran'
+    if path in skipped:
+        return 'notrunnable'
     if any(path.lstrip('/').startswith(a + '/') for a in covered):
         return 'variant' if on_disk(path) else 'newer'
     folder = os.path.dirname(path.split('?')[0])
@@ -182,6 +198,7 @@ def main():
     when = when.astimezone(timezone.utc)
     chrome, chrome_desc = chrome_results(args, when)
     ours, ours_path = our_results(args.ours)
+    unrunnable = not_runnable(ours_path)
     covered = areas()
 
     rows = {depth: collections.defaultdict(lambda: collections.Counter()) for depth in (1, 2, 3)}
@@ -191,7 +208,7 @@ def main():
         if NOT_MEASURED.search(path):
             skipped['chrome files not measured (crashtests, manual, webdriver, the thousands of `encoding/legacy-mb-` variants)'] += 1
             continue
-        group = classify(path, ours, covered)
+        group = classify(path, ours, covered, unrunnable)
         op = ours[path][0] if group == 'ran' else 0
         if group == 'newer':
             skipped['chrome files not in the checkout revision, in directories we cover'] += 1
@@ -217,15 +234,15 @@ def main():
         items = sorted(rows[depth].items(), key=lambda kv: -kv[1][by])
         if limit:
             items = items[:limit]
-        lines = ['| directory | Chrome passes | we pass | gap | gap: in files we ran | not run (variant / area) | not in checkout | mech |',
-                 '|---|--:|--:|--:|--:|--:|--:|:-:|']
+        lines = ['| directory | Chrome passes | we pass | gap | gap: in files we ran | not runnable | no result (variant / area) | not in checkout | mech |',
+                 '|---|--:|--:|--:|--:|--:|--:|--:|:-:|']
         for name, c in items:
             if c[by] == 0:
                 continue
             flag = 'mech' if c['mech'] * 2 >= c['gap'] else ('part' if c['mech'] * 5 >= c['gap'] else '')
-            lines.append('| %s | %d | %d | %d | %d | %d | %d | %s |' % (
-                name, c['chrome'], c['ours'], c['gap'], c['gap_ran'], c['gap_variant'] + c['gap_unrun'],
-                c['gap_absent'], flag))
+            lines.append('| %s | %d | %d | %d | %d | %d | %d | %d | %s |' % (
+                name, c['chrome'], c['ours'], c['gap'], c['gap_ran'], c['gap_notrunnable'],
+                c['gap_variant'] + c['gap_unrun'], c['gap_absent'], flag))
         return '\n'.join(lines)
 
     text = [
@@ -236,12 +253,15 @@ def main():
         '- Ours: `%s` (%d subtests pass, reftests counted one each).' % (os.path.basename(ours_path), ours_total),
         '- Chrome: %s. Checkout: WPT %s, committed %s.' % (chrome_desc, sha[:10], when.strftime('%Y-%m-%d')),
         '- **Chrome passes %d, we match on %d; the gap (subtests Chrome passes and we fail) is %d**: %d in files we ran, '
-        '%d in files in the checkout that our run does not start (variants, areas outside `run.py`\'s list), %d in '
-        'directories that are not in the sparse checkout.' % (
-            total['chrome'], total['ours'], total['gap'], total['gap_ran'], total['gap_variant'] + total['gap_unrun'],
-            total['gap_absent']),
+        '%d in files that cannot be run here (listed with their reason by the run), %d in files in the checkout that '
+        'our run has no result for (URLs the runner does not form, areas outside it), %d in directories that are '
+        'not in the checkout.' % (
+            total['chrome'], total['ours'], total['gap'], total['gap_ran'], total['gap_notrunnable'],
+            total['gap_variant'] + total['gap_unrun'], total['gap_absent']),
         '- Not counted: ' + '; '.join('%d %s' % (n, what) for what, n in skipped.items()) + '.',
-        '- Variants our run does not start, by kind (gap): ' + ', '.join('%s %d' % kv for kv in kinds.most_common()) + '.',
+        '- Files with no result, by kind (gap): ' + (', '.join('%s %d' % kv for kv in kinds.most_common()) or 'none') + '.',
+        '- Not runnable: ' + ('; '.join('%d files (%s)' % (n, why) for why, n in collections.Counter(unrunnable.values()).items())
+                              or 'none') + '.',
         '- "mech" = at least half of the gap is in files under `parsing/` or named `-computed`, `-valid`, `-invalid`, '
         '`idlharness` (part: a fifth). A path heuristic: the failures decide, see the notes.',
         '- The gap of a file is max(0, Chrome passing - ours passing), so it can be a little low where we pass other '

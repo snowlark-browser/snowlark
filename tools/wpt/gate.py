@@ -182,7 +182,7 @@ def latest_baseline():
     best = None
     if os.path.isdir(BASELINES):
         for f in os.listdir(BASELINES):
-            if f.endswith('.json'):
+            if f.endswith('.json') and not f.endswith('.notrunnable.json'):
                 meta = json.load(open(os.path.join(BASELINES, f), encoding='utf-8'))
                 if best is None or meta.get('date', '') > best[0]:
                     best = (meta.get('date', ''), f[:-5])
@@ -204,6 +204,14 @@ def git_commit(cwd=None):
         return None
 
 
+def in_scope(path, scope):
+    """Whether a test path is in one of the gated directories (`scope` None: all of the suite)."""
+    if scope is None:
+        return True
+    p = path.strip('/')
+    return any(p == a or p.startswith(a + '/') for a in scope)
+
+
 def gate_sidecar(results_path):
     return os.path.splitext(results_path)[0] + '.gate.json'
 
@@ -220,10 +228,11 @@ def save_baseline(name, results_path, exe=None, commit=None, directory=BASELINES
     if os.path.isfile(side):
         info = json.load(open(side, encoding='utf-8'))
         skipped = set(info.get('skipped', {}))
+        scope = info.get('scope')  # an --affected run left the other directories out
         for line in open(info['baseline_path'], encoding='utf-8'):
             if line.strip():
                 p = url_path(json.loads(line)['url'])
-                if p in skipped and p not in recs:
+                if p not in recs and (p in skipped or not in_scope(p, scope)):
                     lines.append(line if line.endswith('\n') else line + '\n')
                     filled += 1
     with open(dest, 'w', encoding='utf-8') as f:
@@ -476,6 +485,11 @@ def run_compare(baseline, run, flaky_path=FLAKY, recheck_n=0, exe=None, base_exe
     if os.path.isfile(side):
         info = json.load(open(side, encoding='utf-8'))
         skipped = list(info.get('skipped', {}))
+        scope = info.get('scope')
+        if scope is not None:
+            # An --affected run gated some directories: the baseline's files in the others are out of scope.
+            base = {p: r for p, r in base.items() if in_scope(p, scope)}
+            print(f'gate: compared within {len(scope)} directories ({len(base)} baseline files)')
     result = compare(base, new, load_flaky(flaky_path), skipped)
     label = (meta or {}).get('name', os.path.basename(base_path))
     if meta:
@@ -542,7 +556,7 @@ def main(argv=None):
                   f'{sum(len(v) for v in data["subtests"].values())} subtests, {len(data["reftests"])} reftests')
         elif a.cmd == 'list':
             for fn in sorted(os.listdir(BASELINES)) if os.path.isdir(BASELINES) else []:
-                if fn.endswith('.json'):
+                if fn.endswith('.json') and not fn.endswith('.notrunnable.json'):
                     m = json.load(open(os.path.join(BASELINES, fn), encoding='utf-8'))
                     print(f'{m["name"]:20} {m["date"]}  commit {m.get("commit")}  {m["files"]} files  binary {m.get("binary") and m["binary"]["size"]}')
     except AssertionError as e:
