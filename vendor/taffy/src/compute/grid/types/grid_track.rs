@@ -1,4 +1,5 @@
 //! Contains GridTrack used to represent a single grid track (row/column) during layout
+use crate::style::CalcHandle;
 use crate::{
     prelude::TaffyZero,
     style::{LengthPercentage, MaxTrackSizingFunction, MinTrackSizingFunction},
@@ -137,7 +138,7 @@ impl GridTrack {
     pub fn resolve_fit_content_limit(
         &mut self,
         axis_inner_node_size: Option<f32>,
-        calc_resolver: impl Fn(*const (), f32) -> f32,
+        calc_resolver: impl Fn(CalcHandle, f32) -> f32,
     ) {
         self.fit_content_limit = self
             .max_track_sizing_function
@@ -160,10 +161,6 @@ impl GridTrack {
     #[inline]
     /// Returns the track's flex factor if it is a flex track, else 0.
     pub fn flex_factor(&self) -> f32 {
-        if self.max_track_sizing_function.is_fr() {
-            self.max_track_sizing_function.0.value()
-        } else {
-            0.0
-        }
+        if self.max_track_sizing_function.is_fr() { self.max_track_sizing_function.0.value() } else { 0.0 }
     }
 }

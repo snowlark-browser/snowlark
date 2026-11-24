@@ -60,13 +60,6 @@ mod std {
         value.floor()
     }
 
-    /// Computes the absolute value
-    #[must_use]
-    #[inline(always)]
-    pub(crate) fn abs(value: f32) -> f32 {
-        value.abs()
-    }
-
     /// Returns the largest of two f32 values
     #[inline(always)]
     pub(crate) fn f32_max(a: f32, b: f32) -> f32 {
@@ -123,9 +116,6 @@ mod alloc {
     /// Rounds down to the nearest whole number
     pub(crate) use super::polyfill::floor;
 
-    /// Computes the absolute value
-    pub(crate) use super::polyfill::abs;
-
     /// Returns the largest of two f32 values
     #[inline(always)]
     pub(crate) fn f32_max(a: f32, b: f32) -> f32 {
@@ -146,11 +136,7 @@ mod polyfill {
     #[must_use]
     #[inline(always)]
     fn fract(value: f32) -> f32 {
-        if value == 0.0 {
-            0.0
-        } else {
-            value % 1.0
-        }
+        if value == 0.0 { 0.0 } else { value % 1.0 }
     }
 
     #[must_use]
@@ -160,11 +146,7 @@ mod polyfill {
         if f.is_nan() || f == 0.0 {
             value
         } else if value > 0.0 {
-            if f < 0.5 {
-                value - f
-            } else {
-                value - f + 1.0
-            }
+            if f < 0.5 { value - f } else { value - f + 1.0 }
         } else if -f < 0.5 {
             value - f
         } else {
@@ -195,19 +177,6 @@ mod polyfill {
             value - f + 1.0
         } else {
             value - f
-        }
-    }
-
-    /// Computes the absolute value
-    #[must_use]
-    #[inline(always)]
-    pub(crate) fn abs(value: f32) -> f32 {
-        if value.is_sign_positive() {
-            return value;
-        } else if value.is_sign_negative() {
-            return -value;
-        } else {
-            f32::NAN
         }
     }
 }

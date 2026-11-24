@@ -38,10 +38,10 @@ pub(crate) mod flexbox;
 pub(crate) mod grid;
 
 pub use leaf::compute_leaf_layout;
-pub use oof::{compute_oof_layout, compute_oof_layout_for_area, resolve_static_offset, OofLayoutResult};
+pub use oof::{OofLayoutResult, compute_oof_layout, compute_oof_layout_for_area, resolve_static_offset};
 
 #[cfg(feature = "block_layout")]
-pub use self::block::{compute_block_align_content_offset, compute_block_layout, BlockContext, BlockFormattingContext};
+pub use self::block::{BlockContext, BlockFormattingContext, compute_block_align_content_offset, compute_block_layout};
 
 #[cfg(feature = "flexbox")]
 pub use self::flexbox::compute_flexbox_layout;
@@ -49,6 +49,8 @@ pub use self::flexbox::compute_flexbox_layout;
 #[cfg(feature = "grid")]
 pub use self::grid::compute_grid_layout;
 
+#[cfg(feature = "float_layout")]
+pub use self::block::FloatMark;
 #[cfg(feature = "float_layout")]
 pub use self::float::{BfcSlot, ContentSlot, FloatContext, FloatIntrinsicWidthCalculator};
 
@@ -58,9 +60,9 @@ use crate::tree::{
     AxisStaticAlign, AxisStaticEdge, AxisStaticPosition, Layout, LayoutInput, LayoutOutput, LayoutPartialTree,
     LayoutPartialTreeExt, NodeId, OofCandidate, OofCandidates, RequestedAxis, RoundTree, RunMode, SizingMode,
 };
-use crate::util::debug::{debug_log, debug_log_node, debug_pop_node, debug_push_node};
-use crate::util::sys::{round, Vec};
 use crate::util::ResolveOrZero;
+use crate::util::debug::{debug_log, debug_log_node, debug_pop_node, debug_push_node};
+use crate::util::sys::{Vec, round};
 use crate::{CacheTree, MaybeMath, MaybeResolve};
 
 /// Compute layout for the root node in the tree
@@ -172,6 +174,7 @@ pub fn compute_root_layout(
             // The root is the initial containing block and claims all remaining candidates
             ContainingBlockClaims::ALL,
             overflow,
+            Point { x: direction.is_rtl(), y: false },
             &mut hoisted,
             &mut unclaimed,
         );
@@ -440,14 +443,29 @@ pub fn round_layout(tree: &mut impl RoundTree, node_id: NodeId) {
     /// This is split into a separate function to make it easier to feature flag.
     fn round_scrollable_overflow_rect(
         layout: &mut Layout,
-        unrounded_rect: crate::geometry::Rect<f32>,
+        unrounded_overflow: crate::tree::ScrollableOverflow,
         cumulative_x: f32,
         cumulative_y: f32,
     ) {
-        layout.scrollable_overflow_rect.left = round(cumulative_x + unrounded_rect.left) - round(cumulative_x);
-        layout.scrollable_overflow_rect.right = round(cumulative_x + unrounded_rect.right) - round(cumulative_x);
-        layout.scrollable_overflow_rect.top = round(cumulative_y + unrounded_rect.top) - round(cumulative_y);
-        layout.scrollable_overflow_rect.bottom = round(cumulative_y + unrounded_rect.bottom) - round(cumulative_y);
+        let unrounded_rect = unrounded_overflow.rect();
+        let round_edge = |offset: f32, edge: f32| {
+            let rounded = round(offset + edge) - round(offset);
+            if rounded == 0.0 {
+                // Keep left/top -0.0; ScrollableOverflow::new only re-packs right/bottom signs from reversed.
+                rounded.copysign(edge)
+            } else {
+                rounded
+            }
+        };
+        layout.scrollable_overflow_rect = crate::tree::ScrollableOverflow::new(
+            crate::geometry::Rect {
+                left: round_edge(cumulative_x, unrounded_rect.left),
+                right: round_edge(cumulative_x, unrounded_rect.right),
+                top: round_edge(cumulative_y, unrounded_rect.top),
+                bottom: round_edge(cumulative_y, unrounded_rect.bottom),
+            },
+            unrounded_overflow.is_reversed(),
+        );
     }
 }
 
@@ -478,9 +496,9 @@ pub mod detailed_info {
 #[cfg(test)]
 mod tests {
     use super::compute_hidden_layout;
+    use crate::TaffyTree;
     use crate::geometry::{Point, Size};
     use crate::style::{Display, Style};
-    use crate::TaffyTree;
 
     #[test]
     fn hidden_layout_should_hide_recursively() {

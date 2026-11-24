@@ -318,7 +318,8 @@ def run_reftest_chunk(exe, chunk, results, work, index):
         with open(list_path, 'w', encoding='utf-8') as f:
             for key, url, png, timeout in remaining:
                 size = key[1]
-                f.write(f'{BASE}{url} {png} timeout={timeout * 1000}' + ('' if size == (800, 600) else f' size={size[0]}x{size[1]}') + '\n')
+                # (a space in a variant's query would split the list line: css-view-transitions has some)
+                f.write(f'{BASE}{url.replace(" ", "%20")} {png} timeout={timeout * 1000}' + ('' if size == (800, 600) else f' size={size[0]}x{size[1]}') + '\n')
         part = os.path.join(work, f'part-r{index}.jsonl')
         if os.path.exists(part):
             os.remove(part)

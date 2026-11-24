@@ -34,7 +34,7 @@ lto = false
 html5ever = { path = "vendor/html5ever" }
 # stylo 0.22.0 with @container enabled for the servo build. See vendor/stylo/SNOWLARK-PATCHES.md.
 stylo = { path = "vendor/stylo" }
-# taffy 0.15.1 with flex layout fixes. See vendor/taffy/SNOWLARK-PATCHES.md.
+# taffy 0.16.0 with flex and grid layout fixes. See vendor/taffy/SNOWLARK-PATCHES.md.
 taffy = { path = "vendor/taffy" }
 # url 2.5.8 whose parser and API setters are the URL Standard's basic URL parser as written. See
 # vendor/url/SNOWLARK-PATCHES.md.

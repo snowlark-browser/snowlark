@@ -127,14 +127,15 @@
 //! ```
 //!
 use super::{DetailedLayoutInfo, Layout, LayoutInput, LayoutOutput, NodeId, RequestedAxis, RunMode, SizingMode};
+use crate::CheapCloneStr;
 use crate::debug::debug_log;
 use crate::geometry::{AbsoluteAxis, Line, Size};
+use crate::style::CalcHandle;
 use crate::style::{AvailableSpace, CoreStyle, OofItemStyle};
 #[cfg(feature = "flexbox")]
 use crate::style::{FlexboxContainerStyle, FlexboxItemStyle};
 #[cfg(feature = "grid")]
 use crate::style::{GridContainerStyle, GridItemStyle};
-use crate::CheapCloneStr;
 #[cfg(feature = "block_layout")]
 use crate::{BlockContainerStyle, BlockContext, BlockItemStyle};
 
@@ -188,9 +189,9 @@ pub trait LayoutPartialTree: TraversePartialTree {
     /// styles are expressed in the axes of the node laying them out.
     fn get_core_container_style(&self, node_id: NodeId) -> Self::CoreContainerStyle<'_>;
 
-    /// Resolve calc value
+    /// Resolve a `calc()` value (identified by the [`CalcHandle`] it was created with) against a percentage basis
     #[inline(always)]
-    fn resolve_calc_value(&self, val: *const (), basis: f32) -> f32 {
+    fn resolve_calc_value(&self, val: CalcHandle, basis: f32) -> f32 {
         let _ = val;
         let _ = basis;
         0.0
@@ -259,7 +260,7 @@ pub trait LayoutContainingBlock: LayoutPartialTree {
 /// The `Cache` struct implements a per-node cache that is compatible with this trait.
 pub trait CacheTree {
     /// Try to retrieve a cached result from the cache
-    fn cache_get(&mut self, node_id: NodeId, input: &LayoutInput) -> Option<LayoutOutput>;
+    fn cache_get(&self, node_id: NodeId, input: &LayoutInput) -> Option<LayoutOutput>;
 
     /// Store a computed size in the cache
     fn cache_store(&mut self, node_id: NodeId, input: &LayoutInput, layout_output: LayoutOutput);
@@ -487,14 +488,14 @@ pub(crate) trait LayoutPartialTreeExt: LayoutPartialTree {
     /// Alias to `resolve_calc_value` with a shorter function name
     #[inline(always)]
     #[cfg(feature = "calc")]
-    fn calc(&self, val: *const (), basis: f32) -> f32 {
+    fn calc(&self, val: CalcHandle, basis: f32) -> f32 {
         self.resolve_calc_value(val, basis)
     }
 
     /// Alias to `resolve_calc_value` with a shorter function name
     #[inline(always)]
     #[cfg(not(feature = "calc"))]
-    fn calc(&self, _val: *const (), _basis: f32) -> f32 {
+    fn calc(&self, _val: CalcHandle, _basis: f32) -> f32 {
         0.0
     }
 }

@@ -1,6 +1,6 @@
-# taffy 0.15.1, patched for Snowlark
+# taffy 0.16.0, patched for Snowlark
 
-This is taffy 0.15.1 from crates.io (the first commit that adds this directory is the unmodified release),
+This is taffy 0.16.0 from crates.io (the commit "taffy 0.16.0 from crates.io, unmodified" is the release),
 used through `[patch.crates-io]` in the workspace `Cargo.toml`. Every change is marked `Snowlark patch` in
 the source; `git log -p vendor/taffy` shows the diff.
 
@@ -16,9 +16,7 @@ the source; `git log -p vendor/taffy` shows the diff.
 3. **A column container's main size** (`determine_container_main_size`) is the longest line's
    hypothetical outer main sizes and gaps (§9.2 step 4: the block size its formatting context gives
    it), not §9.9.1's inline-axis algorithm.
-4. **`stretch` falls back to unsafe `flex-start`** (`compute/common/alignment.rs`,
-   `apply_alignment_fallback`): css-align-3 §3.3 gives `space-between` a safe fallback but `stretch`
-   a plain `flex-start`; upstream made both safe.
+4. (Dropped with 0.16.0, which has it: `stretch` falls back to unsafe `flex-start`, css-align-3 §3.3.)
 5. **Overflowing flex lines stay reachable in a scroll container** (`compute/flexbox.rs`,
    `align_flex_lines_per_align_content`): with no overflow-position keyword, `align-content` is safe
    there (css-align-3 §4.4, the default overflow alignment keeps overflowing content reachable).

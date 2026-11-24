@@ -3,8 +3,9 @@ use super::{
     AlignContent, AlignContentKeyword, AlignItems, AlignSelf, CheapCloneStr, CompactLength, CoreStyle, Dimension,
     JustifyContent, LengthPercentage, LengthPercentageAuto, Style,
 };
-use crate::compute::grid::{GridCoordinate, GridLine, OriginZeroLine, MAX_GRID_TRACKS};
+use crate::compute::grid::{GridCoordinate, GridLine, MAX_GRID_TRACKS, OriginZeroLine};
 use crate::geometry::{AbsoluteAxis, AbstractAxis, Line, MinMax, Size};
+use crate::style::CalcHandle;
 use crate::style_helpers::*;
 use crate::sys::{DefaultCheapStr, Vec};
 use core::cmp::{max, min};
@@ -12,7 +13,7 @@ use core::fmt::Debug;
 
 #[cfg(feature = "parse")]
 use crate::util::parse::{
-    from_str_from_css, parse_css_str_entirely, CssParseResult, FromCss, ParseError, Parser, Token,
+    CssParseError, CssParseResult, FromCss, ParseError, Parser, Token, from_str_from_css, parse_css_str_entirely,
 };
 
 /// Defines the value of the `grid-template-areas` property: the named areas plus the overall
@@ -353,7 +354,7 @@ pub enum GridAutoFlow {
 
 #[cfg(feature = "parse")]
 impl FromCss for GridAutoFlow {
-    fn from_css<'i>(parser: &mut Parser<'i, '_>) -> CssParseResult<'i, Self> {
+    fn from_css<'i>(parser: &mut Parser<'i>) -> CssParseResult<'i, Self> {
         let mut axis: Option<&'static str> = None;
         let mut dense = false;
 
@@ -368,7 +369,7 @@ impl FromCss for GridAutoFlow {
                     }
                     "dense" => dense = true,
                     _ => {
-                        return Err(parser.new_unexpected_token_error(Token::Ident(ident)));
+                        return Err(CssParseError::unexpected_token());
                     }
                 }
             } else {
@@ -381,10 +382,7 @@ impl FromCss for GridAutoFlow {
             (Some("row") | None, true) => Ok(Self::RowDense),
             (Some("column"), false) => Ok(Self::Column),
             (Some("column"), true) => Ok(Self::ColumnDense),
-            (None, false) => {
-                let token = parser.next().cloned()?;
-                Err(parser.new_unexpected_token_error(token))
-            }
+            (None, false) => Err(parser.new_error_for_next_token()),
             _ => unreachable!(),
         }
     }
@@ -497,7 +495,7 @@ fn saturating_u16(value: i32) -> u16 {
 
 #[cfg(feature = "parse")]
 impl<S: CheapCloneStr> FromCss for GridPlacement<S> {
-    fn from_css<'i>(parser: &mut Parser<'i, '_>) -> CssParseResult<'i, Self> {
+    fn from_css<'i>(parser: &mut Parser<'i>) -> CssParseResult<'i, Self> {
         let mut span = false;
         let mut number = None;
         let mut ident = None;
@@ -508,31 +506,31 @@ impl<S: CheapCloneStr> FromCss for GridPlacement<S> {
                 Token::Ident(s) => match s.as_ref() {
                     "auto" => {
                         if span || number.is_some() || ident.is_some() {
-                            return Err(parser.new_unexpected_token_error(token));
+                            return Err(CssParseError::unexpected_token());
                         }
                         parser.expect_exhausted()?;
                         return Ok(Self::Auto);
                     }
                     "span" => {
                         if span {
-                            return Err(parser.new_unexpected_token_error(token));
+                            return Err(CssParseError::unexpected_token());
                         }
                         span = true;
                     }
                     other => {
                         if ident.is_some() {
-                            return Err(parser.new_unexpected_token_error(token));
+                            return Err(CssParseError::unexpected_token());
                         }
                         ident = Some(S::from(other));
                     }
                 },
                 Token::Number { int_value: Some(value), .. } if *value != 0 => {
                     if number.is_some() {
-                        return Err(parser.new_unexpected_token_error(token));
+                        return Err(CssParseError::unexpected_token());
                     }
                     number = Some(*value);
                 }
-                _ => return Err(parser.new_unexpected_token_error(token)),
+                _ => return Err(CssParseError::unexpected_token()),
             };
         }
 
@@ -544,7 +542,7 @@ impl<S: CheapCloneStr> FromCss for GridPlacement<S> {
             (false, Some(number), None) => Ok(Self::Line(GridLine::from(saturating_i16(number)))),
             (false, Some(number), Some(ident)) => Ok(Self::NamedLine(ident, saturating_i16(number))),
             (false, None, Some(ident)) => Ok(Self::NamedLine(ident, 0)),
-            (false, None, None) => Err(parser.new_error(cssparser::BasicParseErrorKind::EndOfInput)),
+            (false, None, None) => Err(CssParseError::from_basic_kind(cssparser::BasicParseErrorKind::EndOfInput)),
         }
     }
 }
@@ -812,7 +810,7 @@ impl From<MinTrackSizingFunction> for MaxTrackSizingFunction {
 
 #[cfg(feature = "parse")]
 impl FromCss for MaxTrackSizingFunction {
-    fn from_css<'i>(parser: &mut Parser<'i, '_>) -> CssParseResult<'i, Self> {
+    fn from_css<'i>(parser: &mut Parser<'i>) -> CssParseResult<'i, Self> {
         let token = parser.next()?.clone();
         match token {
             Token::Percentage { unit_value, .. } => Ok(Self::percent(unit_value)),
@@ -822,17 +820,17 @@ impl FromCss for MaxTrackSizingFunction {
                 "auto" => Ok(Self::auto()),
                 "min-content" => Ok(Self::min_content()),
                 "max-content" => Ok(Self::max_content()),
-                _ => Err(parser.new_unexpected_token_error(token))?,
+                _ => Err(CssParseError::unexpected_token())?,
             },
             Token::Function(ref name) if name.as_ref() == "fit-content" => parser.parse_nested_block(|parser| {
                 let token = parser.next()?.clone();
                 match token {
                     Token::Percentage { unit_value, .. } => Ok(Self::fit_content_percent(unit_value)),
                     Token::Dimension { unit, value, .. } if unit == "px" => Ok(Self::fit_content_px(value)),
-                    token => Err(parser.new_unexpected_token_error(token))?,
+                    _ => Err(CssParseError::unexpected_token())?,
                 }
             }),
-            token => Err(parser.new_unexpected_token_error(token))?,
+            _ => Err(CssParseError::unexpected_token())?,
         }
     }
 }
@@ -945,8 +943,8 @@ impl MaxTrackSizingFunction {
     /// The low 3 bits are used as a tag value and will be returned as 0.
     #[inline]
     #[cfg(feature = "calc")]
-    pub fn calc(ptr: *const ()) -> Self {
-        Self(CompactLength::calc(ptr))
+    pub fn calc(handle: CalcHandle) -> Self {
+        Self(CompactLength::calc(handle))
     }
 
     /// A `fit-content()` track sizing function whose limit is a `calc()` value. The value passed here is treated
@@ -955,8 +953,8 @@ impl MaxTrackSizingFunction {
     /// The low 3 bits are used as a tag value and will be returned as 0.
     #[inline]
     #[cfg(feature = "calc")]
-    pub fn fit_content_calc(ptr: *const ()) -> Self {
-        Self(CompactLength::fit_content_calc(ptr))
+    pub fn fit_content_calc(handle: CalcHandle) -> Self {
+        Self(CompactLength::fit_content_calc(handle))
     }
 
     /// Create a LengthPercentageAuto from a raw `CompactLength`.
@@ -1041,7 +1039,7 @@ impl MaxTrackSizingFunction {
     pub fn definite_value(
         self,
         parent_size: Option<f32>,
-        calc_resolver: impl Fn(*const (), f32) -> f32,
+        calc_resolver: impl Fn(CalcHandle, f32) -> f32,
     ) -> Option<f32> {
         match self.0.tag() {
             CompactLength::LENGTH_TAG => Some(self.0.value()),
@@ -1059,7 +1057,7 @@ impl MaxTrackSizingFunction {
     pub fn fit_content_limit(
         self,
         parent_size: Option<f32>,
-        calc_resolver: impl Fn(*const (), f32) -> f32,
+        calc_resolver: impl Fn(CalcHandle, f32) -> f32,
     ) -> Option<f32> {
         #[cfg(not(feature = "calc"))]
         let _ = &calc_resolver;
@@ -1082,7 +1080,7 @@ impl MaxTrackSizingFunction {
     pub fn definite_limit(
         self,
         parent_size: Option<f32>,
-        calc_resolver: impl Fn(*const (), f32) -> f32,
+        calc_resolver: impl Fn(CalcHandle, f32) -> f32,
     ) -> Option<f32> {
         match self.0.tag() {
             CompactLength::FIT_CONTENT_PX_TAG => Some(self.0.value()),
@@ -1099,7 +1097,7 @@ impl MaxTrackSizingFunction {
     pub fn resolved_percentage_size(
         self,
         parent_size: f32,
-        calc_resolver: impl Fn(*const (), f32) -> f32,
+        calc_resolver: impl Fn(CalcHandle, f32) -> f32,
     ) -> Option<f32> {
         self.0.resolved_percentage_size(parent_size, calc_resolver)
     }
@@ -1157,13 +1155,13 @@ pub enum ExpandedMaxTrackSizingFunction {
     /// Track maximum size should be content sized under a max-content constraint, but not larger than
     /// the `calc()` limit (an opaque handle to the calc representation)
     #[cfg(feature = "calc")]
-    FitContentCalc(*const ()),
+    FitContentCalc(CalcHandle),
     /// A fraction of the leftover space (see [`MaxTrackSizingFunction::fr`])
     Fr(f32),
     /// A `calc()` value (see [`MaxTrackSizingFunction::calc`]). The pointer is an opaque handle to
     /// the calc representation, exactly as passed to the constructor.
     #[cfg(feature = "calc")]
-    Calc(*const ()),
+    Calc(CalcHandle),
 }
 
 impl From<MaxTrackSizingFunction> for ExpandedMaxTrackSizingFunction {
@@ -1183,10 +1181,10 @@ impl From<ExpandedMaxTrackSizingFunction> for MaxTrackSizingFunction {
             ExpandedMaxTrackSizingFunction::FitContentPx(val) => Self::fit_content_px(val),
             ExpandedMaxTrackSizingFunction::FitContentPercent(val) => Self::fit_content_percent(val),
             #[cfg(feature = "calc")]
-            ExpandedMaxTrackSizingFunction::FitContentCalc(ptr) => Self::fit_content_calc(ptr),
+            ExpandedMaxTrackSizingFunction::FitContentCalc(handle) => Self::fit_content_calc(handle),
             ExpandedMaxTrackSizingFunction::Fr(val) => Self::fr(val),
             #[cfg(feature = "calc")]
-            ExpandedMaxTrackSizingFunction::Calc(ptr) => Self::calc(ptr),
+            ExpandedMaxTrackSizingFunction::Calc(handle) => Self::calc(handle),
         }
     }
 }
@@ -1258,7 +1256,7 @@ impl From<MaxTrackSizingFunction> for MinTrackSizingFunction {
 
 #[cfg(feature = "parse")]
 impl FromCss for MinTrackSizingFunction {
-    fn from_css<'i>(parser: &mut Parser<'i, '_>) -> CssParseResult<'i, Self> {
+    fn from_css<'i>(parser: &mut Parser<'i>) -> CssParseResult<'i, Self> {
         let token = parser.next()?.clone();
         match token {
             Token::Percentage { unit_value, .. } => Ok(Self::percent(unit_value)),
@@ -1267,9 +1265,9 @@ impl FromCss for MinTrackSizingFunction {
                 "auto" => Ok(Self::auto()),
                 "min-content" => Ok(Self::min_content()),
                 "max-content" => Ok(Self::max_content()),
-                _ => Err(parser.new_unexpected_token_error(token))?,
+                _ => Err(CssParseError::unexpected_token())?,
             },
-            token => Err(parser.new_unexpected_token_error(token))?,
+            _ => Err(CssParseError::unexpected_token())?,
         }
     }
 }
@@ -1345,8 +1343,8 @@ impl MinTrackSizingFunction {
     /// The low 3 bits are used as a tag value and will be returned as 0.
     #[inline]
     #[cfg(feature = "calc")]
-    pub fn calc(ptr: *const ()) -> Self {
-        Self(CompactLength::calc(ptr))
+    pub fn calc(handle: CalcHandle) -> Self {
+        Self(CompactLength::calc(handle))
     }
 
     /// Create a LengthPercentageAuto from a raw `CompactLength`.
@@ -1411,7 +1409,7 @@ impl MinTrackSizingFunction {
     pub fn definite_value(
         self,
         parent_size: Option<f32>,
-        calc_resolver: impl Fn(*const (), f32) -> f32,
+        calc_resolver: impl Fn(CalcHandle, f32) -> f32,
     ) -> Option<f32> {
         match self.0.tag() {
             CompactLength::LENGTH_TAG => Some(self.0.value()),
@@ -1428,7 +1426,7 @@ impl MinTrackSizingFunction {
     pub fn resolved_percentage_size(
         self,
         parent_size: f32,
-        calc_resolver: impl Fn(*const (), f32) -> f32,
+        calc_resolver: impl Fn(CalcHandle, f32) -> f32,
     ) -> Option<f32> {
         self.0.resolved_percentage_size(parent_size, calc_resolver)
     }
@@ -1477,7 +1475,7 @@ pub enum ExpandedMinTrackSizingFunction {
     /// A `calc()` value (see [`MinTrackSizingFunction::calc`]). The pointer is an opaque handle to
     /// the calc representation, exactly as passed to the constructor.
     #[cfg(feature = "calc")]
-    Calc(*const ()),
+    Calc(CalcHandle),
 }
 
 impl From<MinTrackSizingFunction> for ExpandedMinTrackSizingFunction {
@@ -1495,7 +1493,7 @@ impl From<ExpandedMinTrackSizingFunction> for MinTrackSizingFunction {
             ExpandedMinTrackSizingFunction::MinContent => Self::min_content(),
             ExpandedMinTrackSizingFunction::MaxContent => Self::max_content(),
             #[cfg(feature = "calc")]
-            ExpandedMinTrackSizingFunction::Calc(ptr) => Self::calc(ptr),
+            ExpandedMinTrackSizingFunction::Calc(handle) => Self::calc(handle),
         }
     }
 }
@@ -1575,7 +1573,7 @@ impl From<Dimension> for TrackSizingFunction {
 
 #[cfg(feature = "parse")]
 impl FromCss for TrackSizingFunction {
-    fn from_css<'i>(parser: &mut Parser<'i, '_>) -> CssParseResult<'i, Self> {
+    fn from_css<'i>(parser: &mut Parser<'i>) -> CssParseResult<'i, Self> {
         // Try to parse a minmax() function
         if let Ok(value) = parser.try_parse(|parser| {
             parser.expect_function_matching("minmax")?;
@@ -1646,14 +1644,14 @@ impl TryFrom<&str> for RepetitionCount {
 
 #[cfg(feature = "parse")]
 impl FromCss for RepetitionCount {
-    fn from_css<'i>(parser: &mut Parser<'i, '_>) -> CssParseResult<'i, Self> {
+    fn from_css<'i>(parser: &mut Parser<'i>) -> CssParseResult<'i, Self> {
         match parser.next()?.clone() {
             Token::Number { int_value: Some(value), .. } if value.is_positive() => {
                 Ok(Self::Count(saturating_u16(value)))
             }
             Token::Ident(ident) if ident == "auto-fit" => Ok(Self::AutoFit),
             Token::Ident(ident) if ident == "auto-fill" => Ok(Self::AutoFill),
-            token => Err(parser.new_unexpected_token_error(token))?,
+            _ => Err(CssParseError::unexpected_token())?,
         }
     }
 }
@@ -1772,7 +1770,7 @@ impl<S: CheapCloneStr> From<MinMax<MinTrackSizingFunction, MaxTrackSizingFunctio
 
 #[cfg(feature = "parse")]
 impl<S: CheapCloneStr> FromCss for GridTemplateComponent<S> {
-    fn from_css<'i>(parser: &mut Parser<'i, '_>) -> CssParseResult<'i, Self> {
+    fn from_css<'i>(parser: &mut Parser<'i>) -> CssParseResult<'i, Self> {
         // Try to parse a minmax() function
         if let Ok(value) = parser.try_parse(|parser| {
             parser.expect_function_matching("repeat")?;
@@ -1818,8 +1816,8 @@ impl<S: CheapCloneStr, Track> Default for GridTemplateTracks<S, Track> {
 
 #[cfg(feature = "parse")]
 impl<S: CheapCloneStr, Track: FromCss + Debug> FromCss for GridTemplateTracks<S, Track> {
-    fn from_css<'i>(parser: &mut Parser<'i, '_>) -> CssParseResult<'i, Self> {
-        fn try_parse_line_names<'i, S: CheapCloneStr>(parser: &mut Parser<'i, '_>) -> CssParseResult<'i, Vec<S>> {
+    fn from_css<'i>(parser: &mut Parser<'i>) -> CssParseResult<'i, Self> {
+        fn try_parse_line_names<'i, S: CheapCloneStr>(parser: &mut Parser<'i>) -> CssParseResult<'i, Vec<S>> {
             parser.try_parse(|parser| {
                 parser.expect_square_bracket_block()?;
                 parser.parse_nested_block(|parser| {
@@ -1843,7 +1841,7 @@ impl<S: CheapCloneStr, Track: FromCss + Debug> FromCss for GridTemplateTracks<S,
         }
 
         if tracks.tracks.is_empty() {
-            return Err(parser.new_error(cssparser::BasicParseErrorKind::EndOfInput));
+            return Err(CssParseError::from_basic_kind(cssparser::BasicParseErrorKind::EndOfInput));
         }
 
         Ok(tracks)
@@ -1863,13 +1861,13 @@ pub struct GridAutoTracks(pub Vec<TrackSizingFunction>);
 
 #[cfg(feature = "parse")]
 impl FromCss for GridAutoTracks {
-    fn from_css<'i>(parser: &mut Parser<'i, '_>) -> CssParseResult<'i, Self> {
+    fn from_css<'i>(parser: &mut Parser<'i>) -> CssParseResult<'i, Self> {
         let mut tracks = Self::default();
         while !parser.is_exhausted() {
             tracks.0.push(TrackSizingFunction::from_css(parser)?);
         }
         if tracks.0.is_empty() {
-            return Err(parser.new_error(cssparser::BasicParseErrorKind::EndOfInput));
+            return Err(CssParseError::from_basic_kind(cssparser::BasicParseErrorKind::EndOfInput));
         }
         Ok(tracks)
     }
@@ -1973,7 +1971,7 @@ mod expand_tests {
         #[repr(align(8))]
         struct Aligned(u64);
         static HANDLE: Aligned = Aligned(0);
-        let handle = &HANDLE as *const Aligned as *const ();
+        let handle = CalcHandle::from_ptr(&HANDLE as *const Aligned as *const ());
 
         assert_eq!(MaxTrackSizingFunction::calc(handle).expand(), ExpandedMaxTrackSizingFunction::Calc(handle));
         assert_eq!(

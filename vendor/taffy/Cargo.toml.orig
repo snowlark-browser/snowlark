@@ -1,13 +1,13 @@
 [package]
 name = "taffy"
-version = "0.15.1"
+version = "0.16.0"
 authors = [
     "Alice Cecile <alice.i.cecile@gmail.com>",
     "Johnathan Kelley <jkelleyrtp@gmail.com>",
     "Nico Burns <nico@nicoburns.com>",
 ]
-edition = "2021"
-rust-version = "1.71"
+edition = "2024"
+rust-version = "1.85"
 include = ["src/**/*", "examples/**/*", "Cargo.toml", "README.md"]
 description = "A flexible UI layout library "
 repository = "https://github.com/DioxusLabs/taffy"
@@ -19,8 +19,9 @@ license = "MIT"
 document-features = { version = "0.2.7", optional = true }
 serde = { version = "1.0", default-features = false, optional = true, features = ["serde_derive"] }
 slotmap = { version = "1.0.6", default-features = false, optional = true }
+rustc-hash = { version = "2", default-features = false, optional = true }
 smallvec = { version = "1.13", default-features = false, optional = true }
-cssparser = { version = "0.37.0", default-features = false, optional = true }
+cssparser = { version = "0.38.0", default-features = false, optional = true }
 
 [package.metadata.docs.rs]
 # To test all the documentation related features, run:
@@ -64,13 +65,11 @@ calc = []
 content_size = []
 ## Causes algorithms to stores detailed information of the nodes in TaffyTree, with only CSS Grid supporting this.
 detailed_layout_info = []
-## Use strict provenance APIs for pointer manipulation. Using this feature requires Rust 1.84 or higher.
-strict_provenance = []
 
 #! ### Taffy Tree
 
 ## Enable the built-in Taffy node tree. See [`TaffyTree`](crate::TaffyTree).
-taffy_tree = ["dep:slotmap"]
+taffy_tree = ["dep:slotmap", "dep:rustc-hash"]
 
 #! ### Other
 

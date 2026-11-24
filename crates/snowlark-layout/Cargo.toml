@@ -13,4 +13,4 @@ snowlark-paint = { path = "../snowlark-paint" }
 kurbo = "0.13"
 rustc-hash = "2"
 smallvec = { version = "1.13", features = ["union", "const_generics"] }
-taffy = { version = "0.15", default-features = false, features = ["std", "flexbox", "grid", "calc", "content_size", "detailed_layout_info"] }
+taffy = { version = "0.16", default-features = false, features = ["std", "flexbox", "grid", "calc", "content_size", "detailed_layout_info"] }

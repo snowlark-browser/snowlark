@@ -173,9 +173,9 @@ fn calc_handle(
     v: LengthPercentage,
     calcs: &mut Vec<LengthPercentage>,
     non_negative: bool,
-) -> *const () {
+) -> taffy::CalcHandle {
     calcs.push(v);
-    std::ptr::without_provenance(((calcs.len() << 1) | usize::from(non_negative)) << 3)
+    taffy::CalcHandle::from_bits((((calcs.len() << 1) | usize::from(non_negative)) << 3) as u64)
 }
 
 fn dimension(v: SizeValue, calcs: &mut Vec<LengthPercentage>) -> taffy::Dimension {
@@ -1251,12 +1251,15 @@ impl<S: Style> Tree<'_, '_, S> {
                 width: f.size.width,
                 height: f.size.height,
             },
-            scrollable_overflow_rect: taffy::Rect {
-                left: f.overflow.x.min(0.0),
-                right: f.overflow.right(),
-                top: f.overflow.y.min(0.0),
-                bottom: f.overflow.bottom(),
-            },
+            scrollable_overflow_rect: taffy::ScrollableOverflow::new(
+                taffy::Rect {
+                    left: f.overflow.x.min(0.0),
+                    right: f.overflow.right().max(0.0),
+                    top: f.overflow.y.min(0.0),
+                    bottom: f.overflow.bottom().max(0.0),
+                },
+                taffy::Point { x: false, y: false },
+            ),
             baselines,
             top_margin: taffy::CollapsibleMarginSet::ZERO,
             bottom_margin: taffy::CollapsibleMarginSet::ZERO,
@@ -1393,8 +1396,8 @@ fn contained_inputs<S: Style>(
     inputs
 }
 
-fn resolve_calc(calcs: &[LengthPercentage], v: *const (), basis: f32) -> f32 {
-    let handle = v.addr() >> 3;
+fn resolve_calc(calcs: &[LengthPercentage], v: taffy::CalcHandle, basis: f32) -> f32 {
+    let handle = (v.to_bits() >> 3) as usize;
     let i = (handle >> 1).wrapping_sub(1);
     let value = calcs.get(i).map_or(0.0, |lp| lp.resolve(basis));
     if handle & 1 == 1 {
@@ -1442,7 +1445,7 @@ impl<S: Style> LayoutPartialTree for Tree<'_, '_, S> {
         self.container_style(node)
     }
 
-    fn resolve_calc_value(&self, val: *const (), basis: f32) -> f32 {
+    fn resolve_calc_value(&self, val: taffy::CalcHandle, basis: f32) -> f32 {
         resolve_calc(&self.cx.tree.calcs, val, basis)
     }
 
@@ -1488,8 +1491,8 @@ impl<S: Style> LayoutPartialTree for Tree<'_, '_, S> {
 }
 
 impl<S: Style> CacheTree for Tree<'_, '_, S> {
-    fn cache_get(&mut self, node: taffy::NodeId, input: &LayoutInput) -> Option<LayoutOutput> {
-        self.node_mut(node).cache.get(input)
+    fn cache_get(&self, node: taffy::NodeId, input: &LayoutInput) -> Option<LayoutOutput> {
+        self.node(node).cache.get(input)
     }
 
     fn cache_store(&mut self, node: taffy::NodeId, input: &LayoutInput, output: LayoutOutput) {

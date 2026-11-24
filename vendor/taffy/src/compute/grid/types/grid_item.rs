@@ -1,9 +1,10 @@
 //! Contains GridItem used to represent a single grid item during layout
 use super::GridTrack;
-use crate::compute::common::sizing_keyword::{resolve_sizing_keyword, SizingKeywordResolution};
+use crate::compute::common::sizing_keyword::{SizingKeywordResolution, resolve_sizing_keyword};
 use crate::compute::grid::OriginZeroLine;
 use crate::geometry::AbstractAxis;
 use crate::geometry::{Line, Point, Rect, Size};
+use crate::style::CalcHandle;
 use crate::style::{AlignItems, AlignSelf, AvailableSpace, Dimension, LengthPercentageAuto, Overflow};
 use crate::tree::{LayoutPartialTree, LayoutPartialTreeExt, NodeId, OofCandidates, SizingMode};
 use crate::util::sys::f32_max;
@@ -286,7 +287,7 @@ impl GridItem {
         axis: AbstractAxis,
         axis_tracks: &[GridTrack],
         axis_parent_size: Option<f32>,
-        resolve_calc_value: &dyn Fn(*const (), f32) -> f32,
+        resolve_calc_value: &dyn Fn(CalcHandle, f32) -> f32,
     ) -> Option<f32> {
         let spanned_tracks = &axis_tracks[self.track_range_excluding_lines(axis)];
         let tracks_all_fixed = spanned_tracks.iter().all(|track| {
@@ -312,7 +313,7 @@ impl GridItem {
         axis: AbstractAxis,
         axis_tracks: &[GridTrack],
         axis_parent_size: Option<f32>,
-        resolve_calc_value: &dyn Fn(*const (), f32) -> f32,
+        resolve_calc_value: &dyn Fn(CalcHandle, f32) -> f32,
     ) -> Option<f32> {
         let spanned_tracks = &axis_tracks[self.track_range_excluding_lines(axis)];
         let tracks_all_fixed = spanned_tracks.iter().all(|track| {
@@ -492,7 +493,7 @@ impl GridItem {
         other_axis_tracks: &[GridTrack],
         available_space: Size<Option<f32>>,
         get_track_size_estimate: impl Fn(&GridTrack, Option<f32>) -> Option<f32>,
-        resolve_calc_value: &impl Fn(*const (), f32) -> f32,
+        resolve_calc_value: &impl Fn(CalcHandle, f32) -> f32,
     ) -> Size<Option<f32>> {
         let mut size = Size::NONE;
         size.set(
@@ -507,11 +508,7 @@ impl GridItem {
                         .max_track_sizing_function
                         .definite_value(available_space.get(axis), resolve_calc_value)?;
 
-                    if min_size == max_size {
-                        Some(track.base_size)
-                    } else {
-                        None
-                    }
+                    if min_size == max_size { Some(track.base_size) } else { None }
                 })
                 .sum::<Option<f32>>(),
         );
@@ -538,7 +535,7 @@ impl GridItem {
         other_axis_tracks: &[GridTrack],
         available_space: Size<Option<f32>>,
         get_track_size_estimate: impl Fn(&GridTrack, Option<f32>) -> Option<f32>,
-        resolve_calc_value: &impl Fn(*const (), f32) -> f32,
+        resolve_calc_value: &impl Fn(CalcHandle, f32) -> f32,
     ) -> Size<Option<f32>> {
         self.grid_area_size_cache.unwrap_or_else(|| {
             let grid_area_size = self.grid_area_size(
@@ -831,13 +828,16 @@ impl GridItem {
                     // The content-based minimum size is additionally clamped by the sum of any fixed max track sizing
                     // functions of the tracks the item spans. Note that this clamp does not apply to explicitly specified
                     // preferred or minimum sizes, and that the argument to fit-content() does not clamp the content-based
-                    // minimum size in the same way as a fixed max track sizing function. The clamp is a stretch fit into
-                    // the limit, so it does not shrink the item below its padding + border.
+                    // minimum size in the same way as a fixed max track sizing function. The clamp is a stretch fit of
+                    // the item's margin box (including its baseline shim) into the limit, so it does not shrink the
+                    // item below its padding + border.
                     let limit =
                         self.spanned_fixed_track_limit(axis, axis_tracks, inner_node_size.get(axis), &|val, basis| {
                             tree.resolve_calc_value(val, basis)
                         });
-                    minimum_contribution.maybe_min(limit.map(|limit| f32_max(limit, padding_border_size.get(axis))))
+                    let margins = self.margins_axis_sums_with_baseline_shims(grid_area_size.width, tree);
+                    minimum_contribution
+                        .maybe_min(limit.map(|limit| f32_max(limit - margins.get(axis), padding_border_size.get(axis))))
                 } else {
                     0.0
                 }

@@ -1,8 +1,10 @@
 //! Contains [TaffyTree](crate::tree::TaffyTree): the default implementation of [LayoutTree](crate::tree::LayoutTree), and the error type for Taffy.
+use crate::style::CalcHandle;
 #[cfg(not(feature = "std"))]
 use slotmap::SecondaryMap;
 #[cfg(feature = "std")]
-use slotmap::SparseSecondaryMap as SecondaryMap;
+/// Node contexts, hashed with FxHash.
+type SecondaryMap<K, V> = slotmap::SparseSecondaryMap<K, V, core::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
 use slotmap::{DefaultKey, SlotMap};
 
 #[cfg(feature = "block_layout")]
@@ -15,20 +17,20 @@ use crate::tree::{
     RoundTree, RunMode, TraversePartialTree, TraverseTree,
 };
 use crate::util::debug::{debug_log, debug_log_node};
-use crate::util::sys::{new_const_children_vec, new_vec_with_capacity, Box, ChildrenVec, Vec};
+use crate::util::sys::{Box, ChildrenVec, Vec, new_const_children_vec, new_vec_with_capacity};
 
+use crate::CacheTree;
 use crate::compute::{
     compute_cached_layout, compute_hidden_layout, compute_leaf_layout, compute_oof_layout, compute_root_layout,
     round_layout,
 };
-use crate::CacheTree;
 
 #[cfg(feature = "block_layout")]
-use crate::{compute::compute_block_layout, LayoutBlockContainer};
+use crate::{LayoutBlockContainer, compute::compute_block_layout};
 #[cfg(feature = "flexbox")]
-use crate::{compute::compute_flexbox_layout, LayoutFlexboxContainer};
+use crate::{LayoutFlexboxContainer, compute::compute_flexbox_layout};
 #[cfg(feature = "grid")]
-use crate::{compute::compute_grid_layout, LayoutGridContainer};
+use crate::{LayoutGridContainer, compute::compute_grid_layout};
 
 #[cfg(feature = "grid")]
 use crate::compute::grid::DetailedGridInfo;
@@ -145,7 +147,7 @@ impl NodeData {
 
 /// An entire tree of UI nodes. The entry point to Taffy's high-level API.
 ///
-/// Allows you to build a tree of UI nodes, run Taffy's layout algorithms over that tree, and then access the resultant layout.]
+/// Allows you to build a tree of UI nodes, run Taffy's layout algorithms over that tree, and then access the resultant layout.
 #[derive(Debug, Clone)]
 pub struct TaffyTree<NodeContext = ()> {
     /// The [`NodeData`] for each node stored in this tree
@@ -213,7 +215,7 @@ impl<NodeContext> TraverseTree for TaffyTree<NodeContext> {}
 
 // CacheTree impl for TaffyTree
 impl<NodeContext> CacheTree for TaffyTree<NodeContext> {
-    fn cache_get(&mut self, node_id: NodeId, input: &LayoutInput) -> Option<LayoutOutput> {
+    fn cache_get(&self, node_id: NodeId, input: &LayoutInput) -> Option<LayoutOutput> {
         self.nodes[node_id.into()].cache.get(input)
     }
 
@@ -402,7 +404,7 @@ where
     }
 
     #[inline(always)]
-    fn resolve_calc_value(&self, _val: *const (), _basis: f32) -> f32 {
+    fn resolve_calc_value(&self, _val: CalcHandle, _basis: f32) -> f32 {
         0.0
     }
 
@@ -451,7 +453,7 @@ impl<NodeContext, MeasureFunction> CacheTree for TaffyView<'_, NodeContext, Meas
 where
     MeasureFunction: FnMut(LayoutInput, NodeId, Option<&mut NodeContext>, &Style) -> LayoutOutput,
 {
-    fn cache_get(&mut self, node_id: NodeId, input: &LayoutInput) -> Option<LayoutOutput> {
+    fn cache_get(&self, node_id: NodeId, input: &LayoutInput) -> Option<LayoutOutput> {
         self.taffy.nodes[node_id.into()].cache.get(input)
     }
 
@@ -605,6 +607,9 @@ impl<NodeContext> TaffyTree<NodeContext> {
             nodes: SlotMap::with_capacity(capacity),
             children: SlotMap::with_capacity(capacity),
             parents: SlotMap::with_capacity(capacity),
+            #[cfg(feature = "std")]
+            node_context_data: SecondaryMap::with_capacity_and_hasher(capacity, Default::default()),
+            #[cfg(not(feature = "std"))]
             node_context_data: SecondaryMap::with_capacity(capacity),
             config: TaffyConfig::default(),
         }

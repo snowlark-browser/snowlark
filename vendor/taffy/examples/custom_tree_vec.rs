@@ -2,12 +2,13 @@ mod common {
     pub mod image;
     pub mod text;
 }
-use common::image::{image_measure_function, ImageContext};
-use common::text::{text_measure_function, FontMetrics, TextContext, WritingMode, LOREM_IPSUM};
+use common::image::{ImageContext, image_measure_function};
+use common::text::{FontMetrics, LOREM_IPSUM, TextContext, WritingMode, text_measure_function};
+use taffy::CalcHandle;
 use taffy::util::print_tree;
 use taffy::{
-    compute_cached_layout, compute_flexbox_layout, compute_grid_layout, compute_leaf_layout, compute_oof_layout,
-    compute_root_layout, prelude::*, round_layout, Cache, CacheTree,
+    Cache, CacheTree, compute_cached_layout, compute_flexbox_layout, compute_grid_layout, compute_leaf_layout,
+    compute_oof_layout, compute_root_layout, prelude::*, round_layout,
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -156,7 +157,7 @@ impl taffy::LayoutPartialTree for Tree {
         self.node_from_id_mut(node_id).unrounded_layout = *layout;
     }
 
-    fn resolve_calc_value(&self, _val: *const (), _basis: f32) -> f32 {
+    fn resolve_calc_value(&self, _val: CalcHandle, _basis: f32) -> f32 {
         0.0
     }
 
@@ -221,8 +222,8 @@ impl taffy::LayoutContainingBlock for Tree {
 }
 
 impl CacheTree for Tree {
-    fn cache_get(&mut self, node_id: NodeId, inputs: &taffy::LayoutInput) -> Option<taffy::LayoutOutput> {
-        self.node_from_id_mut(node_id).cache.get(inputs)
+    fn cache_get(&self, node_id: NodeId, inputs: &taffy::LayoutInput) -> Option<taffy::LayoutOutput> {
+        self.node_from_id(node_id).cache.get(inputs)
     }
 
     fn cache_store(&mut self, node_id: NodeId, inputs: &taffy::LayoutInput, layout_output: taffy::LayoutOutput) {
