@@ -1132,3 +1132,36 @@ fn background_clip_text_masks_the_background_with_the_text() {
         "{rest:?}"
     );
 }
+
+/// CSS Fonts 4 §4.3.1: `src` entries in formats the engine does not read are not fetched, by
+/// `format()` keyword or string; EOT, which pages list first for old browsers, among them.
+#[test]
+fn font_sources_in_unsupported_formats_are_skipped() {
+    use snowlark_render::renderer::font_source_supported as ok;
+    let url = "https://example.com/f";
+    for format in [
+        "woff2",
+        "\"woff2\"",
+        "'WOFF'",
+        "truetype",
+        "opentype",
+        "collection",
+        "\"woff2-variations\"",
+    ] {
+        assert!(ok(url, Some(format)), "{format}");
+    }
+    for format in [
+        "embedded-opentype",
+        "\"embedded-opentype\"",
+        "svg",
+        "\"x-woff2\"",
+        "\"woff2 extra\"",
+    ] {
+        assert!(!ok(url, Some(format)), "{format}");
+    }
+    assert!(ok("https://example.com/f.woff2", None));
+    assert!(!ok("https://example.com/f.EOT", None));
+    assert!(ok("data:font/eot;base64,AA.eot", None));
+    // (as in other engines: only a URL that ends in `.eot` is taken for EOT)
+    assert!(ok("https://example.com/f.eot?#iefix", None));
+}

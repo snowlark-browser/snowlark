@@ -18,6 +18,17 @@ Patched copies, taken through `[patch.crates-io]` in `Cargo.toml`. Each keeps it
 | `vendor/url` | [servo/rust-url](https://github.com/servo/rust-url) 2.5.8 | MIT or Apache-2.0 |
 | `vendor/v8` | [denoland/rusty_v8](https://github.com/denoland/rusty_v8), its roll to V8 15.8 | MIT |
 
+## Vendored C++ libraries (`vendor/`)
+
+Unmodified copies of the library sources (no tools, tests or build files), compiled by
+`crates/snowlark-ots-sys` with the `cc` crate. Each keeps its `LICENSE`; `README.md` in each folder names the
+upstream commit and how the copy was made.
+
+| Folder | Upstream | Licence |
+|---|---|---|
+| `vendor/ots` | [khaledhosny/ots](https://github.com/khaledhosny/ots) (the OpenType Sanitizer) | BSD-3-Clause |
+| `vendor/woff2` | [google/woff2](https://github.com/google/woff2) (its WOFF 2.0 decoder) | MIT |
+
 The V8 library itself is not in the repository (`docs/v8-build.md`); V8 is under a BSD-style licence, and the
 notices file lists the libraries it links.
 
@@ -40,8 +51,8 @@ bindings in `crates/snowlark-bindings/src/generated/` are generated from them by
 
 - `crates/snowlark-layout/tests/fixtures/Ahem.ttf`: the Ahem test font from web-platform-tests, which its
   authors have placed in the public domain.
-- `crates/snowlark-render/tests/fixtures/noto-sans-latin-400.woff2`: a subset of Noto Sans, SIL Open Font
-  License 1.1 (see the `README.md` next to it, which also describes the other fixtures there).
+- `crates/snowlark-paint/tests/fixtures/noto-sans-latin-400.woff2`: a subset of Noto Sans, SIL Open Font
+  License 1.1 (see the `README.md` next to it).
 - `crates/snowlark-media/tests/fixtures/pattern.mp4`, `pattern-frag.mp4`: a generated test pattern, encoded by
   Snowlark's own test code. MPL-2.0 like the rest.
 - `bench/micro/resources/newssite/*.css` and the markup in `bench/micro/style/newssite-*.html`: the rendered

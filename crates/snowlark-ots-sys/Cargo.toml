@@ -1,0 +1,15 @@
+[package]
+name = "snowlark-ots-sys"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OTS, the OpenType Sanitizer, with the WOFF 2.0 decoder it uses, built from vendor/ots and vendor/woff2: the raw C interface (snowlark-paint's web_font module is the safe one)"
+build = "build.rs"
+links = "snowlark_ots"
+
+[lib]
+doctest = false
+test = false
+
+[build-dependencies]
+cc = "1.2"

@@ -20,6 +20,11 @@ crc32fast = "1"
 smallvec = { version = "1.13", features = ["union", "const_generics"] }
 # UAX #50 Vertical_Orientation (`text-orientation: mixed`).
 unicode-vo = "0.1"
+# OTS, which checks web fonts before DirectWrite reads them (`web_font`), and the zlib and Brotli
+# decoders it is given for WOFF 1.0 and WOFF 2.0.
+snowlark-ots-sys = { path = "../snowlark-ots-sys" }
+flate2 = "1"
+brotli-decompressor = "5"
 
 [dependencies.windows]
 version = "0.62"

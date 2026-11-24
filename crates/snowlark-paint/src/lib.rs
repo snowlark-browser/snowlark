@@ -58,6 +58,7 @@ pub mod ticks;
 pub mod timer_resolution;
 pub mod video;
 pub mod vsync;
+pub mod web_font;
 pub mod window;
 
 pub use compositor::{Compositor, ContentPass};

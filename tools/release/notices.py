@@ -15,6 +15,7 @@ What it covers, and where each part comes from:
   its source (the crate cache, or vendor/). A crate whose package has no licence file gets the
   standard text of its licence, with the authors from its manifest as the copyright holders, and
   says so.
+- The C++ libraries vendored here and compiled in (VENDORED_LIBRARIES: OTS and woff2, from vendor/).
 - The Rust standard library (from the toolchain's share/doc/rust/licenses).
 - V8 and the third-party code its build links into the library we link (`--v8-src`: the rusty_v8
   checkout at the commit vendor/v8 is taken from; tools/v8-pgo builds the pinned library from it).
@@ -44,6 +45,17 @@ DEFAULT_V8_SRC = devenv.dev_dir() / "v8" / "rusty-v8-roll"
 
 # Where the source of our modified MPL-2.0 code is published.
 STYLO_SOURCE = "https://github.com/snowlark-browser/third-party/tree/main/stylo"
+
+# The C++ libraries vendored in this repository and compiled into the program (THIRD-PARTY.md):
+# (name, licence, home, licence files relative to the repository).
+VENDORED_LIBRARIES = [
+    ("OTS (OpenType Sanitizer)", "BSD-3-Clause",
+     "https://github.com/khaledhosny/ots, commit c5d249ce90ab0aa3e76eb0dfad28746f407201d0",
+     ["vendor/ots/LICENSE"]),
+    ("woff2 (the WOFF 2.0 decoder)", "MIT",
+     "https://github.com/google/woff2, commit 1c69169e9e1811dccd6c54c532fedda300233968",
+     ["vendor/woff2/LICENSE"]),
+]
 
 # (name, licence, home, files relative to the rusty_v8 checkout)
 V8_PARTS = [
@@ -235,14 +247,15 @@ def write(out_path, v8_src):
     w("Contents")
     w("  1. Source code of Mozilla Public License 2.0 components")
     w("  2. V8 and the libraries it includes")
-    w("  3. The Rust standard library")
-    w(f"  4. Rust crates ({ncrates}), grouped by licence")
+    w("  3. Other C++ libraries")
+    w("  4. The Rust standard library")
+    w(f"  5. Rust crates ({ncrates}), grouped by licence")
     w("")
     w(RULE)
     w("1. Source code of Mozilla Public License 2.0 components")
     w(RULE)
     w("")
-    w("These components are licensed under the Mozilla Public License 2.0 (its text is in part 4,")
+    w("These components are licensed under the Mozilla Public License 2.0 (its text is in part 5,")
     w("under MPL-2.0). Their source code is available at the addresses below. Stylo is included in")
     w("modified form; the published source is the complete source of the version included here,")
     w("with a list of the changes.")
@@ -290,7 +303,22 @@ def write(out_path, v8_src):
         w(text.rstrip("\n"))
     w("")
     w(RULE)
-    w("3. The Rust standard library")
+    w("3. Other C++ libraries")
+    w(RULE)
+    w("")
+    w("These libraries are compiled from their unmodified source into the program.")
+    for name, lic, home, files in VENDORED_LIBRARIES:
+        w("")
+        w(THIN)
+        w(f"{name}  ({home})")
+        w(f"Licence: {lic}")
+        w(THIN)
+        for f in files:
+            w("")
+            w(file_text(ROOT / f).rstrip("\n"))
+    w("")
+    w(RULE)
+    w("4. The Rust standard library")
     w(RULE)
     w("")
     w("The Rust standard library (https://www.rust-lang.org/) is linked into the program. It is")
@@ -304,7 +332,7 @@ def write(out_path, v8_src):
         w(file_text(lic / f).rstrip("\n"))
     w("")
     w(RULE)
-    w(f"4. Rust crates ({ncrates}), grouped by licence")
+    w(f"5. Rust crates ({ncrates}), grouped by licence")
     w(RULE)
     for group, entries in groups:
         names = sorted({c for _, cs in entries for c in cs}, key=str.lower)

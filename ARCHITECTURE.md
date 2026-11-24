@@ -56,6 +56,10 @@ crates/
   snowlark-paint     Display list → Direct2D on a per-tab raster thread, tiles, compositor with
                    DirectComposition; the DirectWrite TextEngine (shaping lives here, not in layout, so
                    layout → paint is the dependency and painting a fragment tree is layout's job). WIC images.
+                   Every web font goes through OTS (`web_font`) before DirectWrite reads it, in the renderer
+                   and again on the raster side.
+  snowlark-ots-sys   OTS, the OpenType Sanitizer, and the WOFF 2.0 decoder it uses, compiled from vendor/ots and
+                   vendor/woff2 with a small C interface; declarations only, the calls are snowlark-paint's.
   snowlark-net       Fetch: HTTP/1.1 and 2 with TLS, cookies, cache, HSTS, mixed-content and CSP checks,
                    blob:/data:, the request policy.
   snowlark-gl        WebGL's service (docs/webgl.md): the plain-data protocol a page's contexts send, and its
@@ -72,7 +76,7 @@ crates/
                    Web Audio interfaces over it.
   snowlark-render    One document from bytes to a display list: stylo's computed values as layout's Style
                    trait, the StyleSource (pseudo-elements, anonymous boxes, counters, replaced content),
-                   subresource loading (sheets, @import, images with srcset, @font-face with WOFF/WOFF2)
+                   subresource loading (sheets, @import, images with srcset, @font-face, sanitized by OTS)
                    through snowlark-net, SVG images rasterized per drawn size, restyle/layout/paint/PNG.
                    Driven by snowlark-page and `--render`.
   snowlark-page      A document's lifetime: navigation, parsing with scripts, the event loop (tasks,

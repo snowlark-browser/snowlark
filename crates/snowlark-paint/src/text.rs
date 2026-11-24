@@ -27,6 +27,7 @@ use crate::geom::{Color, Point};
 use crate::raster::FontResolver;
 use crate::raster_tables::{FontFile, FontSource};
 use crate::text_cache::{SharedTextCaches, WordCache};
+use crate::web_font::FontLoadError;
 
 /// `font-style`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -732,13 +733,15 @@ impl TextEngine {
             .map(|f| unsafe { f.GetWeight().0 as u16 })
     }
 
-    /// Registers a web font (TrueType/OpenType bytes, already decompressed from WOFF/WOFF2) and returns
-    /// the unique internal family name to use in [`FontQuery::families`]. Names never collide with
-    /// system families or with other web fonts, so pages can't shadow each other's fonts or system ones.
-    /// The bytes are copied.
-    pub fn add_font_data(&self, data: &[u8]) -> Result<String> {
+    /// Registers a web font file (TrueType, OpenType, WOFF or WOFF 2.0) and returns the unique
+    /// internal family name to use in [`FontQuery::families`]. The file is checked and written out
+    /// again by OTS first ([`crate::web_font`]): DirectWrite only ever reads what OTS made of it. Names
+    /// never collide with system families or with other web fonts, so pages can't shadow each other's
+    /// fonts or system ones.
+    pub fn add_font_data(&self, data: &[u8]) -> std::result::Result<String, FontLoadError> {
+        let sfnt = crate::web_font::sanitize(data).map_err(FontLoadError::Rejected)?;
         let mut state = self.state.write().unwrap();
-        let collection = self.collection_from_data(&mut state, data)?;
+        let collection = self.collection_from_data(&mut state, &sfnt)?;
         // SAFETY: an owned collection with at least one family.
         let family = unsafe { family_name_w(&collection.GetFontFamily(0)?)? };
         let name = format!("{WEB_PREFIX}{}", state.web.len());

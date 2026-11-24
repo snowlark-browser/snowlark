@@ -2912,6 +2912,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "snowlark-ots-sys"
+version = "0.1.0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "snowlark-page"
 version = "0.1.0"
 dependencies = [
@@ -2973,11 +2980,14 @@ dependencies = [
 name = "snowlark-paint"
 version = "0.1.0"
 dependencies = [
+ "brotli-decompressor",
  "crc32fast",
+ "flate2",
  "fontdb",
  "rustc-hash",
  "serde",
  "smallvec",
+ "snowlark-ots-sys",
  "unicode-vo",
  "windows",
  "windows-core",
@@ -2990,7 +3000,6 @@ name = "snowlark-render"
 version = "0.1.0"
 dependencies = [
  "app_units",
- "brotli-decompressor",
  "cssparser 0.38.0",
  "encoding_rs",
  "euclid",

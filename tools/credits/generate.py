@@ -71,6 +71,23 @@ NON_RUST = [
         "code it links from its own third_party folder keeps its own licenses there.",
     },
     {
+        "name": "OTS (OpenType Sanitizer)",
+        "version": "c5d249ce",
+        "license": "BSD-3-Clause",
+        "home": "https://github.com/khaledhosny/ots",
+        "note": "Checks every web font before the text engine reads it. Compiled from its unmodified "
+        "source (vendor/ots).",
+        "texts": ["vendor/ots/LICENSE"],
+    },
+    {
+        "name": "woff2",
+        "version": "1c69169e",
+        "license": "MIT",
+        "home": "https://github.com/google/woff2",
+        "note": "The WOFF 2.0 decoder OTS uses. Compiled from its unmodified source (vendor/woff2).",
+        "texts": ["vendor/woff2/LICENSE"],
+    },
+    {
         "name": "uBlock Origin scriptlets and redirect resources",
         "version": "",
         "license": "GPL-3.0",

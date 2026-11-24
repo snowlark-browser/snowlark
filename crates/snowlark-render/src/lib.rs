@@ -10,8 +10,8 @@
 //!   element and pseudo-element styles, anonymous box styles, generated content with counters
 //!   ([`content`]), the replaced content of images.
 //! - [`Renderer`] ([`renderer`]): parsing, stylesheets (`<link>`, `@import`, charset), images (`<img>`
-//!   with `srcset`/`sizes`/`<picture>`, CSS `url()`s), `@font-face` (WOFF/WOFF2 unwrapped by [`woff`],
-//!   registered with the text engine), all fetched asynchronously through one `NetClient` and applied
+//!   with `srcset`/`sizes`/`<picture>`, CSS `url()`s), `@font-face` (checked by OTS and
+//!   registered with the text engine: `snowlark_paint::web_font`), all fetched asynchronously through one `NetClient` and applied
 //!   by [`Renderer::pump`]; then restyle, box tree, layout, paint, PNG.
 //!
 //! Driving it from an event loop:
@@ -59,7 +59,6 @@ pub mod svg_geometry;
 pub mod svg_paint;
 pub mod svg_text;
 pub mod used;
-pub mod woff;
 
 pub use adapter::RenderStyle;
 pub use encoding_url::encoding_parse_url;

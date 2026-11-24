@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use windows::core::{Interface, Result, PCWSTR};
+use windows::core::{Error, Interface, Result, PCWSTR};
 use windows::Win32::Foundation::{E_ACCESSDENIED, E_INVALIDARG, FILETIME};
 use windows::Win32::Graphics::DirectWrite::*;
 
@@ -583,6 +583,10 @@ impl FontTable {
                 if bytes.len() > MAX_FONT_BYTES {
                     return Err(E_INVALIDARG.into());
                 }
+                // The renderer sends what OTS made of a web font, but a renderer is not trusted:
+                // the bytes go through OTS again here before DirectWrite reads them.
+                let bytes =
+                    crate::web_font::sanitize(bytes).map_err(|_| Error::from(E_INVALIDARG))?;
                 // SAFETY: DirectWrite calls with owned interfaces; the bytes are copied by
                 // CreateInMemoryFontFileReference (no owner object is passed), so they need not
                 // outlive the call.
@@ -754,13 +758,17 @@ mod tests {
     }
 
     #[test]
-    fn a_web_font_goes_as_its_bytes() {
+    fn a_web_font_goes_as_what_the_sanitizer_made_of_it() {
         let text = TextEngine::new().unwrap();
         let bytes = windows_font("georgia.ttf");
         let family = text.add_font_data(&bytes).unwrap();
         let id = font(&text, &[&family], 400, FontStyle::Normal);
         let source = text.font_source(id).unwrap();
-        assert!(source.file == FontFile::Data(bytes), "not the same bytes");
+        let sanitized = crate::web_font::sanitize(&bytes).unwrap();
+        assert!(
+            source.file == FontFile::Data(sanitized),
+            "not the same bytes"
+        );
     }
 
     #[test]

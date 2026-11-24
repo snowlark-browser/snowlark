@@ -1,8 +1,5 @@
 # Test fixtures
 
-- `noto-sans-latin-400.woff2`: the Latin subset of Noto Sans Regular as WOFF 2.0 (transformed `glyf`/`loca`),
-  as served by `@fontsource/noto-sans`. Noto Sans is © Google LLC, licensed under the SIL Open Font License 1.1
-  (https://openfontlicense.org); the license and copyright are also in the font's `name` table.
 - `search-button.html`, `search-button.css`: a minimal stand-in for the header search form of
   https://en.wikipedia.org/wiki/Snowlark (Vector 2022 skin, Codex `cdx-button`), written by hand for this
   test: the same structure (a parser-created `<link rel=stylesheet>` in `<head>`, design tokens as custom

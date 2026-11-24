@@ -21,6 +21,7 @@ mod patterns;
 mod pdf;
 mod render_demo;
 mod svg_filters;
+mod web_font;
 mod word_shaping;
 
 /// `autotests = false` means a file in `tests/` that is not a module above would never run.

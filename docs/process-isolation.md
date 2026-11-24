@@ -145,7 +145,9 @@ Encoding 8,500 items (1.9 MB) takes 0.36 ms and decoding 0.55 to 1.0 ms; 85,000 
 
 **Fonts.** Glyph runs carry a renderer-local font id. The raster side keeps a font table per renderer: a system font
 is named by file path and last-write time and opened only if the path is exactly one DirectWrite reports for the
-system font set; a web font arrives as sanitized bytes. Every installed family passes through this check.
+system font set; a web font arrives as the bytes OTS made of it in the renderer, and the table runs them
+through OTS again before DirectWrite reads them (`snowlark-paint` `web_font`). Every installed family passes
+through this check.
 
 **Images** stay in the renderer's `ImageStore`; before a list uses an image for the first time the encode thread
 sends its pixels (size and bounds checked against the section), and the raster side uploads and caches them by id,
@@ -194,9 +196,14 @@ could only be an opt-in strict mode that disables the JIT for chosen sites.
 profile, write to the temp folder, open a socket, start a process, open the browser's process handle, read the
 registry and send a window message; each must fail. It belongs in the merge gate once the sandbox exists.
 
-Until the GPU process exists and the renderer is sandboxed, hostile font bytes reach DirectWrite on the raster side,
-which is the unsandboxed browser process. That is the largest known gap in the plan, and the reason the GPU process
-comes before the renderer sandbox.
+Until the GPU process exists and the renderer is sandboxed, web font bytes from the renderer are parsed on the raster
+side, which is the unsandboxed browser process. DirectWrite there reads only what OTS rewrote: the outline, metric,
+naming and hinting tables parsed and written out again, unknown tables dropped. The color tables, the OpenType
+layout tables (`GSUB`, `GPOS`, `GDEF`, `BASE`) and the variation tables pass through unchanged, as in other
+engines, because OTS's checks of them refuse fonts in wide use. What remains exposed is those tables, read by
+DirectWrite, and OTS's own parsing, which is fuzzed continuously upstream. Moving
+it and DirectWrite's into a sandboxed process is still the reason the GPU process comes before the renderer
+sandbox.
 
 ## 8. Site isolation
 
@@ -399,7 +406,7 @@ does not show a hosted one yet.
 |---|---|---|
 | DirectWrite does not work under a real sandbox | Layout depends on it; a font broker is needed | A sandbox prototype under the planned token and job |
 | A trust check is forgotten | A quiet site isolation hole | `Untrusted<T>`, shadow mode, the evil-renderer suite, fuzzing |
-| Hostile fonts reach the unsandboxed raster side before the GPU process is sandboxed | A full escape through one parser bug | Make the GPU process the default; sanitize; later, produce web font glyph masks inside the sandbox |
+| Hostile fonts reach the unsandboxed raster side before the GPU process is sandboxed | A full escape through one parser bug | Every web font goes through OTS, in the renderer and again on the raster side, so DirectWrite reads only fonts OTS rewrote (done); OTS's own parsers still run there. Make the GPU process the default; later, produce web font glyph masks inside the sandbox |
 | Media Foundation in a separate process | Video falls back to slower paths | Media process prototype |
 | Canvas without a GPU in the renderer | Speedometer chart suites fall | A `SNOWLARK_CANVAS=skia` run, then G6 |
 | A service worker design that assumes one process | Rework of the service traits and the lock | Service workers behind message-shaped traits in the browser half, with fetch interception at the network boundary (`docs/service-workers.md`) |

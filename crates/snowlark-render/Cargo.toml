@@ -24,7 +24,6 @@ smallvec = "1.13"
 rustc-hash = "2"
 encoding_rs = "0.8"
 flate2 = "1"
-brotli-decompressor = "5"
 # SVG images: resvg's usvg parses and simplifies (with roxmltree and fontdb), resvg rasterizes with
 # tiny-skia.
 resvg = "=0.48.1"

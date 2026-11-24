@@ -687,6 +687,12 @@ impl Engine {
                 self.queue_element_task_fire(el, "error", false, false);
             }
         }
+        // (a web font refused by the sanitizer or the text engine: why, on the console)
+        let mut refused = Vec::new();
+        self.for_each_renderer(|r, _| refused.extend(r.take_font_warnings()));
+        for text in refused {
+            self.console_print("warn", &text);
+        }
         any
     }
 

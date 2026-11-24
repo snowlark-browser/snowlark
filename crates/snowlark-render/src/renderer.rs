@@ -468,6 +468,9 @@ struct Doc {
     /// Web font families that arrived since the last box tree update: boxes using them take the new
     /// font table and are laid out again.
     fonts_arrived: Vec<String>,
+    /// Console warnings for web fonts refused since the page last took them (why OTS or the text
+    /// engine refused each).
+    font_warnings: Vec<String>,
     /// Generated content with counters, quotes or `attr()` has been seen: changes elsewhere can
     /// change it, so structural and counter changes rebuild the whole tree.
     generated_seen: bool,
@@ -1380,6 +1383,7 @@ impl Renderer {
             text_changed: Default::default(),
             batch_sets: Default::default(),
             fonts_arrived: Vec::new(),
+            font_warnings: Vec::new(),
             generated_seen: false,
             query_containers_seen: false,
             query_sizes_from: None,
@@ -1886,9 +1890,18 @@ impl Renderer {
             }
             Purpose::Font { face, source } => {
                 let loaded = match a.result {
-                    Ok((_, body)) => crate::woff::to_sfnt(&body)
-                        .ok()
-                        .and_then(|sfnt| self.text.add_font_data(&sfnt).ok()),
+                    Ok((_, body)) => match self.text.add_font_data(&body) {
+                        Ok(internal) => Some(internal),
+                        Err(e) => {
+                            let url = match doc.faces[face].face.sources.get(source) {
+                                Some(FontFaceSource::Url { url, .. }) => url.as_str(),
+                                _ => "",
+                            };
+                            doc.font_warnings
+                                .push(format!("Failed to decode downloaded font: {url}\n{e}"));
+                            None
+                        }
+                    },
                     Err(_) => None,
                 };
                 match loaded {
@@ -2061,14 +2074,7 @@ impl Renderer {
         while let Some(src) = f.face.sources.get(i) {
             match src {
                 FontFaceSource::Url { url, format } => {
-                    // CSS Fonts 4 §4.3: skip formats this engine can't load.
-                    let ok = format.as_deref().is_none_or(|fmt| {
-                        let fmt = fmt.to_ascii_lowercase();
-                        ["woff2", "woff", "truetype", "opentype"]
-                            .iter()
-                            .any(|k| fmt.contains(k))
-                    });
-                    if ok {
+                    if font_source_supported(url, format.as_deref()) {
                         if let Ok(u) = Url::parse(url) {
                             f.source = i;
                             doc.fetcher.start(u, Purpose::Font { face, source: i });
@@ -2781,6 +2787,13 @@ impl Renderer {
         self.doc
             .as_deref_mut()
             .map_or_else(Vec::new, |d| std::mem::take(&mut d.embed_redecided))
+    }
+
+    /// Console warnings for the web fonts refused since the last call.
+    pub fn take_font_warnings(&mut self) -> Vec<String> {
+        self.doc
+            .as_deref_mut()
+            .map_or_else(Vec::new, |d| std::mem::take(&mut d.font_warnings))
     }
 
     /// The `object` and `embed` elements whose image finished loading, and whether it did.
@@ -5505,12 +5518,15 @@ impl Renderer {
     /// Adds a face a script made (`new FontFace(...)` added to `document.fonts`): its `src` list, or
     /// the bytes of a font it was made from. Returns its id.
     pub fn add_script_face(&mut self, face: FontFace, bytes: Option<&[u8]>) -> Option<usize> {
-        let internal = bytes.map(|b| {
-            crate::woff::to_sfnt(b)
-                .ok()
-                .and_then(|sfnt| self.text.add_font_data(&sfnt).ok())
-        });
+        let internal = bytes.map(|b| self.text.add_font_data(b));
         let doc = self.doc.as_deref_mut()?;
+        let internal = internal.map(|r| {
+            r.map_err(|e| {
+                doc.font_warnings
+                    .push(format!("Failed to load font data.\n{e}"))
+            })
+            .ok()
+        });
         let mut load = FaceLoad {
             face,
             source: 0,
@@ -6060,7 +6076,32 @@ impl Renderer {
     }
 }
 
-/// CSS Fonts 4 §4.? `font-weight` descriptor: one weight or a range; `normal`/`bold` keywords.
+/// Whether an `@font-face` `src` URL is worth fetching: CSS Fonts 4 §4.3.1, a source whose
+/// `format()` names a format the user agent does not support is skipped. Supported are the font
+/// files the sanitizer reads (`woff2`, `woff`, `truetype`, `opentype`, `collection`, and the old
+/// `*-variations` strings); `embedded-opentype` and `svg` are not. A source without `format()` whose
+/// URL ends in `.eot` is skipped too, as other engines do: it is the old way of serving EOT first.
+/// `format` is the hint as serialized, a keyword or a quoted string.
+pub fn font_source_supported(url: &str, format: Option<&str>) -> bool {
+    let Some(format) = format else {
+        return url.starts_with("data:") || !url.to_ascii_lowercase().ends_with(".eot");
+    };
+    let format = format.trim_matches(|c| c == '"' || c == '\'');
+    [
+        "woff2",
+        "woff",
+        "truetype",
+        "opentype",
+        "collection",
+        "woff2-variations",
+        "woff-variations",
+        "truetype-variations",
+        "opentype-variations",
+    ]
+    .iter()
+    .any(|k| format.eq_ignore_ascii_case(k))
+}
+
 /// Whether `c` is in a `unicode-range` descriptor's text (`U+26`, `U+0-7F`, `U+4??`, ...).
 fn unicode_range_has(range: &str, c: char) -> bool {
     let c = c as u32;
