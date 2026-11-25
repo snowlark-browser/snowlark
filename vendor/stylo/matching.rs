@@ -746,10 +746,20 @@ trait PrivateMatchMethods: TElement {
                 PseudoElementResolution::IfApplicable,
             );
 
+            // Snowlark patch 104: the keyframes are computed from the style without the element's
+            // animations: an element restyled while animating (a rule change re-reading its
+            // `@keyframes`, a change of its animation's timing) has their values in `new_values`, and
+            // an implicit end keyframe would take the animated value. A pseudo-element's style
+            // comes without them.
+            let base_values = if pseudo_element.is_none() {
+                resolver.style_without_animations(new_values)
+            } else {
+                None
+            };
             animation_set.update_animations_for_new_style::<Self>(
                 *self,
                 &shared_context,
-                &new_values,
+                base_values.as_ref().unwrap_or(new_values),
                 &mut resolver,
             );
         }

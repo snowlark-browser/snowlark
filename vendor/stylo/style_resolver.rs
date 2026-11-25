@@ -825,4 +825,32 @@ where
         let style = self.cascade_style_and_visited_with_default_parents(inputs);
         Some(style.0)
     }
+
+    /// Snowlark patch 104: the element's style without the rules of its animations and transitions
+    /// (`None` when it has none): the computed values a CSS animation's implicit 0% and 100%
+    /// keyframes take (CSS Animations 1 §4.1), which must not be the animation's own values.
+    #[cfg(feature = "servo")]
+    pub fn style_without_animations(
+        &mut self,
+        primary_style: &Arc<ComputedValues>,
+    ) -> Option<Arc<ComputedValues>> {
+        let rule_node = primary_style.rules();
+        let without_animation_rules = self
+            .context
+            .shared
+            .stylist
+            .rule_tree()
+            .remove_animation_rules(rule_node);
+        if without_animation_rules == *rule_node {
+            return None;
+        }
+        let inputs = CascadeInputs {
+            rules: Some(without_animation_rules),
+            visited_rules: primary_style.visited_rules().cloned(),
+            flags: primary_style.flags.for_cascade_inputs(),
+            included_cascade_flags: RuleCascadeFlags::empty(),
+        };
+        let style = self.cascade_style_and_visited_with_default_parents(inputs);
+        Some(style.0)
+    }
 }

@@ -2338,6 +2338,38 @@ fn keyframes_edits_reach_running_animations() {
     );
 }
 
+/// CSS Animations 1 §4.1: a missing `from` or `to` keyframe takes the computed values of the animated
+/// properties, the element's values without the animation. A change of the rules (a rule inserted,
+/// an `@font-face` added: the keyframes are read again) while the animation runs keeps them so; it
+/// must not take the animated value as the implicit keyframe, which froze a from-only fade-in at 0.
+#[test]
+fn implicit_keyframes_survive_rule_changes() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style id=s>@keyframes rise { from { opacity: 0 } }\
+         @keyframes slide { to { margin-left: 100px } }\
+         #d { animation: rise 100s linear -50s paused }\
+         #e { margin-left: 20px; animation: slide 100s linear -50s paused }</style>\
+         <div id=d></div><div id=e></div>",
+    );
+    let r = eval(
+        &mut page,
+        "const s = document.getElementById('s').sheet;
+         const d = document.getElementById('d'), e = document.getElementById('e');
+         const v = () => getComputedStyle(d).opacity + ',' + getComputedStyle(e).marginLeft;
+         const out = [v()];
+         s.insertRule('.unrelated { color: red }', 0);
+         out.push(v());
+         s.insertRule('@font-face { font-family: x; src: local(x) }', 0);
+         out.push(v());
+         s.insertRule('.other { color: blue }', 0);
+         out.push(v(), d.getAnimations().length + e.getAnimations().length);
+         out.join('|')",
+    );
+    assert_eq!(r, "0.5,60px|0.5,60px|0.5,60px|0.5,60px|2");
+}
+
 /// The legacy `display: -webkit-box` (Compat) lays its items out as a single-line flex container
 /// from the `-webkit-box-*` properties: `-webkit-box-pack` packs them along the main axis,
 /// `-webkit-box-align` aligns every item across it, `-webkit-box-direction: reverse` reverses the

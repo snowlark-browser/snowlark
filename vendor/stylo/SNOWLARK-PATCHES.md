@@ -632,5 +632,15 @@ The patches below were written on 0.22.0 and carried to 0.24.0 by a three-way me
    A quoted name that is one of those keywords keeps its quotes; written unquoted it is the keyword and
    serializes without them (WPT `css/cssom/font-family-serialization-001.html`).
 
+104. **A CSS animation's implicit keyframes take the values without animations** (`matching.rs`,
+   `style_resolver.rs`, CSS Animations 1 §4.1): a missing 0% or 100% keyframe is built from the
+   computed values of the animated properties. `process_animations_for_style` gave
+   `update_animations_for_new_style` the element's new style, whose rules hold the animations' current
+   values whenever the element already animates, so a restyle that builds the keyframes again (after a
+   change of the rules, patch 94: a sheet edited, an `@font-face` loaded; or a change of the animation's
+   timing) made the implicit keyframe the animated value and froze the animation there. The keyframes
+   are now built from the style without animation and transition rules
+   (`StyleResolverForElement::style_without_animations`); a pseudo-element's style has none.
+
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.
