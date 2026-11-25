@@ -680,6 +680,123 @@ impl ToJs for CSSBoxType {
     }
 }
 
+/// `enum CSSMathOperator` (css-typed-om.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CSSMathOperator {
+    /// `"sum"`
+    Sum,
+    /// `"product"`
+    Product,
+    /// `"negate"`
+    Negate,
+    /// `"invert"`
+    Invert,
+    /// `"min"`
+    Min,
+    /// `"max"`
+    Max,
+    /// `"clamp"`
+    Clamp,
+}
+
+impl CSSMathOperator {
+    pub const VALUES: &'static [&'static str] =
+        &["sum", "product", "negate", "invert", "min", "max", "clamp"];
+    const ALL: &'static [CSSMathOperator] = &[
+        CSSMathOperator::Sum,
+        CSSMathOperator::Product,
+        CSSMathOperator::Negate,
+        CSSMathOperator::Invert,
+        CSSMathOperator::Min,
+        CSSMathOperator::Max,
+        CSSMathOperator::Clamp,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "CSSMathOperator").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for CSSMathOperator {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
+/// `enum CSSNumericBaseType` (css-typed-om.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CSSNumericBaseType {
+    /// `"length"`
+    Length,
+    /// `"angle"`
+    Angle,
+    /// `"time"`
+    Time,
+    /// `"frequency"`
+    Frequency,
+    /// `"resolution"`
+    Resolution,
+    /// `"flex"`
+    Flex,
+    /// `"percent"`
+    Percent,
+}
+
+impl CSSNumericBaseType {
+    pub const VALUES: &'static [&'static str] = &[
+        "length",
+        "angle",
+        "time",
+        "frequency",
+        "resolution",
+        "flex",
+        "percent",
+    ];
+    const ALL: &'static [CSSNumericBaseType] = &[
+        CSSNumericBaseType::Length,
+        CSSNumericBaseType::Angle,
+        CSSNumericBaseType::Time,
+        CSSNumericBaseType::Frequency,
+        CSSNumericBaseType::Resolution,
+        CSSNumericBaseType::Flex,
+        CSSNumericBaseType::Percent,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "CSSNumericBaseType").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for CSSNumericBaseType {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
 /// `enum CanPlayTypeResult` (html.idl).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CanPlayTypeResult {
@@ -6481,10 +6598,10 @@ pub struct AnimationPlaybackEventInit {
     pub cancelable: bool,
     /// `boolean composed = false`
     pub composed: bool,
-    /// `double? currentTime = null`
-    pub current_time: Option<f64>,
-    /// `double? timelineTime = null`
-    pub timeline_time: Option<f64>,
+    /// `(double or CSSNumericValue)? currentTime = null`
+    pub current_time: Option<DoubleOrCSSNumericValue>,
+    /// `(double or CSSNumericValue)? timelineTime = null`
+    pub timeline_time: Option<DoubleOrCSSNumericValue>,
 }
 
 // The member defaults, written out (some equal the types' defaults).
@@ -6559,7 +6676,7 @@ impl AnimationPlaybackEventInit {
                         if v.is_null_or_undefined() {
                             Some(None)
                         } else {
-                            (rt::to_double(scope, v, true)).map(Some)
+                            (DoubleOrCSSNumericValue::from_js(scope, v)).map(Some)
                         }
                     }?
                 }
@@ -6579,7 +6696,7 @@ impl AnimationPlaybackEventInit {
                         if v.is_null_or_undefined() {
                             Some(None)
                         } else {
-                            (rt::to_double(scope, v, true)).map(Some)
+                            (DoubleOrCSSNumericValue::from_js(scope, v)).map(Some)
                         }
                     }?
                 }
@@ -10301,6 +10418,330 @@ impl ToJs for CSSContainerCondition {
     }
 }
 
+/// `dictionary CSSMatrixComponentOptions` (css-typed-om.idl).
+#[derive(Clone)]
+pub struct CSSMatrixComponentOptions {
+    /// `boolean is2D`
+    pub is2_d: Option<bool>,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for CSSMatrixComponentOptions {
+    fn default() -> Self {
+        CSSMatrixComponentOptions { is2_d: None }
+    }
+}
+
+impl CSSMatrixComponentOptions {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "CSSMatrixComponentOptions")?;
+        let m_is2_d = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("is2D");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(Some(rt::to_boolean(scope, v))?)
+                }
+            }
+            None => None,
+        };
+        Some(CSSMatrixComponentOptions { is2_d: m_is2_d })
+    }
+}
+
+impl ToJs for CSSMatrixComponentOptions {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        if let Some(x) = &self.is2_d {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("is2D");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary CSSNumericType` (css-typed-om.idl).
+#[derive(Clone)]
+pub struct CSSNumericType {
+    /// `long angle`
+    pub angle: Option<i32>,
+    /// `long flex`
+    pub flex: Option<i32>,
+    /// `long frequency`
+    pub frequency: Option<i32>,
+    /// `long length`
+    pub length: Option<i32>,
+    /// `long percent`
+    pub percent: Option<i32>,
+    /// `CSSNumericBaseType percentHint`
+    pub percent_hint: Option<CSSNumericBaseType>,
+    /// `long resolution`
+    pub resolution: Option<i32>,
+    /// `long time`
+    pub time: Option<i32>,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for CSSNumericType {
+    fn default() -> Self {
+        CSSNumericType {
+            angle: None,
+            flex: None,
+            frequency: None,
+            length: None,
+            percent: None,
+            percent_hint: None,
+            resolution: None,
+            time: None,
+        }
+    }
+}
+
+impl CSSNumericType {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "CSSNumericType")?;
+        let m_angle = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("angle");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_long(scope, v, rt::IntMode::Wrap)?)
+                }
+            }
+            None => None,
+        };
+        let m_flex = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("flex");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_long(scope, v, rt::IntMode::Wrap)?)
+                }
+            }
+            None => None,
+        };
+        let m_frequency = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("frequency");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_long(scope, v, rt::IntMode::Wrap)?)
+                }
+            }
+            None => None,
+        };
+        let m_length = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("length");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_long(scope, v, rt::IntMode::Wrap)?)
+                }
+            }
+            None => None,
+        };
+        let m_percent = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("percent");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_long(scope, v, rt::IntMode::Wrap)?)
+                }
+            }
+            None => None,
+        };
+        let m_percent_hint = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("percentHint");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(CSSNumericBaseType::from_js(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_resolution = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("resolution");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_long(scope, v, rt::IntMode::Wrap)?)
+                }
+            }
+            None => None,
+        };
+        let m_time = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("time");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_long(scope, v, rt::IntMode::Wrap)?)
+                }
+            }
+            None => None,
+        };
+        Some(CSSNumericType {
+            angle: m_angle,
+            flex: m_flex,
+            frequency: m_frequency,
+            length: m_length,
+            percent: m_percent,
+            percent_hint: m_percent_hint,
+            resolution: m_resolution,
+            time: m_time,
+        })
+    }
+}
+
+impl ToJs for CSSNumericType {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        if let Some(x) = &self.angle {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("angle");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.flex {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("flex");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.frequency {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("frequency");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.length {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("length");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.percent {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("percent");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.percent_hint {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("percentHint");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.resolution {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("resolution");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.time {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("time");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
 /// `dictionary CSSStyleSheetInit` (cssom.idl).
 #[derive(Clone)]
 pub struct CSSStyleSheetInit {
@@ -12200,8 +12641,8 @@ pub struct ComputedEffectTiming {
     pub delay: Option<f64>,
     /// `PlaybackDirection direction = "normal"`
     pub direction: PlaybackDirection,
-    /// `(unrestricted double or DOMString) duration = "auto"`
-    pub duration: UnrestrictedDoubleOrString,
+    /// `(unrestricted double or CSSNumericValue or DOMString) duration = "auto"`
+    pub duration: UnrestrictedDoubleOrCSSNumericValueOrString,
     /// `DOMString easing = "linear"`
     pub easing: String,
     /// `double endDelay`
@@ -12212,18 +12653,18 @@ pub struct ComputedEffectTiming {
     pub iteration_start: f64,
     /// `unrestricted double iterations = 1.0`
     pub iterations: f64,
-    /// `double activeDuration`
-    pub active_duration: Option<f64>,
+    /// `(double or CSSNumericValue) activeDuration`
+    pub active_duration: Option<DoubleOrCSSNumericValue>,
     /// `unrestricted double? currentIteration`
     pub current_iteration: Option<f64>,
-    /// `double endTime`
-    pub end_time: Option<f64>,
-    /// `double? localTime`
-    pub local_time: Option<f64>,
+    /// `(double or CSSNumericValue) endTime`
+    pub end_time: Option<DoubleOrCSSNumericValue>,
+    /// `(double or CSSNumericValue)? localTime`
+    pub local_time: Option<DoubleOrCSSNumericValue>,
     /// `double? progress`
     pub progress: Option<f64>,
-    /// `double startTime`
-    pub start_time: Option<f64>,
+    /// `(double or CSSNumericValue) startTime`
+    pub start_time: Option<DoubleOrCSSNumericValue>,
 }
 
 // The member defaults, written out (some equal the types' defaults).
@@ -12233,7 +12674,7 @@ impl Default for ComputedEffectTiming {
         ComputedEffectTiming {
             delay: None,
             direction: PlaybackDirection::Normal,
-            duration: UnrestrictedDoubleOrString::String(String::from("auto")),
+            duration: UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto")),
             easing: String::from("linear"),
             end_delay: None,
             fill: FillMode::Auto,
@@ -12287,12 +12728,12 @@ impl ComputedEffectTiming {
                     &K
                 })?;
                 if v.is_undefined() {
-                    UnrestrictedDoubleOrString::String(String::from("auto"))
+                    UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto"))
                 } else {
-                    UnrestrictedDoubleOrString::from_js(scope, v)?
+                    UnrestrictedDoubleOrCSSNumericValueOrString::from_js(scope, v)?
                 }
             }
-            None => UnrestrictedDoubleOrString::String(String::from("auto")),
+            None => UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto")),
         };
         let m_easing = match obj {
             Some(o) => {
@@ -12373,7 +12814,7 @@ impl ComputedEffectTiming {
                 if v.is_undefined() {
                     None
                 } else {
-                    Some(rt::to_double(scope, v, true)?)
+                    Some(DoubleOrCSSNumericValue::from_js(scope, v)?)
                 }
             }
             None => None,
@@ -12407,7 +12848,7 @@ impl ComputedEffectTiming {
                 if v.is_undefined() {
                     None
                 } else {
-                    Some(rt::to_double(scope, v, true)?)
+                    Some(DoubleOrCSSNumericValue::from_js(scope, v)?)
                 }
             }
             None => None,
@@ -12425,7 +12866,7 @@ impl ComputedEffectTiming {
                         if v.is_null_or_undefined() {
                             Some(None)
                         } else {
-                            (rt::to_double(scope, v, true)).map(Some)
+                            (DoubleOrCSSNumericValue::from_js(scope, v)).map(Some)
                         }
                     }?
                 }
@@ -12461,7 +12902,7 @@ impl ComputedEffectTiming {
                 if v.is_undefined() {
                     None
                 } else {
-                    Some(rt::to_double(scope, v, true)?)
+                    Some(DoubleOrCSSNumericValue::from_js(scope, v)?)
                 }
             }
             None => None,
@@ -17925,8 +18366,8 @@ pub struct EffectTiming {
     pub delay: Option<f64>,
     /// `PlaybackDirection direction = "normal"`
     pub direction: PlaybackDirection,
-    /// `(unrestricted double or DOMString) duration = "auto"`
-    pub duration: UnrestrictedDoubleOrString,
+    /// `(unrestricted double or CSSNumericValue or DOMString) duration = "auto"`
+    pub duration: UnrestrictedDoubleOrCSSNumericValueOrString,
     /// `DOMString easing = "linear"`
     pub easing: String,
     /// `double endDelay`
@@ -17946,7 +18387,7 @@ impl Default for EffectTiming {
         EffectTiming {
             delay: None,
             direction: PlaybackDirection::Normal,
-            duration: UnrestrictedDoubleOrString::String(String::from("auto")),
+            duration: UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto")),
             easing: String::from("linear"),
             end_delay: None,
             fill: FillMode::Auto,
@@ -17994,12 +18435,12 @@ impl EffectTiming {
                     &K
                 })?;
                 if v.is_undefined() {
-                    UnrestrictedDoubleOrString::String(String::from("auto"))
+                    UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto"))
                 } else {
-                    UnrestrictedDoubleOrString::from_js(scope, v)?
+                    UnrestrictedDoubleOrCSSNumericValueOrString::from_js(scope, v)?
                 }
             }
-            None => UnrestrictedDoubleOrString::String(String::from("auto")),
+            None => UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto")),
         };
         let m_easing = match obj {
             Some(o) => {
@@ -26457,8 +26898,8 @@ pub struct KeyframeAnimationOptions {
     pub delay: Option<f64>,
     /// `PlaybackDirection direction = "normal"`
     pub direction: PlaybackDirection,
-    /// `(unrestricted double or DOMString) duration = "auto"`
-    pub duration: UnrestrictedDoubleOrString,
+    /// `(unrestricted double or CSSNumericValue or DOMString) duration = "auto"`
+    pub duration: UnrestrictedDoubleOrCSSNumericValueOrString,
     /// `DOMString easing = "linear"`
     pub easing: String,
     /// `double endDelay`
@@ -26475,10 +26916,10 @@ pub struct KeyframeAnimationOptions {
     pub pseudo_element: Option<String>,
     /// `DOMString id = ""`
     pub id: String,
-    /// `(TimelineRangeOffset or DOMString) rangeEnd = "normal"`
-    pub range_end: TimelineRangeOffsetOrString,
-    /// `(TimelineRangeOffset or DOMString) rangeStart = "normal"`
-    pub range_start: TimelineRangeOffsetOrString,
+    /// `(TimelineRangeOffset or CSSNumericValue or CSSKeywordValue or DOMString) rangeEnd = "normal"`
+    pub range_end: TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString,
+    /// `(TimelineRangeOffset or CSSNumericValue or CSSKeywordValue or DOMString) rangeStart = "normal"`
+    pub range_start: TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString,
     /// `AnimationTimeline? timeline`
     pub timeline: Option<Handle>,
 }
@@ -26490,7 +26931,7 @@ impl Default for KeyframeAnimationOptions {
         KeyframeAnimationOptions {
             delay: None,
             direction: PlaybackDirection::Normal,
-            duration: UnrestrictedDoubleOrString::String(String::from("auto")),
+            duration: UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto")),
             easing: String::from("linear"),
             end_delay: None,
             fill: FillMode::Auto,
@@ -26499,8 +26940,12 @@ impl Default for KeyframeAnimationOptions {
             composite: CompositeOperation::Replace,
             pseudo_element: None,
             id: String::from(""),
-            range_end: TimelineRangeOffsetOrString::String(String::from("normal")),
-            range_start: TimelineRangeOffsetOrString::String(String::from("normal")),
+            range_end: TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::String(
+                String::from("normal"),
+            ),
+            range_start: TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::String(
+                String::from("normal"),
+            ),
             timeline: None,
         }
     }
@@ -26544,12 +26989,12 @@ impl KeyframeAnimationOptions {
                     &K
                 })?;
                 if v.is_undefined() {
-                    UnrestrictedDoubleOrString::String(String::from("auto"))
+                    UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto"))
                 } else {
-                    UnrestrictedDoubleOrString::from_js(scope, v)?
+                    UnrestrictedDoubleOrCSSNumericValueOrString::from_js(scope, v)?
                 }
             }
-            None => UnrestrictedDoubleOrString::String(String::from("auto")),
+            None => UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto")),
         };
         let m_easing = match obj {
             Some(o) => {
@@ -26676,12 +27121,18 @@ impl KeyframeAnimationOptions {
                     &K
                 })?;
                 if v.is_undefined() {
-                    TimelineRangeOffsetOrString::String(String::from("normal"))
+                    TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::String(
+                        String::from("normal"),
+                    )
                 } else {
-                    TimelineRangeOffsetOrString::from_js(scope, v)?
+                    TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::from_js(
+                        scope, v,
+                    )?
                 }
             }
-            None => TimelineRangeOffsetOrString::String(String::from("normal")),
+            None => TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::String(
+                String::from("normal"),
+            ),
         };
         let m_range_start = match obj {
             Some(o) => {
@@ -26690,12 +27141,18 @@ impl KeyframeAnimationOptions {
                     &K
                 })?;
                 if v.is_undefined() {
-                    TimelineRangeOffsetOrString::String(String::from("normal"))
+                    TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::String(
+                        String::from("normal"),
+                    )
                 } else {
-                    TimelineRangeOffsetOrString::from_js(scope, v)?
+                    TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::from_js(
+                        scope, v,
+                    )?
                 }
             }
-            None => TimelineRangeOffsetOrString::String(String::from("normal")),
+            None => TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::String(
+                String::from("normal"),
+            ),
         };
         let m_timeline = match obj {
             Some(o) => {
@@ -26926,8 +27383,8 @@ pub struct KeyframeEffectOptions {
     pub delay: Option<f64>,
     /// `PlaybackDirection direction = "normal"`
     pub direction: PlaybackDirection,
-    /// `(unrestricted double or DOMString) duration = "auto"`
-    pub duration: UnrestrictedDoubleOrString,
+    /// `(unrestricted double or CSSNumericValue or DOMString) duration = "auto"`
+    pub duration: UnrestrictedDoubleOrCSSNumericValueOrString,
     /// `DOMString easing = "linear"`
     pub easing: String,
     /// `double endDelay`
@@ -26951,7 +27408,7 @@ impl Default for KeyframeEffectOptions {
         KeyframeEffectOptions {
             delay: None,
             direction: PlaybackDirection::Normal,
-            duration: UnrestrictedDoubleOrString::String(String::from("auto")),
+            duration: UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto")),
             easing: String::from("linear"),
             end_delay: None,
             fill: FillMode::Auto,
@@ -27001,12 +27458,12 @@ impl KeyframeEffectOptions {
                     &K
                 })?;
                 if v.is_undefined() {
-                    UnrestrictedDoubleOrString::String(String::from("auto"))
+                    UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto"))
                 } else {
-                    UnrestrictedDoubleOrString::from_js(scope, v)?
+                    UnrestrictedDoubleOrCSSNumericValueOrString::from_js(scope, v)?
                 }
             }
-            None => UnrestrictedDoubleOrString::String(String::from("auto")),
+            None => UnrestrictedDoubleOrCSSNumericValueOrString::String(String::from("auto")),
         };
         let m_easing = match obj {
             Some(o) => {
@@ -47852,6 +48309,8 @@ impl ToJs for TextEncoderEncodeIntoResult {
 /// `dictionary TimelineRangeOffset` (web-animations-2.idl).
 #[derive(Clone)]
 pub struct TimelineRangeOffset {
+    /// `CSSNumericValue offset`
+    pub offset: Option<Handle>,
     /// `DOMString? rangeName`
     pub range_name: Option<String>,
 }
@@ -47860,13 +48319,37 @@ pub struct TimelineRangeOffset {
 #[allow(clippy::derivable_impls)]
 impl Default for TimelineRangeOffset {
     fn default() -> Self {
-        TimelineRangeOffset { range_name: None }
+        TimelineRangeOffset {
+            offset: None,
+            range_name: None,
+        }
     }
 }
 
 impl TimelineRangeOffset {
     pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
         let obj = rt::dictionary_object(scope, v, "TimelineRangeOffset")?;
+        let m_offset = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("offset");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_interface(
+                        scope,
+                        v,
+                        ids::CSS_NUMERIC_VALUE,
+                        ids::CSS_NUMERIC_VALUE_END,
+                        "TimelineRangeOffset.offset",
+                        "CSSNumericValue",
+                    )?)
+                }
+            }
+            None => None,
+        };
         let m_range_name = match obj {
             Some(o) => {
                 let v = rt::get_named_member(scope, o, {
@@ -47888,6 +48371,7 @@ impl TimelineRangeOffset {
             None => None,
         };
         Some(TimelineRangeOffset {
+            offset: m_offset,
             range_name: m_range_name,
         })
     }
@@ -47896,6 +48380,18 @@ impl TimelineRangeOffset {
 impl ToJs for TimelineRangeOffset {
     fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
         let o = v8::Object::new(scope);
+        if let Some(x) = &self.offset {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("offset");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
         {
             let v = self.range_name.to_js(scope)?;
             o.create_data_property(
@@ -54570,6 +55066,87 @@ impl ToJs for BooleanOrUnrestrictedDoubleOrString {
     }
 }
 
+/// `(CSSNumericValue or DOMString or CSSKeywordValue)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum CSSNumericValueOrStringOrCSSKeywordValue {
+    CSSNumericValue(Handle),
+    String(String),
+    CSSKeywordValue(Handle),
+}
+
+impl CSSNumericValueOrStringOrCSSKeywordValue {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(v, ids::CSS_NUMERIC_VALUE, ids::CSS_NUMERIC_VALUE_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CSS_NUMERIC_VALUE,
+                ids::CSS_NUMERIC_VALUE_END,
+                "The value",
+                "CSSNumericValue",
+            ))
+            .map(CSSNumericValueOrStringOrCSSKeywordValue::CSSNumericValue);
+        }
+        if rt::unwrap_value(v, ids::CSS_KEYWORD_VALUE, ids::CSS_KEYWORD_VALUE_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CSS_KEYWORD_VALUE,
+                ids::CSS_KEYWORD_VALUE_END,
+                "The value",
+                "CSSKeywordValue",
+            ))
+            .map(CSSNumericValueOrStringOrCSSKeywordValue::CSSKeywordValue);
+        }
+        (rt::to_dom_string(scope, v)).map(CSSNumericValueOrStringOrCSSKeywordValue::String)
+    }
+}
+
+impl ToJs for CSSNumericValueOrStringOrCSSKeywordValue {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            CSSNumericValueOrStringOrCSSKeywordValue::CSSNumericValue(x) => x.to_js(scope),
+            CSSNumericValueOrStringOrCSSKeywordValue::String(x) => x.to_js(scope),
+            CSSNumericValueOrStringOrCSSKeywordValue::CSSKeywordValue(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(CSSStyleValue or USVString)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum CSSStyleValueOrString {
+    CSSStyleValue(Handle),
+    String(String),
+}
+
+impl CSSStyleValueOrString {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(v, ids::CSS_STYLE_VALUE, ids::CSS_STYLE_VALUE_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CSS_STYLE_VALUE,
+                ids::CSS_STYLE_VALUE_END,
+                "The value",
+                "CSSStyleValue",
+            ))
+            .map(CSSStyleValueOrString::CSSStyleValue);
+        }
+        (rt::to_usv_string(scope, v)).map(CSSStyleValueOrString::String)
+    }
+}
+
+impl ToJs for CSSStyleValueOrString {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            CSSStyleValueOrString::CSSStyleValue(x) => x.to_js(scope),
+            CSSStyleValueOrString::String(x) => x.to_js(scope),
+        }
+    }
+}
+
 /// `(CanvasRenderingContext2D or WebGLRenderingContext)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -54842,6 +55419,43 @@ impl ToJs for DoubleOrAutoKeyword {
         match self {
             DoubleOrAutoKeyword::Double(x) => x.to_js(scope),
             DoubleOrAutoKeyword::AutoKeyword(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(double or CSSNumericValue)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum DoubleOrCSSNumericValue {
+    Double(f64),
+    CSSNumericValue(Handle),
+}
+
+impl DoubleOrCSSNumericValue {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(v, ids::CSS_NUMERIC_VALUE, ids::CSS_NUMERIC_VALUE_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CSS_NUMERIC_VALUE,
+                ids::CSS_NUMERIC_VALUE_END,
+                "The value",
+                "CSSNumericValue",
+            ))
+            .map(DoubleOrCSSNumericValue::CSSNumericValue);
+        }
+        if v.is_number() {
+            return (rt::to_double(scope, v, true)).map(DoubleOrCSSNumericValue::Double);
+        }
+        (rt::to_double(scope, v, true)).map(DoubleOrCSSNumericValue::Double)
+    }
+}
+
+impl ToJs for DoubleOrCSSNumericValue {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            DoubleOrCSSNumericValue::Double(x) => x.to_js(scope),
+            DoubleOrCSSNumericValue::CSSNumericValue(x) => x.to_js(scope),
         }
     }
 }
@@ -56657,6 +57271,80 @@ impl ToJs for StringOrBlob {
     }
 }
 
+/// `(DOMString or CSSStyleValue)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum StringOrCSSStyleValue {
+    String(String),
+    CSSStyleValue(Handle),
+}
+
+impl StringOrCSSStyleValue {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(v, ids::CSS_STYLE_VALUE, ids::CSS_STYLE_VALUE_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CSS_STYLE_VALUE,
+                ids::CSS_STYLE_VALUE_END,
+                "The value",
+                "CSSStyleValue",
+            ))
+            .map(StringOrCSSStyleValue::CSSStyleValue);
+        }
+        (rt::to_dom_string(scope, v)).map(StringOrCSSStyleValue::String)
+    }
+}
+
+impl ToJs for StringOrCSSStyleValue {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            StringOrCSSStyleValue::String(x) => x.to_js(scope),
+            StringOrCSSStyleValue::CSSStyleValue(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(USVString or CSSVariableReferenceValue)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum StringOrCSSVariableReferenceValue {
+    String(String),
+    CSSVariableReferenceValue(Handle),
+}
+
+impl StringOrCSSVariableReferenceValue {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(
+            v,
+            ids::CSS_VARIABLE_REFERENCE_VALUE,
+            ids::CSS_VARIABLE_REFERENCE_VALUE_END,
+        )
+        .is_some()
+        {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CSS_VARIABLE_REFERENCE_VALUE,
+                ids::CSS_VARIABLE_REFERENCE_VALUE_END,
+                "The value",
+                "CSSVariableReferenceValue",
+            ))
+            .map(StringOrCSSVariableReferenceValue::CSSVariableReferenceValue);
+        }
+        (rt::to_usv_string(scope, v)).map(StringOrCSSVariableReferenceValue::String)
+    }
+}
+
+impl ToJs for StringOrCSSVariableReferenceValue {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            StringOrCSSVariableReferenceValue::String(x) => x.to_js(scope),
+            StringOrCSSVariableReferenceValue::CSSVariableReferenceValue(x) => x.to_js(scope),
+        }
+    }
+}
+
 /// `(DOMString or CanvasGradient or CanvasPattern)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -57298,33 +57986,70 @@ impl ToJs for TextOrElementOrDocument {
     }
 }
 
-/// `(TimelineRangeOffset or DOMString)`
+/// `(TimelineRangeOffset or CSSNumericValue or CSSKeywordValue or DOMString)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum TimelineRangeOffsetOrString {
+pub enum TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString {
     TimelineRangeOffset(TimelineRangeOffset),
+    CSSNumericValue(Handle),
+    CSSKeywordValue(Handle),
     String(String),
 }
 
-impl TimelineRangeOffsetOrString {
+impl TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString {
     pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
         if v.is_null_or_undefined() {
-            return (TimelineRangeOffset::from_js(scope, v))
-                .map(TimelineRangeOffsetOrString::TimelineRangeOffset);
+            return (TimelineRangeOffset::from_js(scope, v)).map(
+                TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::TimelineRangeOffset,
+            );
+        }
+        if rt::unwrap_value(v, ids::CSS_NUMERIC_VALUE, ids::CSS_NUMERIC_VALUE_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CSS_NUMERIC_VALUE,
+                ids::CSS_NUMERIC_VALUE_END,
+                "The value",
+                "CSSNumericValue",
+            ))
+            .map(TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::CSSNumericValue);
+        }
+        if rt::unwrap_value(v, ids::CSS_KEYWORD_VALUE, ids::CSS_KEYWORD_VALUE_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CSS_KEYWORD_VALUE,
+                ids::CSS_KEYWORD_VALUE_END,
+                "The value",
+                "CSSKeywordValue",
+            ))
+            .map(TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::CSSKeywordValue);
         }
         if v.is_object() {
-            return (TimelineRangeOffset::from_js(scope, v))
-                .map(TimelineRangeOffsetOrString::TimelineRangeOffset);
+            return (TimelineRangeOffset::from_js(scope, v)).map(
+                TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::TimelineRangeOffset,
+            );
         }
-        (rt::to_dom_string(scope, v)).map(TimelineRangeOffsetOrString::String)
+        (rt::to_dom_string(scope, v))
+            .map(TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::String)
     }
 }
 
-impl ToJs for TimelineRangeOffsetOrString {
+impl ToJs for TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString {
     fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
         match self {
-            TimelineRangeOffsetOrString::TimelineRangeOffset(x) => x.to_js(scope),
-            TimelineRangeOffsetOrString::String(x) => x.to_js(scope),
+            TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::TimelineRangeOffset(
+                x,
+            ) => x.to_js(scope),
+            TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::CSSNumericValue(x) => {
+                x.to_js(scope)
+            }
+            TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::CSSKeywordValue(x) => {
+                x.to_js(scope)
+            }
+            TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString::String(x) => {
+                x.to_js(scope)
+            }
         }
     }
 }
@@ -57632,6 +58357,83 @@ impl ToJs for Uint8ClampedArrayOrFloat16Array {
         match self {
             Uint8ClampedArrayOrFloat16Array::Uint8ClampedArray(x) => x.to_js(scope),
             Uint8ClampedArrayOrFloat16Array::Float16Array(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(undefined or CSSStyleValue)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum UndefinedOrCSSStyleValue {
+    Undefined(()),
+    CSSStyleValue(Handle),
+}
+
+impl UndefinedOrCSSStyleValue {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(v, ids::CSS_STYLE_VALUE, ids::CSS_STYLE_VALUE_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CSS_STYLE_VALUE,
+                ids::CSS_STYLE_VALUE_END,
+                "The value",
+                "CSSStyleValue",
+            ))
+            .map(UndefinedOrCSSStyleValue::CSSStyleValue);
+        }
+        rt::type_error(
+            scope,
+            "The value is not of type '(undefined or CSSStyleValue)'",
+        )
+    }
+}
+
+impl ToJs for UndefinedOrCSSStyleValue {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            UndefinedOrCSSStyleValue::Undefined(x) => x.to_js(scope),
+            UndefinedOrCSSStyleValue::CSSStyleValue(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(unrestricted double or CSSNumericValue or DOMString)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum UnrestrictedDoubleOrCSSNumericValueOrString {
+    UnrestrictedDouble(f64),
+    CSSNumericValue(Handle),
+    String(String),
+}
+
+impl UnrestrictedDoubleOrCSSNumericValueOrString {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(v, ids::CSS_NUMERIC_VALUE, ids::CSS_NUMERIC_VALUE_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::CSS_NUMERIC_VALUE,
+                ids::CSS_NUMERIC_VALUE_END,
+                "The value",
+                "CSSNumericValue",
+            ))
+            .map(UnrestrictedDoubleOrCSSNumericValueOrString::CSSNumericValue);
+        }
+        if v.is_number() {
+            return (rt::to_double(scope, v, false))
+                .map(UnrestrictedDoubleOrCSSNumericValueOrString::UnrestrictedDouble);
+        }
+        (rt::to_dom_string(scope, v)).map(UnrestrictedDoubleOrCSSNumericValueOrString::String)
+    }
+}
+
+impl ToJs for UnrestrictedDoubleOrCSSNumericValueOrString {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            UnrestrictedDoubleOrCSSNumericValueOrString::UnrestrictedDouble(x) => x.to_js(scope),
+            UnrestrictedDoubleOrCSSNumericValueOrString::CSSNumericValue(x) => x.to_js(scope),
+            UnrestrictedDoubleOrCSSNumericValueOrString::String(x) => x.to_js(scope),
         }
     }
 }

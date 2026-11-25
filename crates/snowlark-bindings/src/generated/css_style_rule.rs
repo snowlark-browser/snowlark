@@ -43,6 +43,13 @@ pub trait CSSStyleRuleImpl {
     fn style(&self, this: Handle) -> Handle {
         rt::stub("CSSStyleRule.style")
     }
+    /// [SameObject] readonly attribute StylePropertyMap styleMap;
+    #[cfg(not(feature = "stubs"))]
+    fn style_map(&self, this: Handle) -> Handle;
+    #[cfg(feature = "stubs")]
+    fn style_map(&self, this: Handle) -> Handle {
+        rt::stub("CSSStyleRule.style_map")
+    }
 }
 
 /// Getter of `attribute CSSOMString selectorText;`.
@@ -132,6 +139,38 @@ pub(crate) fn attr_style_set<D: Dom, const LO: u16, const HI: u16>(
     target.set(scope, rt::name(scope, "cssText").into(), args.get(0));
 }
 
+/// Getter of `[SameObject] readonly attribute StylePropertyMap styleMap;`.
+pub(crate) fn attr_style_map_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleRule.styleMap");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    if let Some(v) = rt::same_object_get(scope, args.this(), {
+        static K: rt::Name = rt::Name::new("CSSStyleRule.styleMap");
+        &K
+    }) {
+        rv.set(v);
+        return;
+    }
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStyleRuleImpl>::style_map(dom, this);
+    let Some(js) = v.to_js(scope) else { return };
+    rt::same_object_set(
+        scope,
+        args.this(),
+        {
+            static K: rt::Name = rt::Name::new("CSSStyleRule.styleMap");
+            &K
+        },
+        js,
+    );
+    rv.set(js);
+}
+
 /// Builds the interface object template of `CSSStyleRule` (Web IDL §3.7), inheriting from `parent`.
 pub(crate) fn template<'s, D: Dom>(
     scope: &v8::PinScope<'s, '_>,
@@ -186,6 +225,18 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "style", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_rule::attr_style_map_get::<D, LO, HI>),
+            "styleMap",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = None;
+        rt::accessor(scope, proto, "styleMap", g, s, false);
     }
     t
 }

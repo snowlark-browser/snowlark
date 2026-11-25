@@ -9,6 +9,7 @@
 //! target in Cargo.toml instead.
 
 mod accent_color;
+mod anchor_position;
 mod animated_images;
 mod audio_context;
 mod audio_output;
@@ -104,6 +105,7 @@ mod text_stroke;
 mod timeline;
 mod touch_events;
 mod trusted_types;
+mod typed_om;
 mod user_agent;
 mod wasm_streaming;
 mod wasm_tasks;

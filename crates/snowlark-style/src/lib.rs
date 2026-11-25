@@ -22,6 +22,8 @@ mod sheets;
 mod slots;
 mod table;
 mod traversal;
+pub mod typed;
+pub mod typed_props;
 pub mod web_animations;
 
 pub use damage::{

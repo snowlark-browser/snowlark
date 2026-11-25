@@ -71,6 +71,12 @@ fn class(o: &Object) -> Class {
             None => Class::Weak,
         },
         Object::StyleDeclaration(Decl::Inline(n)) => Class::Owned(*n),
+        // (an element's style maps live with its wrapper; every other value while script reaches
+        // it or an object that refers to it)
+        Object::Typed(t) => match t.gc_owner() {
+            Some(element) => Class::Owned(element),
+            None => Class::Weak,
+        },
         Object::DomImplementation { document } => Class::Owned(*document),
         Object::Collection(c) => match c.live_anchor() {
             Some(owner) => Class::Owned(owner),
@@ -256,6 +262,7 @@ fn refs(o: &Object, r: &mut Refs) {
         // kept by their owner, which detaches them when it is freed)
         Object::DomRect(rect) => r.opt(rect.svg),
         Object::DomQuad(points) => r.objects.extend(points),
+        Object::Typed(t) => t.gc_refs(&mut r.objects),
         Object::Collection(c) => match c.live_anchor() {
             Some(anchor) => {
                 let from = r.nodes.len();
@@ -2222,6 +2229,7 @@ impl Engine {
             Object::NodeIterator(_) => self.iterators.borrow_mut().retain(|&r| r != h),
             Object::Animation(_) | Object::DocumentTimeline(_) => self.animation_freed(h),
             Object::Svg(ref o) => self.svg_freed(o),
+            Object::Typed(ref t) => self.typed_om_freed(t),
             Object::EventTarget | Object::Idb(_) => {
                 self.listeners.borrow_mut().remove(&h);
                 self.handlers.borrow_mut().retain(|(t, _), _| *t != h);

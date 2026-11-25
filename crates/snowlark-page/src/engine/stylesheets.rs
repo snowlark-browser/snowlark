@@ -734,6 +734,10 @@ impl CSSStyleRuleImpl for Engine {
     fn style(&self, this: Handle) -> Handle {
         self.alloc(Object::StyleDeclaration(Decl::Rule(this)))
     }
+    fn style_map(&self, this: Handle) -> Handle {
+        // ([SameObject]: the bindings keep the first object.)
+        self.rule_style_map(this)
+    }
 }
 
 impl Engine {

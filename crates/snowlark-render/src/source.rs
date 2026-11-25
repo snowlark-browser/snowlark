@@ -129,6 +129,8 @@ pub struct DocumentStyles<'a> {
     filter_references: Option<&'a HashMap<NodeId, Option<Arc<crate::renderer::FilterReferences>>>>,
     /// The elements' last remembered sizes (CSS Sizing 4 5.2.1), from the renderer.
     remembered: Option<&'a HashMap<NodeId, (Option<f32>, Option<f32>)>>,
+    /// The elements' implicit anchor elements, from the renderer.
+    implicit_anchors: Option<&'a HashMap<NodeId, NodeId>>,
     /// An element with `contain-intrinsic-size: auto` was handed to layout.
     auto_intrinsic: Cell<bool>,
     /// HTML "PDF viewer supported": PDF `object`s and `embed`s show a nested document.
@@ -285,6 +287,7 @@ impl<'a> DocumentStyles<'a> {
             clip_references: None,
             filter_references: None,
             remembered: None,
+            implicit_anchors: None,
             auto_intrinsic: Cell::new(false),
             pdf_viewer: false,
             custom_scrollbars: None,
@@ -312,6 +315,12 @@ impl<'a> DocumentStyles<'a> {
         remembered: &'a HashMap<NodeId, (Option<f32>, Option<f32>)>,
     ) -> Self {
         self.remembered = Some(remembered);
+        self
+    }
+
+    /// The elements' implicit anchor elements (CSS Anchor Positioning 1 §2.4.1).
+    pub fn with_implicit_anchors(mut self, anchors: &'a HashMap<NodeId, NodeId>) -> Self {
+        self.implicit_anchors = Some(anchors);
         self
     }
 
@@ -765,6 +774,19 @@ impl StyleSource for DocumentStyles<'_> {
         if let Some(refs) = self.filter_references.and_then(|c| c.get(&element)) {
             style.filter_references = refs.clone();
         }
+        style.implicit_anchor = self.implicit_anchors.and_then(|m| m.get(&element).copied());
+        // CSS Anchor Positioning 1 §6.1: an absolutely positioned box's position options.
+        let p = style.values.get_position();
+        if !p.position_try_fallbacks.value.is_none()
+            && style.values.get_box().position.is_absolutely_positioned()
+        {
+            let options = self
+                .engine
+                .position_try_styles(self.dom, self.data, element);
+            if !options.is_empty() {
+                style.position_try = Some(options.into());
+            }
+        }
         // CSS Sizing 4 5.2.1: `contain-intrinsic-size: auto` and the element's last remembered size.
         if style.intrinsic_size_auto() != (false, false) {
             self.auto_intrinsic.set(true);
@@ -806,6 +828,9 @@ impl StyleSource for DocumentStyles<'_> {
             view: snowlark_layout::style::Flip::IDENTITY,
             animations,
             custom_scrollbar: None,
+            anchored: None,
+            implicit_anchor: None,
+            position_try: None,
         })
     }
 

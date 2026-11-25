@@ -92,6 +92,7 @@ pub(crate) mod timing;
 mod touch;
 mod traversal;
 pub(crate) mod trusted_types;
+pub(crate) mod typed_om;
 pub(crate) mod url;
 pub(crate) mod view;
 pub(crate) mod view_transition;
@@ -334,6 +335,8 @@ pub enum Object {
     DomPoint(geometry::Point4),
     DomQuad([Handle; 4]),
     DomMatrix(Box<geometry::MatrixData>),
+    /// A CSS Typed OM object.
+    Typed(Box<typed_om::Tom>),
     TrustedHtml(String),
     TrustedScript(String),
     TrustedScriptUrl(String),
@@ -1213,6 +1216,7 @@ impl Engine {
                 }
             }
             Object::DomQuad(_) => InterfaceId::DOMQuad,
+            Object::Typed(t) => t.interface(),
             Object::DomMatrix(m) => {
                 if m.read_only {
                     InterfaceId::DOMMatrixReadOnly

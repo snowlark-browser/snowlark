@@ -24,16 +24,16 @@ use crate::rt::{self, Cx, DomStr, Handle, JsObject, JsPromise, JsValue, Record, 
 pub trait AnimationPlaybackEventImpl {
     /// readonly attribute CSSNumberish? currentTime;
     #[cfg(not(feature = "stubs"))]
-    fn current_time(&self, this: Handle) -> Option<f64>;
+    fn current_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue>;
     #[cfg(feature = "stubs")]
-    fn current_time(&self, this: Handle) -> Option<f64> {
+    fn current_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue> {
         rt::stub("AnimationPlaybackEvent.current_time")
     }
     /// readonly attribute CSSNumberish? timelineTime;
     #[cfg(not(feature = "stubs"))]
-    fn timeline_time(&self, this: Handle) -> Option<f64>;
+    fn timeline_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue>;
     #[cfg(feature = "stubs")]
-    fn timeline_time(&self, this: Handle) -> Option<f64> {
+    fn timeline_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue> {
         rt::stub("AnimationPlaybackEvent.timeline_time")
     }
     /// constructor(DOMString type, optional AnimationPlaybackEventInit eventInitDict = {});

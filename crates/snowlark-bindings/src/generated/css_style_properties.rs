@@ -16907,6 +16907,174 @@ pub(crate) fn attr_prop_all_set<D: Dom, const LO: u16, const HI: u16>(
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=anchor-name] attribute CSSOMString anchorName;`.
+pub(crate) fn attr_prop_anchor_name_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.anchorName");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "anchor-name");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=anchor-name] attribute CSSOMString anchorName;`.
+pub(crate) fn attr_prop_anchor_name_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.anchorName");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "anchor-name", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=anchor-name] attribute CSSOMString anchor-name;`.
+pub(crate) fn attr_prop_dash_anchor_name_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.anchor-name");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "anchor-name");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=anchor-name] attribute CSSOMString anchor-name;`.
+pub(crate) fn attr_prop_dash_anchor_name_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.anchor-name");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "anchor-name", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=anchor-scope] attribute CSSOMString anchorScope;`.
+pub(crate) fn attr_prop_anchor_scope_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.anchorScope");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "anchor-scope");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=anchor-scope] attribute CSSOMString anchorScope;`.
+pub(crate) fn attr_prop_anchor_scope_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.anchorScope");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "anchor-scope", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=anchor-scope] attribute CSSOMString anchor-scope;`.
+pub(crate) fn attr_prop_dash_anchor_scope_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.anchor-scope");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "anchor-scope");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=anchor-scope] attribute CSSOMString anchor-scope;`.
+pub(crate) fn attr_prop_dash_anchor_scope_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.anchor-scope");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "anchor-scope", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=animation] attribute CSSOMString animation;`.
 pub(crate) fn attr_prop_animation_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -46101,6 +46269,102 @@ pub(crate) fn attr_prop_position_set<D: Dom, const LO: u16, const HI: u16>(
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=position-anchor] attribute CSSOMString positionAnchor;`.
+pub(crate) fn attr_prop_position_anchor_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.positionAnchor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "position-anchor");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=position-anchor] attribute CSSOMString positionAnchor;`.
+pub(crate) fn attr_prop_position_anchor_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.positionAnchor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "position-anchor",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=position-anchor] attribute CSSOMString position-anchor;`.
+pub(crate) fn attr_prop_dash_position_anchor_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.position-anchor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "position-anchor");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=position-anchor] attribute CSSOMString position-anchor;`.
+pub(crate) fn attr_prop_dash_position_anchor_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.position-anchor");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "position-anchor",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=position-area] attribute CSSOMString positionArea;`.
 pub(crate) fn attr_prop_position_area_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -46177,6 +46441,90 @@ pub(crate) fn attr_prop_dash_position_area_set<D: Dom, const LO: u16, const HI: 
     let r = {
         let mut cx = Cx::new(scope);
         <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "position-area", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=position-try] attribute CSSOMString positionTry;`.
+pub(crate) fn attr_prop_position_try_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.positionTry");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "position-try");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=position-try] attribute CSSOMString positionTry;`.
+pub(crate) fn attr_prop_position_try_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.positionTry");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "position-try", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=position-try] attribute CSSOMString position-try;`.
+pub(crate) fn attr_prop_dash_position_try_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.position-try");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "position-try");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=position-try] attribute CSSOMString position-try;`.
+pub(crate) fn attr_prop_dash_position_try_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.position-try");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "position-try", &value)
     };
     {
         let mut cx = Cx::new(scope);
@@ -46271,6 +46619,198 @@ pub(crate) fn attr_prop_dash_position_try_fallbacks_set<D: Dom, const LO: u16, c
             &mut cx,
             this,
             "position-try-fallbacks",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=position-try-order] attribute CSSOMString positionTryOrder;`.
+pub(crate) fn attr_prop_position_try_order_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.positionTryOrder");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "position-try-order");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=position-try-order] attribute CSSOMString positionTryOrder;`.
+pub(crate) fn attr_prop_position_try_order_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.positionTryOrder");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "position-try-order",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=position-try-order] attribute CSSOMString position-try-order;`.
+pub(crate) fn attr_prop_dash_position_try_order_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.position-try-order");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "position-try-order");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=position-try-order] attribute CSSOMString position-try-order;`.
+pub(crate) fn attr_prop_dash_position_try_order_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.position-try-order");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "position-try-order",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=position-visibility] attribute CSSOMString positionVisibility;`.
+pub(crate) fn attr_prop_position_visibility_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.positionVisibility");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "position-visibility");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=position-visibility] attribute CSSOMString positionVisibility;`.
+pub(crate) fn attr_prop_position_visibility_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.positionVisibility");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "position-visibility",
+            &value,
+        )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=position-visibility] attribute CSSOMString position-visibility;`.
+pub(crate) fn attr_prop_dash_position_visibility_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.position-visibility");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "position-visibility");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=position-visibility] attribute CSSOMString position-visibility;`.
+pub(crate) fn attr_prop_dash_position_visibility_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.position-visibility");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(
+            dom,
+            &mut cx,
+            this,
+            "position-visibility",
             &value,
         )
     };
@@ -63270,6 +63810,74 @@ pub(crate) fn template<'s, D: Dom>(
     {
         let g = rt::getter(
             scope,
+            rt::builder(super::css_style_properties::attr_prop_anchor_name_get::<D, LO, HI>),
+            "anchorName",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_anchor_name_set::<D, LO, HI>),
+            "anchorName",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "anchorName", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_anchor_name_get::<D, LO, HI>),
+            "anchor-name",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_anchor_name_set::<D, LO, HI>),
+            "anchor-name",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "anchor-name", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_anchor_scope_get::<D, LO, HI>),
+            "anchorScope",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_anchor_scope_set::<D, LO, HI>),
+            "anchorScope",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "anchorScope", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_anchor_scope_get::<D, LO, HI>),
+            "anchor-scope",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_anchor_scope_set::<D, LO, HI>),
+            "anchor-scope",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "anchor-scope", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
             rt::builder(super::css_style_properties::attr_prop_animation_get::<D, LO, HI>),
             "animation",
             Some(sig),
@@ -75406,6 +76014,44 @@ pub(crate) fn template<'s, D: Dom>(
     {
         let g = rt::getter(
             scope,
+            rt::builder(super::css_style_properties::attr_prop_position_anchor_get::<D, LO, HI>),
+            "positionAnchor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_position_anchor_set::<D, LO, HI>),
+            "positionAnchor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "positionAnchor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_position_anchor_get::<D, LO, HI>,
+            ),
+            "position-anchor",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_position_anchor_set::<D, LO, HI>,
+            ),
+            "position-anchor",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "position-anchor", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
             rt::builder(super::css_style_properties::attr_prop_position_area_get::<D, LO, HI>),
             "positionArea",
             Some(sig),
@@ -75436,6 +76082,40 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "position-area", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_position_try_get::<D, LO, HI>),
+            "positionTry",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_position_try_set::<D, LO, HI>),
+            "positionTry",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "positionTry", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_position_try_get::<D, LO, HI>),
+            "position-try",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_position_try_set::<D, LO, HI>),
+            "position-try",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "position-try", g, s, false);
     }
     {
         let g = rt::getter(
@@ -75478,6 +76158,86 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "position-try-fallbacks", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_position_try_order_get::<D, LO, HI>),
+            "positionTryOrder",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_position_try_order_set::<D, LO, HI>),
+            "positionTryOrder",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "positionTryOrder", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_position_try_order_get::<D, LO, HI>,
+            ),
+            "position-try-order",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_position_try_order_set::<D, LO, HI>,
+            ),
+            "position-try-order",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "position-try-order", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_position_visibility_get::<D, LO, HI>,
+            ),
+            "positionVisibility",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_position_visibility_set::<D, LO, HI>,
+            ),
+            "positionVisibility",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "positionVisibility", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_position_visibility_get::<D, LO, HI>,
+            ),
+            "position-visibility",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(
+                super::css_style_properties::attr_prop_dash_position_visibility_set::<D, LO, HI>,
+            ),
+            "position-visibility",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "position-visibility", g, s, false);
     }
     {
         let g = rt::getter(

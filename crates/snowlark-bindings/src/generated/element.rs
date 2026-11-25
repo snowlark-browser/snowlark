@@ -655,6 +655,13 @@ pub trait ElementImpl {
     ) -> Result<Option<Handle>> {
         rt::stub("Element.spatial_navigation_search")
     }
+    /// [SameObject] StylePropertyMapReadOnly computedStyleMap();
+    #[cfg(not(feature = "stubs"))]
+    fn computed_style_map(&self, cx: &mut Cx, this: Handle) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn computed_style_map(&self, cx: &mut Cx, this: Handle) -> Result<Handle> {
+        rt::stub("Element.computed_style_map")
+    }
     /// ViewTransition startViewTransition(optional (ViewTransitionUpdateCallback or StartViewTransitionOptions) callbackOptions = {});
     #[cfg(not(feature = "stubs"))]
     fn start_view_transition(
@@ -2711,6 +2718,25 @@ pub(crate) fn op_spatial_navigation_search<D: Dom, const LO: u16, const HI: u16>
     });
     let Some(v) = v else { return };
     call.return_handle(v);
+}
+
+/// `Element.computedStyleMap`: `[SameObject] StylePropertyMapReadOnly computedStyleMap();`
+pub(crate) fn op_computed_style_map<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
+    let _prof = call.prof("Element.computedStyleMap");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { call.receiver() };
+    let argc = call.length();
+    let dom = call.state().engine::<D>();
+    let v = call.with_scope(|scope, mut rv| {
+        let r = {
+            let mut cx = Cx::new(scope);
+            <D as ElementImpl>::computed_style_map(dom, &mut cx, this)
+        };
+        let v = rt::check(scope, r)?;
+        Some(v)
+    });
+    let Some(v) = v else { return };
+    call.return_handle(Some(v));
 }
 
 /// `Element.startViewTransition`: `ViewTransition startViewTransition(optional (ViewTransitionUpdateCallback or StartViewTransitionOptions) callbackOptions = {});`
@@ -5355,6 +5381,16 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         );
         rt::operation(scope, &proto, "spatialNavigationSearch", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::light_builder(super::element::op_computed_style_map::<D, LO, HI>),
+            "computedStyleMap",
+            0,
+            Some(sig),
+        );
+        rt::operation(scope, &proto, "computedStyleMap", f, false);
     }
     {
         let f = rt::method(

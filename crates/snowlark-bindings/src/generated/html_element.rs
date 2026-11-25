@@ -1953,6 +1953,18 @@ pub(crate) fn template<'s, D: Dom>(
     {
         let g = rt::getter(
             scope,
+            rt::builder(super::element_css_inline_style::attr_attribute_style_map_get::<D, LO, HI>),
+            "attributeStyleMap",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = None;
+        rt::accessor(scope, proto, "attributeStyleMap", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
             rt::builder(super::global_event_handlers::attr_onabort_get::<D, LO, HI>),
             "onabort",
             Some(sig),

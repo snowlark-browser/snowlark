@@ -2787,6 +2787,78 @@ pub trait Style: Clone {
     fn resize(&self) -> Resize {
         Resize::None
     }
+
+    // ----- anchor positioning (CSS Anchor Positioning 1) -----
+    /// Whether `anchor-name` is other than `none` (§2.1).
+    fn has_anchor_name(&self) -> bool {
+        false
+    }
+    /// Calls `f` with each of the box's anchor names (§2.1), as written (`--name`).
+    fn anchor_names(&self, _f: &mut dyn FnMut(&str)) {}
+    /// An absolutely positioned box's style with its anchor references resolved against `q`:
+    /// `anchor()` and `anchor-size()` in the insets, sizes and margins as lengths (or their
+    /// fallbacks, or the property's initial value when invalid: §3.2.1, §5.1.1), and what
+    /// `position-area` (§3.1) and `anchor-center` (§4.2) make of its containing block and
+    /// alignment. `None` when the style refers to no anchor.
+    fn resolve_anchors(&self, _q: &dyn AnchorQuery<Self>) -> Option<Anchored<Self>> {
+        None
+    }
+    /// The element's implicit anchor element (§2.4.1; a popover's invoker, HTML §6.12), set by
+    /// the style source.
+    fn implicit_anchor(&self) -> Option<snowlark_dom::NodeId> {
+        None
+    }
+    /// The styles of an absolutely positioned box's position options (§6.1
+    /// `position-try-fallbacks`), in order.
+    fn position_options(&self) -> Vec<Self> {
+        Vec::new()
+    }
+    /// `position-try-order` (§6.2), in physical terms.
+    fn position_try_order(&self) -> PositionTryOrder {
+        PositionTryOrder::Normal
+    }
+}
+
+/// `position-try-order` (CSS Anchor Positioning 1 §6.2) with its logical values resolved.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PositionTryOrder {
+    Normal,
+    MostWidth,
+    MostHeight,
+}
+
+/// An anchor specifier (CSS Anchor Positioning 1 §2.3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnchorSpec<'a> {
+    /// An anchor name (`--name`).
+    Name(&'a str),
+    /// `auto`: the implicit anchor element.
+    Implicit,
+}
+
+/// What resolving an absolutely positioned box's anchor references asks of layout.
+pub trait AnchorQuery<S> {
+    /// The border box of the target anchor element `spec` selects for the box (§2.3), relative to
+    /// the box's containing block (its padding box), in physical coordinates; `None` when there is
+    /// none.
+    fn anchor(&self, spec: AnchorSpec<'_>) -> Option<Rect>;
+    /// The containing block's size.
+    fn containing_block(&self) -> snowlark_paint::Size;
+    /// The style whose writing mode and direction the containing block has (the root's for the
+    /// initial containing block).
+    fn containing_style(&self) -> Option<&S>;
+}
+
+/// An absolutely positioned box's style with its anchor references resolved
+/// ([`Style::resolve_anchors`]).
+pub struct Anchored<S> {
+    /// The style, its anchor functions replaced by lengths.
+    pub style: S,
+    /// `position-area`: the box's containing block, relative to the original one (§3.1).
+    pub area: Option<Rect>,
+    /// `anchor-center` in the horizontal and vertical axes: the default anchor box's center,
+    /// relative to the original containing block (§4.2).
+    pub center: [Option<f32>; 2],
 }
 
 /// Where layout gets styles. Implemented by the page (over stylo and the image cache) and by

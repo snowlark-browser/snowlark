@@ -50,6 +50,14 @@ pub struct RenderStyle {
     /// A scroll container's custom scroll bars (its `::-webkit-scrollbar` parts' styles; set by
     /// the style source).
     pub(crate) custom_scrollbar: Option<ls::CustomScrollbar>,
+    /// An anchored box's anchor references resolved for one layout of it (CSS Anchor Positioning 1,
+    /// [ls::Style::resolve_anchors]); never in the box tree.
+    pub(crate) anchored: Option<Arc<crate::anchor::Overlay>>,
+    /// The element's implicit anchor element (a popover's invoker; set by the style source).
+    pub(crate) implicit_anchor: Option<snowlark_dom::NodeId>,
+    /// The styles of the element's position options (CSS Anchor Positioning 1 §6.1; set by the
+    /// style source).
+    pub(crate) position_try: Option<Arc<[ServoArc<ComputedValues>]>>,
 }
 
 impl std::fmt::Debug for RenderStyle {
@@ -210,6 +218,9 @@ impl RenderStyle {
             view: ls::Flip::IDENTITY,
             animations: 0,
             custom_scrollbar: None,
+            anchored: None,
+            implicit_anchor: None,
+            position_try: None,
         }
     }
 
@@ -245,6 +256,9 @@ impl RenderStyle {
             view: self.view,
             animations: self.animations,
             custom_scrollbar: self.custom_scrollbar,
+            anchored: self.anchored.clone(),
+            implicit_anchor: self.implicit_anchor,
+            position_try: self.position_try.clone(),
         }
     }
 
@@ -1006,7 +1020,7 @@ fn calc_form(node: &c::length_percentage::CalcNode) -> Option<CalcForm> {
     }
 }
 
-fn size(v: &c::Size) -> ls::SizeValue {
+pub(crate) fn size(v: &c::Size) -> ls::SizeValue {
     use style::values::generics::length::GenericSize as S;
     match v {
         S::LengthPercentage(l) => ls::SizeValue::LengthPercentage(lp(&l.0)),
@@ -1021,7 +1035,7 @@ fn size(v: &c::Size) -> ls::SizeValue {
     }
 }
 
-fn max_size(v: &c::MaxSize) -> ls::MaxSizeValue {
+pub(crate) fn max_size(v: &c::MaxSize) -> ls::MaxSizeValue {
     use style::values::generics::length::GenericMaxSize as S;
     match v {
         S::LengthPercentage(l) => ls::MaxSizeValue::LengthPercentage(lp(&l.0)),
@@ -1481,6 +1495,13 @@ impl ls::Style for RenderStyle {
 
     fn phys_inset(&self, side: Side) -> ls::LengthPercentageAuto {
         use style::values::generics::position::GenericInset as I;
+        if let Some(v) = self
+            .anchored
+            .as_ref()
+            .and_then(|o| o.insets[crate::anchor::side_index(side)])
+        {
+            return v;
+        }
         let p = self.values.get_position();
         let v = match side {
             Side::Top => &p.top,
@@ -1490,7 +1511,9 @@ impl ls::Style for RenderStyle {
         };
         match v {
             I::LengthPercentage(l) => ls::LengthPercentageAuto::LengthPercentage(lp(l)),
-            _ => ls::LengthPercentageAuto::Auto,
+            I::Auto => ls::LengthPercentageAuto::Auto,
+            // (no anchor to refer to: the fallback, else `auto`)
+            v => crate::anchor::Resolver::none(self.values.writing_mode).inset(v, side),
         }
     }
 
@@ -1511,27 +1534,45 @@ impl ls::Style for RenderStyle {
     }
 
     fn phys_width(&self) -> ls::SizeValue {
-        size(&self.values.get_position().width)
+        if let Some(v) = self.anchored.as_ref().and_then(|o| o.sizes[0]) {
+            return v;
+        }
+        self.size_or_anchor(&self.values.get_position().width, true)
     }
 
     fn phys_height(&self) -> ls::SizeValue {
-        size(&self.values.get_position().height)
+        if let Some(v) = self.anchored.as_ref().and_then(|o| o.sizes[1]) {
+            return v;
+        }
+        self.size_or_anchor(&self.values.get_position().height, false)
     }
 
     fn phys_min_width(&self) -> ls::SizeValue {
-        self.webkit_box_min(size(&self.values.get_position().min_width))
+        if let Some(v) = self.anchored.as_ref().and_then(|o| o.sizes[2]) {
+            return self.webkit_box_min(v);
+        }
+        self.webkit_box_min(self.size_or_anchor(&self.values.get_position().min_width, true))
     }
 
     fn phys_min_height(&self) -> ls::SizeValue {
-        self.webkit_box_min(size(&self.values.get_position().min_height))
+        if let Some(v) = self.anchored.as_ref().and_then(|o| o.sizes[3]) {
+            return self.webkit_box_min(v);
+        }
+        self.webkit_box_min(self.size_or_anchor(&self.values.get_position().min_height, false))
     }
 
     fn phys_max_width(&self) -> ls::MaxSizeValue {
-        max_size(&self.values.get_position().max_width)
+        if let Some(v) = self.anchored.as_ref().and_then(|o| o.max_sizes[0]) {
+            return v;
+        }
+        self.max_size_or_anchor(&self.values.get_position().max_width, true)
     }
 
     fn phys_max_height(&self) -> ls::MaxSizeValue {
-        max_size(&self.values.get_position().max_height)
+        if let Some(v) = self.anchored.as_ref().and_then(|o| o.max_sizes[1]) {
+            return v;
+        }
+        self.max_size_or_anchor(&self.values.get_position().max_height, false)
     }
 
     fn phys_aspect_ratio(&self) -> ls::AspectRatio {
@@ -1644,6 +1685,13 @@ impl ls::Style for RenderStyle {
 
     fn phys_margin(&self, side: Side) -> ls::LengthPercentageAuto {
         use style::values::generics::length::GenericMargin as M;
+        if let Some(v) = self
+            .anchored
+            .as_ref()
+            .and_then(|o| o.margins[crate::anchor::side_index(side)])
+        {
+            return v;
+        }
         let m = self.values.get_margin();
         let v = match side {
             Side::Top => &m.margin_top,
@@ -1654,9 +1702,8 @@ impl ls::Style for RenderStyle {
         match v {
             M::LengthPercentage(l) => ls::LengthPercentageAuto::LengthPercentage(lp(l)),
             M::Auto => ls::LengthPercentageAuto::Auto,
-            M::AnchorSizeFunction(_) | M::AnchorContainingCalcFunction(_) => {
-                ls::LengthPercentageAuto::ZERO
-            }
+            v => crate::anchor::Resolver::none(self.values.writing_mode)
+                .margin(v, matches!(side, Side::Left | Side::Right)),
         }
     }
 
@@ -1966,6 +2013,9 @@ impl ls::Style for RenderStyle {
         if self.is_webkit_box_item() {
             return ls::Align::Auto;
         }
+        if let Some((a, _)) = self.anchored.as_ref().and_then(|o| o.align_self) {
+            return a;
+        }
         align(self.values.get_position().align_self.0)
     }
 
@@ -1976,6 +2026,9 @@ impl ls::Style for RenderStyle {
     }
 
     fn justify_self(&self) -> ls::Align {
+        if let Some((a, _)) = self.anchored.as_ref().and_then(|o| o.justify_self) {
+            return a;
+        }
         align(self.values.get_position().justify_self.0)
     }
 
@@ -1996,6 +2049,14 @@ impl ls::Style for RenderStyle {
         }
         if self.is_webkit_box_item() {
             s.align_self = ls::OverflowPosition::Default;
+        }
+        if let Some(o) = &self.anchored {
+            if let Some((_, safety)) = o.justify_self {
+                s.justify_self = safety;
+            }
+            if let Some((_, safety)) = o.align_self {
+                s.align_self = safety;
+            }
         }
         s
     }
@@ -2588,6 +2649,9 @@ impl ls::Style for RenderStyle {
             view,
             animations: self.animations,
             custom_scrollbar: self.custom_scrollbar,
+            anchored: self.anchored.clone(),
+            implicit_anchor: self.implicit_anchor,
+            position_try: self.position_try.clone(),
         }
     }
 
@@ -3304,6 +3368,57 @@ impl ls::Style for RenderStyle {
             R::Both => ls::Resize::Both,
             R::Horizontal => ls::Resize::Horizontal,
             R::Vertical => ls::Resize::Vertical,
+        }
+    }
+
+    fn has_anchor_name(&self) -> bool {
+        !self.values.get_box().anchor_name.value.0.is_empty()
+    }
+
+    fn anchor_names(&self, f: &mut dyn FnMut(&str)) {
+        for name in self.values.get_box().anchor_name.value.0.iter() {
+            f(&name.0);
+        }
+    }
+
+    fn resolve_anchors(&self, q: &dyn ls::AnchorQuery<Self>) -> Option<ls::Anchored<Self>> {
+        if !self.values.get_box().position.is_absolutely_positioned() {
+            return None;
+        }
+        self.anchored(q)
+    }
+
+    fn implicit_anchor(&self) -> Option<snowlark_dom::NodeId> {
+        self.implicit_anchor
+    }
+
+    fn position_options(&self) -> Vec<Self> {
+        let Some(options) = &self.position_try else {
+            return Vec::new();
+        };
+        options
+            .iter()
+            .map(|values| {
+                let mut s = self.clone();
+                s.values = values.clone();
+                s.anchored = None;
+                s.position_try = None;
+                s
+            })
+            .collect()
+    }
+
+    fn position_try_order(&self) -> ls::PositionTryOrder {
+        use style::values::computed::PositionTryOrder as O;
+        let vertical = self.values.writing_mode.is_vertical();
+        match self.values.get_position().position_try_order {
+            O::Normal => ls::PositionTryOrder::Normal,
+            O::MostWidth => ls::PositionTryOrder::MostWidth,
+            O::MostHeight => ls::PositionTryOrder::MostHeight,
+            O::MostBlockSize if vertical => ls::PositionTryOrder::MostWidth,
+            O::MostBlockSize => ls::PositionTryOrder::MostHeight,
+            O::MostInlineSize if vertical => ls::PositionTryOrder::MostHeight,
+            O::MostInlineSize => ls::PositionTryOrder::MostWidth,
         }
     }
 }

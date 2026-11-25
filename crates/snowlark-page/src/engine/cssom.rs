@@ -133,6 +133,8 @@ pub struct CssomState {
     /// The style sheets of `<style>` elements in documents no renderer draws, with the text, `type`
     /// and `media` each was made from (`Engine::unrendered_style_sheet`).
     pub unrendered: rustc_hash::FxHashMap<NodeId, UnrenderedSheet>,
+    /// CSS Typed OM `computedStyleMap()`: each element's map ([SameObject]), while it lives.
+    pub computed_maps: rustc_hash::FxHashMap<NodeId, Handle>,
 }
 
 /// A `<style>` element's style sheet in a document without a renderer, and what it was made from.
@@ -243,7 +245,7 @@ impl Engine {
     }
 
     /// CSSOM "update style attribute for" the inline declarations of `el` after a change.
-    fn write_inline(&self, cx: &mut Cx, el: NodeId) {
+    pub(super) fn write_inline(&self, cx: &mut Cx, el: NodeId) {
         let css = self
             .cssom
             .borrow()
@@ -341,7 +343,7 @@ impl Engine {
     }
 
     /// Runs `f` on a style rule's declarations; `f` says whether it changed them.
-    fn with_rule_decls<R: Default>(
+    pub(super) fn with_rule_decls<R: Default>(
         &self,
         rule: Handle,
         f: impl FnOnce(&mut DeclarationBlock) -> (R, bool),
@@ -691,6 +693,10 @@ impl ElementCSSInlineStyleImpl for Engine {
         // ([SameObject]: the bindings keep the first object.)
         self.alloc(Object::StyleDeclaration(Decl::Inline(self.n(this))))
     }
+    fn attribute_style_map(&self, this: Handle) -> Handle {
+        // ([SameObject]: the bindings keep the first object.)
+        self.attribute_style_map(self.n(this))
+    }
 }
 
 impl Engine {
@@ -840,7 +846,31 @@ impl MediaQueryListEventImpl for Engine {
     }
 }
 
+/// CSS Typed OM §4.3.5: `CSS.px(value)` and the other factories, each a `CSSUnitValue` of the unit
+/// it is named for.
+macro_rules! unit_factories {
+    ($($name:ident => $unit:literal),* $(,)?) => {
+        $(fn $name(&self, _cx: &mut Cx, value: f64) -> rt::Result<Handle> {
+            self.css_factory(value, $unit)
+        })*
+    };
+}
+
 impl CSSImpl for Engine {
+    unit_factories! {
+        number => "number", percent => "percent",
+        cap => "cap", ch => "ch", em => "em", ex => "ex", ic => "ic", lh => "lh",
+        rcap => "rcap", rch => "rch", rem => "rem", rex => "rex", ric => "ric", rlh => "rlh",
+        vw => "vw", vh => "vh", vi => "vi", vb => "vb", vmin => "vmin", vmax => "vmax",
+        svw => "svw", svh => "svh", svi => "svi", svb => "svb", svmin => "svmin", svmax => "svmax",
+        lvw => "lvw", lvh => "lvh", lvi => "lvi", lvb => "lvb", lvmin => "lvmin", lvmax => "lvmax",
+        dvw => "dvw", dvh => "dvh", dvi => "dvi", dvb => "dvb", dvmin => "dvmin", dvmax => "dvmax",
+        cqw => "cqw", cqh => "cqh", cqi => "cqi", cqb => "cqb", cqmin => "cqmin", cqmax => "cqmax",
+        cm => "cm", mm => "mm", q => "q", in_ => "in", pt => "pt", pc => "pc", px => "px",
+        deg => "deg", grad => "grad", rad => "rad", turn => "turn",
+        s => "s", ms => "ms", hz => "hz", k_hz => "khz",
+        dpi => "dpi", dpcm => "dpcm", dppx => "dppx", fr => "fr",
+    }
     fn element_sources(&self, cx: &mut Cx, _this: Handle) -> rt::Result<JsValue> {
         Ok(rt::undefined_value(cx.scope()))
     }
@@ -858,19 +888,27 @@ impl CSSImpl for Engine {
     fn supports_condition_text(&self, _cx: &mut Cx, condition_text: &str) -> rt::Result<bool> {
         Ok(snowlark_style::supports_condition(condition_text))
     }
-    fn parse_value(&self, _cx: &mut Cx, _css: &str) -> rt::Result<DomStr<'_>> {
+    fn parse_value(&self, _cx: &mut Cx, _css: &str) -> rt::Result<g::StringOrCSSStyleValue> {
         Err(exception(
             ExceptionName::NotSupportedError,
             "CSS.parseValue is not supported",
         ))
     }
-    fn parse_value_list(&self, _cx: &mut Cx, _css: &str) -> rt::Result<Vec<String>> {
+    fn parse_value_list(
+        &self,
+        _cx: &mut Cx,
+        _css: &str,
+    ) -> rt::Result<Vec<g::StringOrCSSStyleValue>> {
         Err(exception(
             ExceptionName::NotSupportedError,
             "CSS.parseValueList is not supported",
         ))
     }
-    fn parse_comma_value_list(&self, _cx: &mut Cx, _css: &str) -> rt::Result<Vec<Vec<String>>> {
+    fn parse_comma_value_list(
+        &self,
+        _cx: &mut Cx,
+        _css: &str,
+    ) -> rt::Result<Vec<Vec<g::StringOrCSSStyleValue>>> {
         Err(exception(
             ExceptionName::NotSupportedError,
             "CSS.parseCommaValueList is not supported",

@@ -651,7 +651,7 @@ pub(crate) fn layout_block_container_box<S: Style>(
         for o in inline_cb {
             let cb = o.cb.unwrap();
             let pad = inline_padding_box(cx, cb, &children);
-            let (child, more) = crate::positioned::layout_absolute(cx, o, pad);
+            let (child, more) = crate::positioned::layout_absolute(cx, o, pad, &children);
             children.push(child);
             oof.extend(more);
         }

@@ -67,5 +67,8 @@ pub fn init() {
         stylo_static_prefs::set_pref!("layout.css.basic-shape-shape.enabled", true);
         // CSS Values 5 tree-counting functions, `sibling-index()` and `sibling-count()`.
         stylo_static_prefs::set_pref!("layout.css.tree-counting-functions.enabled", true);
+        // CSS Anchor Positioning 1: `anchor-name`, `position-anchor`, `anchor()`, `anchor-size()`,
+        // `@position-try` (layout resolves them where it places absolutely positioned boxes).
+        stylo_static_prefs::set_pref!("layout.css.anchor-positioning.enabled", true);
     });
 }

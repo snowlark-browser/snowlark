@@ -2048,6 +2048,18 @@ pub(crate) fn template<'s, D: Dom>(
         rt::accessor(scope, proto, "style", g, s, false);
     }
     {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::element_css_inline_style::attr_attribute_style_map_get::<D, LO, HI>),
+            "attributeStyleMap",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = None;
+        rt::accessor(scope, proto, "attributeStyleMap", g, s, false);
+    }
+    {
         let f = rt::method(
             scope,
             rt::light_builder(super::html_or_svg_or_math_ml_element::op_focus::<D, LO, HI>),

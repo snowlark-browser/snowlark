@@ -1846,7 +1846,7 @@ fn place_grid_oofs<S: Style>(
             (area.right - area.left).max(0.0),
             (area.bottom - area.top).max(0.0),
         );
-        let (child, more) = crate::positioned::layout_absolute(cx, c, rect);
+        let (child, more) = crate::positioned::layout_absolute(cx, c, rect, children);
         children.push(child);
         rest.extend(more);
     }

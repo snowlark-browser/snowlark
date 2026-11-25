@@ -348,6 +348,8 @@ pub struct FaceInfo {
 struct Doc {
     /// Elements' last remembered sizes (CSS Sizing 4 5.2.1: `contain-intrinsic-size: auto`).
     remembered: HashMap<NodeId, (Option<f32>, Option<f32>)>,
+    /// Elements' implicit anchor elements (CSS Anchor Positioning 1 §2.4.1: popovers' invokers).
+    implicit_anchors: HashMap<NodeId, NodeId>,
     /// An element with `contain-intrinsic-size: auto` has been styled: the sizes are worth recording.
     auto_intrinsic_seen: bool,
     /// The DOM, shared with the page (borrowed for each call, never across one).
@@ -1389,6 +1391,7 @@ impl Renderer {
             query_sizes_from: None,
             auto_intrinsic_seen: false,
             remembered: HashMap::new(),
+            implicit_anchors: HashMap::new(),
             fragments: None,
             last_viewport: None,
             anchor_viewport: None,
@@ -3258,6 +3261,11 @@ impl Renderer {
             None => doc.engine.restyle(&dom, &mut doc.data),
         };
         doc.needs_restyle = false;
+        // (CSS Anchor Positioning 1 §6.4: an element's position options are the styles of the
+        // `@position-try` rules it names, which its own style does not show changing)
+        if doc.engine.take_position_try_changed() {
+            doc.needs_build = true;
+        }
         drop(dom);
         self.stats.restyled += u64::from(stats.restyled);
         self.stats.traversed += u64::from(stats.traversed);
@@ -4291,6 +4299,7 @@ impl Renderer {
         .with_embedded_documents(&doc.embedded_documents)
         .with_pdf_viewer(pdf_viewer)
         .with_remembered(&doc.remembered)
+        .with_implicit_anchors(&doc.implicit_anchors)
         .with_clip_references(&doc.clip_references)
         .with_filter_references(&doc.filter_references)
         .with_custom_scrollbars(&doc.custom_scrollbars);
@@ -5398,6 +5407,31 @@ impl Renderer {
         Some(snowlark_style::computed::computed_property(&values, &id))
     }
 
+    /// CSS Typed OM §3.1: the computed value (not the resolved value) of `name` for `node`, reified.
+    /// `None` when the element has no style or the property is not one.
+    pub fn typed_computed_property(
+        &self,
+        node: NodeId,
+        name: &str,
+    ) -> Option<snowlark_style::typed::Reified> {
+        let doc = self.doc.as_deref()?;
+        let dom = doc.dom.borrow();
+        let values = doc.engine.computed_style(&dom, &doc.data, node)?;
+        snowlark_style::typed::computed(&values, name)
+    }
+
+    /// The custom properties `node`'s computed style has a value for, in code-point order.
+    pub fn computed_custom_property_names(&self, node: NodeId) -> Vec<String> {
+        let Some(doc) = self.doc.as_deref() else {
+            return Vec::new();
+        };
+        let dom = doc.dom.borrow();
+        doc.engine
+            .computed_style(&dom, &doc.data, node)
+            .map(|v| snowlark_style::typed::custom_property_names(&v))
+            .unwrap_or_default()
+    }
+
     /// CSSOM `getComputedStyle(node, pseudo).getPropertyValue(name)` for a pseudo-element
     /// (`::before`, `::after`, `::marker`...), whether or not the pseudo-element generates a box.
     /// The resolved value of a property that has one (CSSOM §9 "resolved value": `width`, `top`,
@@ -5904,6 +5938,21 @@ impl Renderer {
         };
         if doc.top_layer != top_layer {
             doc.top_layer = top_layer;
+            doc.needs_build = true;
+        }
+    }
+
+    /// `element`'s implicit anchor element changed (CSS Anchor Positioning 1 §2.4.1: a popover's
+    /// invoker, HTML "show popover").
+    pub fn set_implicit_anchor(&mut self, element: NodeId, anchor: Option<NodeId>) {
+        let Some(doc) = self.doc.as_deref_mut() else {
+            return;
+        };
+        let old = match anchor {
+            Some(a) => doc.implicit_anchors.insert(element, a),
+            None => doc.implicit_anchors.remove(&element),
+        };
+        if old != anchor {
             doc.needs_build = true;
         }
     }

@@ -11,9 +11,43 @@ use std::sync::Arc;
 use snowlark_bindings::generated::{
     self as g, AnimatableImpl, AnimationEffectImpl, AnimationEventImpl, AnimationImpl,
     AnimationPlayState, AnimationPlaybackEventImpl, AnimationReplaceState, AnimationTimelineImpl,
-    CSSAnimationImpl, CSSTransitionImpl, DocumentTimelineImpl, KeyframeEffectImpl,
-    TransitionEventImpl, UnrestrictedDoubleOrString,
+    CSSAnimationImpl, CSSTransitionImpl, DocumentTimelineImpl, DoubleOrCSSNumericValue,
+    KeyframeEffectImpl, TransitionEventImpl, UnrestrictedDoubleOrCSSNumericValueOrString,
+    UnrestrictedDoubleOrString,
 };
+
+/// A time as `CSSNumberish` returns it: a double (the timelines are monotonic).
+fn numberish(v: f64) -> DoubleOrCSSNumericValue {
+    DoubleOrCSSNumericValue::Double(v)
+}
+
+impl Engine {
+    /// An effect's `duration` input: a `CSSNumericValue` is converted to milliseconds (NaN, which
+    /// the timing checks reject, when it cannot be).
+    fn duration_input(
+        &self,
+        d: UnrestrictedDoubleOrCSSNumericValueOrString,
+    ) -> UnrestrictedDoubleOrString {
+        match d {
+            UnrestrictedDoubleOrCSSNumericValueOrString::UnrestrictedDouble(v) => {
+                UnrestrictedDoubleOrString::UnrestrictedDouble(v)
+            }
+            UnrestrictedDoubleOrCSSNumericValueOrString::CSSNumericValue(h) => {
+                UnrestrictedDoubleOrString::UnrestrictedDouble(
+                    self.numberish_ms(DoubleOrCSSNumericValue::CSSNumericValue(h))
+                        .unwrap_or(f64::NAN),
+                )
+            }
+            UnrestrictedDoubleOrCSSNumericValueOrString::String(s) => {
+                UnrestrictedDoubleOrString::String(s)
+            }
+        }
+    }
+
+    fn time_input(&self, v: Option<DoubleOrCSSNumericValue>) -> rt::Result<Option<f64>> {
+        v.map(|v| self.numberish_ms(v)).transpose()
+    }
+}
 use snowlark_bindings::rt::{self, Cx, DomStr, Error, ExceptionName, Handle, JsObject, JsPromise};
 use snowlark_bindings::InterfaceId;
 use snowlark_dom::NodeId;
@@ -140,14 +174,14 @@ fn composite_from(c: g::CompositeOperation) -> CompositeOperation {
 
 /// The timing members of `KeyframeEffectOptions`/`KeyframeAnimationOptions` (all present).
 macro_rules! timing_input {
-    ($o:expr) => {
+    ($e:expr, $o:expr) => {
         TimingInput {
             delay: Some($o.delay.unwrap_or(0.0)),
             end_delay: Some($o.end_delay.unwrap_or(0.0)),
             fill: Some($o.fill),
             iteration_start: Some($o.iteration_start),
             iterations: Some($o.iterations),
-            duration: Some($o.duration),
+            duration: Some($e.duration_input($o.duration)),
             direction: Some($o.direction),
             easing: Some($o.easing),
         }
@@ -234,10 +268,10 @@ impl Engine {
 }
 
 impl AnimationTimelineImpl for Engine {
-    fn current_time(&self, this: Handle) -> Option<f64> {
-        self.timeline_time(this)
+    fn current_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue> {
+        self.timeline_time(this).map(numberish)
     }
-    fn duration(&self, _this: Handle) -> Option<f64> {
+    fn duration(&self, _this: Handle) -> Option<DoubleOrCSSNumericValue> {
         None
     }
 }
@@ -307,19 +341,31 @@ impl AnimationImpl for Engine {
     fn finished(&self, cx: &mut Cx, this: Handle) -> rt::Result<JsPromise> {
         self.lazy_promise(cx, this, false)
     }
-    fn start_time(&self, this: Handle) -> Option<f64> {
-        self.anim(this, |a| a.model.start_time)
+    fn start_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue> {
+        self.anim(this, |a| a.model.start_time).map(numberish)
     }
-    fn set_start_time(&self, cx: &mut Cx, this: Handle, value: Option<f64>) -> rt::Result<()> {
+    fn set_start_time(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        value: Option<DoubleOrCSSNumericValue>,
+    ) -> rt::Result<()> {
+        let value = self.time_input(value)?;
         self.with_model(cx, this, |m, env, notes| {
             m.set_start_time(env, value, notes);
             Ok(())
         })
     }
-    fn current_time(&self, this: Handle) -> Option<f64> {
-        self.anim_current_time(this)
+    fn current_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue> {
+        self.anim_current_time(this).map(numberish)
     }
-    fn set_current_time(&self, cx: &mut Cx, this: Handle, value: Option<f64>) -> rt::Result<()> {
+    fn set_current_time(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        value: Option<DoubleOrCSSNumericValue>,
+    ) -> rt::Result<()> {
+        let value = self.time_input(value)?;
         self.with_model(cx, this, |m, env, notes| {
             m.set_current_time(env, value, notes)
         })
@@ -403,8 +449,8 @@ impl AnimationEffectImpl for Engine {
                 delay: Some(t.delay),
                 direction: g_direction(t.direction),
                 duration: match t.duration {
-                    Some(d) => UnrestrictedDoubleOrString::UnrestrictedDouble(d),
-                    None => UnrestrictedDoubleOrString::String("auto".into()),
+                    Some(d) => UnrestrictedDoubleOrCSSNumericValueOrString::UnrestrictedDouble(d),
+                    None => UnrestrictedDoubleOrCSSNumericValueOrString::String("auto".into()),
                 },
                 easing: t.easing.css().to_owned(),
                 end_delay: Some(t.end_delay),
@@ -425,18 +471,20 @@ impl AnimationEffectImpl for Engine {
             g::ComputedEffectTiming {
                 delay: Some(t.delay),
                 direction: g_direction(t.direction),
-                duration: UnrestrictedDoubleOrString::UnrestrictedDouble(t.iteration_duration()),
+                duration: UnrestrictedDoubleOrCSSNumericValueOrString::UnrestrictedDouble(
+                    t.iteration_duration(),
+                ),
                 easing: t.easing.css().to_owned(),
                 end_delay: Some(t.end_delay),
                 fill: g_fill(t.computed_fill()),
                 iteration_start: t.iteration_start,
                 iterations: t.iterations,
-                active_duration: Some(t.active_duration()),
+                active_duration: Some(numberish(t.active_duration())),
                 current_iteration: c.current_iteration,
-                end_time: Some(t.end_time()),
-                local_time: c.local_time,
+                end_time: Some(numberish(t.end_time())),
+                local_time: c.local_time.map(numberish),
                 progress: c.progress,
-                start_time: Some(0.0),
+                start_time: Some(numberish(0.0)),
             }
         }))
     }
@@ -563,7 +611,7 @@ impl KeyframeEffectImpl for Engine {
                 EffectOptions {
                     composite: composite_from(o.composite),
                     pseudo: o.pseudo_element.clone(),
-                    timing: timing_input!(o),
+                    timing: timing_input!(self, o),
                 }
             }
         };
@@ -602,15 +650,33 @@ const RANGE_NAMES: &[&str] = &[
 /// `normal`, or an optional `<timeline-range-name>` and a `<length-percentage>` that does not depend
 /// on fonts; a dictionary's `rangeName` must be a range name. Ranges only matter for scroll-driven
 /// timelines, which are not implemented: a valid range is accepted and has no effect.
-fn check_range(range: &g::TimelineRangeOffsetOrString) -> rt::Result<()> {
+fn check_range(
+    engine: &Engine,
+    range: &g::TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString,
+) -> rt::Result<()> {
+    use g::TimelineRangeOffsetOrCSSNumericValueOrCSSKeywordValueOrString as R;
     let invalid = || type_error("The animation range is not valid");
-    match range {
-        g::TimelineRangeOffsetOrString::TimelineRangeOffset(o) => match &o.range_name {
-            Some(n) if !RANGE_NAMES.contains(&n.as_str()) => Err(invalid()),
-            _ => Ok(()),
-        },
-        g::TimelineRangeOffsetOrString::String(s) => {
-            let s = s.trim();
+    // (a CSSNumericValue is an offset alone, a CSSKeywordValue a range name: both are checked as
+    // the text they serialize to)
+    let text = match range {
+        R::TimelineRangeOffset(o) => {
+            return match &o.range_name {
+                Some(n) if !RANGE_NAMES.contains(&n.as_str()) => Err(invalid()),
+                _ => Ok(()),
+            }
+        }
+        R::CSSNumericValue(h) => {
+            if !engine.is_length_percentage(*h) {
+                return Err(invalid());
+            }
+            engine.style_value_css(*h)
+        }
+        R::CSSKeywordValue(h) => engine.style_value_css(*h),
+        R::String(s) => s.clone(),
+    };
+    {
+        {
+            let s = text.trim();
             if s == "normal" {
                 return Ok(());
             }
@@ -677,13 +743,13 @@ impl AnimatableImpl for Engine {
                 None,
             ),
             g::UnrestrictedDoubleOrKeyframeAnimationOptions::KeyframeAnimationOptions(o) => {
-                check_range(&o.range_start)?;
-                check_range(&o.range_end)?;
+                check_range(self, &o.range_start)?;
+                check_range(self, &o.range_end)?;
                 (
                     EffectOptions {
                         composite: composite_from(o.composite),
                         pseudo: o.pseudo_element.clone(),
-                        timing: timing_input!(o),
+                        timing: timing_input!(self, o),
                     },
                     o.id.clone(),
                     o.timeline,
@@ -724,17 +790,19 @@ impl AnimatableImpl for Engine {
 }
 
 impl AnimationPlaybackEventImpl for Engine {
-    fn current_time(&self, this: Handle) -> Option<f64> {
+    fn current_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue> {
         self.ev(this, |e| match e.ext {
             EventExt::AnimationPlayback { current_time, .. } => current_time,
             _ => None,
         })
+        .map(numberish)
     }
-    fn timeline_time(&self, this: Handle) -> Option<f64> {
+    fn timeline_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue> {
         self.ev(this, |e| match e.ext {
             EventExt::AnimationPlayback { timeline_time, .. } => timeline_time,
             _ => None,
         })
+        .map(numberish)
     }
     fn constructor(
         &self,
@@ -749,8 +817,8 @@ impl AnimationPlaybackEventImpl for Engine {
             init.cancelable,
             init.composed,
             EventExt::AnimationPlayback {
-                current_time: init.current_time,
-                timeline_time: init.timeline_time,
+                current_time: self.time_input(init.current_time)?,
+                timeline_time: self.time_input(init.timeline_time)?,
             },
         ))
     }

@@ -172,6 +172,26 @@ impl DeclarationBlock {
         }
     }
 
+    /// CSS Typed OM §3.2: the declared value of `property` reified, `None` when the block does not
+    /// declare it (a shorthand is declared when all its longhands are, and is never reified).
+    pub fn typed(&self, name: &str) -> Option<crate::typed::Reified> {
+        let id = property_id(name)?;
+        let list = self.block.property_value_to_typed_value_list(&id).ok()?;
+        if id.as_shorthand().is_ok() {
+            return Some(crate::typed::Reified::Unsupported(
+                self.property_value(name),
+            ));
+        }
+        Some(crate::typed::reified(name, list, false, || {
+            self.property_value(name)
+        }))
+    }
+
+    /// The names of the declared properties, in order (longhands and custom properties).
+    pub fn property_names(&self) -> Vec<String> {
+        (0..self.len()).filter_map(|i| self.item(i)).collect()
+    }
+
     /// Replaces the declarations with those parsed from `css` (`cssText` setter).
     pub fn set_css_text(&mut self, css: &str) {
         let url = self.url.clone();

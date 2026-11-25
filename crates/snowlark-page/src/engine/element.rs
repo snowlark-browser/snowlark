@@ -706,6 +706,10 @@ impl ElementImpl for Engine {
         Ok(self.alloc(Object::DomRect(r)))
     }
 
+    fn computed_style_map(&self, _cx: &mut Cx, this: Handle) -> rt::Result<Handle> {
+        Ok(self.computed_style_map(self.n(this)))
+    }
+
     fn check_visibility(
         &self,
         _cx: &mut Cx,

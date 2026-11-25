@@ -403,7 +403,7 @@ impl Engine {
         self.new_quad([pt(x, y), pt(x + w, y), pt(x + w, y + h), pt(x, y + h)])
     }
 
-    fn matrix(&self, h: Handle) -> Matrix {
+    pub(super) fn matrix(&self, h: Handle) -> Matrix {
         let (m, svg) = match &*self.obj(h) {
             Object::DomMatrix(m) => (m.m, m.svg),
             _ => panic!("not a DOMMatrix"),

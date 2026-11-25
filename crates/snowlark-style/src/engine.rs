@@ -721,6 +721,9 @@ pub struct StyleEngine {
     /// The used color schemes may have changed (the preferred or the page color scheme): the
     /// next restyle restyles every element.
     color_schemes_changed: bool,
+    /// An `@position-try` rule changed in a restyle since [`StyleEngine::take_position_try_changed`]
+    /// (the position options of the elements naming it are other styles now).
+    position_try_changed: bool,
 }
 
 /// Whether an element's `style` attribute (with this value) applies: CSP `style-src-attr` (the
@@ -1048,6 +1051,7 @@ impl StyleEngine {
             metas: Mutex::new(MetaCandidates::default()),
             cssom_style_attributes: Mutex::new(FxHashMap::default()),
             color_schemes_changed: false,
+            position_try_changed: false,
         };
         engine.sync_quirks(dom);
         engine.sync_noscript();
@@ -1609,6 +1613,11 @@ impl StyleEngine {
             self.report_font_faces(data, sheet);
         }
         self.adopted = adopted;
+    }
+
+    /// Whether an `@position-try` rule changed since the last call (CSS Anchor Positioning 1 §6.4).
+    pub fn take_position_try_changed(&mut self) -> bool {
+        std::mem::take(&mut self.position_try_changed)
     }
 
     /// Something inside the sheets changed (CSSOM rule insertion, `disabled`): rebuild the cascade data
@@ -4170,6 +4179,10 @@ impl StyleEngine {
             ua_or_user: &ua_guard,
         };
         let invalidations = self.stylist.flush(&guards);
+        self.position_try_changed |= !invalidations
+            .cascade_data_difference
+            .changed_position_try_names
+            .is_empty();
 
         let scripted = self.has_script_effects();
         let animating = scripted || !self.animations.sets.read().is_empty();
@@ -4420,6 +4433,49 @@ impl StyleEngine {
             return None;
         }
         Some(style)
+    }
+
+    /// The styles of `element`'s position options (CSS Anchor Positioning 1 §6.1, §6.5.2), in
+    /// `position-try-fallbacks` order: its style with an `@position-try` rule's declarations, a
+    /// try tactic or a `position-area` applied. An option naming no `@position-try` rule is left
+    /// out; none for `none`.
+    pub fn position_try_styles(
+        &self,
+        dom: &Dom,
+        data: &StyleData,
+        element: NodeId,
+    ) -> Vec<Arc<ComputedValues>> {
+        let Some(primary) = self.computed_style(dom, data, element) else {
+            return Vec::new();
+        };
+        let fallbacks = primary.get_position().position_try_fallbacks.clone();
+        if fallbacks.value.is_none() {
+            return Vec::new();
+        }
+        let entered = !thread_state::get().is_layout();
+        if entered {
+            thread_state::enter(ThreadState::LAYOUT);
+        }
+        let styles = self.guards_and_view(dom, data, |shared, view| {
+            fallbacks
+                .value
+                .0
+                .iter()
+                .filter_map(|item| {
+                    self.stylist.resolve_position_try(
+                        &primary,
+                        &shared.guards,
+                        fallbacks.scope,
+                        view.element(element),
+                        item,
+                    )
+                })
+                .collect()
+        });
+        if entered {
+            thread_state::exit(ThreadState::LAYOUT);
+        }
+        styles
     }
 
     /// The style of a `::-webkit-scrollbar` part of `element` cascaded in `state`: the part, its

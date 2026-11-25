@@ -52,23 +52,31 @@ pub trait CSSImpl {
     }
     /// CSSToken parseValue(DOMString css);
     #[cfg(not(feature = "stubs"))]
-    fn parse_value(&self, cx: &mut Cx, css: &str) -> Result<DomStr<'_>>;
+    fn parse_value(&self, cx: &mut Cx, css: &str) -> Result<StringOrCSSStyleValue>;
     #[cfg(feature = "stubs")]
-    fn parse_value(&self, cx: &mut Cx, css: &str) -> Result<DomStr<'_>> {
+    fn parse_value(&self, cx: &mut Cx, css: &str) -> Result<StringOrCSSStyleValue> {
         rt::stub("CSS.parse_value")
     }
     /// sequence<CSSToken> parseValueList(DOMString css);
     #[cfg(not(feature = "stubs"))]
-    fn parse_value_list(&self, cx: &mut Cx, css: &str) -> Result<Vec<String>>;
+    fn parse_value_list(&self, cx: &mut Cx, css: &str) -> Result<Vec<StringOrCSSStyleValue>>;
     #[cfg(feature = "stubs")]
-    fn parse_value_list(&self, cx: &mut Cx, css: &str) -> Result<Vec<String>> {
+    fn parse_value_list(&self, cx: &mut Cx, css: &str) -> Result<Vec<StringOrCSSStyleValue>> {
         rt::stub("CSS.parse_value_list")
     }
     /// sequence<sequence<CSSToken>> parseCommaValueList(DOMString css);
     #[cfg(not(feature = "stubs"))]
-    fn parse_comma_value_list(&self, cx: &mut Cx, css: &str) -> Result<Vec<Vec<String>>>;
+    fn parse_comma_value_list(
+        &self,
+        cx: &mut Cx,
+        css: &str,
+    ) -> Result<Vec<Vec<StringOrCSSStyleValue>>>;
     #[cfg(feature = "stubs")]
-    fn parse_comma_value_list(&self, cx: &mut Cx, css: &str) -> Result<Vec<Vec<String>>> {
+    fn parse_comma_value_list(
+        &self,
+        cx: &mut Cx,
+        css: &str,
+    ) -> Result<Vec<Vec<StringOrCSSStyleValue>>> {
         rt::stub("CSS.parse_comma_value_list")
     }
     /// undefined registerProperty(PropertyDefinition definition);
@@ -77,6 +85,447 @@ pub trait CSSImpl {
     #[cfg(feature = "stubs")]
     fn register_property(&self, cx: &mut Cx, definition: PropertyDefinition) -> Result<()> {
         rt::stub("CSS.register_property")
+    }
+    /// CSSUnitValue number(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn number(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn number(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.number")
+    }
+    /// CSSUnitValue percent(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn percent(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn percent(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.percent")
+    }
+    /// CSSUnitValue cap(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn cap(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn cap(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.cap")
+    }
+    /// CSSUnitValue ch(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn ch(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn ch(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.ch")
+    }
+    /// CSSUnitValue em(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn em(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn em(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.em")
+    }
+    /// CSSUnitValue ex(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn ex(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn ex(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.ex")
+    }
+    /// CSSUnitValue ic(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn ic(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn ic(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.ic")
+    }
+    /// CSSUnitValue lh(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn lh(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn lh(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.lh")
+    }
+    /// CSSUnitValue rcap(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn rcap(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn rcap(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.rcap")
+    }
+    /// CSSUnitValue rch(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn rch(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn rch(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.rch")
+    }
+    /// CSSUnitValue rem(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn rem(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn rem(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.rem")
+    }
+    /// CSSUnitValue rex(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn rex(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn rex(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.rex")
+    }
+    /// CSSUnitValue ric(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn ric(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn ric(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.ric")
+    }
+    /// CSSUnitValue rlh(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn rlh(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn rlh(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.rlh")
+    }
+    /// CSSUnitValue vw(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn vw(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn vw(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.vw")
+    }
+    /// CSSUnitValue vh(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn vh(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn vh(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.vh")
+    }
+    /// CSSUnitValue vi(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn vi(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn vi(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.vi")
+    }
+    /// CSSUnitValue vb(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn vb(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn vb(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.vb")
+    }
+    /// CSSUnitValue vmin(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn vmin(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn vmin(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.vmin")
+    }
+    /// CSSUnitValue vmax(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn vmax(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn vmax(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.vmax")
+    }
+    /// CSSUnitValue svw(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn svw(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn svw(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.svw")
+    }
+    /// CSSUnitValue svh(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn svh(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn svh(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.svh")
+    }
+    /// CSSUnitValue svi(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn svi(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn svi(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.svi")
+    }
+    /// CSSUnitValue svb(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn svb(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn svb(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.svb")
+    }
+    /// CSSUnitValue svmin(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn svmin(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn svmin(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.svmin")
+    }
+    /// CSSUnitValue svmax(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn svmax(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn svmax(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.svmax")
+    }
+    /// CSSUnitValue lvw(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn lvw(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn lvw(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.lvw")
+    }
+    /// CSSUnitValue lvh(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn lvh(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn lvh(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.lvh")
+    }
+    /// CSSUnitValue lvi(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn lvi(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn lvi(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.lvi")
+    }
+    /// CSSUnitValue lvb(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn lvb(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn lvb(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.lvb")
+    }
+    /// CSSUnitValue lvmin(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn lvmin(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn lvmin(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.lvmin")
+    }
+    /// CSSUnitValue lvmax(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn lvmax(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn lvmax(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.lvmax")
+    }
+    /// CSSUnitValue dvw(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn dvw(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn dvw(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.dvw")
+    }
+    /// CSSUnitValue dvh(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn dvh(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn dvh(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.dvh")
+    }
+    /// CSSUnitValue dvi(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn dvi(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn dvi(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.dvi")
+    }
+    /// CSSUnitValue dvb(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn dvb(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn dvb(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.dvb")
+    }
+    /// CSSUnitValue dvmin(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn dvmin(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn dvmin(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.dvmin")
+    }
+    /// CSSUnitValue dvmax(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn dvmax(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn dvmax(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.dvmax")
+    }
+    /// CSSUnitValue cqw(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn cqw(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn cqw(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.cqw")
+    }
+    /// CSSUnitValue cqh(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn cqh(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn cqh(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.cqh")
+    }
+    /// CSSUnitValue cqi(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn cqi(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn cqi(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.cqi")
+    }
+    /// CSSUnitValue cqb(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn cqb(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn cqb(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.cqb")
+    }
+    /// CSSUnitValue cqmin(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn cqmin(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn cqmin(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.cqmin")
+    }
+    /// CSSUnitValue cqmax(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn cqmax(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn cqmax(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.cqmax")
+    }
+    /// CSSUnitValue cm(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn cm(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn cm(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.cm")
+    }
+    /// CSSUnitValue mm(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn mm(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn mm(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.mm")
+    }
+    /// CSSUnitValue Q(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn q(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn q(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.q")
+    }
+    /// CSSUnitValue in(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn in_(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn in_(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.in_")
+    }
+    /// CSSUnitValue pt(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn pt(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn pt(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.pt")
+    }
+    /// CSSUnitValue pc(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn pc(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn pc(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.pc")
+    }
+    /// CSSUnitValue px(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn px(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn px(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.px")
+    }
+    /// CSSUnitValue deg(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn deg(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn deg(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.deg")
+    }
+    /// CSSUnitValue grad(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn grad(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn grad(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.grad")
+    }
+    /// CSSUnitValue rad(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn rad(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn rad(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.rad")
+    }
+    /// CSSUnitValue turn(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn turn(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn turn(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.turn")
+    }
+    /// CSSUnitValue s(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn s(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn s(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.s")
+    }
+    /// CSSUnitValue ms(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn ms(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn ms(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.ms")
+    }
+    /// CSSUnitValue Hz(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn hz(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn hz(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.hz")
+    }
+    /// CSSUnitValue kHz(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn k_hz(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn k_hz(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.k_hz")
+    }
+    /// CSSUnitValue dpi(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn dpi(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn dpi(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.dpi")
+    }
+    /// CSSUnitValue dpcm(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn dpcm(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn dpcm(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.dpcm")
+    }
+    /// CSSUnitValue dppx(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn dppx(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn dppx(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.dppx")
+    }
+    /// CSSUnitValue fr(double value);
+    #[cfg(not(feature = "stubs"))]
+    fn fr(&self, cx: &mut Cx, value: f64) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn fr(&self, cx: &mut Cx, value: f64) -> Result<Handle> {
+        rt::stub("CSS.fr")
     }
 }
 
@@ -427,6 +876,2904 @@ pub(crate) fn static_op_register_property<D: Dom, const LO: u16, const HI: u16>(
     }
 }
 
+/// `CSSUnitValue number(double value);`
+fn static_op_number_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::number(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.number` (Web IDL §3.7.6).
+fn static_op_number_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.number", 1, argc);
+    }
+    static_op_number_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.number`.
+pub(crate) fn static_op_number<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.number");
+    if let Some(v) = static_op_number_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue percent(double value);`
+fn static_op_percent_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::percent(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.percent` (Web IDL §3.7.6).
+fn static_op_percent_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.percent", 1, argc);
+    }
+    static_op_percent_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.percent`.
+pub(crate) fn static_op_percent<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.percent");
+    if let Some(v) = static_op_percent_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue cap(double value);`
+fn static_op_cap_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::cap(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.cap` (Web IDL §3.7.6).
+fn static_op_cap_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.cap", 1, argc);
+    }
+    static_op_cap_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.cap`.
+pub(crate) fn static_op_cap<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.cap");
+    if let Some(v) = static_op_cap_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue ch(double value);`
+fn static_op_ch_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::ch(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.ch` (Web IDL §3.7.6).
+fn static_op_ch_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.ch", 1, argc);
+    }
+    static_op_ch_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.ch`.
+pub(crate) fn static_op_ch<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.ch");
+    if let Some(v) = static_op_ch_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue em(double value);`
+fn static_op_em_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::em(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.em` (Web IDL §3.7.6).
+fn static_op_em_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.em", 1, argc);
+    }
+    static_op_em_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.em`.
+pub(crate) fn static_op_em<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.em");
+    if let Some(v) = static_op_em_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue ex(double value);`
+fn static_op_ex_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::ex(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.ex` (Web IDL §3.7.6).
+fn static_op_ex_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.ex", 1, argc);
+    }
+    static_op_ex_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.ex`.
+pub(crate) fn static_op_ex<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.ex");
+    if let Some(v) = static_op_ex_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue ic(double value);`
+fn static_op_ic_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::ic(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.ic` (Web IDL §3.7.6).
+fn static_op_ic_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.ic", 1, argc);
+    }
+    static_op_ic_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.ic`.
+pub(crate) fn static_op_ic<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.ic");
+    if let Some(v) = static_op_ic_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue lh(double value);`
+fn static_op_lh_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::lh(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.lh` (Web IDL §3.7.6).
+fn static_op_lh_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.lh", 1, argc);
+    }
+    static_op_lh_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.lh`.
+pub(crate) fn static_op_lh<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.lh");
+    if let Some(v) = static_op_lh_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue rcap(double value);`
+fn static_op_rcap_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::rcap(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.rcap` (Web IDL §3.7.6).
+fn static_op_rcap_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.rcap", 1, argc);
+    }
+    static_op_rcap_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.rcap`.
+pub(crate) fn static_op_rcap<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.rcap");
+    if let Some(v) = static_op_rcap_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue rch(double value);`
+fn static_op_rch_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::rch(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.rch` (Web IDL §3.7.6).
+fn static_op_rch_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.rch", 1, argc);
+    }
+    static_op_rch_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.rch`.
+pub(crate) fn static_op_rch<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.rch");
+    if let Some(v) = static_op_rch_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue rem(double value);`
+fn static_op_rem_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::rem(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.rem` (Web IDL §3.7.6).
+fn static_op_rem_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.rem", 1, argc);
+    }
+    static_op_rem_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.rem`.
+pub(crate) fn static_op_rem<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.rem");
+    if let Some(v) = static_op_rem_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue rex(double value);`
+fn static_op_rex_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::rex(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.rex` (Web IDL §3.7.6).
+fn static_op_rex_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.rex", 1, argc);
+    }
+    static_op_rex_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.rex`.
+pub(crate) fn static_op_rex<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.rex");
+    if let Some(v) = static_op_rex_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue ric(double value);`
+fn static_op_ric_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::ric(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.ric` (Web IDL §3.7.6).
+fn static_op_ric_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.ric", 1, argc);
+    }
+    static_op_ric_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.ric`.
+pub(crate) fn static_op_ric<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.ric");
+    if let Some(v) = static_op_ric_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue rlh(double value);`
+fn static_op_rlh_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::rlh(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.rlh` (Web IDL §3.7.6).
+fn static_op_rlh_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.rlh", 1, argc);
+    }
+    static_op_rlh_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.rlh`.
+pub(crate) fn static_op_rlh<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.rlh");
+    if let Some(v) = static_op_rlh_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue vw(double value);`
+fn static_op_vw_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::vw(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.vw` (Web IDL §3.7.6).
+fn static_op_vw_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.vw", 1, argc);
+    }
+    static_op_vw_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.vw`.
+pub(crate) fn static_op_vw<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.vw");
+    if let Some(v) = static_op_vw_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue vh(double value);`
+fn static_op_vh_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::vh(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.vh` (Web IDL §3.7.6).
+fn static_op_vh_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.vh", 1, argc);
+    }
+    static_op_vh_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.vh`.
+pub(crate) fn static_op_vh<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.vh");
+    if let Some(v) = static_op_vh_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue vi(double value);`
+fn static_op_vi_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::vi(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.vi` (Web IDL §3.7.6).
+fn static_op_vi_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.vi", 1, argc);
+    }
+    static_op_vi_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.vi`.
+pub(crate) fn static_op_vi<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.vi");
+    if let Some(v) = static_op_vi_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue vb(double value);`
+fn static_op_vb_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::vb(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.vb` (Web IDL §3.7.6).
+fn static_op_vb_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.vb", 1, argc);
+    }
+    static_op_vb_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.vb`.
+pub(crate) fn static_op_vb<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.vb");
+    if let Some(v) = static_op_vb_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue vmin(double value);`
+fn static_op_vmin_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::vmin(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.vmin` (Web IDL §3.7.6).
+fn static_op_vmin_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.vmin", 1, argc);
+    }
+    static_op_vmin_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.vmin`.
+pub(crate) fn static_op_vmin<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.vmin");
+    if let Some(v) = static_op_vmin_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue vmax(double value);`
+fn static_op_vmax_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::vmax(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.vmax` (Web IDL §3.7.6).
+fn static_op_vmax_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.vmax", 1, argc);
+    }
+    static_op_vmax_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.vmax`.
+pub(crate) fn static_op_vmax<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.vmax");
+    if let Some(v) = static_op_vmax_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue svw(double value);`
+fn static_op_svw_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::svw(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.svw` (Web IDL §3.7.6).
+fn static_op_svw_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.svw", 1, argc);
+    }
+    static_op_svw_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.svw`.
+pub(crate) fn static_op_svw<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.svw");
+    if let Some(v) = static_op_svw_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue svh(double value);`
+fn static_op_svh_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::svh(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.svh` (Web IDL §3.7.6).
+fn static_op_svh_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.svh", 1, argc);
+    }
+    static_op_svh_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.svh`.
+pub(crate) fn static_op_svh<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.svh");
+    if let Some(v) = static_op_svh_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue svi(double value);`
+fn static_op_svi_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::svi(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.svi` (Web IDL §3.7.6).
+fn static_op_svi_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.svi", 1, argc);
+    }
+    static_op_svi_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.svi`.
+pub(crate) fn static_op_svi<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.svi");
+    if let Some(v) = static_op_svi_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue svb(double value);`
+fn static_op_svb_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::svb(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.svb` (Web IDL §3.7.6).
+fn static_op_svb_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.svb", 1, argc);
+    }
+    static_op_svb_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.svb`.
+pub(crate) fn static_op_svb<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.svb");
+    if let Some(v) = static_op_svb_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue svmin(double value);`
+fn static_op_svmin_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::svmin(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.svmin` (Web IDL §3.7.6).
+fn static_op_svmin_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.svmin", 1, argc);
+    }
+    static_op_svmin_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.svmin`.
+pub(crate) fn static_op_svmin<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.svmin");
+    if let Some(v) = static_op_svmin_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue svmax(double value);`
+fn static_op_svmax_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::svmax(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.svmax` (Web IDL §3.7.6).
+fn static_op_svmax_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.svmax", 1, argc);
+    }
+    static_op_svmax_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.svmax`.
+pub(crate) fn static_op_svmax<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.svmax");
+    if let Some(v) = static_op_svmax_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue lvw(double value);`
+fn static_op_lvw_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::lvw(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.lvw` (Web IDL §3.7.6).
+fn static_op_lvw_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.lvw", 1, argc);
+    }
+    static_op_lvw_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.lvw`.
+pub(crate) fn static_op_lvw<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.lvw");
+    if let Some(v) = static_op_lvw_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue lvh(double value);`
+fn static_op_lvh_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::lvh(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.lvh` (Web IDL §3.7.6).
+fn static_op_lvh_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.lvh", 1, argc);
+    }
+    static_op_lvh_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.lvh`.
+pub(crate) fn static_op_lvh<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.lvh");
+    if let Some(v) = static_op_lvh_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue lvi(double value);`
+fn static_op_lvi_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::lvi(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.lvi` (Web IDL §3.7.6).
+fn static_op_lvi_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.lvi", 1, argc);
+    }
+    static_op_lvi_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.lvi`.
+pub(crate) fn static_op_lvi<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.lvi");
+    if let Some(v) = static_op_lvi_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue lvb(double value);`
+fn static_op_lvb_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::lvb(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.lvb` (Web IDL §3.7.6).
+fn static_op_lvb_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.lvb", 1, argc);
+    }
+    static_op_lvb_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.lvb`.
+pub(crate) fn static_op_lvb<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.lvb");
+    if let Some(v) = static_op_lvb_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue lvmin(double value);`
+fn static_op_lvmin_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::lvmin(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.lvmin` (Web IDL §3.7.6).
+fn static_op_lvmin_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.lvmin", 1, argc);
+    }
+    static_op_lvmin_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.lvmin`.
+pub(crate) fn static_op_lvmin<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.lvmin");
+    if let Some(v) = static_op_lvmin_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue lvmax(double value);`
+fn static_op_lvmax_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::lvmax(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.lvmax` (Web IDL §3.7.6).
+fn static_op_lvmax_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.lvmax", 1, argc);
+    }
+    static_op_lvmax_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.lvmax`.
+pub(crate) fn static_op_lvmax<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.lvmax");
+    if let Some(v) = static_op_lvmax_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue dvw(double value);`
+fn static_op_dvw_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::dvw(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.dvw` (Web IDL §3.7.6).
+fn static_op_dvw_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.dvw", 1, argc);
+    }
+    static_op_dvw_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.dvw`.
+pub(crate) fn static_op_dvw<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.dvw");
+    if let Some(v) = static_op_dvw_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue dvh(double value);`
+fn static_op_dvh_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::dvh(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.dvh` (Web IDL §3.7.6).
+fn static_op_dvh_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.dvh", 1, argc);
+    }
+    static_op_dvh_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.dvh`.
+pub(crate) fn static_op_dvh<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.dvh");
+    if let Some(v) = static_op_dvh_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue dvi(double value);`
+fn static_op_dvi_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::dvi(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.dvi` (Web IDL §3.7.6).
+fn static_op_dvi_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.dvi", 1, argc);
+    }
+    static_op_dvi_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.dvi`.
+pub(crate) fn static_op_dvi<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.dvi");
+    if let Some(v) = static_op_dvi_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue dvb(double value);`
+fn static_op_dvb_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::dvb(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.dvb` (Web IDL §3.7.6).
+fn static_op_dvb_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.dvb", 1, argc);
+    }
+    static_op_dvb_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.dvb`.
+pub(crate) fn static_op_dvb<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.dvb");
+    if let Some(v) = static_op_dvb_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue dvmin(double value);`
+fn static_op_dvmin_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::dvmin(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.dvmin` (Web IDL §3.7.6).
+fn static_op_dvmin_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.dvmin", 1, argc);
+    }
+    static_op_dvmin_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.dvmin`.
+pub(crate) fn static_op_dvmin<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.dvmin");
+    if let Some(v) = static_op_dvmin_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue dvmax(double value);`
+fn static_op_dvmax_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::dvmax(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.dvmax` (Web IDL §3.7.6).
+fn static_op_dvmax_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.dvmax", 1, argc);
+    }
+    static_op_dvmax_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.dvmax`.
+pub(crate) fn static_op_dvmax<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.dvmax");
+    if let Some(v) = static_op_dvmax_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue cqw(double value);`
+fn static_op_cqw_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::cqw(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.cqw` (Web IDL §3.7.6).
+fn static_op_cqw_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.cqw", 1, argc);
+    }
+    static_op_cqw_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.cqw`.
+pub(crate) fn static_op_cqw<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.cqw");
+    if let Some(v) = static_op_cqw_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue cqh(double value);`
+fn static_op_cqh_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::cqh(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.cqh` (Web IDL §3.7.6).
+fn static_op_cqh_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.cqh", 1, argc);
+    }
+    static_op_cqh_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.cqh`.
+pub(crate) fn static_op_cqh<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.cqh");
+    if let Some(v) = static_op_cqh_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue cqi(double value);`
+fn static_op_cqi_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::cqi(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.cqi` (Web IDL §3.7.6).
+fn static_op_cqi_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.cqi", 1, argc);
+    }
+    static_op_cqi_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.cqi`.
+pub(crate) fn static_op_cqi<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.cqi");
+    if let Some(v) = static_op_cqi_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue cqb(double value);`
+fn static_op_cqb_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::cqb(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.cqb` (Web IDL §3.7.6).
+fn static_op_cqb_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.cqb", 1, argc);
+    }
+    static_op_cqb_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.cqb`.
+pub(crate) fn static_op_cqb<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.cqb");
+    if let Some(v) = static_op_cqb_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue cqmin(double value);`
+fn static_op_cqmin_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::cqmin(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.cqmin` (Web IDL §3.7.6).
+fn static_op_cqmin_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.cqmin", 1, argc);
+    }
+    static_op_cqmin_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.cqmin`.
+pub(crate) fn static_op_cqmin<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.cqmin");
+    if let Some(v) = static_op_cqmin_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue cqmax(double value);`
+fn static_op_cqmax_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::cqmax(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.cqmax` (Web IDL §3.7.6).
+fn static_op_cqmax_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.cqmax", 1, argc);
+    }
+    static_op_cqmax_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.cqmax`.
+pub(crate) fn static_op_cqmax<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.cqmax");
+    if let Some(v) = static_op_cqmax_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue cm(double value);`
+fn static_op_cm_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::cm(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.cm` (Web IDL §3.7.6).
+fn static_op_cm_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.cm", 1, argc);
+    }
+    static_op_cm_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.cm`.
+pub(crate) fn static_op_cm<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.cm");
+    if let Some(v) = static_op_cm_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue mm(double value);`
+fn static_op_mm_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::mm(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.mm` (Web IDL §3.7.6).
+fn static_op_mm_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.mm", 1, argc);
+    }
+    static_op_mm_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.mm`.
+pub(crate) fn static_op_mm<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.mm");
+    if let Some(v) = static_op_mm_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue Q(double value);`
+fn static_op_q_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::q(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.Q` (Web IDL §3.7.6).
+fn static_op_q_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.Q", 1, argc);
+    }
+    static_op_q_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.Q`.
+pub(crate) fn static_op_q<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.Q");
+    if let Some(v) = static_op_q_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue in(double value);`
+fn static_op_in_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::in_(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.in` (Web IDL §3.7.6).
+fn static_op_in_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.in", 1, argc);
+    }
+    static_op_in_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.in`.
+pub(crate) fn static_op_in<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.in");
+    if let Some(v) = static_op_in_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue pt(double value);`
+fn static_op_pt_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::pt(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.pt` (Web IDL §3.7.6).
+fn static_op_pt_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.pt", 1, argc);
+    }
+    static_op_pt_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.pt`.
+pub(crate) fn static_op_pt<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.pt");
+    if let Some(v) = static_op_pt_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue pc(double value);`
+fn static_op_pc_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::pc(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.pc` (Web IDL §3.7.6).
+fn static_op_pc_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.pc", 1, argc);
+    }
+    static_op_pc_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.pc`.
+pub(crate) fn static_op_pc<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.pc");
+    if let Some(v) = static_op_pc_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue px(double value);`
+fn static_op_px_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::px(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.px` (Web IDL §3.7.6).
+fn static_op_px_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.px", 1, argc);
+    }
+    static_op_px_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.px`.
+pub(crate) fn static_op_px<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.px");
+    if let Some(v) = static_op_px_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue deg(double value);`
+fn static_op_deg_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::deg(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.deg` (Web IDL §3.7.6).
+fn static_op_deg_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.deg", 1, argc);
+    }
+    static_op_deg_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.deg`.
+pub(crate) fn static_op_deg<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.deg");
+    if let Some(v) = static_op_deg_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue grad(double value);`
+fn static_op_grad_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::grad(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.grad` (Web IDL §3.7.6).
+fn static_op_grad_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.grad", 1, argc);
+    }
+    static_op_grad_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.grad`.
+pub(crate) fn static_op_grad<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.grad");
+    if let Some(v) = static_op_grad_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue rad(double value);`
+fn static_op_rad_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::rad(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.rad` (Web IDL §3.7.6).
+fn static_op_rad_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.rad", 1, argc);
+    }
+    static_op_rad_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.rad`.
+pub(crate) fn static_op_rad<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.rad");
+    if let Some(v) = static_op_rad_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue turn(double value);`
+fn static_op_turn_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::turn(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.turn` (Web IDL §3.7.6).
+fn static_op_turn_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.turn", 1, argc);
+    }
+    static_op_turn_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.turn`.
+pub(crate) fn static_op_turn<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.turn");
+    if let Some(v) = static_op_turn_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue s(double value);`
+fn static_op_s_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::s(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.s` (Web IDL §3.7.6).
+fn static_op_s_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.s", 1, argc);
+    }
+    static_op_s_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.s`.
+pub(crate) fn static_op_s<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.s");
+    if let Some(v) = static_op_s_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue ms(double value);`
+fn static_op_ms_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::ms(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.ms` (Web IDL §3.7.6).
+fn static_op_ms_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.ms", 1, argc);
+    }
+    static_op_ms_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.ms`.
+pub(crate) fn static_op_ms<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.ms");
+    if let Some(v) = static_op_ms_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue Hz(double value);`
+fn static_op_hz_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::hz(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.Hz` (Web IDL §3.7.6).
+fn static_op_hz_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.Hz", 1, argc);
+    }
+    static_op_hz_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.Hz`.
+pub(crate) fn static_op_hz<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.Hz");
+    if let Some(v) = static_op_hz_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue kHz(double value);`
+fn static_op_k_hz_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::k_hz(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.kHz` (Web IDL §3.7.6).
+fn static_op_k_hz_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.kHz", 1, argc);
+    }
+    static_op_k_hz_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.kHz`.
+pub(crate) fn static_op_k_hz<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.kHz");
+    if let Some(v) = static_op_k_hz_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue dpi(double value);`
+fn static_op_dpi_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::dpi(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.dpi` (Web IDL §3.7.6).
+fn static_op_dpi_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.dpi", 1, argc);
+    }
+    static_op_dpi_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.dpi`.
+pub(crate) fn static_op_dpi<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.dpi");
+    if let Some(v) = static_op_dpi_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue dpcm(double value);`
+fn static_op_dpcm_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::dpcm(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.dpcm` (Web IDL §3.7.6).
+fn static_op_dpcm_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.dpcm", 1, argc);
+    }
+    static_op_dpcm_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.dpcm`.
+pub(crate) fn static_op_dpcm<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.dpcm");
+    if let Some(v) = static_op_dpcm_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue dppx(double value);`
+fn static_op_dppx_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::dppx(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.dppx` (Web IDL §3.7.6).
+fn static_op_dppx_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.dppx", 1, argc);
+    }
+    static_op_dppx_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.dppx`.
+pub(crate) fn static_op_dppx<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.dppx");
+    if let Some(v) = static_op_dppx_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
+/// `CSSUnitValue fr(double value);`
+fn static_op_fr_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        rt::to_double(scope, v, true)
+    }?;
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSImpl>::fr(dom, &mut cx, a0)
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `CSS.fr` (Web IDL §3.7.6).
+fn static_op_fr_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let argc = args.length();
+    if argc < 1 {
+        return rt::not_enough_arguments(scope, "CSS.fr", 1, argc);
+    }
+    static_op_fr_0::<D, LO, HI>(scope, args, argc)
+}
+
+/// `CSS.fr`.
+pub(crate) fn static_op_fr<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "CSS.fr");
+    if let Some(v) = static_op_fr_dispatch::<D, LO, HI>(scope, &args) {
+        rv.set(v)
+    }
+}
+
 /// Creates the `CSS` namespace object in the current context.
 pub(crate) fn namespace_object<'s, D: Dom>(
     scope: &mut v8::PinScope<'s, '_>,
@@ -494,6 +3841,636 @@ pub(crate) fn namespace_object<'s, D: Dom>(
             None,
         );
         rt::operation(scope, &t, "registerProperty", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_number::<D, LO, HI>),
+            "number",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "number", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_percent::<D, LO, HI>),
+            "percent",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "percent", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_cap::<D, LO, HI>),
+            "cap",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "cap", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_ch::<D, LO, HI>),
+            "ch",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "ch", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_em::<D, LO, HI>),
+            "em",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "em", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_ex::<D, LO, HI>),
+            "ex",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "ex", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_ic::<D, LO, HI>),
+            "ic",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "ic", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_lh::<D, LO, HI>),
+            "lh",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "lh", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_rcap::<D, LO, HI>),
+            "rcap",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "rcap", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_rch::<D, LO, HI>),
+            "rch",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "rch", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_rem::<D, LO, HI>),
+            "rem",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "rem", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_rex::<D, LO, HI>),
+            "rex",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "rex", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_ric::<D, LO, HI>),
+            "ric",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "ric", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_rlh::<D, LO, HI>),
+            "rlh",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "rlh", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_vw::<D, LO, HI>),
+            "vw",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "vw", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_vh::<D, LO, HI>),
+            "vh",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "vh", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_vi::<D, LO, HI>),
+            "vi",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "vi", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_vb::<D, LO, HI>),
+            "vb",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "vb", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_vmin::<D, LO, HI>),
+            "vmin",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "vmin", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_vmax::<D, LO, HI>),
+            "vmax",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "vmax", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_svw::<D, LO, HI>),
+            "svw",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "svw", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_svh::<D, LO, HI>),
+            "svh",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "svh", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_svi::<D, LO, HI>),
+            "svi",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "svi", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_svb::<D, LO, HI>),
+            "svb",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "svb", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_svmin::<D, LO, HI>),
+            "svmin",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "svmin", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_svmax::<D, LO, HI>),
+            "svmax",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "svmax", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_lvw::<D, LO, HI>),
+            "lvw",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "lvw", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_lvh::<D, LO, HI>),
+            "lvh",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "lvh", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_lvi::<D, LO, HI>),
+            "lvi",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "lvi", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_lvb::<D, LO, HI>),
+            "lvb",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "lvb", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_lvmin::<D, LO, HI>),
+            "lvmin",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "lvmin", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_lvmax::<D, LO, HI>),
+            "lvmax",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "lvmax", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_dvw::<D, LO, HI>),
+            "dvw",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "dvw", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_dvh::<D, LO, HI>),
+            "dvh",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "dvh", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_dvi::<D, LO, HI>),
+            "dvi",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "dvi", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_dvb::<D, LO, HI>),
+            "dvb",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "dvb", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_dvmin::<D, LO, HI>),
+            "dvmin",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "dvmin", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_dvmax::<D, LO, HI>),
+            "dvmax",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "dvmax", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_cqw::<D, LO, HI>),
+            "cqw",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "cqw", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_cqh::<D, LO, HI>),
+            "cqh",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "cqh", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_cqi::<D, LO, HI>),
+            "cqi",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "cqi", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_cqb::<D, LO, HI>),
+            "cqb",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "cqb", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_cqmin::<D, LO, HI>),
+            "cqmin",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "cqmin", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_cqmax::<D, LO, HI>),
+            "cqmax",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "cqmax", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_cm::<D, LO, HI>),
+            "cm",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "cm", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_mm::<D, LO, HI>),
+            "mm",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "mm", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_q::<D, LO, HI>),
+            "Q",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "Q", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_in::<D, LO, HI>),
+            "in",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "in", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_pt::<D, LO, HI>),
+            "pt",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "pt", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_pc::<D, LO, HI>),
+            "pc",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "pc", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_px::<D, LO, HI>),
+            "px",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "px", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_deg::<D, LO, HI>),
+            "deg",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "deg", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_grad::<D, LO, HI>),
+            "grad",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "grad", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_rad::<D, LO, HI>),
+            "rad",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "rad", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_turn::<D, LO, HI>),
+            "turn",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "turn", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_s::<D, LO, HI>),
+            "s",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "s", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_ms::<D, LO, HI>),
+            "ms",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "ms", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_hz::<D, LO, HI>),
+            "Hz",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "Hz", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_k_hz::<D, LO, HI>),
+            "kHz",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "kHz", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_dpi::<D, LO, HI>),
+            "dpi",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "dpi", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_dpcm::<D, LO, HI>),
+            "dpcm",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "dpcm", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_dppx::<D, LO, HI>),
+            "dppx",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "dppx", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::builder(super::css::static_op_fr::<D, LO, HI>),
+            "fr",
+            1,
+            None,
+        );
+        rt::operation(scope, &t, "fr", f, false);
     }
     t.new_instance(scope)
 }

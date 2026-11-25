@@ -77,6 +77,9 @@ pub(crate) struct AxisInput {
     pub rtl: bool,
     /// The containing block's inline axis (auto margins with negative space: §4.2).
     pub inline: bool,
+    /// `anchor-center` (CSS Anchor Positioning 1 §4.2): the default anchor box's center, which the
+    /// inset-modified containing block is narrowed to be centered on.
+    pub anchor_center: Option<f32>,
 }
 
 impl AxisInput {
@@ -121,6 +124,10 @@ impl AxisInput {
             }
             [l, r] => (l.unwrap_or(0.0), cb - r.unwrap_or(0.0)),
         };
+        if let Some(c) = self.anchor_center {
+            // (as far on the end side of the center as the start edge is on its start side)
+            end = 2.0 * c - start;
+        }
         if end < start {
             // The weaker inset gives way: the auto one, else the end edge's.
             let start_weaker = match self.insets {
@@ -135,6 +142,16 @@ impl AxisInput {
             }
         }
         (start, end)
+    }
+
+    /// The inset-modified containing block before `anchor-center` narrows it: what the box is
+    /// sized in (CSS Anchor Positioning 1 §4.2).
+    pub fn insets_rect(&self) -> (f32, f32) {
+        AxisInput {
+            anchor_center: None,
+            ..*self
+        }
+        .imcb()
     }
 
     /// Whether an automatic size is the stretch-fit size (§4.1; otherwise it is fit-content).
@@ -216,7 +233,24 @@ impl AxisInput {
                 _ => 0.0,
             };
         let safe = self.align != AxisAlign::Normal && self.overflow != OverflowPosition::Unsafe;
-        if safe && free < 0.0 {
+        if self.anchor_center.is_some() {
+            // (centered on the anchor, then moved back inside the insets' rectangle when it fits
+            // there, else inside it and the containing block: the default overflow alignment)
+            if self.overflow != OverflowPosition::Unsafe {
+                let (o0, o1) = self.insets_rect();
+                let (l0, l1) = if m <= o1 - o0 {
+                    (o0, o1)
+                } else {
+                    (o0.min(0.0), o1.max(self.cb))
+                };
+                if x + m > l1 {
+                    x = l1 - m;
+                }
+                if x < l0 {
+                    x = l0;
+                }
+            }
+        } else if safe && free < 0.0 {
             // css-align-3 §4.4.1.2: cover the inset-modified containing block within the
             // bounding box of it and the containing block, as aligned as that allows; failing
             // that, start-aligned in that box.
@@ -261,17 +295,149 @@ pub(crate) fn stacking_owner<S: Style>(tree: &BoxTree<S>, id: BoxId, cb: Option<
     0
 }
 
+/// The style of out-of-flow box `oof` with its anchor references resolved (CSS Anchor Positioning
+/// 1), when it has any: its anchors are among `placed`, the fragments its containing block placed.
+fn anchored<S: Style>(
+    cx: &Cx<'_, S>,
+    oof: &Oof,
+    style: &S,
+    padding_box: Rect,
+    placed: &[FragmentChild<S>],
+) -> Option<Anchored<S>> {
+    let q = crate::anchor::Lookup {
+        tree: cx.tree,
+        index: &cx.anchors,
+        pos: oof.id,
+        cb: oof.cb,
+        padding_box,
+        placed,
+        frame: cx.frame,
+    };
+    let mut a = style.resolve_anchors(&q)?;
+    // (the area and the centers are physical: into the frame `padding_box` is in)
+    if !cx.frame.is_identity() {
+        let physical = cx
+            .frame
+            .size(Size::new(padding_box.width, padding_box.height));
+        let back = cx.frame.inverse();
+        a.area = a.area.map(|r| back.rect(r, physical));
+        let [cx_, cy] = a.center;
+        let p = back.point(Point::new(cx_.unwrap_or(0.0), cy.unwrap_or(0.0)), physical);
+        a.center = if cx.frame.swaps() {
+            [cy.map(|_| p.x), cx_.map(|_| p.y)]
+        } else {
+            [cx_.map(|_| p.x), cy.map(|_| p.y)]
+        };
+    }
+    Some(a)
+}
+
 /// Lays out an out-of-flow box in its containing block's padding box (`padding_box`, in the
-/// containing block fragment's coordinates). Returns its fragment link and the candidates it passes on.
+/// containing block fragment's coordinates), after the fragments the containing block placed
+/// before it (`placed`, where its anchors are). Returns its fragment link and the candidates it
+/// passes on.
 pub(crate) fn layout_absolute<S: Style>(
     cx: &mut Cx<'_, S>,
     oof: Oof,
     padding_box: Rect,
+    placed: &[FragmentChild<S>],
 ) -> (FragmentChild<S>, Vec<Oof>) {
-    let id = oof.id;
     // (in the containing block's frame: a box in another writing mode is sized and placed in it,
     // and laid out in its own, CSS Writing Modes 4 §7.3)
-    let style = cx.style_here(id);
+    let style = cx.style_here(oof.id);
+    let options = style.position_options();
+    if options.is_empty() {
+        return place_absolute(cx, oof, style, padding_box, placed).0;
+    }
+    // CSS Anchor Positioning 1 §6.5.2: the first of the box's own style and its position options
+    // whose margin box fits its inset-modified containing block; the box's own when none does.
+    let view = style.view();
+    let mut options = options;
+    let order = style.position_try_order();
+    if order != PositionTryOrder::Normal {
+        // §6.2: the options by the size of their inset-modified containing blocks in an axis,
+        // largest first (a stable sort).
+        let mut sized: Vec<(f32, S)> = options
+            .into_iter()
+            .map(|o| {
+                let (w, h) = imcb_size(cx, &oof, &o, padding_box, placed);
+                (
+                    if order == PositionTryOrder::MostWidth {
+                        w
+                    } else {
+                        h
+                    },
+                    o,
+                )
+            })
+            .collect();
+        sized.sort_by(|a, b| b.0.total_cmp(&a.0));
+        options = sized.into_iter().map(|(_, o)| o).collect();
+    }
+    for option in std::iter::once(style.clone()).chain(options) {
+        let option = if option.view() == view {
+            option
+        } else {
+            option.with_view(view)
+        };
+        let (placed_box, fits) = place_absolute(cx, oof, option, padding_box, placed);
+        if fits {
+            return placed_box;
+        }
+    }
+    place_absolute(cx, oof, style, padding_box, placed).0
+}
+
+/// The width and height of the inset-modified containing block out-of-flow box `oof` has with
+/// `style` (its `position-area` and insets; auto insets as zero).
+fn imcb_size<S: Style>(
+    cx: &Cx<'_, S>,
+    oof: &Oof,
+    style: &S,
+    padding_box: Rect,
+    placed: &[FragmentChild<S>],
+) -> (f32, f32) {
+    let mut style = style.clone();
+    let mut cb = padding_box;
+    if let Some(a) = anchored(cx, oof, &style, padding_box, placed) {
+        style = a.style;
+        if let Some(area) = a.area {
+            cb = area;
+        }
+    }
+    let inset = |side, basis| style.inset(side).resolve(basis).unwrap_or(0.0);
+    (
+        cb.width - inset(Side::Left, cb.width) - inset(Side::Right, cb.width),
+        cb.height - inset(Side::Top, cb.height) - inset(Side::Bottom, cb.height),
+    )
+}
+
+/// [`layout_absolute`] with `style`; also whether its margin box fits its inset-modified
+/// containing block.
+fn place_absolute<S: Style>(
+    cx: &mut Cx<'_, S>,
+    oof: Oof,
+    style: S,
+    padding_box: Rect,
+    placed: &[FragmentChild<S>],
+) -> ((FragmentChild<S>, Vec<Oof>), bool) {
+    let id = oof.id;
+    let mut style = style;
+    let mut padding_box = padding_box;
+    let mut anchor_center = [None, None];
+    if let Some(a) = anchored(cx, &oof, &style, padding_box, placed) {
+        style = a.style;
+        let original = padding_box;
+        if let Some(area) = a.area {
+            // `position-area`: the area is the containing block (§3.1).
+            padding_box = area.translate(original.x, original.y);
+        }
+        let shift = (original.x - padding_box.x, original.y - padding_box.y);
+        anchor_center = [
+            a.center[0].map(|c| c + shift.0),
+            a.center[1].map(|c| c + shift.1),
+        ];
+    }
     let kind = cx.tree.b(id).kind;
     let replaced = kind == BoxKind::Replaced;
     // Form controls are semi-replaced: their automatic size stretches like a non-replaced box's
@@ -299,12 +465,23 @@ pub(crate) fn layout_absolute<S: Style>(
     let static_rtl = cx.tree.b(id).parent.map_or(self_rtl, |p| {
         cx.tree.b(p).style.direction() == Direction::Rtl
     });
-    let inset = |side, basis| style.inset(side).resolve(basis);
+    // (`anchor-center` makes auto insets zero: CSS Anchor Positioning 1 §4.2)
+    let inset = |side, basis, center: Option<f32>| {
+        let v = style.inset(side).resolve(basis);
+        if center.is_some() {
+            Some(v.unwrap_or(0.0))
+        } else {
+            v
+        }
+    };
     let sizing = style.box_sizing();
 
     let mut h = AxisInput {
         cb: cbw,
-        insets: [inset(Side::Left, cbw), inset(Side::Right, cbw)],
+        insets: [
+            inset(Side::Left, cbw, anchor_center[0]),
+            inset(Side::Right, cbw, anchor_center[0]),
+        ],
         margins: [edges.margin[3], edges.margin[1]],
         static_pos: StaticPos {
             start: oof.x.start - padding_box.x,
@@ -318,10 +495,14 @@ pub(crate) fn layout_absolute<S: Style>(
         overflow: style.align_safety().justify_self,
         rtl: cb_rtl,
         inline: true,
+        anchor_center: anchor_center[0],
     };
     let mut v = AxisInput {
         cb: cbh,
-        insets: [inset(Side::Top, cbh), inset(Side::Bottom, cbh)],
+        insets: [
+            inset(Side::Top, cbh, anchor_center[1]),
+            inset(Side::Bottom, cbh, anchor_center[1]),
+        ],
         margins: [edges.margin[0], edges.margin[2]],
         static_pos: StaticPos {
             start: oof.y.start - padding_box.y,
@@ -335,6 +516,7 @@ pub(crate) fn layout_absolute<S: Style>(
         overflow: style.align_safety().align_self,
         rtl: false,
         inline: false,
+        anchor_center: anchor_center[1],
     };
 
     if cx.tree.b(id).has(flags::TOP_LAYER) {
@@ -354,9 +536,9 @@ pub(crate) fn layout_absolute<S: Style>(
     };
 
     // The width, against the inset-modified containing block (auto margins as zero).
-    let (h0, h1) = h.imcb();
+    let (h0, h1) = h.insets_rect();
     let stretch_w = (h1 - h0 - edges.margin_h()).max(0.0);
-    let (v0, v1) = v.imcb();
+    let (v0, v1) = v.insets_rect();
     let stretch_h = (v1 - v0 - edges.margin_v()).max(0.0);
     // `stretch` on a replaced box fills the axis; the other axis follows through the ratio
     // (css-position-3 §4.1, css-sizing-4 §5.1).
@@ -525,8 +707,17 @@ pub(crate) fn layout_absolute<S: Style>(
     space.fixed_height = fixed_h;
     let result = cx.layout(id, &space, None, Point::ZERO);
     // (a table can come out wider than asked: its width is a minimum)
-    let (x, _, _) = h.place(result.fragment.size.width);
-    let (y, _, _) = v.place(result.fragment.size.height);
+    let size = result.fragment.size;
+    let (x, ml, mr) = h.place(size.width);
+    let (y, mt, mb) = v.place(size.height);
+    // (CSS Anchor Positioning 1 §6.5.2: the margin box within the inset-modified containing
+    // block, to a rounding error)
+    let fits = |a: &AxisInput, start: f32, end: f32| {
+        // (the insets' rectangle, not the one `anchor-center` narrows)
+        let (i0, i1) = a.insets_rect();
+        start >= i0 - 0.01 && end <= i1 + 0.01
+    };
+    let fit = fits(&h, x - ml, x + size.width + mr) && fits(&v, y - mt, y + size.height + mb);
 
     let offset = Point::new(padding_box.x + x, padding_box.y + y);
     let rest = result
@@ -535,12 +726,15 @@ pub(crate) fn layout_absolute<S: Style>(
         .map(|o| o.shifted(offset.x, offset.y))
         .collect();
     (
-        FragmentChild {
-            offset,
-            fragment: result.fragment,
-            stacking_owner: stacking_owner(cx.tree, id, oof.cb),
-        },
-        rest,
+        (
+            FragmentChild {
+                offset,
+                fragment: result.fragment,
+                stacking_owner: stacking_owner(cx.tree, id, oof.cb),
+            },
+            rest,
+        ),
+        fit,
     )
 }
 
@@ -560,6 +754,7 @@ mod tests {
             overflow: OverflowPosition::Default,
             rtl: false,
             inline: true,
+            anchor_center: None,
         }
     }
 
@@ -607,6 +802,25 @@ mod tests {
         // normal is start, without safety: CSS 2's over-constrained rule.
         let a = axis(100.0, Some(80.0), Some(10.0));
         assert_eq!(a.place(30.0).0, 80.0);
+    }
+
+    #[test]
+    fn anchor_center_centers_then_stays_inside_the_insets() {
+        // CSS Anchor Positioning 1 §4.2: the anchor's center at 65 in a 100px containing block.
+        let mut a = axis(100.0, Some(0.0), Some(0.0));
+        a.align = AxisAlign::Center;
+        a.anchor_center = Some(65.0);
+        // sized in the insets' rectangle, not the narrowed one
+        assert_eq!(a.insets_rect(), (0.0, 100.0));
+        // 60 wide: centered on the anchor
+        assert_eq!(a.place(60.0).0, 35.0);
+        // 100 wide: moved back inside
+        assert_eq!(a.place(100.0).0, 0.0);
+        // `right: -50px`: 150 wide, inside the insets' rectangle
+        let mut b = axis(100.0, Some(0.0), Some(-50.0));
+        b.align = AxisAlign::Center;
+        b.anchor_center = Some(65.0);
+        assert_eq!(b.place(150.0).0, 0.0);
     }
 
     #[test]

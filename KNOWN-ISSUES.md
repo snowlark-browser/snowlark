@@ -48,6 +48,16 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## CSS and style
 
+- **CSS Typed OM, the rest.** The style property maps and `CSSStyleValue` objects work, but properties the style
+  system does not have yet (`shape-outside`, `text-emphasis-color`, `counter-set`, `page` and a few more) are not
+  in the maps, a percentage `opacity` reads back as a number, `step-start` as `steps(1, start)`, and a
+  computed `column-rule-width` as a length instead of a `CSSStyleValue`. (ref 754)
+- **Anchor positioning and scrolling.** A box positioned with `anchor()` or `position-area` is placed against its
+  anchor as laid out, but does not move when a container between them scrolls: a tooltip anchored to an item of
+  a scrolled list stays where the item was. (ref 756)
+- **Anchor positioning, the rest.** `CSSPositionTryRule` is missing from the CSSOM, `anchor-scope` and
+  `position-visibility` parse but have no effect, and `@position-try` rules inside shadow trees are not found.
+  (ref 757)
 - **Custom scroll bars.** `::-webkit-scrollbar` and its thumb and track style a box's scroll bars (hidden, thinner,
   colored) and take layout space beside the content, and `:horizontal`/`:vertical` style each bar, but their
   `:hover` and `:active` rules do not apply and the buttons and track pieces are not drawn. The spin, search,

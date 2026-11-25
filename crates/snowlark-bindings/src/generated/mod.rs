@@ -109,26 +109,64 @@ pub mod css_font_palette_values_rule;
 pub use css_font_palette_values_rule::CSSFontPaletteValuesRuleImpl;
 pub mod css_grouping_rule;
 pub use css_grouping_rule::CSSGroupingRuleImpl;
+pub mod css_image_value;
+pub use css_image_value::CSSImageValueImpl;
 pub mod css_import_rule;
 pub use css_import_rule::CSSImportRuleImpl;
 pub mod css_keyframe_rule;
 pub use css_keyframe_rule::CSSKeyframeRuleImpl;
 pub mod css_keyframes_rule;
 pub use css_keyframes_rule::CSSKeyframesRuleImpl;
+pub mod css_keyword_value;
+pub use css_keyword_value::CSSKeywordValueImpl;
 pub mod css_layer_block_rule;
 pub use css_layer_block_rule::CSSLayerBlockRuleImpl;
 pub mod css_layer_statement_rule;
 pub use css_layer_statement_rule::CSSLayerStatementRuleImpl;
+pub mod css_math_clamp;
+pub use css_math_clamp::CSSMathClampImpl;
+pub mod css_math_invert;
+pub use css_math_invert::CSSMathInvertImpl;
+pub mod css_math_max;
+pub use css_math_max::CSSMathMaxImpl;
+pub mod css_math_min;
+pub use css_math_min::CSSMathMinImpl;
+pub mod css_math_negate;
+pub use css_math_negate::CSSMathNegateImpl;
+pub mod css_math_product;
+pub use css_math_product::CSSMathProductImpl;
+pub mod css_math_sum;
+pub use css_math_sum::CSSMathSumImpl;
+pub mod css_math_value;
+pub use css_math_value::CSSMathValueImpl;
+pub mod css_matrix_component;
+pub use css_matrix_component::CSSMatrixComponentImpl;
 pub mod css_media_rule;
 pub use css_media_rule::CSSMediaRuleImpl;
 pub mod css_namespace_rule;
 pub use css_namespace_rule::CSSNamespaceRuleImpl;
+pub mod css_numeric_array;
+pub use css_numeric_array::CSSNumericArrayImpl;
+pub mod css_numeric_value;
+pub use css_numeric_value::CSSNumericValueImpl;
+pub mod css_perspective;
+pub use css_perspective::CSSPerspectiveImpl;
 pub mod css_property_rule;
 pub use css_property_rule::CSSPropertyRuleImpl;
+pub mod css_rotate;
+pub use css_rotate::CSSRotateImpl;
 pub mod css_rule;
 pub use css_rule::CSSRuleImpl;
 pub mod css_rule_list;
 pub use css_rule_list::CSSRuleListImpl;
+pub mod css_scale;
+pub use css_scale::CSSScaleImpl;
+pub mod css_skew;
+pub use css_skew::CSSSkewImpl;
+pub mod css_skew_x;
+pub use css_skew_x::CSSSkewXImpl;
+pub mod css_skew_y;
+pub use css_skew_y::CSSSkewYImpl;
 pub mod css_style_declaration;
 pub use css_style_declaration::CSSStyleDeclarationImpl;
 pub mod css_style_properties;
@@ -137,10 +175,24 @@ pub mod css_style_rule;
 pub use css_style_rule::CSSStyleRuleImpl;
 pub mod css_style_sheet;
 pub use css_style_sheet::CSSStyleSheetImpl;
+pub mod css_style_value;
+pub use css_style_value::CSSStyleValueImpl;
 pub mod css_supports_rule;
 pub use css_supports_rule::CSSSupportsRuleImpl;
+pub mod css_transform_component;
+pub use css_transform_component::CSSTransformComponentImpl;
+pub mod css_transform_value;
+pub use css_transform_value::CSSTransformValueImpl;
 pub mod css_transition;
 pub use css_transition::CSSTransitionImpl;
+pub mod css_translate;
+pub use css_translate::CSSTranslateImpl;
+pub mod css_unit_value;
+pub use css_unit_value::CSSUnitValueImpl;
+pub mod css_unparsed_value;
+pub use css_unparsed_value::CSSUnparsedValueImpl;
+pub mod css_variable_reference_value;
+pub use css_variable_reference_value::CSSVariableReferenceValueImpl;
 pub mod canvas_compositing;
 pub use canvas_compositing::CanvasCompositingImpl;
 pub mod canvas_draw_image;
@@ -1001,6 +1053,10 @@ pub mod storage_event;
 pub use storage_event::StorageEventImpl;
 pub mod storage_manager;
 pub use storage_manager::StorageManagerImpl;
+pub mod style_property_map;
+pub use style_property_map::StylePropertyMapImpl;
+pub mod style_property_map_read_only;
+pub use style_property_map_read_only::StylePropertyMapReadOnlyImpl;
 pub mod style_sheet;
 pub use style_sheet::StyleSheetImpl;
 pub mod style_sheet_list;
@@ -1221,974 +1277,1030 @@ pub mod ids {
     pub const FILE_END: u16 = 20;
     pub const BYTE_LENGTH_QUEUING_STRATEGY: u16 = 20;
     pub const BYTE_LENGTH_QUEUING_STRATEGY_END: u16 = 21;
-    pub const CSS_RULE: u16 = 21;
-    pub const CSS_RULE_END: u16 = 38;
-    pub const CSS_FONT_FACE_RULE: u16 = 22;
-    pub const CSS_FONT_FACE_RULE_END: u16 = 23;
-    pub const CSS_FONT_FEATURE_VALUES_RULE: u16 = 23;
-    pub const CSS_FONT_FEATURE_VALUES_RULE_END: u16 = 24;
-    pub const CSS_FONT_PALETTE_VALUES_RULE: u16 = 24;
-    pub const CSS_FONT_PALETTE_VALUES_RULE_END: u16 = 25;
-    pub const CSS_GROUPING_RULE: u16 = 25;
-    pub const CSS_GROUPING_RULE_END: u16 = 32;
-    pub const CSS_CONDITION_RULE: u16 = 26;
-    pub const CSS_CONDITION_RULE_END: u16 = 30;
-    pub const CSS_CONTAINER_RULE: u16 = 27;
-    pub const CSS_CONTAINER_RULE_END: u16 = 28;
-    pub const CSS_MEDIA_RULE: u16 = 28;
-    pub const CSS_MEDIA_RULE_END: u16 = 29;
-    pub const CSS_SUPPORTS_RULE: u16 = 29;
-    pub const CSS_SUPPORTS_RULE_END: u16 = 30;
-    pub const CSS_LAYER_BLOCK_RULE: u16 = 30;
-    pub const CSS_LAYER_BLOCK_RULE_END: u16 = 31;
-    pub const CSS_STYLE_RULE: u16 = 31;
-    pub const CSS_STYLE_RULE_END: u16 = 32;
-    pub const CSS_IMPORT_RULE: u16 = 32;
-    pub const CSS_IMPORT_RULE_END: u16 = 33;
-    pub const CSS_KEYFRAME_RULE: u16 = 33;
-    pub const CSS_KEYFRAME_RULE_END: u16 = 34;
-    pub const CSS_KEYFRAMES_RULE: u16 = 34;
-    pub const CSS_KEYFRAMES_RULE_END: u16 = 35;
-    pub const CSS_LAYER_STATEMENT_RULE: u16 = 35;
-    pub const CSS_LAYER_STATEMENT_RULE_END: u16 = 36;
-    pub const CSS_NAMESPACE_RULE: u16 = 36;
-    pub const CSS_NAMESPACE_RULE_END: u16 = 37;
-    pub const CSS_PROPERTY_RULE: u16 = 37;
-    pub const CSS_PROPERTY_RULE_END: u16 = 38;
-    pub const CSS_RULE_LIST: u16 = 38;
-    pub const CSS_RULE_LIST_END: u16 = 39;
-    pub const CSS_STYLE_DECLARATION: u16 = 39;
-    pub const CSS_STYLE_DECLARATION_END: u16 = 42;
-    pub const CSS_FONT_FACE_DESCRIPTORS: u16 = 40;
-    pub const CSS_FONT_FACE_DESCRIPTORS_END: u16 = 41;
-    pub const CSS_STYLE_PROPERTIES: u16 = 41;
-    pub const CSS_STYLE_PROPERTIES_END: u16 = 42;
-    pub const CANVAS_GRADIENT: u16 = 42;
-    pub const CANVAS_GRADIENT_END: u16 = 43;
-    pub const CANVAS_PATTERN: u16 = 43;
-    pub const CANVAS_PATTERN_END: u16 = 44;
-    pub const CANVAS_RENDERING_CONTEXT2_D: u16 = 44;
-    pub const CANVAS_RENDERING_CONTEXT2_D_END: u16 = 45;
-    pub const CLIPBOARD_ITEM: u16 = 45;
-    pub const CLIPBOARD_ITEM_END: u16 = 46;
-    pub const COMPRESSION_STREAM: u16 = 46;
-    pub const COMPRESSION_STREAM_END: u16 = 47;
-    pub const COUNT_QUEUING_STRATEGY: u16 = 47;
-    pub const COUNT_QUEUING_STRATEGY_END: u16 = 48;
-    pub const CREDENTIAL: u16 = 48;
-    pub const CREDENTIAL_END: u16 = 53;
-    pub const FEDERATED_CREDENTIAL: u16 = 49;
-    pub const FEDERATED_CREDENTIAL_END: u16 = 50;
-    pub const IDENTITY_CREDENTIAL: u16 = 50;
-    pub const IDENTITY_CREDENTIAL_END: u16 = 51;
-    pub const PASSWORD_CREDENTIAL: u16 = 51;
-    pub const PASSWORD_CREDENTIAL_END: u16 = 52;
-    pub const PUBLIC_KEY_CREDENTIAL: u16 = 52;
-    pub const PUBLIC_KEY_CREDENTIAL_END: u16 = 53;
-    pub const CREDENTIALS_CONTAINER: u16 = 53;
-    pub const CREDENTIALS_CONTAINER_END: u16 = 54;
-    pub const CRYPTO: u16 = 54;
-    pub const CRYPTO_END: u16 = 55;
-    pub const CRYPTO_KEY: u16 = 55;
-    pub const CRYPTO_KEY_END: u16 = 56;
-    pub const CUSTOM_ELEMENT_REGISTRY: u16 = 56;
-    pub const CUSTOM_ELEMENT_REGISTRY_END: u16 = 57;
-    pub const CUSTOM_STATE_SET: u16 = 57;
-    pub const CUSTOM_STATE_SET_END: u16 = 58;
-    pub const DOM_EXCEPTION: u16 = 58;
-    pub const DOM_EXCEPTION_END: u16 = 59;
-    pub const DOM_IMPLEMENTATION: u16 = 59;
-    pub const DOM_IMPLEMENTATION_END: u16 = 60;
-    pub const DOM_MATRIX_READ_ONLY: u16 = 60;
-    pub const DOM_MATRIX_READ_ONLY_END: u16 = 62;
-    pub const DOM_MATRIX: u16 = 61;
-    pub const DOM_MATRIX_END: u16 = 62;
-    pub const DOM_PARSER: u16 = 62;
-    pub const DOM_PARSER_END: u16 = 63;
-    pub const DOM_POINT_READ_ONLY: u16 = 63;
-    pub const DOM_POINT_READ_ONLY_END: u16 = 65;
-    pub const DOM_POINT: u16 = 64;
-    pub const DOM_POINT_END: u16 = 65;
-    pub const DOM_QUAD: u16 = 65;
-    pub const DOM_QUAD_END: u16 = 66;
-    pub const DOM_RECT_LIST: u16 = 66;
-    pub const DOM_RECT_LIST_END: u16 = 67;
-    pub const DOM_RECT_READ_ONLY: u16 = 67;
-    pub const DOM_RECT_READ_ONLY_END: u16 = 69;
-    pub const DOM_RECT: u16 = 68;
-    pub const DOM_RECT_END: u16 = 69;
-    pub const DOM_STRING_LIST: u16 = 69;
-    pub const DOM_STRING_LIST_END: u16 = 70;
-    pub const DOM_STRING_MAP: u16 = 70;
-    pub const DOM_STRING_MAP_END: u16 = 71;
-    pub const DOM_TOKEN_LIST: u16 = 71;
-    pub const DOM_TOKEN_LIST_END: u16 = 72;
-    pub const DATA_TRANSFER: u16 = 72;
-    pub const DATA_TRANSFER_END: u16 = 73;
-    pub const DATA_TRANSFER_ITEM: u16 = 73;
-    pub const DATA_TRANSFER_ITEM_END: u16 = 74;
-    pub const DATA_TRANSFER_ITEM_LIST: u16 = 74;
-    pub const DATA_TRANSFER_ITEM_LIST_END: u16 = 75;
-    pub const DECOMPRESSION_STREAM: u16 = 75;
-    pub const DECOMPRESSION_STREAM_END: u16 = 76;
-    pub const ELEMENT_INTERNALS: u16 = 76;
-    pub const ELEMENT_INTERNALS_END: u16 = 77;
-    pub const EVENT: u16 = 77;
-    pub const EVENT_END: u16 = 119;
-    pub const ANIMATION_EVENT: u16 = 78;
-    pub const ANIMATION_EVENT_END: u16 = 79;
-    pub const ANIMATION_PLAYBACK_EVENT: u16 = 79;
-    pub const ANIMATION_PLAYBACK_EVENT_END: u16 = 80;
-    pub const BEFORE_UNLOAD_EVENT: u16 = 80;
-    pub const BEFORE_UNLOAD_EVENT_END: u16 = 81;
-    pub const CLIPBOARD_EVENT: u16 = 81;
-    pub const CLIPBOARD_EVENT_END: u16 = 82;
-    pub const CLOSE_EVENT: u16 = 82;
-    pub const CLOSE_EVENT_END: u16 = 83;
-    pub const COMMAND_EVENT: u16 = 83;
-    pub const COMMAND_EVENT_END: u16 = 84;
-    pub const CUSTOM_EVENT: u16 = 84;
-    pub const CUSTOM_EVENT_END: u16 = 85;
-    pub const ERROR_EVENT: u16 = 85;
-    pub const ERROR_EVENT_END: u16 = 86;
-    pub const FONT_FACE_SET_LOAD_EVENT: u16 = 86;
-    pub const FONT_FACE_SET_LOAD_EVENT_END: u16 = 87;
-    pub const FORM_DATA_EVENT: u16 = 87;
-    pub const FORM_DATA_EVENT_END: u16 = 88;
-    pub const GAMEPAD_EVENT: u16 = 88;
-    pub const GAMEPAD_EVENT_END: u16 = 89;
-    pub const HASH_CHANGE_EVENT: u16 = 89;
-    pub const HASH_CHANGE_EVENT_END: u16 = 90;
-    pub const IDB_VERSION_CHANGE_EVENT: u16 = 90;
-    pub const IDB_VERSION_CHANGE_EVENT_END: u16 = 91;
-    pub const MEDIA_ENCRYPTED_EVENT: u16 = 91;
-    pub const MEDIA_ENCRYPTED_EVENT_END: u16 = 92;
-    pub const MEDIA_KEY_MESSAGE_EVENT: u16 = 92;
-    pub const MEDIA_KEY_MESSAGE_EVENT_END: u16 = 93;
-    pub const MEDIA_QUERY_LIST_EVENT: u16 = 93;
-    pub const MEDIA_QUERY_LIST_EVENT_END: u16 = 94;
-    pub const MESSAGE_EVENT: u16 = 94;
-    pub const MESSAGE_EVENT_END: u16 = 95;
-    pub const OFFLINE_AUDIO_COMPLETION_EVENT: u16 = 95;
-    pub const OFFLINE_AUDIO_COMPLETION_EVENT_END: u16 = 96;
-    pub const PAGE_TRANSITION_EVENT: u16 = 96;
-    pub const PAGE_TRANSITION_EVENT_END: u16 = 97;
-    pub const POP_STATE_EVENT: u16 = 97;
-    pub const POP_STATE_EVENT_END: u16 = 98;
-    pub const PROGRESS_EVENT: u16 = 98;
-    pub const PROGRESS_EVENT_END: u16 = 99;
-    pub const PROMISE_REJECTION_EVENT: u16 = 99;
-    pub const PROMISE_REJECTION_EVENT_END: u16 = 100;
-    pub const SECURITY_POLICY_VIOLATION_EVENT: u16 = 100;
-    pub const SECURITY_POLICY_VIOLATION_EVENT_END: u16 = 101;
-    pub const STORAGE_EVENT: u16 = 101;
-    pub const STORAGE_EVENT_END: u16 = 102;
-    pub const SUBMIT_EVENT: u16 = 102;
-    pub const SUBMIT_EVENT_END: u16 = 103;
-    pub const TASK_PRIORITY_CHANGE_EVENT: u16 = 103;
-    pub const TASK_PRIORITY_CHANGE_EVENT_END: u16 = 104;
-    pub const TOGGLE_EVENT: u16 = 104;
-    pub const TOGGLE_EVENT_END: u16 = 105;
-    pub const TRACK_EVENT: u16 = 105;
-    pub const TRACK_EVENT_END: u16 = 106;
-    pub const TRANSITION_EVENT: u16 = 106;
-    pub const TRANSITION_EVENT_END: u16 = 107;
-    pub const UI_EVENT: u16 = 107;
-    pub const UI_EVENT_END: u16 = 118;
-    pub const COMPOSITION_EVENT: u16 = 108;
-    pub const COMPOSITION_EVENT_END: u16 = 109;
-    pub const FOCUS_EVENT: u16 = 109;
-    pub const FOCUS_EVENT_END: u16 = 110;
-    pub const INPUT_EVENT: u16 = 110;
-    pub const INPUT_EVENT_END: u16 = 111;
-    pub const KEYBOARD_EVENT: u16 = 111;
-    pub const KEYBOARD_EVENT_END: u16 = 112;
-    pub const MOUSE_EVENT: u16 = 112;
-    pub const MOUSE_EVENT_END: u16 = 116;
-    pub const DRAG_EVENT: u16 = 113;
-    pub const DRAG_EVENT_END: u16 = 114;
-    pub const POINTER_EVENT: u16 = 114;
-    pub const POINTER_EVENT_END: u16 = 115;
-    pub const WHEEL_EVENT: u16 = 115;
-    pub const WHEEL_EVENT_END: u16 = 116;
-    pub const TEXT_EVENT: u16 = 116;
-    pub const TEXT_EVENT_END: u16 = 117;
-    pub const TOUCH_EVENT: u16 = 117;
-    pub const TOUCH_EVENT_END: u16 = 118;
-    pub const WEB_GL_CONTEXT_EVENT: u16 = 118;
-    pub const WEB_GL_CONTEXT_EVENT_END: u16 = 119;
-    pub const EVENT_TARGET: u16 = 119;
-    pub const EVENT_TARGET_END: u16 = 348;
-    pub const ABORT_SIGNAL: u16 = 120;
-    pub const ABORT_SIGNAL_END: u16 = 122;
-    pub const TASK_SIGNAL: u16 = 121;
-    pub const TASK_SIGNAL_END: u16 = 122;
-    pub const ANIMATION: u16 = 122;
-    pub const ANIMATION_END: u16 = 125;
-    pub const CSS_ANIMATION: u16 = 123;
-    pub const CSS_ANIMATION_END: u16 = 124;
-    pub const CSS_TRANSITION: u16 = 124;
-    pub const CSS_TRANSITION_END: u16 = 125;
-    pub const AUDIO_NODE: u16 = 125;
-    pub const AUDIO_NODE_END: u16 = 143;
-    pub const ANALYSER_NODE: u16 = 126;
-    pub const ANALYSER_NODE_END: u16 = 127;
-    pub const AUDIO_DESTINATION_NODE: u16 = 127;
-    pub const AUDIO_DESTINATION_NODE_END: u16 = 128;
-    pub const AUDIO_SCHEDULED_SOURCE_NODE: u16 = 128;
-    pub const AUDIO_SCHEDULED_SOURCE_NODE_END: u16 = 132;
-    pub const AUDIO_BUFFER_SOURCE_NODE: u16 = 129;
-    pub const AUDIO_BUFFER_SOURCE_NODE_END: u16 = 130;
-    pub const CONSTANT_SOURCE_NODE: u16 = 130;
-    pub const CONSTANT_SOURCE_NODE_END: u16 = 131;
-    pub const OSCILLATOR_NODE: u16 = 131;
-    pub const OSCILLATOR_NODE_END: u16 = 132;
-    pub const BIQUAD_FILTER_NODE: u16 = 132;
-    pub const BIQUAD_FILTER_NODE_END: u16 = 133;
-    pub const CHANNEL_MERGER_NODE: u16 = 133;
-    pub const CHANNEL_MERGER_NODE_END: u16 = 134;
-    pub const CHANNEL_SPLITTER_NODE: u16 = 134;
-    pub const CHANNEL_SPLITTER_NODE_END: u16 = 135;
-    pub const CONVOLVER_NODE: u16 = 135;
-    pub const CONVOLVER_NODE_END: u16 = 136;
-    pub const DELAY_NODE: u16 = 136;
-    pub const DELAY_NODE_END: u16 = 137;
-    pub const DYNAMICS_COMPRESSOR_NODE: u16 = 137;
-    pub const DYNAMICS_COMPRESSOR_NODE_END: u16 = 138;
-    pub const GAIN_NODE: u16 = 138;
-    pub const GAIN_NODE_END: u16 = 139;
-    pub const IIR_FILTER_NODE: u16 = 139;
-    pub const IIR_FILTER_NODE_END: u16 = 140;
-    pub const PANNER_NODE: u16 = 140;
-    pub const PANNER_NODE_END: u16 = 141;
-    pub const STEREO_PANNER_NODE: u16 = 141;
-    pub const STEREO_PANNER_NODE_END: u16 = 142;
-    pub const WAVE_SHAPER_NODE: u16 = 142;
-    pub const WAVE_SHAPER_NODE_END: u16 = 143;
-    pub const AUDIO_TRACK_LIST: u16 = 143;
-    pub const AUDIO_TRACK_LIST_END: u16 = 144;
-    pub const BASE_AUDIO_CONTEXT: u16 = 144;
-    pub const BASE_AUDIO_CONTEXT_END: u16 = 147;
-    pub const AUDIO_CONTEXT: u16 = 145;
-    pub const AUDIO_CONTEXT_END: u16 = 146;
-    pub const OFFLINE_AUDIO_CONTEXT: u16 = 146;
-    pub const OFFLINE_AUDIO_CONTEXT_END: u16 = 147;
-    pub const BATTERY_MANAGER: u16 = 147;
-    pub const BATTERY_MANAGER_END: u16 = 148;
-    pub const BROADCAST_CHANNEL: u16 = 148;
-    pub const BROADCAST_CHANNEL_END: u16 = 149;
-    pub const CLIPBOARD: u16 = 149;
-    pub const CLIPBOARD_END: u16 = 150;
-    pub const FILE_READER: u16 = 150;
-    pub const FILE_READER_END: u16 = 151;
-    pub const FONT_FACE_SET: u16 = 151;
-    pub const FONT_FACE_SET_END: u16 = 152;
-    pub const IDB_DATABASE: u16 = 152;
-    pub const IDB_DATABASE_END: u16 = 153;
-    pub const IDB_REQUEST: u16 = 153;
-    pub const IDB_REQUEST_END: u16 = 155;
-    pub const IDB_OPEN_DB_REQUEST: u16 = 154;
-    pub const IDB_OPEN_DB_REQUEST_END: u16 = 155;
-    pub const IDB_TRANSACTION: u16 = 155;
-    pub const IDB_TRANSACTION_END: u16 = 156;
-    pub const MEDIA_DEVICES: u16 = 156;
-    pub const MEDIA_DEVICES_END: u16 = 157;
-    pub const MEDIA_KEY_SESSION: u16 = 157;
-    pub const MEDIA_KEY_SESSION_END: u16 = 158;
-    pub const MEDIA_QUERY_LIST: u16 = 158;
-    pub const MEDIA_QUERY_LIST_END: u16 = 159;
-    pub const MEDIA_SOURCE: u16 = 159;
-    pub const MEDIA_SOURCE_END: u16 = 160;
-    pub const MESSAGE_PORT: u16 = 160;
-    pub const MESSAGE_PORT_END: u16 = 161;
-    pub const NETWORK_INFORMATION: u16 = 161;
-    pub const NETWORK_INFORMATION_END: u16 = 162;
-    pub const NODE: u16 = 162;
-    pub const NODE_END: u16 = 327;
-    pub const ATTR: u16 = 163;
-    pub const ATTR_END: u16 = 164;
-    pub const CHARACTER_DATA: u16 = 164;
-    pub const CHARACTER_DATA_END: u16 = 169;
-    pub const COMMENT: u16 = 165;
-    pub const COMMENT_END: u16 = 166;
-    pub const PROCESSING_INSTRUCTION: u16 = 166;
-    pub const PROCESSING_INSTRUCTION_END: u16 = 167;
-    pub const TEXT: u16 = 167;
-    pub const TEXT_END: u16 = 169;
-    pub const CDATA_SECTION: u16 = 168;
-    pub const CDATA_SECTION_END: u16 = 169;
-    pub const DOCUMENT: u16 = 169;
-    pub const DOCUMENT_END: u16 = 172;
-    pub const HTML_DOCUMENT: u16 = 170;
-    pub const HTML_DOCUMENT_END: u16 = 171;
-    pub const XML_DOCUMENT: u16 = 171;
-    pub const XML_DOCUMENT_END: u16 = 172;
-    pub const DOCUMENT_FRAGMENT: u16 = 172;
-    pub const DOCUMENT_FRAGMENT_END: u16 = 174;
-    pub const SHADOW_ROOT: u16 = 173;
-    pub const SHADOW_ROOT_END: u16 = 174;
-    pub const DOCUMENT_TYPE: u16 = 174;
-    pub const DOCUMENT_TYPE_END: u16 = 175;
-    pub const ELEMENT: u16 = 175;
-    pub const ELEMENT_END: u16 = 327;
-    pub const HTML_ELEMENT: u16 = 176;
-    pub const HTML_ELEMENT_END: u16 = 256;
-    pub const HTML_ANCHOR_ELEMENT: u16 = 177;
-    pub const HTML_ANCHOR_ELEMENT_END: u16 = 178;
-    pub const HTML_AREA_ELEMENT: u16 = 178;
-    pub const HTML_AREA_ELEMENT_END: u16 = 179;
-    pub const HTMLBR_ELEMENT: u16 = 179;
-    pub const HTMLBR_ELEMENT_END: u16 = 180;
-    pub const HTML_BASE_ELEMENT: u16 = 180;
-    pub const HTML_BASE_ELEMENT_END: u16 = 181;
-    pub const HTML_BODY_ELEMENT: u16 = 181;
-    pub const HTML_BODY_ELEMENT_END: u16 = 182;
-    pub const HTML_BUTTON_ELEMENT: u16 = 182;
-    pub const HTML_BUTTON_ELEMENT_END: u16 = 183;
-    pub const HTML_CAMERA_ELEMENT: u16 = 183;
-    pub const HTML_CAMERA_ELEMENT_END: u16 = 184;
-    pub const HTML_CANVAS_ELEMENT: u16 = 184;
-    pub const HTML_CANVAS_ELEMENT_END: u16 = 185;
-    pub const HTMLD_LIST_ELEMENT: u16 = 185;
-    pub const HTMLD_LIST_ELEMENT_END: u16 = 186;
-    pub const HTML_DATA_ELEMENT: u16 = 186;
-    pub const HTML_DATA_ELEMENT_END: u16 = 187;
-    pub const HTML_DATA_LIST_ELEMENT: u16 = 187;
-    pub const HTML_DATA_LIST_ELEMENT_END: u16 = 188;
-    pub const HTML_DETAILS_ELEMENT: u16 = 188;
-    pub const HTML_DETAILS_ELEMENT_END: u16 = 189;
-    pub const HTML_DIALOG_ELEMENT: u16 = 189;
-    pub const HTML_DIALOG_ELEMENT_END: u16 = 190;
-    pub const HTML_DIRECTORY_ELEMENT: u16 = 190;
-    pub const HTML_DIRECTORY_ELEMENT_END: u16 = 191;
-    pub const HTML_DIV_ELEMENT: u16 = 191;
-    pub const HTML_DIV_ELEMENT_END: u16 = 192;
-    pub const HTML_EMBED_ELEMENT: u16 = 192;
-    pub const HTML_EMBED_ELEMENT_END: u16 = 193;
-    pub const HTML_FENCED_FRAME_ELEMENT: u16 = 193;
-    pub const HTML_FENCED_FRAME_ELEMENT_END: u16 = 194;
-    pub const HTML_FIELD_SET_ELEMENT: u16 = 194;
-    pub const HTML_FIELD_SET_ELEMENT_END: u16 = 195;
-    pub const HTML_FONT_ELEMENT: u16 = 195;
-    pub const HTML_FONT_ELEMENT_END: u16 = 196;
-    pub const HTML_FORM_ELEMENT: u16 = 196;
-    pub const HTML_FORM_ELEMENT_END: u16 = 197;
-    pub const HTML_FRAME_ELEMENT: u16 = 197;
-    pub const HTML_FRAME_ELEMENT_END: u16 = 198;
-    pub const HTML_FRAME_SET_ELEMENT: u16 = 198;
-    pub const HTML_FRAME_SET_ELEMENT_END: u16 = 199;
-    pub const HTML_GEOLOCATION_ELEMENT: u16 = 199;
-    pub const HTML_GEOLOCATION_ELEMENT_END: u16 = 200;
-    pub const HTMLHR_ELEMENT: u16 = 200;
-    pub const HTMLHR_ELEMENT_END: u16 = 201;
-    pub const HTML_HEAD_ELEMENT: u16 = 201;
-    pub const HTML_HEAD_ELEMENT_END: u16 = 202;
-    pub const HTML_HEADING_ELEMENT: u16 = 202;
-    pub const HTML_HEADING_ELEMENT_END: u16 = 203;
-    pub const HTML_HTML_ELEMENT: u16 = 203;
-    pub const HTML_HTML_ELEMENT_END: u16 = 204;
-    pub const HTMLI_FRAME_ELEMENT: u16 = 204;
-    pub const HTMLI_FRAME_ELEMENT_END: u16 = 205;
-    pub const HTML_IMAGE_ELEMENT: u16 = 205;
-    pub const HTML_IMAGE_ELEMENT_END: u16 = 206;
-    pub const HTML_INPUT_ELEMENT: u16 = 206;
-    pub const HTML_INPUT_ELEMENT_END: u16 = 207;
-    pub const HTML_INSTALL_ELEMENT: u16 = 207;
-    pub const HTML_INSTALL_ELEMENT_END: u16 = 208;
-    pub const HTMLLI_ELEMENT: u16 = 208;
-    pub const HTMLLI_ELEMENT_END: u16 = 209;
-    pub const HTML_LABEL_ELEMENT: u16 = 209;
-    pub const HTML_LABEL_ELEMENT_END: u16 = 210;
-    pub const HTML_LEGEND_ELEMENT: u16 = 210;
-    pub const HTML_LEGEND_ELEMENT_END: u16 = 211;
-    pub const HTML_LINK_ELEMENT: u16 = 211;
-    pub const HTML_LINK_ELEMENT_END: u16 = 212;
-    pub const HTML_MAP_ELEMENT: u16 = 212;
-    pub const HTML_MAP_ELEMENT_END: u16 = 213;
-    pub const HTML_MARQUEE_ELEMENT: u16 = 213;
-    pub const HTML_MARQUEE_ELEMENT_END: u16 = 214;
-    pub const HTML_MEDIA_ELEMENT: u16 = 214;
-    pub const HTML_MEDIA_ELEMENT_END: u16 = 217;
-    pub const HTML_AUDIO_ELEMENT: u16 = 215;
-    pub const HTML_AUDIO_ELEMENT_END: u16 = 216;
-    pub const HTML_VIDEO_ELEMENT: u16 = 216;
-    pub const HTML_VIDEO_ELEMENT_END: u16 = 217;
-    pub const HTML_MENU_ELEMENT: u16 = 217;
-    pub const HTML_MENU_ELEMENT_END: u16 = 218;
-    pub const HTML_META_ELEMENT: u16 = 218;
-    pub const HTML_META_ELEMENT_END: u16 = 219;
-    pub const HTML_METER_ELEMENT: u16 = 219;
-    pub const HTML_METER_ELEMENT_END: u16 = 220;
-    pub const HTML_MICROPHONE_ELEMENT: u16 = 220;
-    pub const HTML_MICROPHONE_ELEMENT_END: u16 = 221;
-    pub const HTML_MOD_ELEMENT: u16 = 221;
-    pub const HTML_MOD_ELEMENT_END: u16 = 222;
-    pub const HTML_MODEL_ELEMENT: u16 = 222;
-    pub const HTML_MODEL_ELEMENT_END: u16 = 223;
-    pub const HTMLO_LIST_ELEMENT: u16 = 223;
-    pub const HTMLO_LIST_ELEMENT_END: u16 = 224;
-    pub const HTML_OBJECT_ELEMENT: u16 = 224;
-    pub const HTML_OBJECT_ELEMENT_END: u16 = 225;
-    pub const HTML_OPT_GROUP_ELEMENT: u16 = 225;
-    pub const HTML_OPT_GROUP_ELEMENT_END: u16 = 226;
-    pub const HTML_OPTION_ELEMENT: u16 = 226;
-    pub const HTML_OPTION_ELEMENT_END: u16 = 227;
-    pub const HTML_OUTPUT_ELEMENT: u16 = 227;
-    pub const HTML_OUTPUT_ELEMENT_END: u16 = 228;
-    pub const HTML_PARAGRAPH_ELEMENT: u16 = 228;
-    pub const HTML_PARAGRAPH_ELEMENT_END: u16 = 229;
-    pub const HTML_PARAM_ELEMENT: u16 = 229;
-    pub const HTML_PARAM_ELEMENT_END: u16 = 230;
-    pub const HTML_PICTURE_ELEMENT: u16 = 230;
-    pub const HTML_PICTURE_ELEMENT_END: u16 = 231;
-    pub const HTML_PORTAL_ELEMENT: u16 = 231;
-    pub const HTML_PORTAL_ELEMENT_END: u16 = 232;
-    pub const HTML_PRE_ELEMENT: u16 = 232;
-    pub const HTML_PRE_ELEMENT_END: u16 = 233;
-    pub const HTML_PROGRESS_ELEMENT: u16 = 233;
-    pub const HTML_PROGRESS_ELEMENT_END: u16 = 234;
-    pub const HTML_QUOTE_ELEMENT: u16 = 234;
-    pub const HTML_QUOTE_ELEMENT_END: u16 = 235;
-    pub const HTML_SCRIPT_ELEMENT: u16 = 235;
-    pub const HTML_SCRIPT_ELEMENT_END: u16 = 236;
-    pub const HTML_SELECT_ELEMENT: u16 = 236;
-    pub const HTML_SELECT_ELEMENT_END: u16 = 237;
-    pub const HTML_SELECTED_CONTENT_ELEMENT: u16 = 237;
-    pub const HTML_SELECTED_CONTENT_ELEMENT_END: u16 = 238;
-    pub const HTML_SLOT_ELEMENT: u16 = 238;
-    pub const HTML_SLOT_ELEMENT_END: u16 = 239;
-    pub const HTML_SOURCE_ELEMENT: u16 = 239;
-    pub const HTML_SOURCE_ELEMENT_END: u16 = 240;
-    pub const HTML_SPAN_ELEMENT: u16 = 240;
-    pub const HTML_SPAN_ELEMENT_END: u16 = 241;
-    pub const HTML_STYLE_ELEMENT: u16 = 241;
-    pub const HTML_STYLE_ELEMENT_END: u16 = 242;
-    pub const HTML_TABLE_CAPTION_ELEMENT: u16 = 242;
-    pub const HTML_TABLE_CAPTION_ELEMENT_END: u16 = 243;
-    pub const HTML_TABLE_CELL_ELEMENT: u16 = 243;
-    pub const HTML_TABLE_CELL_ELEMENT_END: u16 = 244;
-    pub const HTML_TABLE_COL_ELEMENT: u16 = 244;
-    pub const HTML_TABLE_COL_ELEMENT_END: u16 = 245;
-    pub const HTML_TABLE_ELEMENT: u16 = 245;
-    pub const HTML_TABLE_ELEMENT_END: u16 = 246;
-    pub const HTML_TABLE_ROW_ELEMENT: u16 = 246;
-    pub const HTML_TABLE_ROW_ELEMENT_END: u16 = 247;
-    pub const HTML_TABLE_SECTION_ELEMENT: u16 = 247;
-    pub const HTML_TABLE_SECTION_ELEMENT_END: u16 = 248;
-    pub const HTML_TEMPLATE_ELEMENT: u16 = 248;
-    pub const HTML_TEMPLATE_ELEMENT_END: u16 = 249;
-    pub const HTML_TEXT_AREA_ELEMENT: u16 = 249;
-    pub const HTML_TEXT_AREA_ELEMENT_END: u16 = 250;
-    pub const HTML_TIME_ELEMENT: u16 = 250;
-    pub const HTML_TIME_ELEMENT_END: u16 = 251;
-    pub const HTML_TITLE_ELEMENT: u16 = 251;
-    pub const HTML_TITLE_ELEMENT_END: u16 = 252;
-    pub const HTML_TRACK_ELEMENT: u16 = 252;
-    pub const HTML_TRACK_ELEMENT_END: u16 = 253;
-    pub const HTMLU_LIST_ELEMENT: u16 = 253;
-    pub const HTMLU_LIST_ELEMENT_END: u16 = 254;
-    pub const HTML_UNKNOWN_ELEMENT: u16 = 254;
-    pub const HTML_UNKNOWN_ELEMENT_END: u16 = 255;
-    pub const HTML_USER_MEDIA_ELEMENT: u16 = 255;
-    pub const HTML_USER_MEDIA_ELEMENT_END: u16 = 256;
-    pub const SVG_ELEMENT: u16 = 256;
-    pub const SVG_ELEMENT_END: u16 = 327;
-    pub const SVG_ANIMATION_ELEMENT: u16 = 257;
-    pub const SVG_ANIMATION_ELEMENT_END: u16 = 262;
-    pub const SVG_ANIMATE_ELEMENT: u16 = 258;
-    pub const SVG_ANIMATE_ELEMENT_END: u16 = 259;
-    pub const SVG_ANIMATE_MOTION_ELEMENT: u16 = 259;
-    pub const SVG_ANIMATE_MOTION_ELEMENT_END: u16 = 260;
-    pub const SVG_ANIMATE_TRANSFORM_ELEMENT: u16 = 260;
-    pub const SVG_ANIMATE_TRANSFORM_ELEMENT_END: u16 = 261;
-    pub const SVG_SET_ELEMENT: u16 = 261;
-    pub const SVG_SET_ELEMENT_END: u16 = 262;
-    pub const SVG_CLIP_PATH_ELEMENT: u16 = 262;
-    pub const SVG_CLIP_PATH_ELEMENT_END: u16 = 263;
-    pub const SVG_COMPONENT_TRANSFER_FUNCTION_ELEMENT: u16 = 263;
-    pub const SVG_COMPONENT_TRANSFER_FUNCTION_ELEMENT_END: u16 = 268;
-    pub const SVGFE_FUNC_A_ELEMENT: u16 = 264;
-    pub const SVGFE_FUNC_A_ELEMENT_END: u16 = 265;
-    pub const SVGFE_FUNC_B_ELEMENT: u16 = 265;
-    pub const SVGFE_FUNC_B_ELEMENT_END: u16 = 266;
-    pub const SVGFE_FUNC_G_ELEMENT: u16 = 266;
-    pub const SVGFE_FUNC_G_ELEMENT_END: u16 = 267;
-    pub const SVGFE_FUNC_R_ELEMENT: u16 = 267;
-    pub const SVGFE_FUNC_R_ELEMENT_END: u16 = 268;
-    pub const SVG_DESC_ELEMENT: u16 = 268;
-    pub const SVG_DESC_ELEMENT_END: u16 = 269;
-    pub const SVGFE_BLEND_ELEMENT: u16 = 269;
-    pub const SVGFE_BLEND_ELEMENT_END: u16 = 270;
-    pub const SVGFE_COLOR_MATRIX_ELEMENT: u16 = 270;
-    pub const SVGFE_COLOR_MATRIX_ELEMENT_END: u16 = 271;
-    pub const SVGFE_COMPONENT_TRANSFER_ELEMENT: u16 = 271;
-    pub const SVGFE_COMPONENT_TRANSFER_ELEMENT_END: u16 = 272;
-    pub const SVGFE_COMPOSITE_ELEMENT: u16 = 272;
-    pub const SVGFE_COMPOSITE_ELEMENT_END: u16 = 273;
-    pub const SVGFE_CONVOLVE_MATRIX_ELEMENT: u16 = 273;
-    pub const SVGFE_CONVOLVE_MATRIX_ELEMENT_END: u16 = 274;
-    pub const SVGFE_DIFFUSE_LIGHTING_ELEMENT: u16 = 274;
-    pub const SVGFE_DIFFUSE_LIGHTING_ELEMENT_END: u16 = 275;
-    pub const SVGFE_DISPLACEMENT_MAP_ELEMENT: u16 = 275;
-    pub const SVGFE_DISPLACEMENT_MAP_ELEMENT_END: u16 = 276;
-    pub const SVGFE_DISTANT_LIGHT_ELEMENT: u16 = 276;
-    pub const SVGFE_DISTANT_LIGHT_ELEMENT_END: u16 = 277;
-    pub const SVGFE_DROP_SHADOW_ELEMENT: u16 = 277;
-    pub const SVGFE_DROP_SHADOW_ELEMENT_END: u16 = 278;
-    pub const SVGFE_FLOOD_ELEMENT: u16 = 278;
-    pub const SVGFE_FLOOD_ELEMENT_END: u16 = 279;
-    pub const SVGFE_GAUSSIAN_BLUR_ELEMENT: u16 = 279;
-    pub const SVGFE_GAUSSIAN_BLUR_ELEMENT_END: u16 = 280;
-    pub const SVGFE_IMAGE_ELEMENT: u16 = 280;
-    pub const SVGFE_IMAGE_ELEMENT_END: u16 = 281;
-    pub const SVGFE_MERGE_ELEMENT: u16 = 281;
-    pub const SVGFE_MERGE_ELEMENT_END: u16 = 282;
-    pub const SVGFE_MERGE_NODE_ELEMENT: u16 = 282;
-    pub const SVGFE_MERGE_NODE_ELEMENT_END: u16 = 283;
-    pub const SVGFE_MORPHOLOGY_ELEMENT: u16 = 283;
-    pub const SVGFE_MORPHOLOGY_ELEMENT_END: u16 = 284;
-    pub const SVGFE_OFFSET_ELEMENT: u16 = 284;
-    pub const SVGFE_OFFSET_ELEMENT_END: u16 = 285;
-    pub const SVGFE_POINT_LIGHT_ELEMENT: u16 = 285;
-    pub const SVGFE_POINT_LIGHT_ELEMENT_END: u16 = 286;
-    pub const SVGFE_SPECULAR_LIGHTING_ELEMENT: u16 = 286;
-    pub const SVGFE_SPECULAR_LIGHTING_ELEMENT_END: u16 = 287;
-    pub const SVGFE_SPOT_LIGHT_ELEMENT: u16 = 287;
-    pub const SVGFE_SPOT_LIGHT_ELEMENT_END: u16 = 288;
-    pub const SVGFE_TILE_ELEMENT: u16 = 288;
-    pub const SVGFE_TILE_ELEMENT_END: u16 = 289;
-    pub const SVGFE_TURBULENCE_ELEMENT: u16 = 289;
-    pub const SVGFE_TURBULENCE_ELEMENT_END: u16 = 290;
-    pub const SVG_FILTER_ELEMENT: u16 = 290;
-    pub const SVG_FILTER_ELEMENT_END: u16 = 291;
-    pub const SVG_GRADIENT_ELEMENT: u16 = 291;
-    pub const SVG_GRADIENT_ELEMENT_END: u16 = 294;
-    pub const SVG_LINEAR_GRADIENT_ELEMENT: u16 = 292;
-    pub const SVG_LINEAR_GRADIENT_ELEMENT_END: u16 = 293;
-    pub const SVG_RADIAL_GRADIENT_ELEMENT: u16 = 293;
-    pub const SVG_RADIAL_GRADIENT_ELEMENT_END: u16 = 294;
-    pub const SVG_GRAPHICS_ELEMENT: u16 = 294;
-    pub const SVG_GRAPHICS_ELEMENT_END: u16 = 317;
-    pub const SVGA_ELEMENT: u16 = 295;
-    pub const SVGA_ELEMENT_END: u16 = 296;
-    pub const SVG_DEFS_ELEMENT: u16 = 296;
-    pub const SVG_DEFS_ELEMENT_END: u16 = 297;
-    pub const SVG_FOREIGN_OBJECT_ELEMENT: u16 = 297;
-    pub const SVG_FOREIGN_OBJECT_ELEMENT_END: u16 = 298;
-    pub const SVGG_ELEMENT: u16 = 298;
-    pub const SVGG_ELEMENT_END: u16 = 299;
-    pub const SVG_GEOMETRY_ELEMENT: u16 = 299;
-    pub const SVG_GEOMETRY_ELEMENT_END: u16 = 307;
-    pub const SVG_CIRCLE_ELEMENT: u16 = 300;
-    pub const SVG_CIRCLE_ELEMENT_END: u16 = 301;
-    pub const SVG_ELLIPSE_ELEMENT: u16 = 301;
-    pub const SVG_ELLIPSE_ELEMENT_END: u16 = 302;
-    pub const SVG_LINE_ELEMENT: u16 = 302;
-    pub const SVG_LINE_ELEMENT_END: u16 = 303;
-    pub const SVG_PATH_ELEMENT: u16 = 303;
-    pub const SVG_PATH_ELEMENT_END: u16 = 304;
-    pub const SVG_POLYGON_ELEMENT: u16 = 304;
-    pub const SVG_POLYGON_ELEMENT_END: u16 = 305;
-    pub const SVG_POLYLINE_ELEMENT: u16 = 305;
-    pub const SVG_POLYLINE_ELEMENT_END: u16 = 306;
-    pub const SVG_RECT_ELEMENT: u16 = 306;
-    pub const SVG_RECT_ELEMENT_END: u16 = 307;
-    pub const SVG_IMAGE_ELEMENT: u16 = 307;
-    pub const SVG_IMAGE_ELEMENT_END: u16 = 308;
-    pub const SVGSVG_ELEMENT: u16 = 308;
-    pub const SVGSVG_ELEMENT_END: u16 = 309;
-    pub const SVG_SWITCH_ELEMENT: u16 = 309;
-    pub const SVG_SWITCH_ELEMENT_END: u16 = 310;
-    pub const SVG_SYMBOL_ELEMENT: u16 = 310;
-    pub const SVG_SYMBOL_ELEMENT_END: u16 = 311;
-    pub const SVG_TEXT_CONTENT_ELEMENT: u16 = 311;
-    pub const SVG_TEXT_CONTENT_ELEMENT_END: u16 = 316;
-    pub const SVG_TEXT_PATH_ELEMENT: u16 = 312;
-    pub const SVG_TEXT_PATH_ELEMENT_END: u16 = 313;
-    pub const SVG_TEXT_POSITIONING_ELEMENT: u16 = 313;
-    pub const SVG_TEXT_POSITIONING_ELEMENT_END: u16 = 316;
-    pub const SVGT_SPAN_ELEMENT: u16 = 314;
-    pub const SVGT_SPAN_ELEMENT_END: u16 = 315;
-    pub const SVG_TEXT_ELEMENT: u16 = 315;
-    pub const SVG_TEXT_ELEMENT_END: u16 = 316;
-    pub const SVG_USE_ELEMENT: u16 = 316;
-    pub const SVG_USE_ELEMENT_END: u16 = 317;
-    pub const SVGM_PATH_ELEMENT: u16 = 317;
-    pub const SVGM_PATH_ELEMENT_END: u16 = 318;
-    pub const SVG_MARKER_ELEMENT: u16 = 318;
-    pub const SVG_MARKER_ELEMENT_END: u16 = 319;
-    pub const SVG_MASK_ELEMENT: u16 = 319;
-    pub const SVG_MASK_ELEMENT_END: u16 = 320;
-    pub const SVG_METADATA_ELEMENT: u16 = 320;
-    pub const SVG_METADATA_ELEMENT_END: u16 = 321;
-    pub const SVG_PATTERN_ELEMENT: u16 = 321;
-    pub const SVG_PATTERN_ELEMENT_END: u16 = 322;
-    pub const SVG_SCRIPT_ELEMENT: u16 = 322;
-    pub const SVG_SCRIPT_ELEMENT_END: u16 = 323;
-    pub const SVG_STOP_ELEMENT: u16 = 323;
-    pub const SVG_STOP_ELEMENT_END: u16 = 324;
-    pub const SVG_STYLE_ELEMENT: u16 = 324;
-    pub const SVG_STYLE_ELEMENT_END: u16 = 325;
-    pub const SVG_TITLE_ELEMENT: u16 = 325;
-    pub const SVG_TITLE_ELEMENT_END: u16 = 326;
-    pub const SVG_VIEW_ELEMENT: u16 = 326;
-    pub const SVG_VIEW_ELEMENT_END: u16 = 327;
-    pub const NOTIFICATION: u16 = 327;
-    pub const NOTIFICATION_END: u16 = 328;
-    pub const OFFSCREEN_CANVAS: u16 = 328;
-    pub const OFFSCREEN_CANVAS_END: u16 = 329;
-    pub const PERFORMANCE: u16 = 329;
-    pub const PERFORMANCE_END: u16 = 330;
-    pub const PERMISSION_STATUS: u16 = 330;
-    pub const PERMISSION_STATUS_END: u16 = 331;
-    pub const SCREEN_ORIENTATION: u16 = 331;
-    pub const SCREEN_ORIENTATION_END: u16 = 332;
-    pub const SOURCE_BUFFER: u16 = 332;
-    pub const SOURCE_BUFFER_END: u16 = 333;
-    pub const SOURCE_BUFFER_LIST: u16 = 333;
-    pub const SOURCE_BUFFER_LIST_END: u16 = 334;
-    pub const TEXT_TRACK: u16 = 334;
-    pub const TEXT_TRACK_END: u16 = 335;
-    pub const TEXT_TRACK_CUE: u16 = 335;
-    pub const TEXT_TRACK_CUE_END: u16 = 337;
-    pub const VTT_CUE: u16 = 336;
-    pub const VTT_CUE_END: u16 = 337;
-    pub const TEXT_TRACK_LIST: u16 = 337;
-    pub const TEXT_TRACK_LIST_END: u16 = 338;
-    pub const VIDEO_TRACK_LIST: u16 = 338;
-    pub const VIDEO_TRACK_LIST_END: u16 = 339;
-    pub const VISUAL_VIEWPORT: u16 = 339;
-    pub const VISUAL_VIEWPORT_END: u16 = 340;
-    pub const WEB_SOCKET: u16 = 340;
-    pub const WEB_SOCKET_END: u16 = 341;
-    pub const WINDOW: u16 = 341;
-    pub const WINDOW_END: u16 = 342;
-    pub const WORKER: u16 = 342;
-    pub const WORKER_END: u16 = 343;
-    pub const WORKER_GLOBAL_SCOPE: u16 = 343;
-    pub const WORKER_GLOBAL_SCOPE_END: u16 = 345;
-    pub const DEDICATED_WORKER_GLOBAL_SCOPE: u16 = 344;
-    pub const DEDICATED_WORKER_GLOBAL_SCOPE_END: u16 = 345;
-    pub const XML_HTTP_REQUEST_EVENT_TARGET: u16 = 345;
-    pub const XML_HTTP_REQUEST_EVENT_TARGET_END: u16 = 348;
-    pub const XML_HTTP_REQUEST: u16 = 346;
-    pub const XML_HTTP_REQUEST_END: u16 = 347;
-    pub const XML_HTTP_REQUEST_UPLOAD: u16 = 347;
-    pub const XML_HTTP_REQUEST_UPLOAD_END: u16 = 348;
-    pub const EXTERNAL: u16 = 348;
-    pub const EXTERNAL_END: u16 = 349;
-    pub const FILE_LIST: u16 = 349;
-    pub const FILE_LIST_END: u16 = 350;
-    pub const FONT_FACE: u16 = 350;
-    pub const FONT_FACE_END: u16 = 351;
-    pub const FORM_DATA: u16 = 351;
-    pub const FORM_DATA_END: u16 = 352;
-    pub const GAMEPAD: u16 = 352;
-    pub const GAMEPAD_END: u16 = 353;
-    pub const GAMEPAD_BUTTON: u16 = 353;
-    pub const GAMEPAD_BUTTON_END: u16 = 354;
-    pub const GAMEPAD_HAPTIC_ACTUATOR: u16 = 354;
-    pub const GAMEPAD_HAPTIC_ACTUATOR_END: u16 = 355;
-    pub const HTML_ALL_COLLECTION: u16 = 355;
-    pub const HTML_ALL_COLLECTION_END: u16 = 356;
-    pub const HTML_COLLECTION: u16 = 356;
-    pub const HTML_COLLECTION_END: u16 = 359;
-    pub const HTML_FORM_CONTROLS_COLLECTION: u16 = 357;
-    pub const HTML_FORM_CONTROLS_COLLECTION_END: u16 = 358;
-    pub const HTML_OPTIONS_COLLECTION: u16 = 358;
-    pub const HTML_OPTIONS_COLLECTION_END: u16 = 359;
-    pub const HEADERS: u16 = 359;
-    pub const HEADERS_END: u16 = 360;
-    pub const HISTORY: u16 = 360;
-    pub const HISTORY_END: u16 = 361;
-    pub const IDB_CURSOR: u16 = 361;
-    pub const IDB_CURSOR_END: u16 = 363;
-    pub const IDB_CURSOR_WITH_VALUE: u16 = 362;
-    pub const IDB_CURSOR_WITH_VALUE_END: u16 = 363;
-    pub const IDB_FACTORY: u16 = 363;
-    pub const IDB_FACTORY_END: u16 = 364;
-    pub const IDB_INDEX: u16 = 364;
-    pub const IDB_INDEX_END: u16 = 365;
-    pub const IDB_KEY_RANGE: u16 = 365;
-    pub const IDB_KEY_RANGE_END: u16 = 366;
-    pub const IDB_OBJECT_STORE: u16 = 366;
-    pub const IDB_OBJECT_STORE_END: u16 = 367;
-    pub const IDB_RECORD: u16 = 367;
-    pub const IDB_RECORD_END: u16 = 368;
-    pub const IDLE_DEADLINE: u16 = 368;
-    pub const IDLE_DEADLINE_END: u16 = 369;
-    pub const IMAGE_BITMAP: u16 = 369;
-    pub const IMAGE_BITMAP_END: u16 = 370;
-    pub const IMAGE_DATA: u16 = 370;
-    pub const IMAGE_DATA_END: u16 = 371;
-    pub const INPUT_DEVICE_CAPABILITIES: u16 = 371;
-    pub const INPUT_DEVICE_CAPABILITIES_END: u16 = 372;
-    pub const INTERSECTION_OBSERVER: u16 = 372;
-    pub const INTERSECTION_OBSERVER_END: u16 = 373;
-    pub const INTERSECTION_OBSERVER_ENTRY: u16 = 373;
-    pub const INTERSECTION_OBSERVER_ENTRY_END: u16 = 374;
-    pub const LOCATION: u16 = 374;
-    pub const LOCATION_END: u16 = 375;
-    pub const MEDIA_CAPABILITIES: u16 = 375;
-    pub const MEDIA_CAPABILITIES_END: u16 = 376;
-    pub const MEDIA_DEVICE_INFO: u16 = 376;
-    pub const MEDIA_DEVICE_INFO_END: u16 = 378;
-    pub const INPUT_DEVICE_INFO: u16 = 377;
-    pub const INPUT_DEVICE_INFO_END: u16 = 378;
-    pub const MEDIA_ERROR: u16 = 378;
-    pub const MEDIA_ERROR_END: u16 = 379;
-    pub const MEDIA_KEY_STATUS_MAP: u16 = 379;
-    pub const MEDIA_KEY_STATUS_MAP_END: u16 = 380;
-    pub const MEDIA_KEY_SYSTEM_ACCESS: u16 = 380;
-    pub const MEDIA_KEY_SYSTEM_ACCESS_END: u16 = 381;
-    pub const MEDIA_KEYS: u16 = 381;
-    pub const MEDIA_KEYS_END: u16 = 382;
-    pub const MEDIA_LIST: u16 = 382;
-    pub const MEDIA_LIST_END: u16 = 383;
-    pub const MESSAGE_CHANNEL: u16 = 383;
-    pub const MESSAGE_CHANNEL_END: u16 = 384;
-    pub const MIME_TYPE: u16 = 384;
-    pub const MIME_TYPE_END: u16 = 385;
-    pub const MIME_TYPE_ARRAY: u16 = 385;
-    pub const MIME_TYPE_ARRAY_END: u16 = 386;
-    pub const MUTATION_OBSERVER: u16 = 386;
-    pub const MUTATION_OBSERVER_END: u16 = 387;
-    pub const MUTATION_RECORD: u16 = 387;
-    pub const MUTATION_RECORD_END: u16 = 388;
-    pub const NAMED_NODE_MAP: u16 = 388;
-    pub const NAMED_NODE_MAP_END: u16 = 389;
-    pub const NAVIGATOR: u16 = 389;
-    pub const NAVIGATOR_END: u16 = 390;
-    pub const NAVIGATOR_UA_DATA: u16 = 390;
-    pub const NAVIGATOR_UA_DATA_END: u16 = 391;
-    pub const NODE_ITERATOR: u16 = 391;
-    pub const NODE_ITERATOR_END: u16 = 392;
-    pub const NODE_LIST: u16 = 392;
-    pub const NODE_LIST_END: u16 = 394;
-    pub const RADIO_NODE_LIST: u16 = 393;
-    pub const RADIO_NODE_LIST_END: u16 = 394;
-    pub const OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D: u16 = 394;
-    pub const OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D_END: u16 = 395;
-    pub const PATH2_D: u16 = 395;
-    pub const PATH2_D_END: u16 = 396;
-    pub const PERFORMANCE_ENTRY: u16 = 396;
-    pub const PERFORMANCE_ENTRY_END: u16 = 404;
-    pub const PERFORMANCE_EVENT_TIMING: u16 = 397;
-    pub const PERFORMANCE_EVENT_TIMING_END: u16 = 398;
-    pub const PERFORMANCE_MARK: u16 = 398;
-    pub const PERFORMANCE_MARK_END: u16 = 399;
-    pub const PERFORMANCE_MEASURE: u16 = 399;
-    pub const PERFORMANCE_MEASURE_END: u16 = 400;
-    pub const PERFORMANCE_PAINT_TIMING: u16 = 400;
-    pub const PERFORMANCE_PAINT_TIMING_END: u16 = 401;
-    pub const PERFORMANCE_RESOURCE_TIMING: u16 = 401;
-    pub const PERFORMANCE_RESOURCE_TIMING_END: u16 = 403;
-    pub const PERFORMANCE_NAVIGATION_TIMING: u16 = 402;
-    pub const PERFORMANCE_NAVIGATION_TIMING_END: u16 = 403;
-    pub const VISIBILITY_STATE_ENTRY: u16 = 403;
-    pub const VISIBILITY_STATE_ENTRY_END: u16 = 404;
-    pub const PERFORMANCE_NAVIGATION: u16 = 404;
-    pub const PERFORMANCE_NAVIGATION_END: u16 = 405;
-    pub const PERFORMANCE_OBSERVER: u16 = 405;
-    pub const PERFORMANCE_OBSERVER_END: u16 = 406;
-    pub const PERFORMANCE_OBSERVER_ENTRY_LIST: u16 = 406;
-    pub const PERFORMANCE_OBSERVER_ENTRY_LIST_END: u16 = 407;
-    pub const PERFORMANCE_SERVER_TIMING: u16 = 407;
-    pub const PERFORMANCE_SERVER_TIMING_END: u16 = 408;
-    pub const PERFORMANCE_TIMING: u16 = 408;
-    pub const PERFORMANCE_TIMING_END: u16 = 409;
-    pub const PERIODIC_WAVE: u16 = 409;
-    pub const PERIODIC_WAVE_END: u16 = 410;
-    pub const PERMISSIONS: u16 = 410;
-    pub const PERMISSIONS_END: u16 = 411;
-    pub const PLUGIN: u16 = 411;
-    pub const PLUGIN_END: u16 = 412;
-    pub const PLUGIN_ARRAY: u16 = 412;
-    pub const PLUGIN_ARRAY_END: u16 = 413;
-    pub const READABLE_BYTE_STREAM_CONTROLLER: u16 = 413;
-    pub const READABLE_BYTE_STREAM_CONTROLLER_END: u16 = 414;
-    pub const READABLE_STREAM: u16 = 414;
-    pub const READABLE_STREAM_END: u16 = 415;
-    pub const READABLE_STREAM_BYOB_READER: u16 = 415;
-    pub const READABLE_STREAM_BYOB_READER_END: u16 = 416;
-    pub const READABLE_STREAM_BYOB_REQUEST: u16 = 416;
-    pub const READABLE_STREAM_BYOB_REQUEST_END: u16 = 417;
-    pub const READABLE_STREAM_DEFAULT_CONTROLLER: u16 = 417;
-    pub const READABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 418;
-    pub const READABLE_STREAM_DEFAULT_READER: u16 = 418;
-    pub const READABLE_STREAM_DEFAULT_READER_END: u16 = 419;
-    pub const REQUEST: u16 = 419;
-    pub const REQUEST_END: u16 = 420;
-    pub const RESIZE_OBSERVER: u16 = 420;
-    pub const RESIZE_OBSERVER_END: u16 = 421;
-    pub const RESIZE_OBSERVER_ENTRY: u16 = 421;
-    pub const RESIZE_OBSERVER_ENTRY_END: u16 = 422;
-    pub const RESIZE_OBSERVER_SIZE: u16 = 422;
-    pub const RESIZE_OBSERVER_SIZE_END: u16 = 423;
-    pub const RESPONSE: u16 = 423;
-    pub const RESPONSE_END: u16 = 424;
-    pub const SVG_ANGLE: u16 = 424;
-    pub const SVG_ANGLE_END: u16 = 425;
-    pub const SVG_ANIMATED_ANGLE: u16 = 425;
-    pub const SVG_ANIMATED_ANGLE_END: u16 = 426;
-    pub const SVG_ANIMATED_BOOLEAN: u16 = 426;
-    pub const SVG_ANIMATED_BOOLEAN_END: u16 = 427;
-    pub const SVG_ANIMATED_ENUMERATION: u16 = 427;
-    pub const SVG_ANIMATED_ENUMERATION_END: u16 = 428;
-    pub const SVG_ANIMATED_INTEGER: u16 = 428;
-    pub const SVG_ANIMATED_INTEGER_END: u16 = 429;
-    pub const SVG_ANIMATED_LENGTH: u16 = 429;
-    pub const SVG_ANIMATED_LENGTH_END: u16 = 430;
-    pub const SVG_ANIMATED_LENGTH_LIST: u16 = 430;
-    pub const SVG_ANIMATED_LENGTH_LIST_END: u16 = 431;
-    pub const SVG_ANIMATED_NUMBER: u16 = 431;
-    pub const SVG_ANIMATED_NUMBER_END: u16 = 432;
-    pub const SVG_ANIMATED_NUMBER_LIST: u16 = 432;
-    pub const SVG_ANIMATED_NUMBER_LIST_END: u16 = 433;
-    pub const SVG_ANIMATED_PRESERVE_ASPECT_RATIO: u16 = 433;
-    pub const SVG_ANIMATED_PRESERVE_ASPECT_RATIO_END: u16 = 434;
-    pub const SVG_ANIMATED_RECT: u16 = 434;
-    pub const SVG_ANIMATED_RECT_END: u16 = 435;
-    pub const SVG_ANIMATED_STRING: u16 = 435;
-    pub const SVG_ANIMATED_STRING_END: u16 = 436;
-    pub const SVG_ANIMATED_TRANSFORM_LIST: u16 = 436;
-    pub const SVG_ANIMATED_TRANSFORM_LIST_END: u16 = 437;
-    pub const SVG_LENGTH: u16 = 437;
-    pub const SVG_LENGTH_END: u16 = 438;
-    pub const SVG_LENGTH_LIST: u16 = 438;
-    pub const SVG_LENGTH_LIST_END: u16 = 439;
-    pub const SVG_NUMBER: u16 = 439;
-    pub const SVG_NUMBER_END: u16 = 440;
-    pub const SVG_NUMBER_LIST: u16 = 440;
-    pub const SVG_NUMBER_LIST_END: u16 = 441;
-    pub const SVG_POINT_LIST: u16 = 441;
-    pub const SVG_POINT_LIST_END: u16 = 442;
-    pub const SVG_PRESERVE_ASPECT_RATIO: u16 = 442;
-    pub const SVG_PRESERVE_ASPECT_RATIO_END: u16 = 443;
-    pub const SVG_STRING_LIST: u16 = 443;
-    pub const SVG_STRING_LIST_END: u16 = 444;
-    pub const SVG_TRANSFORM: u16 = 444;
-    pub const SVG_TRANSFORM_END: u16 = 445;
-    pub const SVG_TRANSFORM_LIST: u16 = 445;
-    pub const SVG_TRANSFORM_LIST_END: u16 = 446;
-    pub const SVG_UNIT_TYPES: u16 = 446;
-    pub const SVG_UNIT_TYPES_END: u16 = 447;
-    pub const SANITIZER: u16 = 447;
-    pub const SANITIZER_END: u16 = 448;
-    pub const SCHEDULER: u16 = 448;
-    pub const SCHEDULER_END: u16 = 449;
-    pub const SCHEDULING: u16 = 449;
-    pub const SCHEDULING_END: u16 = 450;
-    pub const SCREEN: u16 = 450;
-    pub const SCREEN_END: u16 = 451;
-    pub const SELECTION: u16 = 451;
-    pub const SELECTION_END: u16 = 452;
-    pub const STORAGE: u16 = 452;
-    pub const STORAGE_END: u16 = 453;
-    pub const STORAGE_MANAGER: u16 = 453;
-    pub const STORAGE_MANAGER_END: u16 = 454;
-    pub const STYLE_SHEET: u16 = 454;
-    pub const STYLE_SHEET_END: u16 = 456;
-    pub const CSS_STYLE_SHEET: u16 = 455;
-    pub const CSS_STYLE_SHEET_END: u16 = 456;
-    pub const STYLE_SHEET_LIST: u16 = 456;
-    pub const STYLE_SHEET_LIST_END: u16 = 457;
-    pub const SUBTLE_CRYPTO: u16 = 457;
-    pub const SUBTLE_CRYPTO_END: u16 = 458;
-    pub const TEXT_DECODER: u16 = 458;
-    pub const TEXT_DECODER_END: u16 = 459;
-    pub const TEXT_DECODER_STREAM: u16 = 459;
-    pub const TEXT_DECODER_STREAM_END: u16 = 460;
-    pub const TEXT_ENCODER: u16 = 460;
-    pub const TEXT_ENCODER_END: u16 = 461;
-    pub const TEXT_ENCODER_STREAM: u16 = 461;
-    pub const TEXT_ENCODER_STREAM_END: u16 = 462;
-    pub const TEXT_METRICS: u16 = 462;
-    pub const TEXT_METRICS_END: u16 = 463;
-    pub const TEXT_TRACK_CUE_LIST: u16 = 463;
-    pub const TEXT_TRACK_CUE_LIST_END: u16 = 464;
-    pub const TIME_RANGES: u16 = 464;
-    pub const TIME_RANGES_END: u16 = 465;
-    pub const TOUCH: u16 = 465;
-    pub const TOUCH_END: u16 = 466;
-    pub const TOUCH_LIST: u16 = 466;
-    pub const TOUCH_LIST_END: u16 = 467;
-    pub const TRANSFORM_STREAM: u16 = 467;
-    pub const TRANSFORM_STREAM_END: u16 = 468;
-    pub const TRANSFORM_STREAM_DEFAULT_CONTROLLER: u16 = 468;
-    pub const TRANSFORM_STREAM_DEFAULT_CONTROLLER_END: u16 = 469;
-    pub const TREE_WALKER: u16 = 469;
-    pub const TREE_WALKER_END: u16 = 470;
-    pub const TRUSTED_HTML: u16 = 470;
-    pub const TRUSTED_HTML_END: u16 = 471;
-    pub const TRUSTED_HTML_PARSER_OPTIONS: u16 = 471;
-    pub const TRUSTED_HTML_PARSER_OPTIONS_END: u16 = 472;
-    pub const TRUSTED_SCRIPT: u16 = 472;
-    pub const TRUSTED_SCRIPT_END: u16 = 473;
-    pub const TRUSTED_SCRIPT_URL: u16 = 473;
-    pub const TRUSTED_SCRIPT_URL_END: u16 = 474;
-    pub const TRUSTED_TYPE_POLICY: u16 = 474;
-    pub const TRUSTED_TYPE_POLICY_END: u16 = 475;
-    pub const TRUSTED_TYPE_POLICY_FACTORY: u16 = 475;
-    pub const TRUSTED_TYPE_POLICY_FACTORY_END: u16 = 476;
-    pub const URL: u16 = 476;
-    pub const URL_END: u16 = 477;
-    pub const URL_SEARCH_PARAMS: u16 = 477;
-    pub const URL_SEARCH_PARAMS_END: u16 = 478;
-    pub const USER_ACTIVATION: u16 = 478;
-    pub const USER_ACTIVATION_END: u16 = 479;
-    pub const VALIDITY_STATE: u16 = 479;
-    pub const VALIDITY_STATE_END: u16 = 480;
-    pub const VIDEO_PLAYBACK_QUALITY: u16 = 480;
-    pub const VIDEO_PLAYBACK_QUALITY_END: u16 = 481;
-    pub const VIDEO_TRACK: u16 = 481;
-    pub const VIDEO_TRACK_END: u16 = 482;
-    pub const VIEW_TRANSITION: u16 = 482;
-    pub const VIEW_TRANSITION_END: u16 = 483;
-    pub const VIEW_TRANSITION_TYPE_SET: u16 = 483;
-    pub const VIEW_TRANSITION_TYPE_SET_END: u16 = 484;
-    pub const WEB_GL_ACTIVE_INFO: u16 = 484;
-    pub const WEB_GL_ACTIVE_INFO_END: u16 = 485;
-    pub const WEB_GL_OBJECT: u16 = 485;
-    pub const WEB_GL_OBJECT_END: u16 = 492;
-    pub const WEB_GL_BUFFER: u16 = 486;
-    pub const WEB_GL_BUFFER_END: u16 = 487;
-    pub const WEB_GL_FRAMEBUFFER: u16 = 487;
-    pub const WEB_GL_FRAMEBUFFER_END: u16 = 488;
-    pub const WEB_GL_PROGRAM: u16 = 488;
-    pub const WEB_GL_PROGRAM_END: u16 = 489;
-    pub const WEB_GL_RENDERBUFFER: u16 = 489;
-    pub const WEB_GL_RENDERBUFFER_END: u16 = 490;
-    pub const WEB_GL_SHADER: u16 = 490;
-    pub const WEB_GL_SHADER_END: u16 = 491;
-    pub const WEB_GL_TEXTURE: u16 = 491;
-    pub const WEB_GL_TEXTURE_END: u16 = 492;
-    pub const WEB_GL_RENDERING_CONTEXT: u16 = 492;
-    pub const WEB_GL_RENDERING_CONTEXT_END: u16 = 493;
-    pub const WEB_GL_SHADER_PRECISION_FORMAT: u16 = 493;
-    pub const WEB_GL_SHADER_PRECISION_FORMAT_END: u16 = 494;
-    pub const WEB_GL_UNIFORM_LOCATION: u16 = 494;
-    pub const WEB_GL_UNIFORM_LOCATION_END: u16 = 495;
-    pub const WORKER_LOCATION: u16 = 495;
-    pub const WORKER_LOCATION_END: u16 = 496;
-    pub const WORKER_NAVIGATOR: u16 = 496;
-    pub const WORKER_NAVIGATOR_END: u16 = 497;
-    pub const WRITABLE_STREAM: u16 = 497;
-    pub const WRITABLE_STREAM_END: u16 = 498;
-    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER: u16 = 498;
-    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 499;
-    pub const WRITABLE_STREAM_DEFAULT_WRITER: u16 = 499;
-    pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 500;
-    pub const XML_SERIALIZER: u16 = 500;
-    pub const XML_SERIALIZER_END: u16 = 501;
-    pub const X_PATH_EVALUATOR: u16 = 501;
-    pub const X_PATH_EVALUATOR_END: u16 = 502;
-    pub const X_PATH_EXPRESSION: u16 = 502;
-    pub const X_PATH_EXPRESSION_END: u16 = 503;
-    pub const X_PATH_RESULT: u16 = 503;
-    pub const X_PATH_RESULT_END: u16 = 504;
+    pub const CSS_NUMERIC_ARRAY: u16 = 21;
+    pub const CSS_NUMERIC_ARRAY_END: u16 = 22;
+    pub const CSS_RULE: u16 = 22;
+    pub const CSS_RULE_END: u16 = 39;
+    pub const CSS_FONT_FACE_RULE: u16 = 23;
+    pub const CSS_FONT_FACE_RULE_END: u16 = 24;
+    pub const CSS_FONT_FEATURE_VALUES_RULE: u16 = 24;
+    pub const CSS_FONT_FEATURE_VALUES_RULE_END: u16 = 25;
+    pub const CSS_FONT_PALETTE_VALUES_RULE: u16 = 25;
+    pub const CSS_FONT_PALETTE_VALUES_RULE_END: u16 = 26;
+    pub const CSS_GROUPING_RULE: u16 = 26;
+    pub const CSS_GROUPING_RULE_END: u16 = 33;
+    pub const CSS_CONDITION_RULE: u16 = 27;
+    pub const CSS_CONDITION_RULE_END: u16 = 31;
+    pub const CSS_CONTAINER_RULE: u16 = 28;
+    pub const CSS_CONTAINER_RULE_END: u16 = 29;
+    pub const CSS_MEDIA_RULE: u16 = 29;
+    pub const CSS_MEDIA_RULE_END: u16 = 30;
+    pub const CSS_SUPPORTS_RULE: u16 = 30;
+    pub const CSS_SUPPORTS_RULE_END: u16 = 31;
+    pub const CSS_LAYER_BLOCK_RULE: u16 = 31;
+    pub const CSS_LAYER_BLOCK_RULE_END: u16 = 32;
+    pub const CSS_STYLE_RULE: u16 = 32;
+    pub const CSS_STYLE_RULE_END: u16 = 33;
+    pub const CSS_IMPORT_RULE: u16 = 33;
+    pub const CSS_IMPORT_RULE_END: u16 = 34;
+    pub const CSS_KEYFRAME_RULE: u16 = 34;
+    pub const CSS_KEYFRAME_RULE_END: u16 = 35;
+    pub const CSS_KEYFRAMES_RULE: u16 = 35;
+    pub const CSS_KEYFRAMES_RULE_END: u16 = 36;
+    pub const CSS_LAYER_STATEMENT_RULE: u16 = 36;
+    pub const CSS_LAYER_STATEMENT_RULE_END: u16 = 37;
+    pub const CSS_NAMESPACE_RULE: u16 = 37;
+    pub const CSS_NAMESPACE_RULE_END: u16 = 38;
+    pub const CSS_PROPERTY_RULE: u16 = 38;
+    pub const CSS_PROPERTY_RULE_END: u16 = 39;
+    pub const CSS_RULE_LIST: u16 = 39;
+    pub const CSS_RULE_LIST_END: u16 = 40;
+    pub const CSS_STYLE_DECLARATION: u16 = 40;
+    pub const CSS_STYLE_DECLARATION_END: u16 = 43;
+    pub const CSS_FONT_FACE_DESCRIPTORS: u16 = 41;
+    pub const CSS_FONT_FACE_DESCRIPTORS_END: u16 = 42;
+    pub const CSS_STYLE_PROPERTIES: u16 = 42;
+    pub const CSS_STYLE_PROPERTIES_END: u16 = 43;
+    pub const CSS_STYLE_VALUE: u16 = 43;
+    pub const CSS_STYLE_VALUE_END: u16 = 58;
+    pub const CSS_IMAGE_VALUE: u16 = 44;
+    pub const CSS_IMAGE_VALUE_END: u16 = 45;
+    pub const CSS_KEYWORD_VALUE: u16 = 45;
+    pub const CSS_KEYWORD_VALUE_END: u16 = 46;
+    pub const CSS_NUMERIC_VALUE: u16 = 46;
+    pub const CSS_NUMERIC_VALUE_END: u16 = 56;
+    pub const CSS_MATH_VALUE: u16 = 47;
+    pub const CSS_MATH_VALUE_END: u16 = 55;
+    pub const CSS_MATH_CLAMP: u16 = 48;
+    pub const CSS_MATH_CLAMP_END: u16 = 49;
+    pub const CSS_MATH_INVERT: u16 = 49;
+    pub const CSS_MATH_INVERT_END: u16 = 50;
+    pub const CSS_MATH_MAX: u16 = 50;
+    pub const CSS_MATH_MAX_END: u16 = 51;
+    pub const CSS_MATH_MIN: u16 = 51;
+    pub const CSS_MATH_MIN_END: u16 = 52;
+    pub const CSS_MATH_NEGATE: u16 = 52;
+    pub const CSS_MATH_NEGATE_END: u16 = 53;
+    pub const CSS_MATH_PRODUCT: u16 = 53;
+    pub const CSS_MATH_PRODUCT_END: u16 = 54;
+    pub const CSS_MATH_SUM: u16 = 54;
+    pub const CSS_MATH_SUM_END: u16 = 55;
+    pub const CSS_UNIT_VALUE: u16 = 55;
+    pub const CSS_UNIT_VALUE_END: u16 = 56;
+    pub const CSS_TRANSFORM_VALUE: u16 = 56;
+    pub const CSS_TRANSFORM_VALUE_END: u16 = 57;
+    pub const CSS_UNPARSED_VALUE: u16 = 57;
+    pub const CSS_UNPARSED_VALUE_END: u16 = 58;
+    pub const CSS_TRANSFORM_COMPONENT: u16 = 58;
+    pub const CSS_TRANSFORM_COMPONENT_END: u16 = 67;
+    pub const CSS_MATRIX_COMPONENT: u16 = 59;
+    pub const CSS_MATRIX_COMPONENT_END: u16 = 60;
+    pub const CSS_PERSPECTIVE: u16 = 60;
+    pub const CSS_PERSPECTIVE_END: u16 = 61;
+    pub const CSS_ROTATE: u16 = 61;
+    pub const CSS_ROTATE_END: u16 = 62;
+    pub const CSS_SCALE: u16 = 62;
+    pub const CSS_SCALE_END: u16 = 63;
+    pub const CSS_SKEW: u16 = 63;
+    pub const CSS_SKEW_END: u16 = 64;
+    pub const CSS_SKEW_X: u16 = 64;
+    pub const CSS_SKEW_X_END: u16 = 65;
+    pub const CSS_SKEW_Y: u16 = 65;
+    pub const CSS_SKEW_Y_END: u16 = 66;
+    pub const CSS_TRANSLATE: u16 = 66;
+    pub const CSS_TRANSLATE_END: u16 = 67;
+    pub const CSS_VARIABLE_REFERENCE_VALUE: u16 = 67;
+    pub const CSS_VARIABLE_REFERENCE_VALUE_END: u16 = 68;
+    pub const CANVAS_GRADIENT: u16 = 68;
+    pub const CANVAS_GRADIENT_END: u16 = 69;
+    pub const CANVAS_PATTERN: u16 = 69;
+    pub const CANVAS_PATTERN_END: u16 = 70;
+    pub const CANVAS_RENDERING_CONTEXT2_D: u16 = 70;
+    pub const CANVAS_RENDERING_CONTEXT2_D_END: u16 = 71;
+    pub const CLIPBOARD_ITEM: u16 = 71;
+    pub const CLIPBOARD_ITEM_END: u16 = 72;
+    pub const COMPRESSION_STREAM: u16 = 72;
+    pub const COMPRESSION_STREAM_END: u16 = 73;
+    pub const COUNT_QUEUING_STRATEGY: u16 = 73;
+    pub const COUNT_QUEUING_STRATEGY_END: u16 = 74;
+    pub const CREDENTIAL: u16 = 74;
+    pub const CREDENTIAL_END: u16 = 79;
+    pub const FEDERATED_CREDENTIAL: u16 = 75;
+    pub const FEDERATED_CREDENTIAL_END: u16 = 76;
+    pub const IDENTITY_CREDENTIAL: u16 = 76;
+    pub const IDENTITY_CREDENTIAL_END: u16 = 77;
+    pub const PASSWORD_CREDENTIAL: u16 = 77;
+    pub const PASSWORD_CREDENTIAL_END: u16 = 78;
+    pub const PUBLIC_KEY_CREDENTIAL: u16 = 78;
+    pub const PUBLIC_KEY_CREDENTIAL_END: u16 = 79;
+    pub const CREDENTIALS_CONTAINER: u16 = 79;
+    pub const CREDENTIALS_CONTAINER_END: u16 = 80;
+    pub const CRYPTO: u16 = 80;
+    pub const CRYPTO_END: u16 = 81;
+    pub const CRYPTO_KEY: u16 = 81;
+    pub const CRYPTO_KEY_END: u16 = 82;
+    pub const CUSTOM_ELEMENT_REGISTRY: u16 = 82;
+    pub const CUSTOM_ELEMENT_REGISTRY_END: u16 = 83;
+    pub const CUSTOM_STATE_SET: u16 = 83;
+    pub const CUSTOM_STATE_SET_END: u16 = 84;
+    pub const DOM_EXCEPTION: u16 = 84;
+    pub const DOM_EXCEPTION_END: u16 = 85;
+    pub const DOM_IMPLEMENTATION: u16 = 85;
+    pub const DOM_IMPLEMENTATION_END: u16 = 86;
+    pub const DOM_MATRIX_READ_ONLY: u16 = 86;
+    pub const DOM_MATRIX_READ_ONLY_END: u16 = 88;
+    pub const DOM_MATRIX: u16 = 87;
+    pub const DOM_MATRIX_END: u16 = 88;
+    pub const DOM_PARSER: u16 = 88;
+    pub const DOM_PARSER_END: u16 = 89;
+    pub const DOM_POINT_READ_ONLY: u16 = 89;
+    pub const DOM_POINT_READ_ONLY_END: u16 = 91;
+    pub const DOM_POINT: u16 = 90;
+    pub const DOM_POINT_END: u16 = 91;
+    pub const DOM_QUAD: u16 = 91;
+    pub const DOM_QUAD_END: u16 = 92;
+    pub const DOM_RECT_LIST: u16 = 92;
+    pub const DOM_RECT_LIST_END: u16 = 93;
+    pub const DOM_RECT_READ_ONLY: u16 = 93;
+    pub const DOM_RECT_READ_ONLY_END: u16 = 95;
+    pub const DOM_RECT: u16 = 94;
+    pub const DOM_RECT_END: u16 = 95;
+    pub const DOM_STRING_LIST: u16 = 95;
+    pub const DOM_STRING_LIST_END: u16 = 96;
+    pub const DOM_STRING_MAP: u16 = 96;
+    pub const DOM_STRING_MAP_END: u16 = 97;
+    pub const DOM_TOKEN_LIST: u16 = 97;
+    pub const DOM_TOKEN_LIST_END: u16 = 98;
+    pub const DATA_TRANSFER: u16 = 98;
+    pub const DATA_TRANSFER_END: u16 = 99;
+    pub const DATA_TRANSFER_ITEM: u16 = 99;
+    pub const DATA_TRANSFER_ITEM_END: u16 = 100;
+    pub const DATA_TRANSFER_ITEM_LIST: u16 = 100;
+    pub const DATA_TRANSFER_ITEM_LIST_END: u16 = 101;
+    pub const DECOMPRESSION_STREAM: u16 = 101;
+    pub const DECOMPRESSION_STREAM_END: u16 = 102;
+    pub const ELEMENT_INTERNALS: u16 = 102;
+    pub const ELEMENT_INTERNALS_END: u16 = 103;
+    pub const EVENT: u16 = 103;
+    pub const EVENT_END: u16 = 145;
+    pub const ANIMATION_EVENT: u16 = 104;
+    pub const ANIMATION_EVENT_END: u16 = 105;
+    pub const ANIMATION_PLAYBACK_EVENT: u16 = 105;
+    pub const ANIMATION_PLAYBACK_EVENT_END: u16 = 106;
+    pub const BEFORE_UNLOAD_EVENT: u16 = 106;
+    pub const BEFORE_UNLOAD_EVENT_END: u16 = 107;
+    pub const CLIPBOARD_EVENT: u16 = 107;
+    pub const CLIPBOARD_EVENT_END: u16 = 108;
+    pub const CLOSE_EVENT: u16 = 108;
+    pub const CLOSE_EVENT_END: u16 = 109;
+    pub const COMMAND_EVENT: u16 = 109;
+    pub const COMMAND_EVENT_END: u16 = 110;
+    pub const CUSTOM_EVENT: u16 = 110;
+    pub const CUSTOM_EVENT_END: u16 = 111;
+    pub const ERROR_EVENT: u16 = 111;
+    pub const ERROR_EVENT_END: u16 = 112;
+    pub const FONT_FACE_SET_LOAD_EVENT: u16 = 112;
+    pub const FONT_FACE_SET_LOAD_EVENT_END: u16 = 113;
+    pub const FORM_DATA_EVENT: u16 = 113;
+    pub const FORM_DATA_EVENT_END: u16 = 114;
+    pub const GAMEPAD_EVENT: u16 = 114;
+    pub const GAMEPAD_EVENT_END: u16 = 115;
+    pub const HASH_CHANGE_EVENT: u16 = 115;
+    pub const HASH_CHANGE_EVENT_END: u16 = 116;
+    pub const IDB_VERSION_CHANGE_EVENT: u16 = 116;
+    pub const IDB_VERSION_CHANGE_EVENT_END: u16 = 117;
+    pub const MEDIA_ENCRYPTED_EVENT: u16 = 117;
+    pub const MEDIA_ENCRYPTED_EVENT_END: u16 = 118;
+    pub const MEDIA_KEY_MESSAGE_EVENT: u16 = 118;
+    pub const MEDIA_KEY_MESSAGE_EVENT_END: u16 = 119;
+    pub const MEDIA_QUERY_LIST_EVENT: u16 = 119;
+    pub const MEDIA_QUERY_LIST_EVENT_END: u16 = 120;
+    pub const MESSAGE_EVENT: u16 = 120;
+    pub const MESSAGE_EVENT_END: u16 = 121;
+    pub const OFFLINE_AUDIO_COMPLETION_EVENT: u16 = 121;
+    pub const OFFLINE_AUDIO_COMPLETION_EVENT_END: u16 = 122;
+    pub const PAGE_TRANSITION_EVENT: u16 = 122;
+    pub const PAGE_TRANSITION_EVENT_END: u16 = 123;
+    pub const POP_STATE_EVENT: u16 = 123;
+    pub const POP_STATE_EVENT_END: u16 = 124;
+    pub const PROGRESS_EVENT: u16 = 124;
+    pub const PROGRESS_EVENT_END: u16 = 125;
+    pub const PROMISE_REJECTION_EVENT: u16 = 125;
+    pub const PROMISE_REJECTION_EVENT_END: u16 = 126;
+    pub const SECURITY_POLICY_VIOLATION_EVENT: u16 = 126;
+    pub const SECURITY_POLICY_VIOLATION_EVENT_END: u16 = 127;
+    pub const STORAGE_EVENT: u16 = 127;
+    pub const STORAGE_EVENT_END: u16 = 128;
+    pub const SUBMIT_EVENT: u16 = 128;
+    pub const SUBMIT_EVENT_END: u16 = 129;
+    pub const TASK_PRIORITY_CHANGE_EVENT: u16 = 129;
+    pub const TASK_PRIORITY_CHANGE_EVENT_END: u16 = 130;
+    pub const TOGGLE_EVENT: u16 = 130;
+    pub const TOGGLE_EVENT_END: u16 = 131;
+    pub const TRACK_EVENT: u16 = 131;
+    pub const TRACK_EVENT_END: u16 = 132;
+    pub const TRANSITION_EVENT: u16 = 132;
+    pub const TRANSITION_EVENT_END: u16 = 133;
+    pub const UI_EVENT: u16 = 133;
+    pub const UI_EVENT_END: u16 = 144;
+    pub const COMPOSITION_EVENT: u16 = 134;
+    pub const COMPOSITION_EVENT_END: u16 = 135;
+    pub const FOCUS_EVENT: u16 = 135;
+    pub const FOCUS_EVENT_END: u16 = 136;
+    pub const INPUT_EVENT: u16 = 136;
+    pub const INPUT_EVENT_END: u16 = 137;
+    pub const KEYBOARD_EVENT: u16 = 137;
+    pub const KEYBOARD_EVENT_END: u16 = 138;
+    pub const MOUSE_EVENT: u16 = 138;
+    pub const MOUSE_EVENT_END: u16 = 142;
+    pub const DRAG_EVENT: u16 = 139;
+    pub const DRAG_EVENT_END: u16 = 140;
+    pub const POINTER_EVENT: u16 = 140;
+    pub const POINTER_EVENT_END: u16 = 141;
+    pub const WHEEL_EVENT: u16 = 141;
+    pub const WHEEL_EVENT_END: u16 = 142;
+    pub const TEXT_EVENT: u16 = 142;
+    pub const TEXT_EVENT_END: u16 = 143;
+    pub const TOUCH_EVENT: u16 = 143;
+    pub const TOUCH_EVENT_END: u16 = 144;
+    pub const WEB_GL_CONTEXT_EVENT: u16 = 144;
+    pub const WEB_GL_CONTEXT_EVENT_END: u16 = 145;
+    pub const EVENT_TARGET: u16 = 145;
+    pub const EVENT_TARGET_END: u16 = 374;
+    pub const ABORT_SIGNAL: u16 = 146;
+    pub const ABORT_SIGNAL_END: u16 = 148;
+    pub const TASK_SIGNAL: u16 = 147;
+    pub const TASK_SIGNAL_END: u16 = 148;
+    pub const ANIMATION: u16 = 148;
+    pub const ANIMATION_END: u16 = 151;
+    pub const CSS_ANIMATION: u16 = 149;
+    pub const CSS_ANIMATION_END: u16 = 150;
+    pub const CSS_TRANSITION: u16 = 150;
+    pub const CSS_TRANSITION_END: u16 = 151;
+    pub const AUDIO_NODE: u16 = 151;
+    pub const AUDIO_NODE_END: u16 = 169;
+    pub const ANALYSER_NODE: u16 = 152;
+    pub const ANALYSER_NODE_END: u16 = 153;
+    pub const AUDIO_DESTINATION_NODE: u16 = 153;
+    pub const AUDIO_DESTINATION_NODE_END: u16 = 154;
+    pub const AUDIO_SCHEDULED_SOURCE_NODE: u16 = 154;
+    pub const AUDIO_SCHEDULED_SOURCE_NODE_END: u16 = 158;
+    pub const AUDIO_BUFFER_SOURCE_NODE: u16 = 155;
+    pub const AUDIO_BUFFER_SOURCE_NODE_END: u16 = 156;
+    pub const CONSTANT_SOURCE_NODE: u16 = 156;
+    pub const CONSTANT_SOURCE_NODE_END: u16 = 157;
+    pub const OSCILLATOR_NODE: u16 = 157;
+    pub const OSCILLATOR_NODE_END: u16 = 158;
+    pub const BIQUAD_FILTER_NODE: u16 = 158;
+    pub const BIQUAD_FILTER_NODE_END: u16 = 159;
+    pub const CHANNEL_MERGER_NODE: u16 = 159;
+    pub const CHANNEL_MERGER_NODE_END: u16 = 160;
+    pub const CHANNEL_SPLITTER_NODE: u16 = 160;
+    pub const CHANNEL_SPLITTER_NODE_END: u16 = 161;
+    pub const CONVOLVER_NODE: u16 = 161;
+    pub const CONVOLVER_NODE_END: u16 = 162;
+    pub const DELAY_NODE: u16 = 162;
+    pub const DELAY_NODE_END: u16 = 163;
+    pub const DYNAMICS_COMPRESSOR_NODE: u16 = 163;
+    pub const DYNAMICS_COMPRESSOR_NODE_END: u16 = 164;
+    pub const GAIN_NODE: u16 = 164;
+    pub const GAIN_NODE_END: u16 = 165;
+    pub const IIR_FILTER_NODE: u16 = 165;
+    pub const IIR_FILTER_NODE_END: u16 = 166;
+    pub const PANNER_NODE: u16 = 166;
+    pub const PANNER_NODE_END: u16 = 167;
+    pub const STEREO_PANNER_NODE: u16 = 167;
+    pub const STEREO_PANNER_NODE_END: u16 = 168;
+    pub const WAVE_SHAPER_NODE: u16 = 168;
+    pub const WAVE_SHAPER_NODE_END: u16 = 169;
+    pub const AUDIO_TRACK_LIST: u16 = 169;
+    pub const AUDIO_TRACK_LIST_END: u16 = 170;
+    pub const BASE_AUDIO_CONTEXT: u16 = 170;
+    pub const BASE_AUDIO_CONTEXT_END: u16 = 173;
+    pub const AUDIO_CONTEXT: u16 = 171;
+    pub const AUDIO_CONTEXT_END: u16 = 172;
+    pub const OFFLINE_AUDIO_CONTEXT: u16 = 172;
+    pub const OFFLINE_AUDIO_CONTEXT_END: u16 = 173;
+    pub const BATTERY_MANAGER: u16 = 173;
+    pub const BATTERY_MANAGER_END: u16 = 174;
+    pub const BROADCAST_CHANNEL: u16 = 174;
+    pub const BROADCAST_CHANNEL_END: u16 = 175;
+    pub const CLIPBOARD: u16 = 175;
+    pub const CLIPBOARD_END: u16 = 176;
+    pub const FILE_READER: u16 = 176;
+    pub const FILE_READER_END: u16 = 177;
+    pub const FONT_FACE_SET: u16 = 177;
+    pub const FONT_FACE_SET_END: u16 = 178;
+    pub const IDB_DATABASE: u16 = 178;
+    pub const IDB_DATABASE_END: u16 = 179;
+    pub const IDB_REQUEST: u16 = 179;
+    pub const IDB_REQUEST_END: u16 = 181;
+    pub const IDB_OPEN_DB_REQUEST: u16 = 180;
+    pub const IDB_OPEN_DB_REQUEST_END: u16 = 181;
+    pub const IDB_TRANSACTION: u16 = 181;
+    pub const IDB_TRANSACTION_END: u16 = 182;
+    pub const MEDIA_DEVICES: u16 = 182;
+    pub const MEDIA_DEVICES_END: u16 = 183;
+    pub const MEDIA_KEY_SESSION: u16 = 183;
+    pub const MEDIA_KEY_SESSION_END: u16 = 184;
+    pub const MEDIA_QUERY_LIST: u16 = 184;
+    pub const MEDIA_QUERY_LIST_END: u16 = 185;
+    pub const MEDIA_SOURCE: u16 = 185;
+    pub const MEDIA_SOURCE_END: u16 = 186;
+    pub const MESSAGE_PORT: u16 = 186;
+    pub const MESSAGE_PORT_END: u16 = 187;
+    pub const NETWORK_INFORMATION: u16 = 187;
+    pub const NETWORK_INFORMATION_END: u16 = 188;
+    pub const NODE: u16 = 188;
+    pub const NODE_END: u16 = 353;
+    pub const ATTR: u16 = 189;
+    pub const ATTR_END: u16 = 190;
+    pub const CHARACTER_DATA: u16 = 190;
+    pub const CHARACTER_DATA_END: u16 = 195;
+    pub const COMMENT: u16 = 191;
+    pub const COMMENT_END: u16 = 192;
+    pub const PROCESSING_INSTRUCTION: u16 = 192;
+    pub const PROCESSING_INSTRUCTION_END: u16 = 193;
+    pub const TEXT: u16 = 193;
+    pub const TEXT_END: u16 = 195;
+    pub const CDATA_SECTION: u16 = 194;
+    pub const CDATA_SECTION_END: u16 = 195;
+    pub const DOCUMENT: u16 = 195;
+    pub const DOCUMENT_END: u16 = 198;
+    pub const HTML_DOCUMENT: u16 = 196;
+    pub const HTML_DOCUMENT_END: u16 = 197;
+    pub const XML_DOCUMENT: u16 = 197;
+    pub const XML_DOCUMENT_END: u16 = 198;
+    pub const DOCUMENT_FRAGMENT: u16 = 198;
+    pub const DOCUMENT_FRAGMENT_END: u16 = 200;
+    pub const SHADOW_ROOT: u16 = 199;
+    pub const SHADOW_ROOT_END: u16 = 200;
+    pub const DOCUMENT_TYPE: u16 = 200;
+    pub const DOCUMENT_TYPE_END: u16 = 201;
+    pub const ELEMENT: u16 = 201;
+    pub const ELEMENT_END: u16 = 353;
+    pub const HTML_ELEMENT: u16 = 202;
+    pub const HTML_ELEMENT_END: u16 = 282;
+    pub const HTML_ANCHOR_ELEMENT: u16 = 203;
+    pub const HTML_ANCHOR_ELEMENT_END: u16 = 204;
+    pub const HTML_AREA_ELEMENT: u16 = 204;
+    pub const HTML_AREA_ELEMENT_END: u16 = 205;
+    pub const HTMLBR_ELEMENT: u16 = 205;
+    pub const HTMLBR_ELEMENT_END: u16 = 206;
+    pub const HTML_BASE_ELEMENT: u16 = 206;
+    pub const HTML_BASE_ELEMENT_END: u16 = 207;
+    pub const HTML_BODY_ELEMENT: u16 = 207;
+    pub const HTML_BODY_ELEMENT_END: u16 = 208;
+    pub const HTML_BUTTON_ELEMENT: u16 = 208;
+    pub const HTML_BUTTON_ELEMENT_END: u16 = 209;
+    pub const HTML_CAMERA_ELEMENT: u16 = 209;
+    pub const HTML_CAMERA_ELEMENT_END: u16 = 210;
+    pub const HTML_CANVAS_ELEMENT: u16 = 210;
+    pub const HTML_CANVAS_ELEMENT_END: u16 = 211;
+    pub const HTMLD_LIST_ELEMENT: u16 = 211;
+    pub const HTMLD_LIST_ELEMENT_END: u16 = 212;
+    pub const HTML_DATA_ELEMENT: u16 = 212;
+    pub const HTML_DATA_ELEMENT_END: u16 = 213;
+    pub const HTML_DATA_LIST_ELEMENT: u16 = 213;
+    pub const HTML_DATA_LIST_ELEMENT_END: u16 = 214;
+    pub const HTML_DETAILS_ELEMENT: u16 = 214;
+    pub const HTML_DETAILS_ELEMENT_END: u16 = 215;
+    pub const HTML_DIALOG_ELEMENT: u16 = 215;
+    pub const HTML_DIALOG_ELEMENT_END: u16 = 216;
+    pub const HTML_DIRECTORY_ELEMENT: u16 = 216;
+    pub const HTML_DIRECTORY_ELEMENT_END: u16 = 217;
+    pub const HTML_DIV_ELEMENT: u16 = 217;
+    pub const HTML_DIV_ELEMENT_END: u16 = 218;
+    pub const HTML_EMBED_ELEMENT: u16 = 218;
+    pub const HTML_EMBED_ELEMENT_END: u16 = 219;
+    pub const HTML_FENCED_FRAME_ELEMENT: u16 = 219;
+    pub const HTML_FENCED_FRAME_ELEMENT_END: u16 = 220;
+    pub const HTML_FIELD_SET_ELEMENT: u16 = 220;
+    pub const HTML_FIELD_SET_ELEMENT_END: u16 = 221;
+    pub const HTML_FONT_ELEMENT: u16 = 221;
+    pub const HTML_FONT_ELEMENT_END: u16 = 222;
+    pub const HTML_FORM_ELEMENT: u16 = 222;
+    pub const HTML_FORM_ELEMENT_END: u16 = 223;
+    pub const HTML_FRAME_ELEMENT: u16 = 223;
+    pub const HTML_FRAME_ELEMENT_END: u16 = 224;
+    pub const HTML_FRAME_SET_ELEMENT: u16 = 224;
+    pub const HTML_FRAME_SET_ELEMENT_END: u16 = 225;
+    pub const HTML_GEOLOCATION_ELEMENT: u16 = 225;
+    pub const HTML_GEOLOCATION_ELEMENT_END: u16 = 226;
+    pub const HTMLHR_ELEMENT: u16 = 226;
+    pub const HTMLHR_ELEMENT_END: u16 = 227;
+    pub const HTML_HEAD_ELEMENT: u16 = 227;
+    pub const HTML_HEAD_ELEMENT_END: u16 = 228;
+    pub const HTML_HEADING_ELEMENT: u16 = 228;
+    pub const HTML_HEADING_ELEMENT_END: u16 = 229;
+    pub const HTML_HTML_ELEMENT: u16 = 229;
+    pub const HTML_HTML_ELEMENT_END: u16 = 230;
+    pub const HTMLI_FRAME_ELEMENT: u16 = 230;
+    pub const HTMLI_FRAME_ELEMENT_END: u16 = 231;
+    pub const HTML_IMAGE_ELEMENT: u16 = 231;
+    pub const HTML_IMAGE_ELEMENT_END: u16 = 232;
+    pub const HTML_INPUT_ELEMENT: u16 = 232;
+    pub const HTML_INPUT_ELEMENT_END: u16 = 233;
+    pub const HTML_INSTALL_ELEMENT: u16 = 233;
+    pub const HTML_INSTALL_ELEMENT_END: u16 = 234;
+    pub const HTMLLI_ELEMENT: u16 = 234;
+    pub const HTMLLI_ELEMENT_END: u16 = 235;
+    pub const HTML_LABEL_ELEMENT: u16 = 235;
+    pub const HTML_LABEL_ELEMENT_END: u16 = 236;
+    pub const HTML_LEGEND_ELEMENT: u16 = 236;
+    pub const HTML_LEGEND_ELEMENT_END: u16 = 237;
+    pub const HTML_LINK_ELEMENT: u16 = 237;
+    pub const HTML_LINK_ELEMENT_END: u16 = 238;
+    pub const HTML_MAP_ELEMENT: u16 = 238;
+    pub const HTML_MAP_ELEMENT_END: u16 = 239;
+    pub const HTML_MARQUEE_ELEMENT: u16 = 239;
+    pub const HTML_MARQUEE_ELEMENT_END: u16 = 240;
+    pub const HTML_MEDIA_ELEMENT: u16 = 240;
+    pub const HTML_MEDIA_ELEMENT_END: u16 = 243;
+    pub const HTML_AUDIO_ELEMENT: u16 = 241;
+    pub const HTML_AUDIO_ELEMENT_END: u16 = 242;
+    pub const HTML_VIDEO_ELEMENT: u16 = 242;
+    pub const HTML_VIDEO_ELEMENT_END: u16 = 243;
+    pub const HTML_MENU_ELEMENT: u16 = 243;
+    pub const HTML_MENU_ELEMENT_END: u16 = 244;
+    pub const HTML_META_ELEMENT: u16 = 244;
+    pub const HTML_META_ELEMENT_END: u16 = 245;
+    pub const HTML_METER_ELEMENT: u16 = 245;
+    pub const HTML_METER_ELEMENT_END: u16 = 246;
+    pub const HTML_MICROPHONE_ELEMENT: u16 = 246;
+    pub const HTML_MICROPHONE_ELEMENT_END: u16 = 247;
+    pub const HTML_MOD_ELEMENT: u16 = 247;
+    pub const HTML_MOD_ELEMENT_END: u16 = 248;
+    pub const HTML_MODEL_ELEMENT: u16 = 248;
+    pub const HTML_MODEL_ELEMENT_END: u16 = 249;
+    pub const HTMLO_LIST_ELEMENT: u16 = 249;
+    pub const HTMLO_LIST_ELEMENT_END: u16 = 250;
+    pub const HTML_OBJECT_ELEMENT: u16 = 250;
+    pub const HTML_OBJECT_ELEMENT_END: u16 = 251;
+    pub const HTML_OPT_GROUP_ELEMENT: u16 = 251;
+    pub const HTML_OPT_GROUP_ELEMENT_END: u16 = 252;
+    pub const HTML_OPTION_ELEMENT: u16 = 252;
+    pub const HTML_OPTION_ELEMENT_END: u16 = 253;
+    pub const HTML_OUTPUT_ELEMENT: u16 = 253;
+    pub const HTML_OUTPUT_ELEMENT_END: u16 = 254;
+    pub const HTML_PARAGRAPH_ELEMENT: u16 = 254;
+    pub const HTML_PARAGRAPH_ELEMENT_END: u16 = 255;
+    pub const HTML_PARAM_ELEMENT: u16 = 255;
+    pub const HTML_PARAM_ELEMENT_END: u16 = 256;
+    pub const HTML_PICTURE_ELEMENT: u16 = 256;
+    pub const HTML_PICTURE_ELEMENT_END: u16 = 257;
+    pub const HTML_PORTAL_ELEMENT: u16 = 257;
+    pub const HTML_PORTAL_ELEMENT_END: u16 = 258;
+    pub const HTML_PRE_ELEMENT: u16 = 258;
+    pub const HTML_PRE_ELEMENT_END: u16 = 259;
+    pub const HTML_PROGRESS_ELEMENT: u16 = 259;
+    pub const HTML_PROGRESS_ELEMENT_END: u16 = 260;
+    pub const HTML_QUOTE_ELEMENT: u16 = 260;
+    pub const HTML_QUOTE_ELEMENT_END: u16 = 261;
+    pub const HTML_SCRIPT_ELEMENT: u16 = 261;
+    pub const HTML_SCRIPT_ELEMENT_END: u16 = 262;
+    pub const HTML_SELECT_ELEMENT: u16 = 262;
+    pub const HTML_SELECT_ELEMENT_END: u16 = 263;
+    pub const HTML_SELECTED_CONTENT_ELEMENT: u16 = 263;
+    pub const HTML_SELECTED_CONTENT_ELEMENT_END: u16 = 264;
+    pub const HTML_SLOT_ELEMENT: u16 = 264;
+    pub const HTML_SLOT_ELEMENT_END: u16 = 265;
+    pub const HTML_SOURCE_ELEMENT: u16 = 265;
+    pub const HTML_SOURCE_ELEMENT_END: u16 = 266;
+    pub const HTML_SPAN_ELEMENT: u16 = 266;
+    pub const HTML_SPAN_ELEMENT_END: u16 = 267;
+    pub const HTML_STYLE_ELEMENT: u16 = 267;
+    pub const HTML_STYLE_ELEMENT_END: u16 = 268;
+    pub const HTML_TABLE_CAPTION_ELEMENT: u16 = 268;
+    pub const HTML_TABLE_CAPTION_ELEMENT_END: u16 = 269;
+    pub const HTML_TABLE_CELL_ELEMENT: u16 = 269;
+    pub const HTML_TABLE_CELL_ELEMENT_END: u16 = 270;
+    pub const HTML_TABLE_COL_ELEMENT: u16 = 270;
+    pub const HTML_TABLE_COL_ELEMENT_END: u16 = 271;
+    pub const HTML_TABLE_ELEMENT: u16 = 271;
+    pub const HTML_TABLE_ELEMENT_END: u16 = 272;
+    pub const HTML_TABLE_ROW_ELEMENT: u16 = 272;
+    pub const HTML_TABLE_ROW_ELEMENT_END: u16 = 273;
+    pub const HTML_TABLE_SECTION_ELEMENT: u16 = 273;
+    pub const HTML_TABLE_SECTION_ELEMENT_END: u16 = 274;
+    pub const HTML_TEMPLATE_ELEMENT: u16 = 274;
+    pub const HTML_TEMPLATE_ELEMENT_END: u16 = 275;
+    pub const HTML_TEXT_AREA_ELEMENT: u16 = 275;
+    pub const HTML_TEXT_AREA_ELEMENT_END: u16 = 276;
+    pub const HTML_TIME_ELEMENT: u16 = 276;
+    pub const HTML_TIME_ELEMENT_END: u16 = 277;
+    pub const HTML_TITLE_ELEMENT: u16 = 277;
+    pub const HTML_TITLE_ELEMENT_END: u16 = 278;
+    pub const HTML_TRACK_ELEMENT: u16 = 278;
+    pub const HTML_TRACK_ELEMENT_END: u16 = 279;
+    pub const HTMLU_LIST_ELEMENT: u16 = 279;
+    pub const HTMLU_LIST_ELEMENT_END: u16 = 280;
+    pub const HTML_UNKNOWN_ELEMENT: u16 = 280;
+    pub const HTML_UNKNOWN_ELEMENT_END: u16 = 281;
+    pub const HTML_USER_MEDIA_ELEMENT: u16 = 281;
+    pub const HTML_USER_MEDIA_ELEMENT_END: u16 = 282;
+    pub const SVG_ELEMENT: u16 = 282;
+    pub const SVG_ELEMENT_END: u16 = 353;
+    pub const SVG_ANIMATION_ELEMENT: u16 = 283;
+    pub const SVG_ANIMATION_ELEMENT_END: u16 = 288;
+    pub const SVG_ANIMATE_ELEMENT: u16 = 284;
+    pub const SVG_ANIMATE_ELEMENT_END: u16 = 285;
+    pub const SVG_ANIMATE_MOTION_ELEMENT: u16 = 285;
+    pub const SVG_ANIMATE_MOTION_ELEMENT_END: u16 = 286;
+    pub const SVG_ANIMATE_TRANSFORM_ELEMENT: u16 = 286;
+    pub const SVG_ANIMATE_TRANSFORM_ELEMENT_END: u16 = 287;
+    pub const SVG_SET_ELEMENT: u16 = 287;
+    pub const SVG_SET_ELEMENT_END: u16 = 288;
+    pub const SVG_CLIP_PATH_ELEMENT: u16 = 288;
+    pub const SVG_CLIP_PATH_ELEMENT_END: u16 = 289;
+    pub const SVG_COMPONENT_TRANSFER_FUNCTION_ELEMENT: u16 = 289;
+    pub const SVG_COMPONENT_TRANSFER_FUNCTION_ELEMENT_END: u16 = 294;
+    pub const SVGFE_FUNC_A_ELEMENT: u16 = 290;
+    pub const SVGFE_FUNC_A_ELEMENT_END: u16 = 291;
+    pub const SVGFE_FUNC_B_ELEMENT: u16 = 291;
+    pub const SVGFE_FUNC_B_ELEMENT_END: u16 = 292;
+    pub const SVGFE_FUNC_G_ELEMENT: u16 = 292;
+    pub const SVGFE_FUNC_G_ELEMENT_END: u16 = 293;
+    pub const SVGFE_FUNC_R_ELEMENT: u16 = 293;
+    pub const SVGFE_FUNC_R_ELEMENT_END: u16 = 294;
+    pub const SVG_DESC_ELEMENT: u16 = 294;
+    pub const SVG_DESC_ELEMENT_END: u16 = 295;
+    pub const SVGFE_BLEND_ELEMENT: u16 = 295;
+    pub const SVGFE_BLEND_ELEMENT_END: u16 = 296;
+    pub const SVGFE_COLOR_MATRIX_ELEMENT: u16 = 296;
+    pub const SVGFE_COLOR_MATRIX_ELEMENT_END: u16 = 297;
+    pub const SVGFE_COMPONENT_TRANSFER_ELEMENT: u16 = 297;
+    pub const SVGFE_COMPONENT_TRANSFER_ELEMENT_END: u16 = 298;
+    pub const SVGFE_COMPOSITE_ELEMENT: u16 = 298;
+    pub const SVGFE_COMPOSITE_ELEMENT_END: u16 = 299;
+    pub const SVGFE_CONVOLVE_MATRIX_ELEMENT: u16 = 299;
+    pub const SVGFE_CONVOLVE_MATRIX_ELEMENT_END: u16 = 300;
+    pub const SVGFE_DIFFUSE_LIGHTING_ELEMENT: u16 = 300;
+    pub const SVGFE_DIFFUSE_LIGHTING_ELEMENT_END: u16 = 301;
+    pub const SVGFE_DISPLACEMENT_MAP_ELEMENT: u16 = 301;
+    pub const SVGFE_DISPLACEMENT_MAP_ELEMENT_END: u16 = 302;
+    pub const SVGFE_DISTANT_LIGHT_ELEMENT: u16 = 302;
+    pub const SVGFE_DISTANT_LIGHT_ELEMENT_END: u16 = 303;
+    pub const SVGFE_DROP_SHADOW_ELEMENT: u16 = 303;
+    pub const SVGFE_DROP_SHADOW_ELEMENT_END: u16 = 304;
+    pub const SVGFE_FLOOD_ELEMENT: u16 = 304;
+    pub const SVGFE_FLOOD_ELEMENT_END: u16 = 305;
+    pub const SVGFE_GAUSSIAN_BLUR_ELEMENT: u16 = 305;
+    pub const SVGFE_GAUSSIAN_BLUR_ELEMENT_END: u16 = 306;
+    pub const SVGFE_IMAGE_ELEMENT: u16 = 306;
+    pub const SVGFE_IMAGE_ELEMENT_END: u16 = 307;
+    pub const SVGFE_MERGE_ELEMENT: u16 = 307;
+    pub const SVGFE_MERGE_ELEMENT_END: u16 = 308;
+    pub const SVGFE_MERGE_NODE_ELEMENT: u16 = 308;
+    pub const SVGFE_MERGE_NODE_ELEMENT_END: u16 = 309;
+    pub const SVGFE_MORPHOLOGY_ELEMENT: u16 = 309;
+    pub const SVGFE_MORPHOLOGY_ELEMENT_END: u16 = 310;
+    pub const SVGFE_OFFSET_ELEMENT: u16 = 310;
+    pub const SVGFE_OFFSET_ELEMENT_END: u16 = 311;
+    pub const SVGFE_POINT_LIGHT_ELEMENT: u16 = 311;
+    pub const SVGFE_POINT_LIGHT_ELEMENT_END: u16 = 312;
+    pub const SVGFE_SPECULAR_LIGHTING_ELEMENT: u16 = 312;
+    pub const SVGFE_SPECULAR_LIGHTING_ELEMENT_END: u16 = 313;
+    pub const SVGFE_SPOT_LIGHT_ELEMENT: u16 = 313;
+    pub const SVGFE_SPOT_LIGHT_ELEMENT_END: u16 = 314;
+    pub const SVGFE_TILE_ELEMENT: u16 = 314;
+    pub const SVGFE_TILE_ELEMENT_END: u16 = 315;
+    pub const SVGFE_TURBULENCE_ELEMENT: u16 = 315;
+    pub const SVGFE_TURBULENCE_ELEMENT_END: u16 = 316;
+    pub const SVG_FILTER_ELEMENT: u16 = 316;
+    pub const SVG_FILTER_ELEMENT_END: u16 = 317;
+    pub const SVG_GRADIENT_ELEMENT: u16 = 317;
+    pub const SVG_GRADIENT_ELEMENT_END: u16 = 320;
+    pub const SVG_LINEAR_GRADIENT_ELEMENT: u16 = 318;
+    pub const SVG_LINEAR_GRADIENT_ELEMENT_END: u16 = 319;
+    pub const SVG_RADIAL_GRADIENT_ELEMENT: u16 = 319;
+    pub const SVG_RADIAL_GRADIENT_ELEMENT_END: u16 = 320;
+    pub const SVG_GRAPHICS_ELEMENT: u16 = 320;
+    pub const SVG_GRAPHICS_ELEMENT_END: u16 = 343;
+    pub const SVGA_ELEMENT: u16 = 321;
+    pub const SVGA_ELEMENT_END: u16 = 322;
+    pub const SVG_DEFS_ELEMENT: u16 = 322;
+    pub const SVG_DEFS_ELEMENT_END: u16 = 323;
+    pub const SVG_FOREIGN_OBJECT_ELEMENT: u16 = 323;
+    pub const SVG_FOREIGN_OBJECT_ELEMENT_END: u16 = 324;
+    pub const SVGG_ELEMENT: u16 = 324;
+    pub const SVGG_ELEMENT_END: u16 = 325;
+    pub const SVG_GEOMETRY_ELEMENT: u16 = 325;
+    pub const SVG_GEOMETRY_ELEMENT_END: u16 = 333;
+    pub const SVG_CIRCLE_ELEMENT: u16 = 326;
+    pub const SVG_CIRCLE_ELEMENT_END: u16 = 327;
+    pub const SVG_ELLIPSE_ELEMENT: u16 = 327;
+    pub const SVG_ELLIPSE_ELEMENT_END: u16 = 328;
+    pub const SVG_LINE_ELEMENT: u16 = 328;
+    pub const SVG_LINE_ELEMENT_END: u16 = 329;
+    pub const SVG_PATH_ELEMENT: u16 = 329;
+    pub const SVG_PATH_ELEMENT_END: u16 = 330;
+    pub const SVG_POLYGON_ELEMENT: u16 = 330;
+    pub const SVG_POLYGON_ELEMENT_END: u16 = 331;
+    pub const SVG_POLYLINE_ELEMENT: u16 = 331;
+    pub const SVG_POLYLINE_ELEMENT_END: u16 = 332;
+    pub const SVG_RECT_ELEMENT: u16 = 332;
+    pub const SVG_RECT_ELEMENT_END: u16 = 333;
+    pub const SVG_IMAGE_ELEMENT: u16 = 333;
+    pub const SVG_IMAGE_ELEMENT_END: u16 = 334;
+    pub const SVGSVG_ELEMENT: u16 = 334;
+    pub const SVGSVG_ELEMENT_END: u16 = 335;
+    pub const SVG_SWITCH_ELEMENT: u16 = 335;
+    pub const SVG_SWITCH_ELEMENT_END: u16 = 336;
+    pub const SVG_SYMBOL_ELEMENT: u16 = 336;
+    pub const SVG_SYMBOL_ELEMENT_END: u16 = 337;
+    pub const SVG_TEXT_CONTENT_ELEMENT: u16 = 337;
+    pub const SVG_TEXT_CONTENT_ELEMENT_END: u16 = 342;
+    pub const SVG_TEXT_PATH_ELEMENT: u16 = 338;
+    pub const SVG_TEXT_PATH_ELEMENT_END: u16 = 339;
+    pub const SVG_TEXT_POSITIONING_ELEMENT: u16 = 339;
+    pub const SVG_TEXT_POSITIONING_ELEMENT_END: u16 = 342;
+    pub const SVGT_SPAN_ELEMENT: u16 = 340;
+    pub const SVGT_SPAN_ELEMENT_END: u16 = 341;
+    pub const SVG_TEXT_ELEMENT: u16 = 341;
+    pub const SVG_TEXT_ELEMENT_END: u16 = 342;
+    pub const SVG_USE_ELEMENT: u16 = 342;
+    pub const SVG_USE_ELEMENT_END: u16 = 343;
+    pub const SVGM_PATH_ELEMENT: u16 = 343;
+    pub const SVGM_PATH_ELEMENT_END: u16 = 344;
+    pub const SVG_MARKER_ELEMENT: u16 = 344;
+    pub const SVG_MARKER_ELEMENT_END: u16 = 345;
+    pub const SVG_MASK_ELEMENT: u16 = 345;
+    pub const SVG_MASK_ELEMENT_END: u16 = 346;
+    pub const SVG_METADATA_ELEMENT: u16 = 346;
+    pub const SVG_METADATA_ELEMENT_END: u16 = 347;
+    pub const SVG_PATTERN_ELEMENT: u16 = 347;
+    pub const SVG_PATTERN_ELEMENT_END: u16 = 348;
+    pub const SVG_SCRIPT_ELEMENT: u16 = 348;
+    pub const SVG_SCRIPT_ELEMENT_END: u16 = 349;
+    pub const SVG_STOP_ELEMENT: u16 = 349;
+    pub const SVG_STOP_ELEMENT_END: u16 = 350;
+    pub const SVG_STYLE_ELEMENT: u16 = 350;
+    pub const SVG_STYLE_ELEMENT_END: u16 = 351;
+    pub const SVG_TITLE_ELEMENT: u16 = 351;
+    pub const SVG_TITLE_ELEMENT_END: u16 = 352;
+    pub const SVG_VIEW_ELEMENT: u16 = 352;
+    pub const SVG_VIEW_ELEMENT_END: u16 = 353;
+    pub const NOTIFICATION: u16 = 353;
+    pub const NOTIFICATION_END: u16 = 354;
+    pub const OFFSCREEN_CANVAS: u16 = 354;
+    pub const OFFSCREEN_CANVAS_END: u16 = 355;
+    pub const PERFORMANCE: u16 = 355;
+    pub const PERFORMANCE_END: u16 = 356;
+    pub const PERMISSION_STATUS: u16 = 356;
+    pub const PERMISSION_STATUS_END: u16 = 357;
+    pub const SCREEN_ORIENTATION: u16 = 357;
+    pub const SCREEN_ORIENTATION_END: u16 = 358;
+    pub const SOURCE_BUFFER: u16 = 358;
+    pub const SOURCE_BUFFER_END: u16 = 359;
+    pub const SOURCE_BUFFER_LIST: u16 = 359;
+    pub const SOURCE_BUFFER_LIST_END: u16 = 360;
+    pub const TEXT_TRACK: u16 = 360;
+    pub const TEXT_TRACK_END: u16 = 361;
+    pub const TEXT_TRACK_CUE: u16 = 361;
+    pub const TEXT_TRACK_CUE_END: u16 = 363;
+    pub const VTT_CUE: u16 = 362;
+    pub const VTT_CUE_END: u16 = 363;
+    pub const TEXT_TRACK_LIST: u16 = 363;
+    pub const TEXT_TRACK_LIST_END: u16 = 364;
+    pub const VIDEO_TRACK_LIST: u16 = 364;
+    pub const VIDEO_TRACK_LIST_END: u16 = 365;
+    pub const VISUAL_VIEWPORT: u16 = 365;
+    pub const VISUAL_VIEWPORT_END: u16 = 366;
+    pub const WEB_SOCKET: u16 = 366;
+    pub const WEB_SOCKET_END: u16 = 367;
+    pub const WINDOW: u16 = 367;
+    pub const WINDOW_END: u16 = 368;
+    pub const WORKER: u16 = 368;
+    pub const WORKER_END: u16 = 369;
+    pub const WORKER_GLOBAL_SCOPE: u16 = 369;
+    pub const WORKER_GLOBAL_SCOPE_END: u16 = 371;
+    pub const DEDICATED_WORKER_GLOBAL_SCOPE: u16 = 370;
+    pub const DEDICATED_WORKER_GLOBAL_SCOPE_END: u16 = 371;
+    pub const XML_HTTP_REQUEST_EVENT_TARGET: u16 = 371;
+    pub const XML_HTTP_REQUEST_EVENT_TARGET_END: u16 = 374;
+    pub const XML_HTTP_REQUEST: u16 = 372;
+    pub const XML_HTTP_REQUEST_END: u16 = 373;
+    pub const XML_HTTP_REQUEST_UPLOAD: u16 = 373;
+    pub const XML_HTTP_REQUEST_UPLOAD_END: u16 = 374;
+    pub const EXTERNAL: u16 = 374;
+    pub const EXTERNAL_END: u16 = 375;
+    pub const FILE_LIST: u16 = 375;
+    pub const FILE_LIST_END: u16 = 376;
+    pub const FONT_FACE: u16 = 376;
+    pub const FONT_FACE_END: u16 = 377;
+    pub const FORM_DATA: u16 = 377;
+    pub const FORM_DATA_END: u16 = 378;
+    pub const GAMEPAD: u16 = 378;
+    pub const GAMEPAD_END: u16 = 379;
+    pub const GAMEPAD_BUTTON: u16 = 379;
+    pub const GAMEPAD_BUTTON_END: u16 = 380;
+    pub const GAMEPAD_HAPTIC_ACTUATOR: u16 = 380;
+    pub const GAMEPAD_HAPTIC_ACTUATOR_END: u16 = 381;
+    pub const HTML_ALL_COLLECTION: u16 = 381;
+    pub const HTML_ALL_COLLECTION_END: u16 = 382;
+    pub const HTML_COLLECTION: u16 = 382;
+    pub const HTML_COLLECTION_END: u16 = 385;
+    pub const HTML_FORM_CONTROLS_COLLECTION: u16 = 383;
+    pub const HTML_FORM_CONTROLS_COLLECTION_END: u16 = 384;
+    pub const HTML_OPTIONS_COLLECTION: u16 = 384;
+    pub const HTML_OPTIONS_COLLECTION_END: u16 = 385;
+    pub const HEADERS: u16 = 385;
+    pub const HEADERS_END: u16 = 386;
+    pub const HISTORY: u16 = 386;
+    pub const HISTORY_END: u16 = 387;
+    pub const IDB_CURSOR: u16 = 387;
+    pub const IDB_CURSOR_END: u16 = 389;
+    pub const IDB_CURSOR_WITH_VALUE: u16 = 388;
+    pub const IDB_CURSOR_WITH_VALUE_END: u16 = 389;
+    pub const IDB_FACTORY: u16 = 389;
+    pub const IDB_FACTORY_END: u16 = 390;
+    pub const IDB_INDEX: u16 = 390;
+    pub const IDB_INDEX_END: u16 = 391;
+    pub const IDB_KEY_RANGE: u16 = 391;
+    pub const IDB_KEY_RANGE_END: u16 = 392;
+    pub const IDB_OBJECT_STORE: u16 = 392;
+    pub const IDB_OBJECT_STORE_END: u16 = 393;
+    pub const IDB_RECORD: u16 = 393;
+    pub const IDB_RECORD_END: u16 = 394;
+    pub const IDLE_DEADLINE: u16 = 394;
+    pub const IDLE_DEADLINE_END: u16 = 395;
+    pub const IMAGE_BITMAP: u16 = 395;
+    pub const IMAGE_BITMAP_END: u16 = 396;
+    pub const IMAGE_DATA: u16 = 396;
+    pub const IMAGE_DATA_END: u16 = 397;
+    pub const INPUT_DEVICE_CAPABILITIES: u16 = 397;
+    pub const INPUT_DEVICE_CAPABILITIES_END: u16 = 398;
+    pub const INTERSECTION_OBSERVER: u16 = 398;
+    pub const INTERSECTION_OBSERVER_END: u16 = 399;
+    pub const INTERSECTION_OBSERVER_ENTRY: u16 = 399;
+    pub const INTERSECTION_OBSERVER_ENTRY_END: u16 = 400;
+    pub const LOCATION: u16 = 400;
+    pub const LOCATION_END: u16 = 401;
+    pub const MEDIA_CAPABILITIES: u16 = 401;
+    pub const MEDIA_CAPABILITIES_END: u16 = 402;
+    pub const MEDIA_DEVICE_INFO: u16 = 402;
+    pub const MEDIA_DEVICE_INFO_END: u16 = 404;
+    pub const INPUT_DEVICE_INFO: u16 = 403;
+    pub const INPUT_DEVICE_INFO_END: u16 = 404;
+    pub const MEDIA_ERROR: u16 = 404;
+    pub const MEDIA_ERROR_END: u16 = 405;
+    pub const MEDIA_KEY_STATUS_MAP: u16 = 405;
+    pub const MEDIA_KEY_STATUS_MAP_END: u16 = 406;
+    pub const MEDIA_KEY_SYSTEM_ACCESS: u16 = 406;
+    pub const MEDIA_KEY_SYSTEM_ACCESS_END: u16 = 407;
+    pub const MEDIA_KEYS: u16 = 407;
+    pub const MEDIA_KEYS_END: u16 = 408;
+    pub const MEDIA_LIST: u16 = 408;
+    pub const MEDIA_LIST_END: u16 = 409;
+    pub const MESSAGE_CHANNEL: u16 = 409;
+    pub const MESSAGE_CHANNEL_END: u16 = 410;
+    pub const MIME_TYPE: u16 = 410;
+    pub const MIME_TYPE_END: u16 = 411;
+    pub const MIME_TYPE_ARRAY: u16 = 411;
+    pub const MIME_TYPE_ARRAY_END: u16 = 412;
+    pub const MUTATION_OBSERVER: u16 = 412;
+    pub const MUTATION_OBSERVER_END: u16 = 413;
+    pub const MUTATION_RECORD: u16 = 413;
+    pub const MUTATION_RECORD_END: u16 = 414;
+    pub const NAMED_NODE_MAP: u16 = 414;
+    pub const NAMED_NODE_MAP_END: u16 = 415;
+    pub const NAVIGATOR: u16 = 415;
+    pub const NAVIGATOR_END: u16 = 416;
+    pub const NAVIGATOR_UA_DATA: u16 = 416;
+    pub const NAVIGATOR_UA_DATA_END: u16 = 417;
+    pub const NODE_ITERATOR: u16 = 417;
+    pub const NODE_ITERATOR_END: u16 = 418;
+    pub const NODE_LIST: u16 = 418;
+    pub const NODE_LIST_END: u16 = 420;
+    pub const RADIO_NODE_LIST: u16 = 419;
+    pub const RADIO_NODE_LIST_END: u16 = 420;
+    pub const OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D: u16 = 420;
+    pub const OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D_END: u16 = 421;
+    pub const PATH2_D: u16 = 421;
+    pub const PATH2_D_END: u16 = 422;
+    pub const PERFORMANCE_ENTRY: u16 = 422;
+    pub const PERFORMANCE_ENTRY_END: u16 = 430;
+    pub const PERFORMANCE_EVENT_TIMING: u16 = 423;
+    pub const PERFORMANCE_EVENT_TIMING_END: u16 = 424;
+    pub const PERFORMANCE_MARK: u16 = 424;
+    pub const PERFORMANCE_MARK_END: u16 = 425;
+    pub const PERFORMANCE_MEASURE: u16 = 425;
+    pub const PERFORMANCE_MEASURE_END: u16 = 426;
+    pub const PERFORMANCE_PAINT_TIMING: u16 = 426;
+    pub const PERFORMANCE_PAINT_TIMING_END: u16 = 427;
+    pub const PERFORMANCE_RESOURCE_TIMING: u16 = 427;
+    pub const PERFORMANCE_RESOURCE_TIMING_END: u16 = 429;
+    pub const PERFORMANCE_NAVIGATION_TIMING: u16 = 428;
+    pub const PERFORMANCE_NAVIGATION_TIMING_END: u16 = 429;
+    pub const VISIBILITY_STATE_ENTRY: u16 = 429;
+    pub const VISIBILITY_STATE_ENTRY_END: u16 = 430;
+    pub const PERFORMANCE_NAVIGATION: u16 = 430;
+    pub const PERFORMANCE_NAVIGATION_END: u16 = 431;
+    pub const PERFORMANCE_OBSERVER: u16 = 431;
+    pub const PERFORMANCE_OBSERVER_END: u16 = 432;
+    pub const PERFORMANCE_OBSERVER_ENTRY_LIST: u16 = 432;
+    pub const PERFORMANCE_OBSERVER_ENTRY_LIST_END: u16 = 433;
+    pub const PERFORMANCE_SERVER_TIMING: u16 = 433;
+    pub const PERFORMANCE_SERVER_TIMING_END: u16 = 434;
+    pub const PERFORMANCE_TIMING: u16 = 434;
+    pub const PERFORMANCE_TIMING_END: u16 = 435;
+    pub const PERIODIC_WAVE: u16 = 435;
+    pub const PERIODIC_WAVE_END: u16 = 436;
+    pub const PERMISSIONS: u16 = 436;
+    pub const PERMISSIONS_END: u16 = 437;
+    pub const PLUGIN: u16 = 437;
+    pub const PLUGIN_END: u16 = 438;
+    pub const PLUGIN_ARRAY: u16 = 438;
+    pub const PLUGIN_ARRAY_END: u16 = 439;
+    pub const READABLE_BYTE_STREAM_CONTROLLER: u16 = 439;
+    pub const READABLE_BYTE_STREAM_CONTROLLER_END: u16 = 440;
+    pub const READABLE_STREAM: u16 = 440;
+    pub const READABLE_STREAM_END: u16 = 441;
+    pub const READABLE_STREAM_BYOB_READER: u16 = 441;
+    pub const READABLE_STREAM_BYOB_READER_END: u16 = 442;
+    pub const READABLE_STREAM_BYOB_REQUEST: u16 = 442;
+    pub const READABLE_STREAM_BYOB_REQUEST_END: u16 = 443;
+    pub const READABLE_STREAM_DEFAULT_CONTROLLER: u16 = 443;
+    pub const READABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 444;
+    pub const READABLE_STREAM_DEFAULT_READER: u16 = 444;
+    pub const READABLE_STREAM_DEFAULT_READER_END: u16 = 445;
+    pub const REQUEST: u16 = 445;
+    pub const REQUEST_END: u16 = 446;
+    pub const RESIZE_OBSERVER: u16 = 446;
+    pub const RESIZE_OBSERVER_END: u16 = 447;
+    pub const RESIZE_OBSERVER_ENTRY: u16 = 447;
+    pub const RESIZE_OBSERVER_ENTRY_END: u16 = 448;
+    pub const RESIZE_OBSERVER_SIZE: u16 = 448;
+    pub const RESIZE_OBSERVER_SIZE_END: u16 = 449;
+    pub const RESPONSE: u16 = 449;
+    pub const RESPONSE_END: u16 = 450;
+    pub const SVG_ANGLE: u16 = 450;
+    pub const SVG_ANGLE_END: u16 = 451;
+    pub const SVG_ANIMATED_ANGLE: u16 = 451;
+    pub const SVG_ANIMATED_ANGLE_END: u16 = 452;
+    pub const SVG_ANIMATED_BOOLEAN: u16 = 452;
+    pub const SVG_ANIMATED_BOOLEAN_END: u16 = 453;
+    pub const SVG_ANIMATED_ENUMERATION: u16 = 453;
+    pub const SVG_ANIMATED_ENUMERATION_END: u16 = 454;
+    pub const SVG_ANIMATED_INTEGER: u16 = 454;
+    pub const SVG_ANIMATED_INTEGER_END: u16 = 455;
+    pub const SVG_ANIMATED_LENGTH: u16 = 455;
+    pub const SVG_ANIMATED_LENGTH_END: u16 = 456;
+    pub const SVG_ANIMATED_LENGTH_LIST: u16 = 456;
+    pub const SVG_ANIMATED_LENGTH_LIST_END: u16 = 457;
+    pub const SVG_ANIMATED_NUMBER: u16 = 457;
+    pub const SVG_ANIMATED_NUMBER_END: u16 = 458;
+    pub const SVG_ANIMATED_NUMBER_LIST: u16 = 458;
+    pub const SVG_ANIMATED_NUMBER_LIST_END: u16 = 459;
+    pub const SVG_ANIMATED_PRESERVE_ASPECT_RATIO: u16 = 459;
+    pub const SVG_ANIMATED_PRESERVE_ASPECT_RATIO_END: u16 = 460;
+    pub const SVG_ANIMATED_RECT: u16 = 460;
+    pub const SVG_ANIMATED_RECT_END: u16 = 461;
+    pub const SVG_ANIMATED_STRING: u16 = 461;
+    pub const SVG_ANIMATED_STRING_END: u16 = 462;
+    pub const SVG_ANIMATED_TRANSFORM_LIST: u16 = 462;
+    pub const SVG_ANIMATED_TRANSFORM_LIST_END: u16 = 463;
+    pub const SVG_LENGTH: u16 = 463;
+    pub const SVG_LENGTH_END: u16 = 464;
+    pub const SVG_LENGTH_LIST: u16 = 464;
+    pub const SVG_LENGTH_LIST_END: u16 = 465;
+    pub const SVG_NUMBER: u16 = 465;
+    pub const SVG_NUMBER_END: u16 = 466;
+    pub const SVG_NUMBER_LIST: u16 = 466;
+    pub const SVG_NUMBER_LIST_END: u16 = 467;
+    pub const SVG_POINT_LIST: u16 = 467;
+    pub const SVG_POINT_LIST_END: u16 = 468;
+    pub const SVG_PRESERVE_ASPECT_RATIO: u16 = 468;
+    pub const SVG_PRESERVE_ASPECT_RATIO_END: u16 = 469;
+    pub const SVG_STRING_LIST: u16 = 469;
+    pub const SVG_STRING_LIST_END: u16 = 470;
+    pub const SVG_TRANSFORM: u16 = 470;
+    pub const SVG_TRANSFORM_END: u16 = 471;
+    pub const SVG_TRANSFORM_LIST: u16 = 471;
+    pub const SVG_TRANSFORM_LIST_END: u16 = 472;
+    pub const SVG_UNIT_TYPES: u16 = 472;
+    pub const SVG_UNIT_TYPES_END: u16 = 473;
+    pub const SANITIZER: u16 = 473;
+    pub const SANITIZER_END: u16 = 474;
+    pub const SCHEDULER: u16 = 474;
+    pub const SCHEDULER_END: u16 = 475;
+    pub const SCHEDULING: u16 = 475;
+    pub const SCHEDULING_END: u16 = 476;
+    pub const SCREEN: u16 = 476;
+    pub const SCREEN_END: u16 = 477;
+    pub const SELECTION: u16 = 477;
+    pub const SELECTION_END: u16 = 478;
+    pub const STORAGE: u16 = 478;
+    pub const STORAGE_END: u16 = 479;
+    pub const STORAGE_MANAGER: u16 = 479;
+    pub const STORAGE_MANAGER_END: u16 = 480;
+    pub const STYLE_PROPERTY_MAP_READ_ONLY: u16 = 480;
+    pub const STYLE_PROPERTY_MAP_READ_ONLY_END: u16 = 482;
+    pub const STYLE_PROPERTY_MAP: u16 = 481;
+    pub const STYLE_PROPERTY_MAP_END: u16 = 482;
+    pub const STYLE_SHEET: u16 = 482;
+    pub const STYLE_SHEET_END: u16 = 484;
+    pub const CSS_STYLE_SHEET: u16 = 483;
+    pub const CSS_STYLE_SHEET_END: u16 = 484;
+    pub const STYLE_SHEET_LIST: u16 = 484;
+    pub const STYLE_SHEET_LIST_END: u16 = 485;
+    pub const SUBTLE_CRYPTO: u16 = 485;
+    pub const SUBTLE_CRYPTO_END: u16 = 486;
+    pub const TEXT_DECODER: u16 = 486;
+    pub const TEXT_DECODER_END: u16 = 487;
+    pub const TEXT_DECODER_STREAM: u16 = 487;
+    pub const TEXT_DECODER_STREAM_END: u16 = 488;
+    pub const TEXT_ENCODER: u16 = 488;
+    pub const TEXT_ENCODER_END: u16 = 489;
+    pub const TEXT_ENCODER_STREAM: u16 = 489;
+    pub const TEXT_ENCODER_STREAM_END: u16 = 490;
+    pub const TEXT_METRICS: u16 = 490;
+    pub const TEXT_METRICS_END: u16 = 491;
+    pub const TEXT_TRACK_CUE_LIST: u16 = 491;
+    pub const TEXT_TRACK_CUE_LIST_END: u16 = 492;
+    pub const TIME_RANGES: u16 = 492;
+    pub const TIME_RANGES_END: u16 = 493;
+    pub const TOUCH: u16 = 493;
+    pub const TOUCH_END: u16 = 494;
+    pub const TOUCH_LIST: u16 = 494;
+    pub const TOUCH_LIST_END: u16 = 495;
+    pub const TRANSFORM_STREAM: u16 = 495;
+    pub const TRANSFORM_STREAM_END: u16 = 496;
+    pub const TRANSFORM_STREAM_DEFAULT_CONTROLLER: u16 = 496;
+    pub const TRANSFORM_STREAM_DEFAULT_CONTROLLER_END: u16 = 497;
+    pub const TREE_WALKER: u16 = 497;
+    pub const TREE_WALKER_END: u16 = 498;
+    pub const TRUSTED_HTML: u16 = 498;
+    pub const TRUSTED_HTML_END: u16 = 499;
+    pub const TRUSTED_HTML_PARSER_OPTIONS: u16 = 499;
+    pub const TRUSTED_HTML_PARSER_OPTIONS_END: u16 = 500;
+    pub const TRUSTED_SCRIPT: u16 = 500;
+    pub const TRUSTED_SCRIPT_END: u16 = 501;
+    pub const TRUSTED_SCRIPT_URL: u16 = 501;
+    pub const TRUSTED_SCRIPT_URL_END: u16 = 502;
+    pub const TRUSTED_TYPE_POLICY: u16 = 502;
+    pub const TRUSTED_TYPE_POLICY_END: u16 = 503;
+    pub const TRUSTED_TYPE_POLICY_FACTORY: u16 = 503;
+    pub const TRUSTED_TYPE_POLICY_FACTORY_END: u16 = 504;
+    pub const URL: u16 = 504;
+    pub const URL_END: u16 = 505;
+    pub const URL_SEARCH_PARAMS: u16 = 505;
+    pub const URL_SEARCH_PARAMS_END: u16 = 506;
+    pub const USER_ACTIVATION: u16 = 506;
+    pub const USER_ACTIVATION_END: u16 = 507;
+    pub const VALIDITY_STATE: u16 = 507;
+    pub const VALIDITY_STATE_END: u16 = 508;
+    pub const VIDEO_PLAYBACK_QUALITY: u16 = 508;
+    pub const VIDEO_PLAYBACK_QUALITY_END: u16 = 509;
+    pub const VIDEO_TRACK: u16 = 509;
+    pub const VIDEO_TRACK_END: u16 = 510;
+    pub const VIEW_TRANSITION: u16 = 510;
+    pub const VIEW_TRANSITION_END: u16 = 511;
+    pub const VIEW_TRANSITION_TYPE_SET: u16 = 511;
+    pub const VIEW_TRANSITION_TYPE_SET_END: u16 = 512;
+    pub const WEB_GL_ACTIVE_INFO: u16 = 512;
+    pub const WEB_GL_ACTIVE_INFO_END: u16 = 513;
+    pub const WEB_GL_OBJECT: u16 = 513;
+    pub const WEB_GL_OBJECT_END: u16 = 520;
+    pub const WEB_GL_BUFFER: u16 = 514;
+    pub const WEB_GL_BUFFER_END: u16 = 515;
+    pub const WEB_GL_FRAMEBUFFER: u16 = 515;
+    pub const WEB_GL_FRAMEBUFFER_END: u16 = 516;
+    pub const WEB_GL_PROGRAM: u16 = 516;
+    pub const WEB_GL_PROGRAM_END: u16 = 517;
+    pub const WEB_GL_RENDERBUFFER: u16 = 517;
+    pub const WEB_GL_RENDERBUFFER_END: u16 = 518;
+    pub const WEB_GL_SHADER: u16 = 518;
+    pub const WEB_GL_SHADER_END: u16 = 519;
+    pub const WEB_GL_TEXTURE: u16 = 519;
+    pub const WEB_GL_TEXTURE_END: u16 = 520;
+    pub const WEB_GL_RENDERING_CONTEXT: u16 = 520;
+    pub const WEB_GL_RENDERING_CONTEXT_END: u16 = 521;
+    pub const WEB_GL_SHADER_PRECISION_FORMAT: u16 = 521;
+    pub const WEB_GL_SHADER_PRECISION_FORMAT_END: u16 = 522;
+    pub const WEB_GL_UNIFORM_LOCATION: u16 = 522;
+    pub const WEB_GL_UNIFORM_LOCATION_END: u16 = 523;
+    pub const WORKER_LOCATION: u16 = 523;
+    pub const WORKER_LOCATION_END: u16 = 524;
+    pub const WORKER_NAVIGATOR: u16 = 524;
+    pub const WORKER_NAVIGATOR_END: u16 = 525;
+    pub const WRITABLE_STREAM: u16 = 525;
+    pub const WRITABLE_STREAM_END: u16 = 526;
+    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER: u16 = 526;
+    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 527;
+    pub const WRITABLE_STREAM_DEFAULT_WRITER: u16 = 527;
+    pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 528;
+    pub const XML_SERIALIZER: u16 = 528;
+    pub const XML_SERIALIZER_END: u16 = 529;
+    pub const X_PATH_EVALUATOR: u16 = 529;
+    pub const X_PATH_EVALUATOR_END: u16 = 530;
+    pub const X_PATH_EXPRESSION: u16 = 530;
+    pub const X_PATH_EXPRESSION_END: u16 = 531;
+    pub const X_PATH_RESULT: u16 = 531;
+    pub const X_PATH_RESULT_END: u16 = 532;
     /// The number of generated interfaces.
-    pub const COUNT: usize = 503;
+    pub const COUNT: usize = 531;
 }
 
 /// The generated interfaces; the engine names an object's most derived one in `Host::interface_of`.
@@ -2215,489 +2327,517 @@ pub enum InterfaceId {
     Blob = 18,
     File = 19,
     ByteLengthQueuingStrategy = 20,
-    CSSRule = 21,
-    CSSFontFaceRule = 22,
-    CSSFontFeatureValuesRule = 23,
-    CSSFontPaletteValuesRule = 24,
-    CSSGroupingRule = 25,
-    CSSConditionRule = 26,
-    CSSContainerRule = 27,
-    CSSMediaRule = 28,
-    CSSSupportsRule = 29,
-    CSSLayerBlockRule = 30,
-    CSSStyleRule = 31,
-    CSSImportRule = 32,
-    CSSKeyframeRule = 33,
-    CSSKeyframesRule = 34,
-    CSSLayerStatementRule = 35,
-    CSSNamespaceRule = 36,
-    CSSPropertyRule = 37,
-    CSSRuleList = 38,
-    CSSStyleDeclaration = 39,
-    CSSFontFaceDescriptors = 40,
-    CSSStyleProperties = 41,
-    CanvasGradient = 42,
-    CanvasPattern = 43,
-    CanvasRenderingContext2D = 44,
-    ClipboardItem = 45,
-    CompressionStream = 46,
-    CountQueuingStrategy = 47,
-    Credential = 48,
-    FederatedCredential = 49,
-    IdentityCredential = 50,
-    PasswordCredential = 51,
-    PublicKeyCredential = 52,
-    CredentialsContainer = 53,
-    Crypto = 54,
-    CryptoKey = 55,
-    CustomElementRegistry = 56,
-    CustomStateSet = 57,
-    DOMException = 58,
-    DOMImplementation = 59,
-    DOMMatrixReadOnly = 60,
-    DOMMatrix = 61,
-    DOMParser = 62,
-    DOMPointReadOnly = 63,
-    DOMPoint = 64,
-    DOMQuad = 65,
-    DOMRectList = 66,
-    DOMRectReadOnly = 67,
-    DOMRect = 68,
-    DOMStringList = 69,
-    DOMStringMap = 70,
-    DOMTokenList = 71,
-    DataTransfer = 72,
-    DataTransferItem = 73,
-    DataTransferItemList = 74,
-    DecompressionStream = 75,
-    ElementInternals = 76,
-    Event = 77,
-    AnimationEvent = 78,
-    AnimationPlaybackEvent = 79,
-    BeforeUnloadEvent = 80,
-    ClipboardEvent = 81,
-    CloseEvent = 82,
-    CommandEvent = 83,
-    CustomEvent = 84,
-    ErrorEvent = 85,
-    FontFaceSetLoadEvent = 86,
-    FormDataEvent = 87,
-    GamepadEvent = 88,
-    HashChangeEvent = 89,
-    IDBVersionChangeEvent = 90,
-    MediaEncryptedEvent = 91,
-    MediaKeyMessageEvent = 92,
-    MediaQueryListEvent = 93,
-    MessageEvent = 94,
-    OfflineAudioCompletionEvent = 95,
-    PageTransitionEvent = 96,
-    PopStateEvent = 97,
-    ProgressEvent = 98,
-    PromiseRejectionEvent = 99,
-    SecurityPolicyViolationEvent = 100,
-    StorageEvent = 101,
-    SubmitEvent = 102,
-    TaskPriorityChangeEvent = 103,
-    ToggleEvent = 104,
-    TrackEvent = 105,
-    TransitionEvent = 106,
-    UIEvent = 107,
-    CompositionEvent = 108,
-    FocusEvent = 109,
-    InputEvent = 110,
-    KeyboardEvent = 111,
-    MouseEvent = 112,
-    DragEvent = 113,
-    PointerEvent = 114,
-    WheelEvent = 115,
-    TextEvent = 116,
-    TouchEvent = 117,
-    WebGLContextEvent = 118,
-    EventTarget = 119,
-    AbortSignal = 120,
-    TaskSignal = 121,
-    Animation = 122,
-    CSSAnimation = 123,
-    CSSTransition = 124,
-    AudioNode = 125,
-    AnalyserNode = 126,
-    AudioDestinationNode = 127,
-    AudioScheduledSourceNode = 128,
-    AudioBufferSourceNode = 129,
-    ConstantSourceNode = 130,
-    OscillatorNode = 131,
-    BiquadFilterNode = 132,
-    ChannelMergerNode = 133,
-    ChannelSplitterNode = 134,
-    ConvolverNode = 135,
-    DelayNode = 136,
-    DynamicsCompressorNode = 137,
-    GainNode = 138,
-    IIRFilterNode = 139,
-    PannerNode = 140,
-    StereoPannerNode = 141,
-    WaveShaperNode = 142,
-    AudioTrackList = 143,
-    BaseAudioContext = 144,
-    AudioContext = 145,
-    OfflineAudioContext = 146,
-    BatteryManager = 147,
-    BroadcastChannel = 148,
-    Clipboard = 149,
-    FileReader = 150,
-    FontFaceSet = 151,
-    IDBDatabase = 152,
-    IDBRequest = 153,
-    IDBOpenDBRequest = 154,
-    IDBTransaction = 155,
-    MediaDevices = 156,
-    MediaKeySession = 157,
-    MediaQueryList = 158,
-    MediaSource = 159,
-    MessagePort = 160,
-    NetworkInformation = 161,
-    Node = 162,
-    Attr = 163,
-    CharacterData = 164,
-    Comment = 165,
-    ProcessingInstruction = 166,
-    Text = 167,
-    CDATASection = 168,
-    Document = 169,
-    HTMLDocument = 170,
-    XMLDocument = 171,
-    DocumentFragment = 172,
-    ShadowRoot = 173,
-    DocumentType = 174,
-    Element = 175,
-    HTMLElement = 176,
-    HTMLAnchorElement = 177,
-    HTMLAreaElement = 178,
-    HTMLBRElement = 179,
-    HTMLBaseElement = 180,
-    HTMLBodyElement = 181,
-    HTMLButtonElement = 182,
-    HTMLCameraElement = 183,
-    HTMLCanvasElement = 184,
-    HTMLDListElement = 185,
-    HTMLDataElement = 186,
-    HTMLDataListElement = 187,
-    HTMLDetailsElement = 188,
-    HTMLDialogElement = 189,
-    HTMLDirectoryElement = 190,
-    HTMLDivElement = 191,
-    HTMLEmbedElement = 192,
-    HTMLFencedFrameElement = 193,
-    HTMLFieldSetElement = 194,
-    HTMLFontElement = 195,
-    HTMLFormElement = 196,
-    HTMLFrameElement = 197,
-    HTMLFrameSetElement = 198,
-    HTMLGeolocationElement = 199,
-    HTMLHRElement = 200,
-    HTMLHeadElement = 201,
-    HTMLHeadingElement = 202,
-    HTMLHtmlElement = 203,
-    HTMLIFrameElement = 204,
-    HTMLImageElement = 205,
-    HTMLInputElement = 206,
-    HTMLInstallElement = 207,
-    HTMLLIElement = 208,
-    HTMLLabelElement = 209,
-    HTMLLegendElement = 210,
-    HTMLLinkElement = 211,
-    HTMLMapElement = 212,
-    HTMLMarqueeElement = 213,
-    HTMLMediaElement = 214,
-    HTMLAudioElement = 215,
-    HTMLVideoElement = 216,
-    HTMLMenuElement = 217,
-    HTMLMetaElement = 218,
-    HTMLMeterElement = 219,
-    HTMLMicrophoneElement = 220,
-    HTMLModElement = 221,
-    HTMLModelElement = 222,
-    HTMLOListElement = 223,
-    HTMLObjectElement = 224,
-    HTMLOptGroupElement = 225,
-    HTMLOptionElement = 226,
-    HTMLOutputElement = 227,
-    HTMLParagraphElement = 228,
-    HTMLParamElement = 229,
-    HTMLPictureElement = 230,
-    HTMLPortalElement = 231,
-    HTMLPreElement = 232,
-    HTMLProgressElement = 233,
-    HTMLQuoteElement = 234,
-    HTMLScriptElement = 235,
-    HTMLSelectElement = 236,
-    HTMLSelectedContentElement = 237,
-    HTMLSlotElement = 238,
-    HTMLSourceElement = 239,
-    HTMLSpanElement = 240,
-    HTMLStyleElement = 241,
-    HTMLTableCaptionElement = 242,
-    HTMLTableCellElement = 243,
-    HTMLTableColElement = 244,
-    HTMLTableElement = 245,
-    HTMLTableRowElement = 246,
-    HTMLTableSectionElement = 247,
-    HTMLTemplateElement = 248,
-    HTMLTextAreaElement = 249,
-    HTMLTimeElement = 250,
-    HTMLTitleElement = 251,
-    HTMLTrackElement = 252,
-    HTMLUListElement = 253,
-    HTMLUnknownElement = 254,
-    HTMLUserMediaElement = 255,
-    SVGElement = 256,
-    SVGAnimationElement = 257,
-    SVGAnimateElement = 258,
-    SVGAnimateMotionElement = 259,
-    SVGAnimateTransformElement = 260,
-    SVGSetElement = 261,
-    SVGClipPathElement = 262,
-    SVGComponentTransferFunctionElement = 263,
-    SVGFEFuncAElement = 264,
-    SVGFEFuncBElement = 265,
-    SVGFEFuncGElement = 266,
-    SVGFEFuncRElement = 267,
-    SVGDescElement = 268,
-    SVGFEBlendElement = 269,
-    SVGFEColorMatrixElement = 270,
-    SVGFEComponentTransferElement = 271,
-    SVGFECompositeElement = 272,
-    SVGFEConvolveMatrixElement = 273,
-    SVGFEDiffuseLightingElement = 274,
-    SVGFEDisplacementMapElement = 275,
-    SVGFEDistantLightElement = 276,
-    SVGFEDropShadowElement = 277,
-    SVGFEFloodElement = 278,
-    SVGFEGaussianBlurElement = 279,
-    SVGFEImageElement = 280,
-    SVGFEMergeElement = 281,
-    SVGFEMergeNodeElement = 282,
-    SVGFEMorphologyElement = 283,
-    SVGFEOffsetElement = 284,
-    SVGFEPointLightElement = 285,
-    SVGFESpecularLightingElement = 286,
-    SVGFESpotLightElement = 287,
-    SVGFETileElement = 288,
-    SVGFETurbulenceElement = 289,
-    SVGFilterElement = 290,
-    SVGGradientElement = 291,
-    SVGLinearGradientElement = 292,
-    SVGRadialGradientElement = 293,
-    SVGGraphicsElement = 294,
-    SVGAElement = 295,
-    SVGDefsElement = 296,
-    SVGForeignObjectElement = 297,
-    SVGGElement = 298,
-    SVGGeometryElement = 299,
-    SVGCircleElement = 300,
-    SVGEllipseElement = 301,
-    SVGLineElement = 302,
-    SVGPathElement = 303,
-    SVGPolygonElement = 304,
-    SVGPolylineElement = 305,
-    SVGRectElement = 306,
-    SVGImageElement = 307,
-    SVGSVGElement = 308,
-    SVGSwitchElement = 309,
-    SVGSymbolElement = 310,
-    SVGTextContentElement = 311,
-    SVGTextPathElement = 312,
-    SVGTextPositioningElement = 313,
-    SVGTSpanElement = 314,
-    SVGTextElement = 315,
-    SVGUseElement = 316,
-    SVGMPathElement = 317,
-    SVGMarkerElement = 318,
-    SVGMaskElement = 319,
-    SVGMetadataElement = 320,
-    SVGPatternElement = 321,
-    SVGScriptElement = 322,
-    SVGStopElement = 323,
-    SVGStyleElement = 324,
-    SVGTitleElement = 325,
-    SVGViewElement = 326,
-    Notification = 327,
-    OffscreenCanvas = 328,
-    Performance = 329,
-    PermissionStatus = 330,
-    ScreenOrientation = 331,
-    SourceBuffer = 332,
-    SourceBufferList = 333,
-    TextTrack = 334,
-    TextTrackCue = 335,
-    VTTCue = 336,
-    TextTrackList = 337,
-    VideoTrackList = 338,
-    VisualViewport = 339,
-    WebSocket = 340,
-    Window = 341,
-    Worker = 342,
-    WorkerGlobalScope = 343,
-    DedicatedWorkerGlobalScope = 344,
-    XMLHttpRequestEventTarget = 345,
-    XMLHttpRequest = 346,
-    XMLHttpRequestUpload = 347,
-    External = 348,
-    FileList = 349,
-    FontFace = 350,
-    FormData = 351,
-    Gamepad = 352,
-    GamepadButton = 353,
-    GamepadHapticActuator = 354,
-    HTMLAllCollection = 355,
-    HTMLCollection = 356,
-    HTMLFormControlsCollection = 357,
-    HTMLOptionsCollection = 358,
-    Headers = 359,
-    History = 360,
-    IDBCursor = 361,
-    IDBCursorWithValue = 362,
-    IDBFactory = 363,
-    IDBIndex = 364,
-    IDBKeyRange = 365,
-    IDBObjectStore = 366,
-    IDBRecord = 367,
-    IdleDeadline = 368,
-    ImageBitmap = 369,
-    ImageData = 370,
-    InputDeviceCapabilities = 371,
-    IntersectionObserver = 372,
-    IntersectionObserverEntry = 373,
-    Location = 374,
-    MediaCapabilities = 375,
-    MediaDeviceInfo = 376,
-    InputDeviceInfo = 377,
-    MediaError = 378,
-    MediaKeyStatusMap = 379,
-    MediaKeySystemAccess = 380,
-    MediaKeys = 381,
-    MediaList = 382,
-    MessageChannel = 383,
-    MimeType = 384,
-    MimeTypeArray = 385,
-    MutationObserver = 386,
-    MutationRecord = 387,
-    NamedNodeMap = 388,
-    Navigator = 389,
-    NavigatorUAData = 390,
-    NodeIterator = 391,
-    NodeList = 392,
-    RadioNodeList = 393,
-    OffscreenCanvasRenderingContext2D = 394,
-    Path2D = 395,
-    PerformanceEntry = 396,
-    PerformanceEventTiming = 397,
-    PerformanceMark = 398,
-    PerformanceMeasure = 399,
-    PerformancePaintTiming = 400,
-    PerformanceResourceTiming = 401,
-    PerformanceNavigationTiming = 402,
-    VisibilityStateEntry = 403,
-    PerformanceNavigation = 404,
-    PerformanceObserver = 405,
-    PerformanceObserverEntryList = 406,
-    PerformanceServerTiming = 407,
-    PerformanceTiming = 408,
-    PeriodicWave = 409,
-    Permissions = 410,
-    Plugin = 411,
-    PluginArray = 412,
-    ReadableByteStreamController = 413,
-    ReadableStream = 414,
-    ReadableStreamBYOBReader = 415,
-    ReadableStreamBYOBRequest = 416,
-    ReadableStreamDefaultController = 417,
-    ReadableStreamDefaultReader = 418,
-    Request = 419,
-    ResizeObserver = 420,
-    ResizeObserverEntry = 421,
-    ResizeObserverSize = 422,
-    Response = 423,
-    SVGAngle = 424,
-    SVGAnimatedAngle = 425,
-    SVGAnimatedBoolean = 426,
-    SVGAnimatedEnumeration = 427,
-    SVGAnimatedInteger = 428,
-    SVGAnimatedLength = 429,
-    SVGAnimatedLengthList = 430,
-    SVGAnimatedNumber = 431,
-    SVGAnimatedNumberList = 432,
-    SVGAnimatedPreserveAspectRatio = 433,
-    SVGAnimatedRect = 434,
-    SVGAnimatedString = 435,
-    SVGAnimatedTransformList = 436,
-    SVGLength = 437,
-    SVGLengthList = 438,
-    SVGNumber = 439,
-    SVGNumberList = 440,
-    SVGPointList = 441,
-    SVGPreserveAspectRatio = 442,
-    SVGStringList = 443,
-    SVGTransform = 444,
-    SVGTransformList = 445,
-    SVGUnitTypes = 446,
-    Sanitizer = 447,
-    Scheduler = 448,
-    Scheduling = 449,
-    Screen = 450,
-    Selection = 451,
-    Storage = 452,
-    StorageManager = 453,
-    StyleSheet = 454,
-    CSSStyleSheet = 455,
-    StyleSheetList = 456,
-    SubtleCrypto = 457,
-    TextDecoder = 458,
-    TextDecoderStream = 459,
-    TextEncoder = 460,
-    TextEncoderStream = 461,
-    TextMetrics = 462,
-    TextTrackCueList = 463,
-    TimeRanges = 464,
-    Touch = 465,
-    TouchList = 466,
-    TransformStream = 467,
-    TransformStreamDefaultController = 468,
-    TreeWalker = 469,
-    TrustedHTML = 470,
-    TrustedHTMLParserOptions = 471,
-    TrustedScript = 472,
-    TrustedScriptURL = 473,
-    TrustedTypePolicy = 474,
-    TrustedTypePolicyFactory = 475,
-    URL = 476,
-    URLSearchParams = 477,
-    UserActivation = 478,
-    ValidityState = 479,
-    VideoPlaybackQuality = 480,
-    VideoTrack = 481,
-    ViewTransition = 482,
-    ViewTransitionTypeSet = 483,
-    WebGLActiveInfo = 484,
-    WebGLObject = 485,
-    WebGLBuffer = 486,
-    WebGLFramebuffer = 487,
-    WebGLProgram = 488,
-    WebGLRenderbuffer = 489,
-    WebGLShader = 490,
-    WebGLTexture = 491,
-    WebGLRenderingContext = 492,
-    WebGLShaderPrecisionFormat = 493,
-    WebGLUniformLocation = 494,
-    WorkerLocation = 495,
-    WorkerNavigator = 496,
-    WritableStream = 497,
-    WritableStreamDefaultController = 498,
-    WritableStreamDefaultWriter = 499,
-    XMLSerializer = 500,
-    XPathEvaluator = 501,
-    XPathExpression = 502,
-    XPathResult = 503,
+    CSSNumericArray = 21,
+    CSSRule = 22,
+    CSSFontFaceRule = 23,
+    CSSFontFeatureValuesRule = 24,
+    CSSFontPaletteValuesRule = 25,
+    CSSGroupingRule = 26,
+    CSSConditionRule = 27,
+    CSSContainerRule = 28,
+    CSSMediaRule = 29,
+    CSSSupportsRule = 30,
+    CSSLayerBlockRule = 31,
+    CSSStyleRule = 32,
+    CSSImportRule = 33,
+    CSSKeyframeRule = 34,
+    CSSKeyframesRule = 35,
+    CSSLayerStatementRule = 36,
+    CSSNamespaceRule = 37,
+    CSSPropertyRule = 38,
+    CSSRuleList = 39,
+    CSSStyleDeclaration = 40,
+    CSSFontFaceDescriptors = 41,
+    CSSStyleProperties = 42,
+    CSSStyleValue = 43,
+    CSSImageValue = 44,
+    CSSKeywordValue = 45,
+    CSSNumericValue = 46,
+    CSSMathValue = 47,
+    CSSMathClamp = 48,
+    CSSMathInvert = 49,
+    CSSMathMax = 50,
+    CSSMathMin = 51,
+    CSSMathNegate = 52,
+    CSSMathProduct = 53,
+    CSSMathSum = 54,
+    CSSUnitValue = 55,
+    CSSTransformValue = 56,
+    CSSUnparsedValue = 57,
+    CSSTransformComponent = 58,
+    CSSMatrixComponent = 59,
+    CSSPerspective = 60,
+    CSSRotate = 61,
+    CSSScale = 62,
+    CSSSkew = 63,
+    CSSSkewX = 64,
+    CSSSkewY = 65,
+    CSSTranslate = 66,
+    CSSVariableReferenceValue = 67,
+    CanvasGradient = 68,
+    CanvasPattern = 69,
+    CanvasRenderingContext2D = 70,
+    ClipboardItem = 71,
+    CompressionStream = 72,
+    CountQueuingStrategy = 73,
+    Credential = 74,
+    FederatedCredential = 75,
+    IdentityCredential = 76,
+    PasswordCredential = 77,
+    PublicKeyCredential = 78,
+    CredentialsContainer = 79,
+    Crypto = 80,
+    CryptoKey = 81,
+    CustomElementRegistry = 82,
+    CustomStateSet = 83,
+    DOMException = 84,
+    DOMImplementation = 85,
+    DOMMatrixReadOnly = 86,
+    DOMMatrix = 87,
+    DOMParser = 88,
+    DOMPointReadOnly = 89,
+    DOMPoint = 90,
+    DOMQuad = 91,
+    DOMRectList = 92,
+    DOMRectReadOnly = 93,
+    DOMRect = 94,
+    DOMStringList = 95,
+    DOMStringMap = 96,
+    DOMTokenList = 97,
+    DataTransfer = 98,
+    DataTransferItem = 99,
+    DataTransferItemList = 100,
+    DecompressionStream = 101,
+    ElementInternals = 102,
+    Event = 103,
+    AnimationEvent = 104,
+    AnimationPlaybackEvent = 105,
+    BeforeUnloadEvent = 106,
+    ClipboardEvent = 107,
+    CloseEvent = 108,
+    CommandEvent = 109,
+    CustomEvent = 110,
+    ErrorEvent = 111,
+    FontFaceSetLoadEvent = 112,
+    FormDataEvent = 113,
+    GamepadEvent = 114,
+    HashChangeEvent = 115,
+    IDBVersionChangeEvent = 116,
+    MediaEncryptedEvent = 117,
+    MediaKeyMessageEvent = 118,
+    MediaQueryListEvent = 119,
+    MessageEvent = 120,
+    OfflineAudioCompletionEvent = 121,
+    PageTransitionEvent = 122,
+    PopStateEvent = 123,
+    ProgressEvent = 124,
+    PromiseRejectionEvent = 125,
+    SecurityPolicyViolationEvent = 126,
+    StorageEvent = 127,
+    SubmitEvent = 128,
+    TaskPriorityChangeEvent = 129,
+    ToggleEvent = 130,
+    TrackEvent = 131,
+    TransitionEvent = 132,
+    UIEvent = 133,
+    CompositionEvent = 134,
+    FocusEvent = 135,
+    InputEvent = 136,
+    KeyboardEvent = 137,
+    MouseEvent = 138,
+    DragEvent = 139,
+    PointerEvent = 140,
+    WheelEvent = 141,
+    TextEvent = 142,
+    TouchEvent = 143,
+    WebGLContextEvent = 144,
+    EventTarget = 145,
+    AbortSignal = 146,
+    TaskSignal = 147,
+    Animation = 148,
+    CSSAnimation = 149,
+    CSSTransition = 150,
+    AudioNode = 151,
+    AnalyserNode = 152,
+    AudioDestinationNode = 153,
+    AudioScheduledSourceNode = 154,
+    AudioBufferSourceNode = 155,
+    ConstantSourceNode = 156,
+    OscillatorNode = 157,
+    BiquadFilterNode = 158,
+    ChannelMergerNode = 159,
+    ChannelSplitterNode = 160,
+    ConvolverNode = 161,
+    DelayNode = 162,
+    DynamicsCompressorNode = 163,
+    GainNode = 164,
+    IIRFilterNode = 165,
+    PannerNode = 166,
+    StereoPannerNode = 167,
+    WaveShaperNode = 168,
+    AudioTrackList = 169,
+    BaseAudioContext = 170,
+    AudioContext = 171,
+    OfflineAudioContext = 172,
+    BatteryManager = 173,
+    BroadcastChannel = 174,
+    Clipboard = 175,
+    FileReader = 176,
+    FontFaceSet = 177,
+    IDBDatabase = 178,
+    IDBRequest = 179,
+    IDBOpenDBRequest = 180,
+    IDBTransaction = 181,
+    MediaDevices = 182,
+    MediaKeySession = 183,
+    MediaQueryList = 184,
+    MediaSource = 185,
+    MessagePort = 186,
+    NetworkInformation = 187,
+    Node = 188,
+    Attr = 189,
+    CharacterData = 190,
+    Comment = 191,
+    ProcessingInstruction = 192,
+    Text = 193,
+    CDATASection = 194,
+    Document = 195,
+    HTMLDocument = 196,
+    XMLDocument = 197,
+    DocumentFragment = 198,
+    ShadowRoot = 199,
+    DocumentType = 200,
+    Element = 201,
+    HTMLElement = 202,
+    HTMLAnchorElement = 203,
+    HTMLAreaElement = 204,
+    HTMLBRElement = 205,
+    HTMLBaseElement = 206,
+    HTMLBodyElement = 207,
+    HTMLButtonElement = 208,
+    HTMLCameraElement = 209,
+    HTMLCanvasElement = 210,
+    HTMLDListElement = 211,
+    HTMLDataElement = 212,
+    HTMLDataListElement = 213,
+    HTMLDetailsElement = 214,
+    HTMLDialogElement = 215,
+    HTMLDirectoryElement = 216,
+    HTMLDivElement = 217,
+    HTMLEmbedElement = 218,
+    HTMLFencedFrameElement = 219,
+    HTMLFieldSetElement = 220,
+    HTMLFontElement = 221,
+    HTMLFormElement = 222,
+    HTMLFrameElement = 223,
+    HTMLFrameSetElement = 224,
+    HTMLGeolocationElement = 225,
+    HTMLHRElement = 226,
+    HTMLHeadElement = 227,
+    HTMLHeadingElement = 228,
+    HTMLHtmlElement = 229,
+    HTMLIFrameElement = 230,
+    HTMLImageElement = 231,
+    HTMLInputElement = 232,
+    HTMLInstallElement = 233,
+    HTMLLIElement = 234,
+    HTMLLabelElement = 235,
+    HTMLLegendElement = 236,
+    HTMLLinkElement = 237,
+    HTMLMapElement = 238,
+    HTMLMarqueeElement = 239,
+    HTMLMediaElement = 240,
+    HTMLAudioElement = 241,
+    HTMLVideoElement = 242,
+    HTMLMenuElement = 243,
+    HTMLMetaElement = 244,
+    HTMLMeterElement = 245,
+    HTMLMicrophoneElement = 246,
+    HTMLModElement = 247,
+    HTMLModelElement = 248,
+    HTMLOListElement = 249,
+    HTMLObjectElement = 250,
+    HTMLOptGroupElement = 251,
+    HTMLOptionElement = 252,
+    HTMLOutputElement = 253,
+    HTMLParagraphElement = 254,
+    HTMLParamElement = 255,
+    HTMLPictureElement = 256,
+    HTMLPortalElement = 257,
+    HTMLPreElement = 258,
+    HTMLProgressElement = 259,
+    HTMLQuoteElement = 260,
+    HTMLScriptElement = 261,
+    HTMLSelectElement = 262,
+    HTMLSelectedContentElement = 263,
+    HTMLSlotElement = 264,
+    HTMLSourceElement = 265,
+    HTMLSpanElement = 266,
+    HTMLStyleElement = 267,
+    HTMLTableCaptionElement = 268,
+    HTMLTableCellElement = 269,
+    HTMLTableColElement = 270,
+    HTMLTableElement = 271,
+    HTMLTableRowElement = 272,
+    HTMLTableSectionElement = 273,
+    HTMLTemplateElement = 274,
+    HTMLTextAreaElement = 275,
+    HTMLTimeElement = 276,
+    HTMLTitleElement = 277,
+    HTMLTrackElement = 278,
+    HTMLUListElement = 279,
+    HTMLUnknownElement = 280,
+    HTMLUserMediaElement = 281,
+    SVGElement = 282,
+    SVGAnimationElement = 283,
+    SVGAnimateElement = 284,
+    SVGAnimateMotionElement = 285,
+    SVGAnimateTransformElement = 286,
+    SVGSetElement = 287,
+    SVGClipPathElement = 288,
+    SVGComponentTransferFunctionElement = 289,
+    SVGFEFuncAElement = 290,
+    SVGFEFuncBElement = 291,
+    SVGFEFuncGElement = 292,
+    SVGFEFuncRElement = 293,
+    SVGDescElement = 294,
+    SVGFEBlendElement = 295,
+    SVGFEColorMatrixElement = 296,
+    SVGFEComponentTransferElement = 297,
+    SVGFECompositeElement = 298,
+    SVGFEConvolveMatrixElement = 299,
+    SVGFEDiffuseLightingElement = 300,
+    SVGFEDisplacementMapElement = 301,
+    SVGFEDistantLightElement = 302,
+    SVGFEDropShadowElement = 303,
+    SVGFEFloodElement = 304,
+    SVGFEGaussianBlurElement = 305,
+    SVGFEImageElement = 306,
+    SVGFEMergeElement = 307,
+    SVGFEMergeNodeElement = 308,
+    SVGFEMorphologyElement = 309,
+    SVGFEOffsetElement = 310,
+    SVGFEPointLightElement = 311,
+    SVGFESpecularLightingElement = 312,
+    SVGFESpotLightElement = 313,
+    SVGFETileElement = 314,
+    SVGFETurbulenceElement = 315,
+    SVGFilterElement = 316,
+    SVGGradientElement = 317,
+    SVGLinearGradientElement = 318,
+    SVGRadialGradientElement = 319,
+    SVGGraphicsElement = 320,
+    SVGAElement = 321,
+    SVGDefsElement = 322,
+    SVGForeignObjectElement = 323,
+    SVGGElement = 324,
+    SVGGeometryElement = 325,
+    SVGCircleElement = 326,
+    SVGEllipseElement = 327,
+    SVGLineElement = 328,
+    SVGPathElement = 329,
+    SVGPolygonElement = 330,
+    SVGPolylineElement = 331,
+    SVGRectElement = 332,
+    SVGImageElement = 333,
+    SVGSVGElement = 334,
+    SVGSwitchElement = 335,
+    SVGSymbolElement = 336,
+    SVGTextContentElement = 337,
+    SVGTextPathElement = 338,
+    SVGTextPositioningElement = 339,
+    SVGTSpanElement = 340,
+    SVGTextElement = 341,
+    SVGUseElement = 342,
+    SVGMPathElement = 343,
+    SVGMarkerElement = 344,
+    SVGMaskElement = 345,
+    SVGMetadataElement = 346,
+    SVGPatternElement = 347,
+    SVGScriptElement = 348,
+    SVGStopElement = 349,
+    SVGStyleElement = 350,
+    SVGTitleElement = 351,
+    SVGViewElement = 352,
+    Notification = 353,
+    OffscreenCanvas = 354,
+    Performance = 355,
+    PermissionStatus = 356,
+    ScreenOrientation = 357,
+    SourceBuffer = 358,
+    SourceBufferList = 359,
+    TextTrack = 360,
+    TextTrackCue = 361,
+    VTTCue = 362,
+    TextTrackList = 363,
+    VideoTrackList = 364,
+    VisualViewport = 365,
+    WebSocket = 366,
+    Window = 367,
+    Worker = 368,
+    WorkerGlobalScope = 369,
+    DedicatedWorkerGlobalScope = 370,
+    XMLHttpRequestEventTarget = 371,
+    XMLHttpRequest = 372,
+    XMLHttpRequestUpload = 373,
+    External = 374,
+    FileList = 375,
+    FontFace = 376,
+    FormData = 377,
+    Gamepad = 378,
+    GamepadButton = 379,
+    GamepadHapticActuator = 380,
+    HTMLAllCollection = 381,
+    HTMLCollection = 382,
+    HTMLFormControlsCollection = 383,
+    HTMLOptionsCollection = 384,
+    Headers = 385,
+    History = 386,
+    IDBCursor = 387,
+    IDBCursorWithValue = 388,
+    IDBFactory = 389,
+    IDBIndex = 390,
+    IDBKeyRange = 391,
+    IDBObjectStore = 392,
+    IDBRecord = 393,
+    IdleDeadline = 394,
+    ImageBitmap = 395,
+    ImageData = 396,
+    InputDeviceCapabilities = 397,
+    IntersectionObserver = 398,
+    IntersectionObserverEntry = 399,
+    Location = 400,
+    MediaCapabilities = 401,
+    MediaDeviceInfo = 402,
+    InputDeviceInfo = 403,
+    MediaError = 404,
+    MediaKeyStatusMap = 405,
+    MediaKeySystemAccess = 406,
+    MediaKeys = 407,
+    MediaList = 408,
+    MessageChannel = 409,
+    MimeType = 410,
+    MimeTypeArray = 411,
+    MutationObserver = 412,
+    MutationRecord = 413,
+    NamedNodeMap = 414,
+    Navigator = 415,
+    NavigatorUAData = 416,
+    NodeIterator = 417,
+    NodeList = 418,
+    RadioNodeList = 419,
+    OffscreenCanvasRenderingContext2D = 420,
+    Path2D = 421,
+    PerformanceEntry = 422,
+    PerformanceEventTiming = 423,
+    PerformanceMark = 424,
+    PerformanceMeasure = 425,
+    PerformancePaintTiming = 426,
+    PerformanceResourceTiming = 427,
+    PerformanceNavigationTiming = 428,
+    VisibilityStateEntry = 429,
+    PerformanceNavigation = 430,
+    PerformanceObserver = 431,
+    PerformanceObserverEntryList = 432,
+    PerformanceServerTiming = 433,
+    PerformanceTiming = 434,
+    PeriodicWave = 435,
+    Permissions = 436,
+    Plugin = 437,
+    PluginArray = 438,
+    ReadableByteStreamController = 439,
+    ReadableStream = 440,
+    ReadableStreamBYOBReader = 441,
+    ReadableStreamBYOBRequest = 442,
+    ReadableStreamDefaultController = 443,
+    ReadableStreamDefaultReader = 444,
+    Request = 445,
+    ResizeObserver = 446,
+    ResizeObserverEntry = 447,
+    ResizeObserverSize = 448,
+    Response = 449,
+    SVGAngle = 450,
+    SVGAnimatedAngle = 451,
+    SVGAnimatedBoolean = 452,
+    SVGAnimatedEnumeration = 453,
+    SVGAnimatedInteger = 454,
+    SVGAnimatedLength = 455,
+    SVGAnimatedLengthList = 456,
+    SVGAnimatedNumber = 457,
+    SVGAnimatedNumberList = 458,
+    SVGAnimatedPreserveAspectRatio = 459,
+    SVGAnimatedRect = 460,
+    SVGAnimatedString = 461,
+    SVGAnimatedTransformList = 462,
+    SVGLength = 463,
+    SVGLengthList = 464,
+    SVGNumber = 465,
+    SVGNumberList = 466,
+    SVGPointList = 467,
+    SVGPreserveAspectRatio = 468,
+    SVGStringList = 469,
+    SVGTransform = 470,
+    SVGTransformList = 471,
+    SVGUnitTypes = 472,
+    Sanitizer = 473,
+    Scheduler = 474,
+    Scheduling = 475,
+    Screen = 476,
+    Selection = 477,
+    Storage = 478,
+    StorageManager = 479,
+    StylePropertyMapReadOnly = 480,
+    StylePropertyMap = 481,
+    StyleSheet = 482,
+    CSSStyleSheet = 483,
+    StyleSheetList = 484,
+    SubtleCrypto = 485,
+    TextDecoder = 486,
+    TextDecoderStream = 487,
+    TextEncoder = 488,
+    TextEncoderStream = 489,
+    TextMetrics = 490,
+    TextTrackCueList = 491,
+    TimeRanges = 492,
+    Touch = 493,
+    TouchList = 494,
+    TransformStream = 495,
+    TransformStreamDefaultController = 496,
+    TreeWalker = 497,
+    TrustedHTML = 498,
+    TrustedHTMLParserOptions = 499,
+    TrustedScript = 500,
+    TrustedScriptURL = 501,
+    TrustedTypePolicy = 502,
+    TrustedTypePolicyFactory = 503,
+    URL = 504,
+    URLSearchParams = 505,
+    UserActivation = 506,
+    ValidityState = 507,
+    VideoPlaybackQuality = 508,
+    VideoTrack = 509,
+    ViewTransition = 510,
+    ViewTransitionTypeSet = 511,
+    WebGLActiveInfo = 512,
+    WebGLObject = 513,
+    WebGLBuffer = 514,
+    WebGLFramebuffer = 515,
+    WebGLProgram = 516,
+    WebGLRenderbuffer = 517,
+    WebGLShader = 518,
+    WebGLTexture = 519,
+    WebGLRenderingContext = 520,
+    WebGLShaderPrecisionFormat = 521,
+    WebGLUniformLocation = 522,
+    WorkerLocation = 523,
+    WorkerNavigator = 524,
+    WritableStream = 525,
+    WritableStreamDefaultController = 526,
+    WritableStreamDefaultWriter = 527,
+    XMLSerializer = 528,
+    XPathEvaluator = 529,
+    XPathExpression = 530,
+    XPathResult = 531,
 }
 
 impl InterfaceId {
@@ -2723,6 +2863,7 @@ impl InterfaceId {
             InterfaceId::Blob => "Blob",
             InterfaceId::File => "File",
             InterfaceId::ByteLengthQueuingStrategy => "ByteLengthQueuingStrategy",
+            InterfaceId::CSSNumericArray => "CSSNumericArray",
             InterfaceId::CSSRule => "CSSRule",
             InterfaceId::CSSFontFaceRule => "CSSFontFaceRule",
             InterfaceId::CSSFontFeatureValuesRule => "CSSFontFeatureValuesRule",
@@ -2744,6 +2885,31 @@ impl InterfaceId {
             InterfaceId::CSSStyleDeclaration => "CSSStyleDeclaration",
             InterfaceId::CSSFontFaceDescriptors => "CSSFontFaceDescriptors",
             InterfaceId::CSSStyleProperties => "CSSStyleProperties",
+            InterfaceId::CSSStyleValue => "CSSStyleValue",
+            InterfaceId::CSSImageValue => "CSSImageValue",
+            InterfaceId::CSSKeywordValue => "CSSKeywordValue",
+            InterfaceId::CSSNumericValue => "CSSNumericValue",
+            InterfaceId::CSSMathValue => "CSSMathValue",
+            InterfaceId::CSSMathClamp => "CSSMathClamp",
+            InterfaceId::CSSMathInvert => "CSSMathInvert",
+            InterfaceId::CSSMathMax => "CSSMathMax",
+            InterfaceId::CSSMathMin => "CSSMathMin",
+            InterfaceId::CSSMathNegate => "CSSMathNegate",
+            InterfaceId::CSSMathProduct => "CSSMathProduct",
+            InterfaceId::CSSMathSum => "CSSMathSum",
+            InterfaceId::CSSUnitValue => "CSSUnitValue",
+            InterfaceId::CSSTransformValue => "CSSTransformValue",
+            InterfaceId::CSSUnparsedValue => "CSSUnparsedValue",
+            InterfaceId::CSSTransformComponent => "CSSTransformComponent",
+            InterfaceId::CSSMatrixComponent => "CSSMatrixComponent",
+            InterfaceId::CSSPerspective => "CSSPerspective",
+            InterfaceId::CSSRotate => "CSSRotate",
+            InterfaceId::CSSScale => "CSSScale",
+            InterfaceId::CSSSkew => "CSSSkew",
+            InterfaceId::CSSSkewX => "CSSSkewX",
+            InterfaceId::CSSSkewY => "CSSSkewY",
+            InterfaceId::CSSTranslate => "CSSTranslate",
+            InterfaceId::CSSVariableReferenceValue => "CSSVariableReferenceValue",
             InterfaceId::CanvasGradient => "CanvasGradient",
             InterfaceId::CanvasPattern => "CanvasPattern",
             InterfaceId::CanvasRenderingContext2D => "CanvasRenderingContext2D",
@@ -3158,6 +3324,8 @@ impl InterfaceId {
             InterfaceId::Selection => "Selection",
             InterfaceId::Storage => "Storage",
             InterfaceId::StorageManager => "StorageManager",
+            InterfaceId::StylePropertyMapReadOnly => "StylePropertyMapReadOnly",
+            InterfaceId::StylePropertyMap => "StylePropertyMap",
             InterfaceId::StyleSheet => "StyleSheet",
             InterfaceId::CSSStyleSheet => "CSSStyleSheet",
             InterfaceId::StyleSheetList => "StyleSheetList",
@@ -3267,22 +3435,48 @@ pub trait Dom:
     + CSSFontFeatureValuesRuleImpl
     + CSSFontPaletteValuesRuleImpl
     + CSSGroupingRuleImpl
+    + CSSImageValueImpl
     + CSSImportRuleImpl
     + CSSKeyframeRuleImpl
     + CSSKeyframesRuleImpl
+    + CSSKeywordValueImpl
     + CSSLayerBlockRuleImpl
     + CSSLayerStatementRuleImpl
+    + CSSMathClampImpl
+    + CSSMathInvertImpl
+    + CSSMathMaxImpl
+    + CSSMathMinImpl
+    + CSSMathNegateImpl
+    + CSSMathProductImpl
+    + CSSMathSumImpl
+    + CSSMathValueImpl
+    + CSSMatrixComponentImpl
     + CSSMediaRuleImpl
     + CSSNamespaceRuleImpl
+    + CSSNumericArrayImpl
+    + CSSNumericValueImpl
+    + CSSPerspectiveImpl
     + CSSPropertyRuleImpl
+    + CSSRotateImpl
     + CSSRuleImpl
     + CSSRuleListImpl
+    + CSSScaleImpl
+    + CSSSkewImpl
+    + CSSSkewXImpl
+    + CSSSkewYImpl
     + CSSStyleDeclarationImpl
     + CSSStylePropertiesImpl
     + CSSStyleRuleImpl
     + CSSStyleSheetImpl
+    + CSSStyleValueImpl
     + CSSSupportsRuleImpl
+    + CSSTransformComponentImpl
+    + CSSTransformValueImpl
     + CSSTransitionImpl
+    + CSSTranslateImpl
+    + CSSUnitValueImpl
+    + CSSUnparsedValueImpl
+    + CSSVariableReferenceValueImpl
     + CanvasCompositingImpl
     + CanvasDrawImageImpl
     + CanvasDrawPathImpl
@@ -3713,6 +3907,8 @@ pub trait Dom:
     + StorageImpl
     + StorageEventImpl
     + StorageManagerImpl
+    + StylePropertyMapImpl
+    + StylePropertyMapReadOnlyImpl
     + StyleSheetImpl
     + StyleSheetListImpl
     + SubmitEventImpl
@@ -3857,22 +4053,48 @@ impl<T> Dom for T where
         + CSSFontFeatureValuesRuleImpl
         + CSSFontPaletteValuesRuleImpl
         + CSSGroupingRuleImpl
+        + CSSImageValueImpl
         + CSSImportRuleImpl
         + CSSKeyframeRuleImpl
         + CSSKeyframesRuleImpl
+        + CSSKeywordValueImpl
         + CSSLayerBlockRuleImpl
         + CSSLayerStatementRuleImpl
+        + CSSMathClampImpl
+        + CSSMathInvertImpl
+        + CSSMathMaxImpl
+        + CSSMathMinImpl
+        + CSSMathNegateImpl
+        + CSSMathProductImpl
+        + CSSMathSumImpl
+        + CSSMathValueImpl
+        + CSSMatrixComponentImpl
         + CSSMediaRuleImpl
         + CSSNamespaceRuleImpl
+        + CSSNumericArrayImpl
+        + CSSNumericValueImpl
+        + CSSPerspectiveImpl
         + CSSPropertyRuleImpl
+        + CSSRotateImpl
         + CSSRuleImpl
         + CSSRuleListImpl
+        + CSSScaleImpl
+        + CSSSkewImpl
+        + CSSSkewXImpl
+        + CSSSkewYImpl
         + CSSStyleDeclarationImpl
         + CSSStylePropertiesImpl
         + CSSStyleRuleImpl
         + CSSStyleSheetImpl
+        + CSSStyleValueImpl
         + CSSSupportsRuleImpl
+        + CSSTransformComponentImpl
+        + CSSTransformValueImpl
         + CSSTransitionImpl
+        + CSSTranslateImpl
+        + CSSUnitValueImpl
+        + CSSUnparsedValueImpl
+        + CSSVariableReferenceValueImpl
         + CanvasCompositingImpl
         + CanvasDrawImageImpl
         + CanvasDrawPathImpl
@@ -4303,6 +4525,8 @@ impl<T> Dom for T where
         + StorageImpl
         + StorageEventImpl
         + StorageManagerImpl
+        + StylePropertyMapImpl
+        + StylePropertyMapReadOnlyImpl
         + StyleSheetImpl
         + StyleSheetListImpl
         + SubmitEventImpl
@@ -4446,22 +4670,48 @@ macro_rules! for_each_trait {
         $m!(CSSFontFeatureValuesRuleImpl);
         $m!(CSSFontPaletteValuesRuleImpl);
         $m!(CSSGroupingRuleImpl);
+        $m!(CSSImageValueImpl);
         $m!(CSSImportRuleImpl);
         $m!(CSSKeyframeRuleImpl);
         $m!(CSSKeyframesRuleImpl);
+        $m!(CSSKeywordValueImpl);
         $m!(CSSLayerBlockRuleImpl);
         $m!(CSSLayerStatementRuleImpl);
+        $m!(CSSMathClampImpl);
+        $m!(CSSMathInvertImpl);
+        $m!(CSSMathMaxImpl);
+        $m!(CSSMathMinImpl);
+        $m!(CSSMathNegateImpl);
+        $m!(CSSMathProductImpl);
+        $m!(CSSMathSumImpl);
+        $m!(CSSMathValueImpl);
+        $m!(CSSMatrixComponentImpl);
         $m!(CSSMediaRuleImpl);
         $m!(CSSNamespaceRuleImpl);
+        $m!(CSSNumericArrayImpl);
+        $m!(CSSNumericValueImpl);
+        $m!(CSSPerspectiveImpl);
         $m!(CSSPropertyRuleImpl);
+        $m!(CSSRotateImpl);
         $m!(CSSRuleImpl);
         $m!(CSSRuleListImpl);
+        $m!(CSSScaleImpl);
+        $m!(CSSSkewImpl);
+        $m!(CSSSkewXImpl);
+        $m!(CSSSkewYImpl);
         $m!(CSSStyleDeclarationImpl);
         $m!(CSSStylePropertiesImpl);
         $m!(CSSStyleRuleImpl);
         $m!(CSSStyleSheetImpl);
+        $m!(CSSStyleValueImpl);
         $m!(CSSSupportsRuleImpl);
+        $m!(CSSTransformComponentImpl);
+        $m!(CSSTransformValueImpl);
         $m!(CSSTransitionImpl);
+        $m!(CSSTranslateImpl);
+        $m!(CSSUnitValueImpl);
+        $m!(CSSUnparsedValueImpl);
+        $m!(CSSVariableReferenceValueImpl);
         $m!(CanvasCompositingImpl);
         $m!(CanvasDrawImageImpl);
         $m!(CanvasDrawPathImpl);
@@ -4892,6 +5142,8 @@ macro_rules! for_each_trait {
         $m!(StorageImpl);
         $m!(StorageEventImpl);
         $m!(StorageManagerImpl);
+        $m!(StylePropertyMapImpl);
+        $m!(StylePropertyMapReadOnlyImpl);
         $m!(StyleSheetImpl);
         $m!(StyleSheetListImpl);
         $m!(SubmitEventImpl);
@@ -5085,6 +5337,8 @@ pub fn init_isolate<D: Dom>(
         scope,
         t_byte_length_queuing_strategy,
     );
+    let t_css_numeric_array = css_numeric_array::template::<D>(scope, None, &options);
+    st.set_template(ids::CSS_NUMERIC_ARRAY, scope, t_css_numeric_array);
     let t_css_rule = css_rule::template::<D>(scope, None, &options);
     st.set_template(ids::CSS_RULE, scope, t_css_rule);
     let t_css_font_face_rule = css_font_face_rule::template::<D>(scope, Some(t_css_rule), &options);
@@ -5154,6 +5408,76 @@ pub fn init_isolate<D: Dom>(
     let t_css_style_properties =
         css_style_properties::template::<D>(scope, Some(t_css_style_declaration), &options);
     st.set_template(ids::CSS_STYLE_PROPERTIES, scope, t_css_style_properties);
+    let t_css_style_value = css_style_value::template::<D>(scope, None, &options);
+    st.set_template(ids::CSS_STYLE_VALUE, scope, t_css_style_value);
+    let t_css_image_value =
+        css_image_value::template::<D>(scope, Some(t_css_style_value), &options);
+    st.set_template(ids::CSS_IMAGE_VALUE, scope, t_css_image_value);
+    let t_css_keyword_value =
+        css_keyword_value::template::<D>(scope, Some(t_css_style_value), &options);
+    st.set_template(ids::CSS_KEYWORD_VALUE, scope, t_css_keyword_value);
+    let t_css_numeric_value =
+        css_numeric_value::template::<D>(scope, Some(t_css_style_value), &options);
+    st.set_template(ids::CSS_NUMERIC_VALUE, scope, t_css_numeric_value);
+    let t_css_math_value =
+        css_math_value::template::<D>(scope, Some(t_css_numeric_value), &options);
+    st.set_template(ids::CSS_MATH_VALUE, scope, t_css_math_value);
+    let t_css_math_clamp = css_math_clamp::template::<D>(scope, Some(t_css_math_value), &options);
+    st.set_template(ids::CSS_MATH_CLAMP, scope, t_css_math_clamp);
+    let t_css_math_invert = css_math_invert::template::<D>(scope, Some(t_css_math_value), &options);
+    st.set_template(ids::CSS_MATH_INVERT, scope, t_css_math_invert);
+    let t_css_math_max = css_math_max::template::<D>(scope, Some(t_css_math_value), &options);
+    st.set_template(ids::CSS_MATH_MAX, scope, t_css_math_max);
+    let t_css_math_min = css_math_min::template::<D>(scope, Some(t_css_math_value), &options);
+    st.set_template(ids::CSS_MATH_MIN, scope, t_css_math_min);
+    let t_css_math_negate = css_math_negate::template::<D>(scope, Some(t_css_math_value), &options);
+    st.set_template(ids::CSS_MATH_NEGATE, scope, t_css_math_negate);
+    let t_css_math_product =
+        css_math_product::template::<D>(scope, Some(t_css_math_value), &options);
+    st.set_template(ids::CSS_MATH_PRODUCT, scope, t_css_math_product);
+    let t_css_math_sum = css_math_sum::template::<D>(scope, Some(t_css_math_value), &options);
+    st.set_template(ids::CSS_MATH_SUM, scope, t_css_math_sum);
+    let t_css_unit_value =
+        css_unit_value::template::<D>(scope, Some(t_css_numeric_value), &options);
+    st.set_template(ids::CSS_UNIT_VALUE, scope, t_css_unit_value);
+    let t_css_transform_value =
+        css_transform_value::template::<D>(scope, Some(t_css_style_value), &options);
+    st.set_template(ids::CSS_TRANSFORM_VALUE, scope, t_css_transform_value);
+    let t_css_unparsed_value =
+        css_unparsed_value::template::<D>(scope, Some(t_css_style_value), &options);
+    st.set_template(ids::CSS_UNPARSED_VALUE, scope, t_css_unparsed_value);
+    let t_css_transform_component = css_transform_component::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::CSS_TRANSFORM_COMPONENT,
+        scope,
+        t_css_transform_component,
+    );
+    let t_css_matrix_component =
+        css_matrix_component::template::<D>(scope, Some(t_css_transform_component), &options);
+    st.set_template(ids::CSS_MATRIX_COMPONENT, scope, t_css_matrix_component);
+    let t_css_perspective =
+        css_perspective::template::<D>(scope, Some(t_css_transform_component), &options);
+    st.set_template(ids::CSS_PERSPECTIVE, scope, t_css_perspective);
+    let t_css_rotate = css_rotate::template::<D>(scope, Some(t_css_transform_component), &options);
+    st.set_template(ids::CSS_ROTATE, scope, t_css_rotate);
+    let t_css_scale = css_scale::template::<D>(scope, Some(t_css_transform_component), &options);
+    st.set_template(ids::CSS_SCALE, scope, t_css_scale);
+    let t_css_skew = css_skew::template::<D>(scope, Some(t_css_transform_component), &options);
+    st.set_template(ids::CSS_SKEW, scope, t_css_skew);
+    let t_css_skew_x = css_skew_x::template::<D>(scope, Some(t_css_transform_component), &options);
+    st.set_template(ids::CSS_SKEW_X, scope, t_css_skew_x);
+    let t_css_skew_y = css_skew_y::template::<D>(scope, Some(t_css_transform_component), &options);
+    st.set_template(ids::CSS_SKEW_Y, scope, t_css_skew_y);
+    let t_css_translate =
+        css_translate::template::<D>(scope, Some(t_css_transform_component), &options);
+    st.set_template(ids::CSS_TRANSLATE, scope, t_css_translate);
+    let t_css_variable_reference_value =
+        css_variable_reference_value::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::CSS_VARIABLE_REFERENCE_VALUE,
+        scope,
+        t_css_variable_reference_value,
+    );
     let t_canvas_gradient = canvas_gradient::template::<D>(scope, None, &options);
     st.set_template(ids::CANVAS_GRADIENT, scope, t_canvas_gradient);
     let t_canvas_pattern = canvas_pattern::template::<D>(scope, None, &options);
@@ -6499,6 +6823,16 @@ pub fn init_isolate<D: Dom>(
     st.set_template(ids::STORAGE, scope, t_storage);
     let t_storage_manager = storage_manager::template::<D>(scope, None, &options);
     st.set_template(ids::STORAGE_MANAGER, scope, t_storage_manager);
+    let t_style_property_map_read_only =
+        style_property_map_read_only::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::STYLE_PROPERTY_MAP_READ_ONLY,
+        scope,
+        t_style_property_map_read_only,
+    );
+    let t_style_property_map =
+        style_property_map::template::<D>(scope, Some(t_style_property_map_read_only), &options);
+    st.set_template(ids::STYLE_PROPERTY_MAP, scope, t_style_property_map);
     let t_style_sheet = style_sheet::template::<D>(scope, None, &options);
     st.set_template(ids::STYLE_SHEET, scope, t_style_sheet);
     let t_css_style_sheet = css_style_sheet::template::<D>(scope, Some(t_style_sheet), &options);
@@ -6882,6 +7216,12 @@ pub fn install_context_for<D: Dom>(
             f_byte_length_queuing_strategy,
         )?;
     }
+    let f_css_numeric_array = st
+        .template(scope, ids::CSS_NUMERIC_ARRAY)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSNumericArray", f_css_numeric_array)?;
+    }
     let f_css_rule = st.template(scope, ids::CSS_RULE)?.get_function(scope)?;
     if kind.exposes(&["Window"]) {
         rt::expose(scope, global, "CSSRule", f_css_rule)?;
@@ -7049,6 +7389,172 @@ pub fn install_context_for<D: Dom>(
         rt::expose(scope, global, "CSSStyleProperties", f_css_style_properties)?;
     }
     f_css_style_properties.set_prototype(scope, f_css_style_declaration.into())?;
+    let f_css_style_value = st
+        .template(scope, ids::CSS_STYLE_VALUE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSStyleValue", f_css_style_value)?;
+    }
+    let f_css_image_value = st
+        .template(scope, ids::CSS_IMAGE_VALUE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSImageValue", f_css_image_value)?;
+    }
+    f_css_image_value.set_prototype(scope, f_css_style_value.into())?;
+    let f_css_keyword_value = st
+        .template(scope, ids::CSS_KEYWORD_VALUE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSKeywordValue", f_css_keyword_value)?;
+    }
+    f_css_keyword_value.set_prototype(scope, f_css_style_value.into())?;
+    let f_css_numeric_value = st
+        .template(scope, ids::CSS_NUMERIC_VALUE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSNumericValue", f_css_numeric_value)?;
+    }
+    f_css_numeric_value.set_prototype(scope, f_css_style_value.into())?;
+    let f_css_math_value = st
+        .template(scope, ids::CSS_MATH_VALUE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSMathValue", f_css_math_value)?;
+    }
+    f_css_math_value.set_prototype(scope, f_css_numeric_value.into())?;
+    let f_css_math_clamp = st
+        .template(scope, ids::CSS_MATH_CLAMP)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSMathClamp", f_css_math_clamp)?;
+    }
+    f_css_math_clamp.set_prototype(scope, f_css_math_value.into())?;
+    let f_css_math_invert = st
+        .template(scope, ids::CSS_MATH_INVERT)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSMathInvert", f_css_math_invert)?;
+    }
+    f_css_math_invert.set_prototype(scope, f_css_math_value.into())?;
+    let f_css_math_max = st.template(scope, ids::CSS_MATH_MAX)?.get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSMathMax", f_css_math_max)?;
+    }
+    f_css_math_max.set_prototype(scope, f_css_math_value.into())?;
+    let f_css_math_min = st.template(scope, ids::CSS_MATH_MIN)?.get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSMathMin", f_css_math_min)?;
+    }
+    f_css_math_min.set_prototype(scope, f_css_math_value.into())?;
+    let f_css_math_negate = st
+        .template(scope, ids::CSS_MATH_NEGATE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSMathNegate", f_css_math_negate)?;
+    }
+    f_css_math_negate.set_prototype(scope, f_css_math_value.into())?;
+    let f_css_math_product = st
+        .template(scope, ids::CSS_MATH_PRODUCT)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSMathProduct", f_css_math_product)?;
+    }
+    f_css_math_product.set_prototype(scope, f_css_math_value.into())?;
+    let f_css_math_sum = st.template(scope, ids::CSS_MATH_SUM)?.get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSMathSum", f_css_math_sum)?;
+    }
+    f_css_math_sum.set_prototype(scope, f_css_math_value.into())?;
+    let f_css_unit_value = st
+        .template(scope, ids::CSS_UNIT_VALUE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSUnitValue", f_css_unit_value)?;
+    }
+    f_css_unit_value.set_prototype(scope, f_css_numeric_value.into())?;
+    let f_css_transform_value = st
+        .template(scope, ids::CSS_TRANSFORM_VALUE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSTransformValue", f_css_transform_value)?;
+    }
+    f_css_transform_value.set_prototype(scope, f_css_style_value.into())?;
+    let f_css_unparsed_value = st
+        .template(scope, ids::CSS_UNPARSED_VALUE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSUnparsedValue", f_css_unparsed_value)?;
+    }
+    f_css_unparsed_value.set_prototype(scope, f_css_style_value.into())?;
+    let f_css_transform_component = st
+        .template(scope, ids::CSS_TRANSFORM_COMPONENT)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(
+            scope,
+            global,
+            "CSSTransformComponent",
+            f_css_transform_component,
+        )?;
+    }
+    let f_css_matrix_component = st
+        .template(scope, ids::CSS_MATRIX_COMPONENT)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSMatrixComponent", f_css_matrix_component)?;
+    }
+    f_css_matrix_component.set_prototype(scope, f_css_transform_component.into())?;
+    let f_css_perspective = st
+        .template(scope, ids::CSS_PERSPECTIVE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSPerspective", f_css_perspective)?;
+    }
+    f_css_perspective.set_prototype(scope, f_css_transform_component.into())?;
+    let f_css_rotate = st.template(scope, ids::CSS_ROTATE)?.get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSRotate", f_css_rotate)?;
+    }
+    f_css_rotate.set_prototype(scope, f_css_transform_component.into())?;
+    let f_css_scale = st.template(scope, ids::CSS_SCALE)?.get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSScale", f_css_scale)?;
+    }
+    f_css_scale.set_prototype(scope, f_css_transform_component.into())?;
+    let f_css_skew = st.template(scope, ids::CSS_SKEW)?.get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSSkew", f_css_skew)?;
+    }
+    f_css_skew.set_prototype(scope, f_css_transform_component.into())?;
+    let f_css_skew_x = st.template(scope, ids::CSS_SKEW_X)?.get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSSkewX", f_css_skew_x)?;
+    }
+    f_css_skew_x.set_prototype(scope, f_css_transform_component.into())?;
+    let f_css_skew_y = st.template(scope, ids::CSS_SKEW_Y)?.get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSSkewY", f_css_skew_y)?;
+    }
+    f_css_skew_y.set_prototype(scope, f_css_transform_component.into())?;
+    let f_css_translate = st
+        .template(scope, ids::CSS_TRANSLATE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(scope, global, "CSSTranslate", f_css_translate)?;
+    }
+    f_css_translate.set_prototype(scope, f_css_transform_component.into())?;
+    let f_css_variable_reference_value = st
+        .template(scope, ids::CSS_VARIABLE_REFERENCE_VALUE)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(
+            scope,
+            global,
+            "CSSVariableReferenceValue",
+            f_css_variable_reference_value,
+        )?;
+    }
     let f_canvas_gradient = st
         .template(scope, ids::CANVAS_GRADIENT)?
         .get_function(scope)?;
@@ -10215,6 +10721,29 @@ pub fn install_context_for<D: Dom>(
     if kind.exposes(&["Window", "Worker"]) {
         rt::expose(scope, global, "StorageManager", f_storage_manager)?;
     }
+    let f_style_property_map_read_only = st
+        .template(scope, ids::STYLE_PROPERTY_MAP_READ_ONLY)?
+        .get_function(scope)?;
+    if kind.exposes(&["LayoutWorklet", "PaintWorklet", "Window", "Worker"]) {
+        rt::expose(
+            scope,
+            global,
+            "StylePropertyMapReadOnly",
+            f_style_property_map_read_only,
+        )?;
+    }
+    rt::pair_iterator_install(
+        scope,
+        ids::STYLE_PROPERTY_MAP_READ_ONLY,
+        f_style_property_map_read_only,
+    )?;
+    let f_style_property_map = st
+        .template(scope, ids::STYLE_PROPERTY_MAP)?
+        .get_function(scope)?;
+    if kind.exposes(&["Window"]) {
+        rt::expose(scope, global, "StylePropertyMap", f_style_property_map)?;
+    }
+    f_style_property_map.set_prototype(scope, f_style_property_map_read_only.into())?;
     let f_style_sheet = st.template(scope, ids::STYLE_SHEET)?.get_function(scope)?;
     if kind.exposes(&["Window"]) {
         rt::expose(scope, global, "StyleSheet", f_style_sheet)?;

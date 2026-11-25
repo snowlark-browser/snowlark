@@ -353,6 +353,8 @@ impl Engine {
             d.previously_focused = None;
             d.invoker = invoker;
         }
+        // (the invoker is the popover's implicit anchor element: CSS Anchor Positioning 1 §2.4.1)
+        self.with_doc_renderer(doc, |r, _| r.set_implicit_anchor(el, invoker));
         let originally_focused = self.focused_element(doc);
         self.add_to_top_layer(el);
         if effective == Some(PopoverMode::Hint) {
@@ -566,6 +568,7 @@ impl Engine {
             }
         }
         self.html.borrow_mut().popovers.retain(|&p| p != el);
+        self.with_doc_renderer(doc, |r, _| r.set_implicit_anchor(el, None));
         self.set_element_state(el, ElementState::POPOVER_OPEN, false);
     }
 

@@ -19,6 +19,7 @@
 //! Text goes through the paint crate's `TextEngine` (DirectWrite shaping, clusters with break
 //! opportunities and bidi levels); layout measures and paints the same glyphs.
 
+mod anchor;
 mod block;
 mod boxes;
 mod build;
@@ -345,6 +346,7 @@ impl<S: Style> LayoutTree<S> {
             column_flow: false,
             nested: Vec::new(),
             nested_path: Vec::new(),
+            anchors: Default::default(),
         };
         let icb_size = frame.inverse().size(viewport);
         let space = Space::fill(icb_size.width, Some(icb_size.height));
@@ -366,7 +368,7 @@ impl<S: Style> LayoutTree<S> {
             guard += 1;
             let mut next = Vec::new();
             for o in pending {
-                let (child, more) = positioned_at_icb(&mut cx, o, icb);
+                let (child, more) = positioned_at_icb(&mut cx, o, icb, &children);
                 children.push(child);
                 next.extend(more);
             }
@@ -886,8 +888,9 @@ fn positioned_at_icb<S: Style>(
     cx: &mut Cx<'_, S>,
     o: layout::Oof,
     icb: Rect,
+    placed: &[FragmentChild<S>],
 ) -> (FragmentChild<S>, Vec<layout::Oof>) {
-    positioned::layout_absolute(cx, o, icb)
+    positioned::layout_absolute(cx, o, icb, placed)
 }
 
 /// What painting and hit testing need besides the fragments: the viewport and scroll positions.

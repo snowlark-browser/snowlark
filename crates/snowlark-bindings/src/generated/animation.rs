@@ -115,30 +115,50 @@ pub trait AnimationImpl {
     }
     /// attribute CSSNumberish? startTime;
     #[cfg(not(feature = "stubs"))]
-    fn start_time(&self, this: Handle) -> Option<f64>;
+    fn start_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue>;
     #[cfg(feature = "stubs")]
-    fn start_time(&self, this: Handle) -> Option<f64> {
+    fn start_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue> {
         rt::stub("Animation.start_time")
     }
     /// attribute CSSNumberish? startTime;
     #[cfg(not(feature = "stubs"))]
-    fn set_start_time(&self, cx: &mut Cx, this: Handle, value: Option<f64>) -> Result<()>;
+    fn set_start_time(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        value: Option<DoubleOrCSSNumericValue>,
+    ) -> Result<()>;
     #[cfg(feature = "stubs")]
-    fn set_start_time(&self, cx: &mut Cx, this: Handle, value: Option<f64>) -> Result<()> {
+    fn set_start_time(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        value: Option<DoubleOrCSSNumericValue>,
+    ) -> Result<()> {
         rt::stub("Animation.set_start_time")
     }
     /// attribute CSSNumberish? currentTime;
     #[cfg(not(feature = "stubs"))]
-    fn current_time(&self, this: Handle) -> Option<f64>;
+    fn current_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue>;
     #[cfg(feature = "stubs")]
-    fn current_time(&self, this: Handle) -> Option<f64> {
+    fn current_time(&self, this: Handle) -> Option<DoubleOrCSSNumericValue> {
         rt::stub("Animation.current_time")
     }
     /// attribute CSSNumberish? currentTime;
     #[cfg(not(feature = "stubs"))]
-    fn set_current_time(&self, cx: &mut Cx, this: Handle, value: Option<f64>) -> Result<()>;
+    fn set_current_time(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        value: Option<DoubleOrCSSNumericValue>,
+    ) -> Result<()>;
     #[cfg(feature = "stubs")]
-    fn set_current_time(&self, cx: &mut Cx, this: Handle, value: Option<f64>) -> Result<()> {
+    fn set_current_time(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        value: Option<DoubleOrCSSNumericValue>,
+    ) -> Result<()> {
         rt::stub("Animation.set_current_time")
     }
     /// readonly attribute double? overallProgress;
@@ -662,7 +682,7 @@ pub(crate) fn attr_start_time_set<D: Dom, const LO: u16, const HI: u16>(
         if v.is_null_or_undefined() {
             Some(None)
         } else {
-            (rt::to_double(scope, v, true)).map(Some)
+            (DoubleOrCSSNumericValue::from_js(scope, v)).map(Some)
         }
     }) else {
         return;
@@ -702,7 +722,7 @@ pub(crate) fn attr_current_time_set<D: Dom, const LO: u16, const HI: u16>(
         if v.is_null_or_undefined() {
             Some(None)
         } else {
-            (rt::to_double(scope, v, true)).map(Some)
+            (DoubleOrCSSNumericValue::from_js(scope, v)).map(Some)
         }
     }) else {
         return;

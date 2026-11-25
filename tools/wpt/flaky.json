@@ -46,6 +46,9 @@
    "IDBObjectStore.getAll() for an autoincrement store",
    "IDBObjectStore.getAllKeys() for an autoincrement store"
   ],
+  "/close-watcher/user-activation/n-activate-preventDefault.html?dialog": [
+   "Create a close watcher without user activation that preventDefault()s cancel; send user activation"
+  ],
   "/close-watcher/user-activation/ny-activate-preventDefault.html?dialog": [
    "Create a close watcher without user activation; create a close watcher with user activation that preventDefault()s cancel; send user activation"
   ],
@@ -68,6 +71,16 @@
    "Content Security Policy: Expects allowed for worker-module to same-https origin and no-redirect redirection from https context.",
    "Content Security Policy: Expects allowed for worker-module to same-https origin and no-redirect redirection from https context.: securitypolicyviolation"
   ],
+  "/content-security-policy/gen/top.http-rp/script-src-wildcard/worker-import.http.html": [
+   "Content Security Policy: Expects allowed for worker-import to cross-http origin and swap-origin redirection from http context.",
+   "Content Security Policy: Expects allowed for worker-import to cross-http origin and swap-origin redirection from http context.: securitypolicyviolation",
+   "Content Security Policy: Expects allowed for worker-import to same-http origin and keep-origin redirection from http context.",
+   "Content Security Policy: Expects allowed for worker-import to same-http origin and keep-origin redirection from http context.: securitypolicyviolation",
+   "Content Security Policy: Expects allowed for worker-import to same-http origin and no-redirect redirection from http context.",
+   "Content Security Policy: Expects allowed for worker-import to same-http origin and no-redirect redirection from http context.: securitypolicyviolation",
+   "Content Security Policy: Expects allowed for worker-import to same-http origin and swap-origin redirection from http context.",
+   "Content Security Policy: Expects allowed for worker-import to same-http origin and swap-origin redirection from http context.: securitypolicyviolation"
+  ],
   "/content-security-policy/gen/top.http-rp/worker-src-none/worker-module.http.html": [
    "Content Security Policy: Expects blocked for worker-module to same-http origin and keep-origin redirection from http context.",
    "Content Security Policy: Expects blocked for worker-module to same-http origin and keep-origin redirection from http context.: securitypolicyviolation",
@@ -87,6 +100,13 @@
    "Content Security Policy: Expects blocked for worker-import-data to same-http origin and no-redirect redirection from http context.: securitypolicyviolation",
    "Content Security Policy: Expects blocked for worker-import-data to same-http origin and swap-origin redirection from http context.",
    "Content Security Policy: Expects blocked for worker-import-data to same-http origin and swap-origin redirection from http context.: securitypolicyviolation"
+  ],
+  "/content-security-policy/gen/top.meta/script-src-self/script-tag.http.html": [
+   "Content Security Policy: Expects blocked for script-tag to cross-http origin and keep-origin redirection from http context.",
+   "Content Security Policy: Expects blocked for script-tag to cross-http origin and no-redirect redirection from http context.",
+   "Content Security Policy: Expects blocked for script-tag to cross-http origin and swap-origin redirection from http context.",
+   "Content Security Policy: Expects blocked for script-tag to same-http origin and swap-origin redirection from http context.",
+   "Content Security Policy: Expects blocked for script-tag to same-http origin and swap-origin redirection from http context.: securitypolicyviolation"
   ],
   "/content-security-policy/gen/top.meta/script-src-self/worker-classic.http.html": [
    "Content Security Policy: Expects allowed for worker-classic to same-http origin and keep-origin redirection from http context.",
@@ -121,13 +141,20 @@
    "Content Security Policy: Expects allowed for script-tag to same-https origin and swap-origin redirection from https context.",
    "Content Security Policy: Expects allowed for script-tag to same-https origin and swap-origin redirection from https context.: securitypolicyviolation"
   ],
+  "/content-security-policy/gen/top.meta/worker-src-none/sharedworker-import-data.http.html": [
+   "Content Security Policy: Expects blocked for sharedworker-import-data to same-http origin and swap-origin redirection from http context."
+  ],
   "/content-security-policy/gen/top.meta/worker-src-wildcard/sharedworker-import-data.http.html": [
    "Content Security Policy: Expects blocked for sharedworker-import-data to same-http origin and swap-origin redirection from http context."
+  ],
+  "/content-security-policy/generic/invalid-characters-in-policy.html": [
+   "Non-ASCII character in directive name should not affect other directives. - HTTP header"
   ],
   "/content-security-policy/generic/only-valid-whitespaces-are-allowed.html": [
    "U+000B VT    should not be parsed between directive name and value - meta tag",
    "U+000B VT    should not be parsed inside directive value - meta tag",
-   "U+00A0 NBSP  should not be parsed inside directive value - HTTP header"
+   "U+00A0 NBSP  should not be parsed inside directive value - HTTP header",
+   "U+00A0 NBSP  should not be parsed inside directive value - meta tag"
   ],
   "/content-security-policy/img-src/img-src-host-partial-wildcard-allowed.sub.html": [
    "img src matches correctly partial wildcard host csp directive"
@@ -584,6 +611,26 @@
    "flexbox | computed style | flex: auto"
   ],
   "/css/css-flexbox/image-as-flexitem-size-002v.html": [
+   ".flexbox > img 1",
+   ".flexbox > img 10",
+   ".flexbox > img 11",
+   ".flexbox > img 12",
+   ".flexbox > img 13",
+   ".flexbox > img 14",
+   ".flexbox > img 15",
+   ".flexbox > img 16",
+   ".flexbox > img 17",
+   ".flexbox > img 18",
+   ".flexbox > img 2",
+   ".flexbox > img 3",
+   ".flexbox > img 4",
+   ".flexbox > img 5",
+   ".flexbox > img 6",
+   ".flexbox > img 7",
+   ".flexbox > img 8",
+   ".flexbox > img 9"
+  ],
+  "/css/css-flexbox/image-as-flexitem-size-004v.html": [
    ".flexbox > img 1",
    ".flexbox > img 10",
    ".flexbox > img 11",
@@ -1077,6 +1124,152 @@
   "/css/cssom/cssimportrule-sheet-identity.html": [
    "CSSImportRule has different sheets even if referencing the same URL"
   ],
+  "/css/filter-effects/animation/filter-interpolation-001.html": [
+   "CSS Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (-0.5) should be [hue-rotate(-90deg) blur(4px)]",
+   "CSS Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0) should be [hue-rotate(0deg) blur(6px)]",
+   "CSS Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0.25) should be [hue-rotate(45deg) blur(7px)]",
+   "CSS Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0.5) should be [hue-rotate(90deg) blur(8px)]",
+   "CSS Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (1) should be [hue-rotate(180deg) blur(10px)]",
+   "CSS Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (1.5) should be [hue-rotate(270deg) blur(12px)]",
+   "CSS Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (-0.5) should be [hue-rotate(75deg) blur(4mm)]",
+   "CSS Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0) should be [hue-rotate(80deg) blur(6mm)]",
+   "CSS Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0.25) should be [hue-rotate(82.5deg) blur(7mm)]",
+   "CSS Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0.5) should be [hue-rotate(85deg) blur(8mm)]",
+   "CSS Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (1) should be [hue-rotate(90deg) blur(10mm)]",
+   "CSS Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (1.5) should be [hue-rotate(95deg) blur(12mm)]",
+   "CSS Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(35deg)]",
+   "CSS Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (0) should be [hue-rotate(30deg)]",
+   "CSS Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(27deg)]",
+   "CSS Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(24deg)]",
+   "CSS Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(15deg)]",
+   "CSS Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(-10deg)]",
+   "CSS Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (0) should be [hue-rotate(0deg)]",
+   "CSS Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(6deg)]",
+   "CSS Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(12deg)]",
+   "CSS Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(30deg)]",
+   "CSS Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(-10deg)]",
+   "CSS Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (0) should be [hue-rotate(0deg)]",
+   "CSS Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(6deg)]",
+   "CSS Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(12deg)]",
+   "CSS Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(30deg)]",
+   "CSS Animations: property <filter> from neutral to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(5deg)]",
+   "CSS Animations: property <filter> from neutral to [hue-rotate(20deg)] at (0) should be [hue-rotate(10deg)]",
+   "CSS Animations: property <filter> from neutral to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(13deg)]",
+   "CSS Animations: property <filter> from neutral to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(16deg)]",
+   "CSS Animations: property <filter> from neutral to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Animations: property <filter> from neutral to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(25deg)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (-0.5) should be [hue-rotate(-90deg) blur(4px)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0) should be [hue-rotate(0deg) blur(6px)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0.25) should be [hue-rotate(45deg) blur(7px)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0.5) should be [hue-rotate(90deg) blur(8px)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (1) should be [hue-rotate(180deg) blur(10px)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (1.5) should be [hue-rotate(270deg) blur(12px)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (-0.5) should be [hue-rotate(75deg) blur(4mm)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0) should be [hue-rotate(80deg) blur(6mm)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0.25) should be [hue-rotate(82.5deg) blur(7mm)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0.5) should be [hue-rotate(85deg) blur(8mm)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (1) should be [hue-rotate(90deg) blur(10mm)]",
+   "CSS Transitions with transition: all: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (1.5) should be [hue-rotate(95deg) blur(12mm)]",
+   "CSS Transitions with transition: all: property <filter> from [inherit] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(35deg)]",
+   "CSS Transitions with transition: all: property <filter> from [inherit] to [hue-rotate(20deg)] at (0) should be [hue-rotate(30deg)]",
+   "CSS Transitions with transition: all: property <filter> from [inherit] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(27deg)]",
+   "CSS Transitions with transition: all: property <filter> from [inherit] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(24deg)]",
+   "CSS Transitions with transition: all: property <filter> from [inherit] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Transitions with transition: all: property <filter> from [inherit] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(15deg)]",
+   "CSS Transitions with transition: all: property <filter> from [initial] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(-10deg)]",
+   "CSS Transitions with transition: all: property <filter> from [initial] to [hue-rotate(20deg)] at (0) should be [hue-rotate(0deg)]",
+   "CSS Transitions with transition: all: property <filter> from [initial] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(6deg)]",
+   "CSS Transitions with transition: all: property <filter> from [initial] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(12deg)]",
+   "CSS Transitions with transition: all: property <filter> from [initial] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Transitions with transition: all: property <filter> from [initial] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(30deg)]",
+   "CSS Transitions with transition: all: property <filter> from [unset] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(-10deg)]",
+   "CSS Transitions with transition: all: property <filter> from [unset] to [hue-rotate(20deg)] at (0) should be [hue-rotate(0deg)]",
+   "CSS Transitions with transition: all: property <filter> from [unset] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(6deg)]",
+   "CSS Transitions with transition: all: property <filter> from [unset] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(12deg)]",
+   "CSS Transitions with transition: all: property <filter> from [unset] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Transitions with transition: all: property <filter> from [unset] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(30deg)]",
+   "CSS Transitions with transition: all: property <filter> from neutral to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(5deg)]",
+   "CSS Transitions with transition: all: property <filter> from neutral to [hue-rotate(20deg)] at (0) should be [hue-rotate(10deg)]",
+   "CSS Transitions with transition: all: property <filter> from neutral to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(13deg)]",
+   "CSS Transitions with transition: all: property <filter> from neutral to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(16deg)]",
+   "CSS Transitions with transition: all: property <filter> from neutral to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Transitions with transition: all: property <filter> from neutral to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(25deg)]",
+   "CSS Transitions: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (-0.5) should be [hue-rotate(-90deg) blur(4px)]",
+   "CSS Transitions: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0) should be [hue-rotate(0deg) blur(6px)]",
+   "CSS Transitions: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0.25) should be [hue-rotate(45deg) blur(7px)]",
+   "CSS Transitions: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0.5) should be [hue-rotate(90deg) blur(8px)]",
+   "CSS Transitions: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (1) should be [hue-rotate(180deg) blur(10px)]",
+   "CSS Transitions: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (1.5) should be [hue-rotate(270deg) blur(12px)]",
+   "CSS Transitions: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (-0.5) should be [hue-rotate(75deg) blur(4mm)]",
+   "CSS Transitions: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0) should be [hue-rotate(80deg) blur(6mm)]",
+   "CSS Transitions: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0.25) should be [hue-rotate(82.5deg) blur(7mm)]",
+   "CSS Transitions: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0.5) should be [hue-rotate(85deg) blur(8mm)]",
+   "CSS Transitions: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (1) should be [hue-rotate(90deg) blur(10mm)]",
+   "CSS Transitions: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (1.5) should be [hue-rotate(95deg) blur(12mm)]",
+   "CSS Transitions: property <filter> from [inherit] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(35deg)]",
+   "CSS Transitions: property <filter> from [inherit] to [hue-rotate(20deg)] at (0) should be [hue-rotate(30deg)]",
+   "CSS Transitions: property <filter> from [inherit] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(27deg)]",
+   "CSS Transitions: property <filter> from [inherit] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(24deg)]",
+   "CSS Transitions: property <filter> from [inherit] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Transitions: property <filter> from [inherit] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(15deg)]",
+   "CSS Transitions: property <filter> from [initial] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(-10deg)]",
+   "CSS Transitions: property <filter> from [initial] to [hue-rotate(20deg)] at (0) should be [hue-rotate(0deg)]",
+   "CSS Transitions: property <filter> from [initial] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(6deg)]",
+   "CSS Transitions: property <filter> from [initial] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(12deg)]",
+   "CSS Transitions: property <filter> from [initial] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Transitions: property <filter> from [initial] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(30deg)]",
+   "CSS Transitions: property <filter> from [unset] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(-10deg)]",
+   "CSS Transitions: property <filter> from [unset] to [hue-rotate(20deg)] at (0) should be [hue-rotate(0deg)]",
+   "CSS Transitions: property <filter> from [unset] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(6deg)]",
+   "CSS Transitions: property <filter> from [unset] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(12deg)]",
+   "CSS Transitions: property <filter> from [unset] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Transitions: property <filter> from [unset] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(30deg)]",
+   "CSS Transitions: property <filter> from neutral to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(5deg)]",
+   "CSS Transitions: property <filter> from neutral to [hue-rotate(20deg)] at (0) should be [hue-rotate(10deg)]",
+   "CSS Transitions: property <filter> from neutral to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(13deg)]",
+   "CSS Transitions: property <filter> from neutral to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(16deg)]",
+   "CSS Transitions: property <filter> from neutral to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "CSS Transitions: property <filter> from neutral to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(25deg)]",
+   "Web Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (-0.5) should be [hue-rotate(-90deg) blur(4px)]",
+   "Web Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0) should be [hue-rotate(0deg) blur(6px)]",
+   "Web Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0.25) should be [hue-rotate(45deg) blur(7px)]",
+   "Web Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (0.5) should be [hue-rotate(90deg) blur(8px)]",
+   "Web Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (1) should be [hue-rotate(180deg) blur(10px)]",
+   "Web Animations: property <filter> from [hue-rotate(0deg) blur(6px)] to [hue-rotate(180deg) blur(10px)] at (1.5) should be [hue-rotate(270deg) blur(12px)]",
+   "Web Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (-0.5) should be [hue-rotate(75deg) blur(4mm)]",
+   "Web Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0) should be [hue-rotate(80deg) blur(6mm)]",
+   "Web Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0.25) should be [hue-rotate(82.5deg) blur(7mm)]",
+   "Web Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (0.5) should be [hue-rotate(85deg) blur(8mm)]",
+   "Web Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (1) should be [hue-rotate(90deg) blur(10mm)]",
+   "Web Animations: property <filter> from [hue-rotate(80deg) blur(6mm)] to [hue-rotate(100grad) blur(1cm)] at (1.5) should be [hue-rotate(95deg) blur(12mm)]",
+   "Web Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(35deg)]",
+   "Web Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (0) should be [hue-rotate(30deg)]",
+   "Web Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(27deg)]",
+   "Web Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(24deg)]",
+   "Web Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "Web Animations: property <filter> from [inherit] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(15deg)]",
+   "Web Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(-10deg)]",
+   "Web Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (0) should be [hue-rotate(0deg)]",
+   "Web Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(6deg)]",
+   "Web Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(12deg)]",
+   "Web Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "Web Animations: property <filter> from [initial] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(30deg)]",
+   "Web Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(-10deg)]",
+   "Web Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (0) should be [hue-rotate(0deg)]",
+   "Web Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(6deg)]",
+   "Web Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(12deg)]",
+   "Web Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "Web Animations: property <filter> from [unset] to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(30deg)]",
+   "Web Animations: property <filter> from neutral to [hue-rotate(20deg)] at (-0.5) should be [hue-rotate(5deg)]",
+   "Web Animations: property <filter> from neutral to [hue-rotate(20deg)] at (0) should be [hue-rotate(10deg)]",
+   "Web Animations: property <filter> from neutral to [hue-rotate(20deg)] at (0.3) should be [hue-rotate(13deg)]",
+   "Web Animations: property <filter> from neutral to [hue-rotate(20deg)] at (0.6) should be [hue-rotate(16deg)]",
+   "Web Animations: property <filter> from neutral to [hue-rotate(20deg)] at (1) should be [hue-rotate(20deg)]",
+   "Web Animations: property <filter> from neutral to [hue-rotate(20deg)] at (1.5) should be [hue-rotate(25deg)]"
+  ],
   "/custom-elements/custom-element-reaction-queue.html": [
    "Mutating a undefined custom element while upgrading a custom element must not enqueue or invoke reactions on the mutated element",
    "Mutating another custom element inside adopted callback must invoke all pending callbacks on the mutated element",
@@ -1197,6 +1390,9 @@
   "/editing/other/typing-space-in-editable-summary.tentative.html": [
    "Type space key in editable <summary> shouldn't be handled by the <summary> when it's not focused",
    "Type space key in editable element in <summary> shouldn't be handled by the <summary>"
+  ],
+  "/encoding-detection/ca-windows-1252-late.tentative.html": [
+   "Check detection result"
   ],
   "/encoding/streams/realms.window.html": [
    "a TextDecoderStream object should be associated with the realm the constructor came from",
@@ -1337,6 +1533,20 @@
    "Request on bad port 993 should throw TypeError.",
    "Request on bad port 995 should throw TypeError."
   ],
+  "/fetch/api/request/request-cache-no-cache.any.html": [
+   "RequestCache \"no-cache\" mode revalidates stale responses found in the cache with Etag and stale response",
+   "RequestCache \"no-cache\" mode revalidates stale responses found in the cache with Last-Modified and stale response"
+  ],
+  "/fetch/api/request/request-cache-no-store.any.html": [
+   "RequestCache \"no-store\" mode does not check the cache for previously cached content and goes to the network regardless with Etag and fresh response",
+   "RequestCache \"no-store\" mode does not check the cache for previously cached content and goes to the network regardless with Etag and stale response",
+   "RequestCache \"no-store\" mode does not check the cache for previously cached content and goes to the network regardless with Last-Modified and fresh response",
+   "RequestCache \"no-store\" mode does not check the cache for previously cached content and goes to the network regardless with Last-Modified and stale response",
+   "RequestCache \"no-store\" mode does not store the response in the cache with Etag and stale response"
+  ],
+  "/fetch/metadata/generated/script-module-import-static.sub.html": [
+   "sec-fetch-site - Not sent to non-trustworthy cross-site destination"
+  ],
   "/fetch/metadata/generated/svg-image.https.sub.html": [
    "sec-fetch-site - Same-Origin -> Cross-Site no attributes"
   ],
@@ -1395,6 +1605,9 @@
    "Empty value",
    "document has no cookie"
   ],
+  "/html/editing/dnd/drop/030.html?dropeffect=copy&effectallowed=copyLink": [
+   "Test all effectAlloweds against against all dropEffects on dragEnd"
+  ],
   "/html/infrastructure/urls/resolving-urls/query-encoding/location.sub.html?encoding=utf8": [
    "location [PutForwards]",
    "location.assign()",
@@ -1427,6 +1640,12 @@
   ],
   "/html/semantics/embedded-content/media-elements/track/track-element/cors/024.html": [
    "track CORS: Use Credentials, not same-origin, with headers, redirects to same-origin, no headers"
+  ],
+  "/html/semantics/embedded-content/media-elements/track/track-element/cors/027.html": [
+   "track CORS: Anonymous, same-origin, no headers, redirects to not same-origin, no headers"
+  ],
+  "/html/semantics/embedded-content/media-elements/track/track-element/cors/028.html": [
+   "track CORS: Anonymous, same-origin, with headers, redirects to not same-origin, with headers"
   ],
   "/html/semantics/embedded-content/the-audio-element/audio-loading-lazy-in-scroller.html": [
    "Audio with loading=lazy inside scroll container loads when scrolled into view within container"
@@ -1499,6 +1718,9 @@
   ],
   "/html/semantics/scripting-1/the-script-element/text-module/credentials.sub.html": [
    "Text Modules should be loaded with or without the credentials based on the same-origin-ness and the crossOrigin attribute"
+  ],
+  "/html/semantics/scripting-1/the-script-element/text-module/repeated-imports.any.worker.html": [
+   "Two modules of different type with the same specifier can load if the server changes its responses (first text, then JS)"
   ],
   "/html/semantics/the-button-element/command-and-commandfor/on-video-behavior.tentative.html": [
    "invoking playing video with play action is a no-op",
@@ -1624,6 +1846,9 @@
   "/media-source/SourceBuffer-abort-updating.html": [
    "SourceBuffer#abort() (video/mp4) : Check the algorithm when the updating attribute is true."
   ],
+  "/media-source/mediasource-config-change-mp4-av-video-bitrate.html": [
+   "Tests mp4 video bitrate changes in multiplexed content."
+  ],
   "/media-source/mediasource-play.html": [
    "Test normal playback case with MediaSource API"
   ],
@@ -1664,6 +1889,9 @@
    "Partial interface Document[3]: member names are unique",
    "idl_test setup",
    "idl_test validation"
+  ],
+  "/performance-timeline/po-resource.html": [
+   "resource entries are observable"
   ],
   "/pointerevents/compat/pointerevent_mouse-pointer-updown-events.html": [
    "pointerup/down events are fired correctly for corresponding mouse events"
@@ -1713,6 +1941,14 @@
   "/pointerevents/pointerevent_pointerout_no_pointer_movement.html": [
    "Layout change under a stationary pointer (a new element appears) fires boundary events and no pointermove event"
   ],
+  "/referrer-policy/4K+1/gen/top.http-rp/no-referrer-when-downgrade/fetch.http.html": [
+   "Referrer Policy: Expects stripped-referrer for fetch to cross-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for fetch to cross-http origin and no-redirect redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for fetch to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/4K+1/gen/top.http-rp/same-origin/worker-classic.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and no-redirect redirection from http context."
+  ],
   "/referrer-policy/4K+1/gen/top.http-rp/unsafe-url/script-tag.http.html": [
    "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and no-redirect redirection from http context."
   ],
@@ -1722,6 +1958,15 @@
   ],
   "/referrer-policy/4K+1/gen/top.meta/unsafe-url/fetch.http.html": [
    "Referrer Policy: Expects stripped-referrer for fetch to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/4K+1/gen/top.meta/unsafe-url/worker-module.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-module to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/4K+1/gen/top.meta/unset/worker-classic.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/4K+1/gen/top.meta/unset/worker-module.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-module to same-http origin and no-redirect redirection from http context."
   ],
   "/referrer-policy/4K-1/gen/top.http-rp/same-origin/script-tag.http.html": [
    "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and keep-origin redirection from http context.",
@@ -1734,9 +1979,16 @@
    "Referrer Policy: Expects stripped-referrer for iframe-tag to same-http origin and keep-origin redirection from http context.",
    "Referrer Policy: Expects stripped-referrer for iframe-tag to same-http origin and no-redirect redirection from http context."
   ],
+  "/referrer-policy/4K/gen/top.http-rp/strict-origin-when-cross-origin/fetch.http.html": [
+   "Referrer Policy: Expects stripped-referrer for fetch to same-http origin and no-redirect redirection from http context."
+  ],
   "/referrer-policy/4K/gen/top.http-rp/strict-origin-when-cross-origin/script-tag.http.html": [
    "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and keep-origin redirection from http context.",
    "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/4K/gen/top.http-rp/strict-origin-when-cross-origin/worker-classic.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and no-redirect redirection from http context."
   ],
   "/referrer-policy/4K/gen/top.meta/no-referrer-when-downgrade/fetch.http.html": [
    "Referrer Policy: Expects stripped-referrer for fetch to same-http origin and keep-origin redirection from http context."
@@ -1747,6 +1999,10 @@
   ],
   "/referrer-policy/4K/gen/top.meta/unset/script-tag.http.html": [
    "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/gen/iframe.http-rp/no-referrer/worker-module.http.html": [
+   "Referrer Policy: Expects omitted for worker-module to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects omitted for worker-module to same-http origin and no-redirect redirection from http context."
   ],
   "/referrer-policy/gen/iframe.meta/always/a-tag.http.html": [
    "Referrer Policy: Expects stripped-referrer for a-tag to cross-http origin and no-redirect redirection from http context."
@@ -1769,6 +2025,7 @@
    "Referrer Policy: Expects origin for script-tag-dynamic-import to cross-http origin and swap-origin redirection from http context."
   ],
   "/referrer-policy/gen/req.attr/strict-origin-when-cross-origin/a-tag.http.html": [
+   "Referrer Policy: Expects origin for a-tag to cross-http origin and no-redirect redirection from http context.",
    "Referrer Policy: Expects stripped-referrer for a-tag to same-http origin and no-redirect redirection from http context."
   ],
   "/referrer-policy/gen/srcdoc-inherit.http-rp/same-origin/fetch.http.html": [
@@ -1780,6 +2037,13 @@
   ],
   "/referrer-policy/gen/srcdoc-inherit.meta/strict-origin-when-cross-origin/a-tag.http.html": [
    "Referrer Policy: Expects origin for a-tag to cross-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/gen/srcdoc-inherit.meta/unset/a-tag.http.html": [
+   "Referrer Policy: Expects origin for a-tag to cross-http origin and no-redirect redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for a-tag to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/gen/srcdoc.meta/no-referrer-when-downgrade/worker-module.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-module to same-http origin and no-redirect redirection from http context."
   ],
   "/referrer-policy/gen/top.http-rp/origin-when-cross-origin/script-tag-dynamic-import.http.html": [
    "Referrer Policy: Expects origin for script-tag-dynamic-import to cross-http origin and keep-origin redirection from http context.",
@@ -1803,6 +2067,20 @@
    "Referrer Policy: Expects origin for xhr to same-http origin and keep-origin redirection from http context.",
    "Referrer Policy: Expects origin for xhr to same-http origin and no-redirect redirection from http context.",
    "Referrer Policy: Expects origin for xhr to same-http origin and swap-origin redirection from http context."
+  ],
+  "/referrer-policy/gen/top.http-rp/unsafe-url/worker-classic.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and keep-origin redirection from http context."
+  ],
+  "/referrer-policy/gen/top.http-rp/unsafe-url/xhr.http.html": [
+   "Referrer Policy: Expects stripped-referrer for xhr to same-http origin and swap-origin redirection from http context."
+  ],
+  "/referrer-policy/gen/top.http-rp/unset/xhr.http.html": [
+   "Referrer Policy: Expects origin for xhr to cross-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects origin for xhr to cross-http origin and no-redirect redirection from http context.",
+   "Referrer Policy: Expects origin for xhr to cross-http origin and swap-origin redirection from http context.",
+   "Referrer Policy: Expects origin for xhr to same-http origin and swap-origin redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for xhr to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for xhr to same-http origin and no-redirect redirection from http context."
   ],
   "/referrer-policy/gen/top.meta/always/script-tag-dynamic-import.http.html": [
    "Referrer Policy: Expects stripped-referrer for script-tag-dynamic-import to cross-http origin and keep-origin redirection from http context.",
@@ -1856,10 +2134,23 @@
    "Referrer Policy: Expects omitted for fetch to same-http origin and no-redirect redirection from http context.",
    "Referrer Policy: Expects omitted for fetch to same-http origin and swap-origin redirection from http context."
   ],
+  "/referrer-policy/gen/top.meta/no-referrer/worker-module.http.html": [
+   "Referrer Policy: Expects omitted for worker-module to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects omitted for worker-module to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/gen/top.meta/origin-when-cross-origin/img-tag.http.html": [
+   "Referrer Policy: Expects stripped-referrer for img-tag to same-http origin and no-redirect redirection from http context."
+  ],
   "/referrer-policy/gen/top.meta/origin/script-tag.http.html": [
    "Referrer Policy: Expects origin for script-tag to cross-http origin and keep-origin redirection from http context.",
    "Referrer Policy: Expects origin for script-tag to cross-http origin and no-redirect redirection from http context.",
    "Referrer Policy: Expects origin for script-tag to cross-http origin and swap-origin redirection from http context."
+  ],
+  "/referrer-policy/gen/top.meta/unsafe-url/worker-classic.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and keep-origin redirection from http context."
+  ],
+  "/referrer-policy/gen/top.meta/unset/worker-classic.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and no-redirect redirection from http context."
   ],
   "/referrer-policy/gen/worker-classic.http-rp/no-referrer/fetch.http.html": [
    "Referrer Policy: Expects omitted for fetch to cross-http origin and keep-origin redirection from http context.",
@@ -1874,6 +2165,9 @@
    "Referrer Policy: Expects omitted for fetch to same-https origin and keep-origin redirection from http context.",
    "Referrer Policy: Expects omitted for fetch to same-https origin and no-redirect redirection from http context.",
    "Referrer Policy: Expects omitted for fetch to same-https origin and swap-origin redirection from http context."
+  ],
+  "/referrer-policy/gen/worker-classic.http-rp/origin/worker-module.http.html": [
+   "Referrer Policy: Expects origin for worker-module to same-http origin and keep-origin redirection from http context."
   ],
   "/referrer-policy/gen/worker-classic.http-rp/unsafe-url/xhr.http.html": [
    "Referrer Policy: Expects stripped-referrer for xhr to cross-http origin and keep-origin redirection from http context.",
@@ -4010,6 +4304,9 @@
   "/third_party/test262/test/annexB/built-ins/String/prototype/anchor/prop-desc.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/annexB/language/eval-code/direct/global-if-decl-else-decl-b-eval-global-existing-non-enumerable-global-init.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/annexB/language/eval-code/indirect/global-if-decl-else-decl-b-eval-global-init.test262.html": [
    "Test"
   ],
@@ -4079,6 +4376,9 @@
   "/third_party/test262/test/built-ins/Boolean/is-a-constructor.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/built-ins/DataView/custom-proto-if-not-object-fallbacks-to-default-prototype.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/built-ins/DataView/prototype/byteOffset/resizable-array-buffer-auto.test262.html": [
    "Test"
   ],
@@ -4092,6 +4392,9 @@
    "Test"
   ],
   "/third_party/test262/test/built-ins/Date/prototype/toISOString/name.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/DisposableStack/prototype/move/prop-desc.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/built-ins/DisposableStack/prototype/use/this-not-object-throws.test262.html": [
@@ -4122,6 +4425,9 @@
    "Test"
   ],
   "/third_party/test262/test/built-ins/Map/name.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Map/prototype/entries/name.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/built-ins/Math/acosh/not-a-constructor.test262.html": [
@@ -4166,7 +4472,13 @@
   "/third_party/test262/test/built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-166.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-39.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/built-ins/Object/internals/DefineOwnProperty/consistent-value-regexp-dollar1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Object/isSealed/proxy-no-ownkeys-returned-keys-order.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/built-ins/Object/prototype/hasOwnProperty/8.12.1-1_38.test262.html": [
@@ -4326,6 +4638,9 @@
    "Test"
   ],
   "/third_party/test262/test/built-ins/TypedArray/prototype/findLastIndex/BigInt/predicate-call-this-strict.test262.strict.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArray/prototype/findLastIndex/BigInt/predicate-may-detach-buffer.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/built-ins/TypedArray/prototype/keys/prop-desc.test262.html": [
@@ -4508,6 +4823,9 @@
   "/third_party/test262/test/intl402/Temporal/PlainMonthDay/prototype/toLocaleString/lone-options-accepted.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/intl402/Temporal/PlainYearMonth/prototype/add/leap-year-japanese.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/intl402/Temporal/PlainYearMonth/prototype/toLocaleString/dateStyle-undefined.test262.html": [
    "Test"
   ],
@@ -4613,6 +4931,9 @@
   "/third_party/test262/test/language/expressions/class/elements/after-same-line-static-gen-rs-static-method-privatename-identifier.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/language/expressions/class/elements/multiple-stacked-definitions-rs-privatename-identifier.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/language/expressions/class/elements/new-sc-line-gen-rs-static-method-privatename-identifier.test262.html": [
    "Test"
   ],
@@ -4638,6 +4959,9 @@
    "Test"
   ],
   "/third_party/test262/test/language/expressions/compound-assignment/left-hand-side-private-reference-data-property-rshift.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/compound-assignment/left-shift-non-simple.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/language/expressions/conditional/S11.12_A2.1_T2.test262.html": [
@@ -4740,6 +5064,9 @@
    "Test"
   ],
   "/third_party/test262/test/language/expressions/object/dstr/gen-meth-ary-ptrn-rest-ary-rest.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/object/dstr/gen-meth-dflt-ary-ptrn-elem-obj-val-undef.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/language/expressions/object/dstr/gen-meth-dflt-ary-ptrn-rest-id-elision.test262.html": [
@@ -4865,10 +5192,19 @@
   "/third_party/test262/test/language/statements/for-await-of/async-gen-dstr-let-obj-ptrn-id-init-fn-name-class.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/language/statements/for-await-of/async-gen-dstr-var-ary-name-iter-val.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/for-await-of/head-const-init.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/language/statements/for-in/dstr/obj-id-init-yield-ident-invalid.test262.strict.html": [
    "Test"
   ],
   "/third_party/test262/test/language/statements/for-of/break-label-from-try.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/for-of/dstr/let-obj-ptrn-id-init-fn-name-fn.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/language/statements/for-of/dstr/obj-empty-null.test262.html": [
@@ -4925,6 +5261,9 @@
    "Creating policy works for policy in the blocklist, since it's report-only.",
    "Test number of sent reports.",
    "Test report-uri works with trusted-types violation."
+  ],
+  "/uievents/mouse/mouse_boundary_events_after_removing_last_over_element.html": [
+   "After removing the last over element, redundant mouseenter events should not be fired on the ancestors"
   ],
   "/uievents/order-of-events/mouse-events/click-order.html": [
    "Click-related events should fire in the correct order"
@@ -5857,6 +6196,9 @@
   ],
   "/xhr/responsexml-document-properties.htm": [
    "cookie"
+  ],
+  "/xhr/xhr-timeout-longtask.any.html": [
+   "Long tasks should not trigger load timeout"
   ]
  },
  "reftests": [
@@ -5970,7 +6312,12 @@
   "gate re-check of gate-affected.jsonl",
   "gate re-check of gate.jsonl",
   "gate re-check of avif1-gate.jsonl",
-  "gate re-check of wasm1-gate2.jsonl"
+  "gate re-check of wasm1-gate2.jsonl",
+  "gate re-check of gate.jsonl",
+  "typedom-losses-r1.jsonl",
+  "typedom-losses-r2.jsonl",
+  "typedom-losses-r3.jsonl",
+  "gate re-check of gate.jsonl"
  ],
  "note": "Subtests and reftests whose result differed across runs of one binary; the gate reports their losses apart."
 }

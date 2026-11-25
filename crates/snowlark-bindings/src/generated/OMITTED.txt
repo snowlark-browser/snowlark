@@ -21,78 +21,15 @@ AudioContext.sinkId: audio output device selection is not implemented
 BaseAudioContext.audioWorklet: interface AudioWorklet is not generated
 BaseAudioContext.createScriptProcessor(bufferSize, numberOfInputChannels, numberOfOutputChannels): interface ScriptProcessorNode is not generated
 BaseAudioContext.renderQuantumSize: not shipped (a later level's proposal)
-CSS.Hz(value): interface CSSUnitValue is not generated
-CSS.Q(value): interface CSSUnitValue is not generated
 CSS.animationWorklet: interface Worklet is not generated
-CSS.cap(value): interface CSSUnitValue is not generated
-CSS.ch(value): interface CSSUnitValue is not generated
-CSS.cm(value): interface CSSUnitValue is not generated
-CSS.cqb(value): interface CSSUnitValue is not generated
-CSS.cqh(value): interface CSSUnitValue is not generated
-CSS.cqi(value): interface CSSUnitValue is not generated
-CSS.cqmax(value): interface CSSUnitValue is not generated
-CSS.cqmin(value): interface CSSUnitValue is not generated
-CSS.cqw(value): interface CSSUnitValue is not generated
-CSS.deg(value): interface CSSUnitValue is not generated
-CSS.dpcm(value): interface CSSUnitValue is not generated
-CSS.dpi(value): interface CSSUnitValue is not generated
-CSS.dppx(value): interface CSSUnitValue is not generated
-CSS.dvb(value): interface CSSUnitValue is not generated
-CSS.dvh(value): interface CSSUnitValue is not generated
-CSS.dvi(value): interface CSSUnitValue is not generated
-CSS.dvmax(value): interface CSSUnitValue is not generated
-CSS.dvmin(value): interface CSSUnitValue is not generated
-CSS.dvw(value): interface CSSUnitValue is not generated
-CSS.em(value): interface CSSUnitValue is not generated
-CSS.ex(value): interface CSSUnitValue is not generated
-CSS.fr(value): interface CSSUnitValue is not generated
-CSS.grad(value): interface CSSUnitValue is not generated
 CSS.highlights: interface HighlightRegistry is not generated
-CSS.ic(value): interface CSSUnitValue is not generated
-CSS.in(value): interface CSSUnitValue is not generated
-CSS.kHz(value): interface CSSUnitValue is not generated
 CSS.layoutWorklet: interface Worklet is not generated
-CSS.lh(value): interface CSSUnitValue is not generated
-CSS.lvb(value): interface CSSUnitValue is not generated
-CSS.lvh(value): interface CSSUnitValue is not generated
-CSS.lvi(value): interface CSSUnitValue is not generated
-CSS.lvmax(value): interface CSSUnitValue is not generated
-CSS.lvmin(value): interface CSSUnitValue is not generated
-CSS.lvw(value): interface CSSUnitValue is not generated
-CSS.mm(value): interface CSSUnitValue is not generated
-CSS.ms(value): interface CSSUnitValue is not generated
-CSS.number(value): interface CSSUnitValue is not generated
 CSS.paintWorklet: interface Worklet is not generated
 CSS.parseDeclaration(css, options): interface CSSParserDeclaration is not generated
 CSS.parseDeclarationList(css, options): interface CSSParserRule is not generated
 CSS.parseRule(css, options): interface CSSParserRule is not generated
 CSS.parseRuleList(css, options): interface CSSParserRule is not generated
 CSS.parseStylesheet(css, options): interface CSSParserRule is not generated
-CSS.pc(value): interface CSSUnitValue is not generated
-CSS.percent(value): interface CSSUnitValue is not generated
-CSS.pt(value): interface CSSUnitValue is not generated
-CSS.px(value): interface CSSUnitValue is not generated
-CSS.rad(value): interface CSSUnitValue is not generated
-CSS.rcap(value): interface CSSUnitValue is not generated
-CSS.rch(value): interface CSSUnitValue is not generated
-CSS.rem(value): interface CSSUnitValue is not generated
-CSS.rex(value): interface CSSUnitValue is not generated
-CSS.ric(value): interface CSSUnitValue is not generated
-CSS.rlh(value): interface CSSUnitValue is not generated
-CSS.s(value): interface CSSUnitValue is not generated
-CSS.svb(value): interface CSSUnitValue is not generated
-CSS.svh(value): interface CSSUnitValue is not generated
-CSS.svi(value): interface CSSUnitValue is not generated
-CSS.svmax(value): interface CSSUnitValue is not generated
-CSS.svmin(value): interface CSSUnitValue is not generated
-CSS.svw(value): interface CSSUnitValue is not generated
-CSS.turn(value): interface CSSUnitValue is not generated
-CSS.vb(value): interface CSSUnitValue is not generated
-CSS.vh(value): interface CSSUnitValue is not generated
-CSS.vi(value): interface CSSUnitValue is not generated
-CSS.vmax(value): interface CSSUnitValue is not generated
-CSS.vmin(value): interface CSSUnitValue is not generated
-CSS.vw(value): interface CSSUnitValue is not generated
 CSSFontFeatureValuesRule.annotation: interface CSSFontFeatureValuesMap is not generated
 CSSFontFeatureValuesRule.characterVariant: interface CSSFontFeatureValuesMap is not generated
 CSSFontFeatureValuesRule.historicalForms: interface CSSFontFeatureValuesMap is not generated
@@ -100,7 +37,6 @@ CSSFontFeatureValuesRule.ornaments: interface CSSFontFeatureValuesMap is not gen
 CSSFontFeatureValuesRule.styleset: interface CSSFontFeatureValuesMap is not generated
 CSSFontFeatureValuesRule.stylistic: interface CSSFontFeatureValuesMap is not generated
 CSSFontFeatureValuesRule.swash: interface CSSFontFeatureValuesMap is not generated
-CSSStyleRule.styleMap: interface StylePropertyMap is not generated
 DataTransferItem.getAsFileSystemHandle(): interface FileSystemHandle is not generated
 DataTransferItem.webkitGetAsEntry(): interface FileSystemEntry is not generated
 Document.caretPositionFromPoint(x, y, options): interface CaretPosition is not generated
@@ -110,7 +46,6 @@ Document.measureText(text, styleMap): interface FontMetrics is not generated
 Document.modelContext: interface ModelContext is not generated
 Document.namedFlows: interface NamedFlowMap is not generated
 Document.permissionsPolicy: interface PermissionsPolicy is not generated
-Element.computedStyleMap(): interface StylePropertyMapReadOnly is not generated
 Element.pseudo(type): interface CSSPseudoElement is not generated
 EventTarget.when(type, options): interface Observable is not generated
 FontFace.features: interface FontFaceFeatures is not generated
@@ -123,7 +58,6 @@ Gamepad.touches: not shipped (a later level's proposal)
 GamepadHapticActuator.pulse: not shipped (a later level's proposal)
 HTMLCameraElement.track: interface MediaStreamTrack is not generated
 HTMLCanvasElement.captureStream(frameRequestRate): interface MediaStream is not generated
-HTMLElement.attributeStyleMap: interface StylePropertyMap is not generated
 HTMLElement.editContext: interface EditContext is not generated
 HTMLFencedFrameElement.config: interface FencedFrameConfig is not generated
 HTMLGeolocationElement.error: interface GeolocationPositionError is not generated
@@ -176,7 +110,6 @@ OfflineAudioContext.close: not shipped (a later level's proposal)
 Performance.eventCounts: interface EventCounts is not generated
 PerformanceNavigationTiming.confidence: interface PerformanceTimingConfidence is not generated
 PerformanceNavigationTiming.notRestoredReasons: interface NotRestoredReasons is not generated
-SVGElement.attributeStyleMap: interface StylePropertyMap is not generated
 SVGPathElement.getPointAtLength: not shipped (a later level's proposal)
 SVGPathElement.getTotalLength: not shipped (a later level's proposal)
 SVGPathElement.pathLength: not shipped (a later level's proposal)

@@ -38,6 +38,7 @@
 //! Headless: `load_html`, [`Renderer::render_until_settled`], [`Renderer::render_png`].
 
 pub mod adapter;
+mod anchor;
 pub mod canvas;
 mod clip_ref;
 mod compositor_animations;

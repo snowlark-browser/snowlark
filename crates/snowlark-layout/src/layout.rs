@@ -411,6 +411,9 @@ pub(crate) struct Cx<'a, S: Style> {
     pub nested: Vec<crate::multicol::Nested>,
     /// Those boxes and their ancestors in the outer flow: their cached layouts are not theirs here.
     pub nested_path: Vec<BoxId>,
+    /// The boxes with anchor names (CSS Anchor Positioning 1 §2.1), gathered the first time a box
+    /// is positioned by an anchor in this pass.
+    pub anchors: std::cell::OnceCell<crate::anchor::AnchorIndex>,
 }
 
 impl<'a, S: Style> Cx<'a, S> {
@@ -592,51 +595,59 @@ impl<'a, S: Style> Cx<'a, S> {
     /// transform, filter, layout or paint containment: [`Style::establishes_fixed_cb`]); `None` for
     /// the initial containing block. Inline boxes a block was split out of are its ancestors here.
     pub fn containing_block_of(&self, id: BoxId) -> Option<BoxId> {
-        let fixed = self.tree.b(id).style.position() == Position::Fixed;
-        let mut child = id;
-        let mut cur = self.tree.b(id).parent;
-        while let Some(c) = cur {
-            for &i in self.tree.split_inline_ancestors(child) {
-                // (a non-atomic inline box is not transformable: positioning counts, and a filter,
-                // which Filter Effects 1 §5 applies to inline boxes too)
-                if self.tree.get(i).is_some_and(|b| {
-                    !fixed && b.style.position().is_positioned() || b.style.has_filter()
-                }) {
-                    return Some(i);
-                }
-            }
-            let b = self.tree.b(c);
-            let s = &b.style;
-            if b.has(flags::ROOT) {
-                // The root is the containing block of absolutely positioned boxes only when
-                // positioned, and of fixed ones when transformed (a filter on the root does not
-                // make it one: Filter Effects 1 §5).
-                return if !fixed && s.position().is_positioned() || s.has_transform() {
-                    Some(c)
-                } else {
-                    None
-                };
-            }
-            // Anonymous boxes and table wrappers inherit no positioning; the table box shares the
-            // element's style with its wrapper, so only the wrapper counts.
-            let counts = !b.is_anonymous() && b.kind != BoxKind::Table;
-            if counts {
-                let positioned = !fixed && s.position().is_positioned();
-                let establishes = if b.kind == BoxKind::Inline {
-                    s.has_filter()
-                } else {
-                    s.establishes_fixed_cb()
-                };
-                if positioned || establishes {
-                    return Some(c);
-                }
-            }
-            child = c;
-            cur = b.parent;
-        }
-        None
+        containing_block_in(self.tree, id)
     }
+}
 
+/// [`Cx::containing_block_of`] in `tree`: the containing block box `id` has when it is absolutely
+/// positioned (or fixed, as its `position` says).
+pub(crate) fn containing_block_in<S: Style>(tree: &BoxTree<S>, id: BoxId) -> Option<BoxId> {
+    let fixed = tree.b(id).style.position() == Position::Fixed;
+    let mut child = id;
+    let mut cur = tree.b(id).parent;
+    while let Some(c) = cur {
+        for &i in tree.split_inline_ancestors(child) {
+            // (a non-atomic inline box is not transformable: positioning counts, and a filter,
+            // which Filter Effects 1 §5 applies to inline boxes too)
+            if tree.get(i).is_some_and(|b| {
+                !fixed && b.style.position().is_positioned() || b.style.has_filter()
+            }) {
+                return Some(i);
+            }
+        }
+        let b = tree.b(c);
+        let s = &b.style;
+        if b.has(flags::ROOT) {
+            // The root is the containing block of absolutely positioned boxes only when
+            // positioned, and of fixed ones when transformed (a filter on the root does not
+            // make it one: Filter Effects 1 §5).
+            return if !fixed && s.position().is_positioned() || s.has_transform() {
+                Some(c)
+            } else {
+                None
+            };
+        }
+        // Anonymous boxes and table wrappers inherit no positioning; the table box shares the
+        // element's style with its wrapper, so only the wrapper counts.
+        let counts = !b.is_anonymous() && b.kind != BoxKind::Table;
+        if counts {
+            let positioned = !fixed && s.position().is_positioned();
+            let establishes = if b.kind == BoxKind::Inline {
+                s.has_filter()
+            } else {
+                s.establishes_fixed_cb()
+            };
+            if positioned || establishes {
+                return Some(c);
+            }
+        }
+        child = c;
+        cur = b.parent;
+    }
+    None
+}
+
+impl<'a, S: Style> Cx<'a, S> {
     /// A new out-of-flow candidate for `id` at a static position (relative to the fragment of the box
     /// whose layout is running).
     pub fn oof_candidate(&self, id: BoxId, x: StaticPos, y: StaticPos) -> Oof {
@@ -660,7 +671,8 @@ impl<'a, S: Style> Cx<'a, S> {
         let mut rest = Vec::new();
         for c in candidates {
             if c.cb == Some(cb_box) {
-                let (child, more) = crate::positioned::layout_absolute(self, c, padding_box);
+                let (child, more) =
+                    crate::positioned::layout_absolute(self, c, padding_box, children);
                 children.push(child);
                 rest.extend(more);
             } else {
