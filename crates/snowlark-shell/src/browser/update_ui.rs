@@ -54,7 +54,10 @@ impl Browser {
             match updates.outcome() {
                 Some(Outcome::Staged(_)) => Some(UpdatePrompt::Restart),
                 Some(Outcome::CannotWrite { page, .. }) => Some(UpdatePrompt::Manual { page }),
-                _ => None,
+                Some(o) => o.shown().map(|reason| UpdatePrompt::Failed {
+                    reason: reason.to_owned(),
+                }),
+                None => None,
             }
         };
         let Some(prompt) = prompt else {
@@ -116,6 +119,12 @@ impl Browser {
             (_, UpdateHit::Close) => {}
             (UpdatePrompt::Consent, UpdateHit::Button(i)) => self.answer_update_question(i == 1),
             (UpdatePrompt::Restart, UpdateHit::Button(_)) => self.restart_into_update(window),
+            (UpdatePrompt::Failed { .. }, UpdateHit::Button(_)) => {
+                if let Ok(url) = snowlark_net::Url::parse(crate::update::RELEASES_PAGE) {
+                    self.open_tab(url, Placement::End);
+                    self.chrome_dirty = true;
+                }
+            }
             (UpdatePrompt::Manual { page }, UpdateHit::Button(_)) => {
                 let url = crate::update::feed::is_https_or_local(&page)
                     .then(|| snowlark_net::Url::parse(&page).ok())

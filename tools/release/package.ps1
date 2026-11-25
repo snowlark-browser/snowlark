@@ -163,9 +163,27 @@ $readme = $readme.Replace('{DATE}', $date).Replace('{SHA}', $sha).Replace("`r`n"
 
 $zip = Join-Path $OutDir "$name.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-# (the folder itself is the zip's one top-level entry, so unzipping makes one folder)
-[IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip, [IO.Compression.CompressionLevel]::Optimal, $true)
+# The folder is the zip's one top-level entry, so unzipping makes one folder. Entry names use '/', as the zip
+# format requires (APPNOTE 4.4.17): Windows PowerShell's ZipFile.CreateFromDirectory writes '\', which the
+# browser's update check refuses as an unsafe name, so the entries are added one by one.
+$archive = [IO.Compression.ZipFile]::Open($zip, 'Create')
+try {
+    foreach ($f in Get-ChildItem $stage -File | Sort-Object Name) {
+        [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $f.FullName, "$name/$($f.Name)",
+            [IO.Compression.CompressionLevel]::Optimal)
+    }
+} finally {
+    $archive.Dispose()
+}
+$check = [IO.Compression.ZipFile]::OpenRead($zip)
+try {
+    $bad = @($check.Entries | Where-Object { $_.FullName.Contains('\') -or -not $_.FullName.StartsWith("$name/") })
+    if ($bad.Count -gt 0) { throw "the zip has entries the update check refuses: $($bad.FullName -join ', ')" }
+} finally {
+    $check.Dispose()
+}
 
 $size = (Get-Item $zip).Length
 $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()

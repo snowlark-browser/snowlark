@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! The updates' prompt at the top right of the window (as the "Restore pages?" one): whether to
-//! check for new versions, that a new version is ready after a restart, or that one can be
-//! downloaded by hand. A title, a few wrapped lines, buttons and a close button, drawn in the
+//! check for new versions, that a new version is ready after a restart, that one can be
+//! downloaded by hand, or that the check or the download failed (with the reason). A title, a few wrapped lines, buttons and a close button, drawn in the
 //! window's overlay; it stays until answered or closed.
 
 use snowlark_paint::{BoxShadow, Color, DisplayListBuilder, Point, Radii, Rect, Size};
@@ -27,6 +27,8 @@ pub enum UpdatePrompt {
     Restart,
     /// A new version exists, but the browser's folder cannot be written: its page.
     Manual { page: String },
+    /// The check or the download failed: why. The way out is the releases' page.
+    Failed { reason: String },
 }
 
 /// A part of the prompt that does something.
@@ -63,18 +65,22 @@ impl UpdateBubble {
             UpdatePrompt::Consent => "Check for new versions?",
             UpdatePrompt::Restart => "Snowlark has been updated",
             UpdatePrompt::Manual { .. } => "A new version of Snowlark is available",
+            UpdatePrompt::Failed { .. } => "Snowlark couldn't update",
         }
     }
 
-    fn text(&self) -> &'static str {
-        match self.prompt {
+    fn text(&self) -> String {
+        match &self.prompt {
             UpdatePrompt::Consent => {
-                "Snowlark can ask github.com once a day for its list of releases and download a newer version in the background. Nothing is sent until you say yes; you can change this in Settings, About Snowlark."
+                "Snowlark can ask github.com once a day for its list of releases and download a newer version in the background. Nothing is sent until you say yes; you can change this in Settings, About Snowlark.".into()
             }
-            UpdatePrompt::Restart => "Restart to apply. Your tabs will come back.",
+            UpdatePrompt::Restart => "Restart to apply. Your tabs will come back.".into(),
             UpdatePrompt::Manual { .. } => {
-                "Snowlark can't update the folder it runs from. Download the new version from its release page."
+                "Snowlark can't update the folder it runs from. Download the new version from its release page.".into()
             }
+            UpdatePrompt::Failed { reason } => format!(
+                "The update could not be completed: {reason}. You can download the newest version from the release page; Snowlark tries again tomorrow."
+            ),
         }
     }
 
@@ -83,14 +89,14 @@ impl UpdateBubble {
         match self.prompt {
             UpdatePrompt::Consent => &["No", "Yes"],
             UpdatePrompt::Restart => &["Restart"],
-            UpdatePrompt::Manual { .. } => &["Open release page"],
+            UpdatePrompt::Manual { .. } | UpdatePrompt::Failed { .. } => &["Open release page"],
         }
     }
 
     pub fn place(&mut self, area: Size, fonts: &Fonts) {
         let w = WIDTH.min((area.width - 8.0).max(220.0));
         self.lines =
-            crate::tooltip::wrap(self.text(), w - 2.0 * PAD, |s| fonts.width(s, TEXT_SIZE));
+            crate::tooltip::wrap(&self.text(), w - 2.0 * PAD, |s| fonts.width(s, TEXT_SIZE));
         let h = 44.0 + self.lines.len() as f32 * LINE + 14.0 + BUTTON_HEIGHT + 14.0;
         self.rect = Rect::new((area.width - w - 8.0).max(4.0), 4.0, w, h);
     }
@@ -238,5 +244,11 @@ mod tests {
         let page = "https://example.test/r".to_owned();
         let m = UpdateBubble::new(UpdatePrompt::Manual { page }, Size::new(800.0, 400.0), &f);
         assert_eq!(m.buttons(), ["Open release page"]);
+        let reason = "the zip: a name with a backslash".to_owned();
+        let failed =
+            UpdateBubble::new(UpdatePrompt::Failed { reason }, Size::new(800.0, 400.0), &f);
+        assert_eq!(failed.buttons(), ["Open release page"]);
+        assert_eq!(failed.title(), "Snowlark couldn't update");
+        assert!(failed.text().contains("a name with a backslash"));
     }
 }

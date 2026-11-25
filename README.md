@@ -12,7 +12,11 @@ Where a proven component exists as a library, Snowlark uses it:
 - WebGL: [ANGLE](https://chromium.googlesource.com/angle/angle)
 - Web font sanitizing: [OTS](https://github.com/khaledhosny/ots), before any font reaches the system's font stack
 - Content blocking: [adblock-rust](https://github.com/brave/adblock-rust)
-- Drawing, text, images and media decoding: Windows' Direct2D, DirectWrite, WIC and Media Foundation
+- Images: decoded in Rust ([png](https://crates.io/crates/png), [zune-jpeg](https://crates.io/crates/zune-jpeg),
+  [gif](https://crates.io/crates/gif), [image-webp](https://crates.io/crates/image-webp)), AVIF through
+  [CrabbyAvif](https://github.com/webmproject/CrabbyAvif) with [dav1d](https://code.videolan.org/videolan/dav1d),
+  colour profiles applied with [qcms](https://crates.io/crates/qcms)
+- Drawing, text and media decoding: Windows' Direct2D, DirectWrite and Media Foundation
 - Many smaller Rust crates, listed with their licences on the browser's credits page
 
 The rest has no reusable form outside a whole engine: the DOM, the JavaScript bindings (generated from the

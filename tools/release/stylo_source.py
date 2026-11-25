@@ -28,11 +28,11 @@ _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 
 import devenv  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
-# The commit that added vendor/stylo, unmodified ("Vendor stylo 0.22.0 unmodified").
-BASE = "24868de7"
-VERSION = "0.22.0"
-# servo/stylo's commit the 0.22.0 package was made from (its .cargo_vcs_info.json), folder `style`.
-UPSTREAM_COMMIT = "34d25f741765a0bdb894f8271852e633299352d8"
+# The commit that put the unmodified release into vendor/stylo ("stylo 0.24.0 from crates.io, unmodified").
+BASE = "21d9f425"
+VERSION = "0.24.0"
+# servo/stylo's commit the 0.24.0 package was made from (its .cargo_vcs_info.json), folder `style`.
+UPSTREAM_COMMIT = "32359dc3f17780ee269980cb7a3a7f8597a1dc0e"
 
 
 def git(*args, binary=False):
@@ -58,7 +58,8 @@ def check_base():
         print(f"stylo {VERSION} is not in the crate cache: the base is not checked")
         return
     reg = regs[0]
-    base = tree(BASE)
+    # cargo's unpack marker is not part of the package (the 0.24.0 base commit happens to carry it)
+    base = {k: v for k, v in tree(BASE).items() if k.rsplit("/", 1)[-1] != ".cargo-ok"}
     released = {
         str(p.relative_to(reg)).replace("\\", "/"): p.read_bytes()
         for p in reg.rglob("*") if p.is_file() and p.name != ".cargo-ok"

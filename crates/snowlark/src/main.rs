@@ -99,6 +99,21 @@ fn run(
     {
         snowlark_paint::window::attach_parent_console();
     }
+    // The window processes leave the folder they were started in (a graphics driver writes a folder
+    // of its own to the current directory); the command line's file is made absolute first.
+    let start = args.get(1).filter(|a| !a.starts_with("--")).map(|a| {
+        snowlark_shell::working_dir::absolute_start(a)
+            .to_string_lossy()
+            .into_owned()
+    });
+    if window
+        || matches!(
+            args.get(1).map(String::as_str),
+            Some("--type=renderer" | "--type=gpu")
+        )
+    {
+        snowlark_shell::working_dir::leave_working_directory();
+    }
     match args.get(1).map(String::as_str) {
         Some("--eval") => {
             #[path = "cli/eval.rs"]
@@ -177,7 +192,7 @@ fn run(
         }
         // The browser window: no arguments (the home page) or an address.
         None => snowlark_shell::run(None, model, flags),
-        Some(a) if !a.starts_with("--") => snowlark_shell::run(Some(a), model, flags),
+        Some(a) if !a.starts_with("--") => snowlark_shell::run(start.as_deref(), model, flags),
         _ => {
             eprintln!("usage: snowlark [--process-model=tab|single] [--gpu-process] [--incognito] [<url>] | --eval <js> | --render <url> <png> [width] | --reftest <list> <outdir> | --video <url> <png> [--time T] [--wait S] | --media-types");
             2

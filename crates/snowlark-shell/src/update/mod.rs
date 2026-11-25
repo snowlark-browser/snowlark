@@ -8,7 +8,10 @@
 //!
 //! - Nothing is sent before the user said yes. The check is one request for the list of releases
 //!   ([`FEED`]) with a generic User-Agent, no cookies and no other identifier; a refusal (the
-//!   site's rate limit) is quietly left until the next day.
+//!   site's rate limit, or no network) is quietly left until the next day.
+//! - Any other failure (a download that does not match its checksum, a zip with unsafe names, an
+//!   unsigned executable, an unwritable profile) is kept in `state.json` (`lastError`, until a check
+//!   goes through) and shown once in the window ([`Outcome::shown`]), with the releases' page.
 //! - The check runs on a thread of its own at background priority, a few seconds after the first
 //!   window shows ([`FIRST_CHECK_AFTER`]); the window never waits for it.
 //! - A newer release ([`feed::newer`]) is downloaded, and kept only when the zip's SHA-256 is the
@@ -116,6 +119,8 @@ pub struct State {
     pub last_check: Option<u64>,
     /// A release downloaded, checked and unpacked, waiting for the next start.
     pub staged: Option<Staged>,
+    /// Why the last check failed, until a later check goes through.
+    pub last_error: Option<String>,
 }
 
 /// A staged release.
@@ -261,6 +266,21 @@ pub enum Outcome {
     Failed(String),
 }
 
+impl Outcome {
+    /// The reason to show the user, for a failure that is not the network's: a list of releases
+    /// that could not be asked for (no network, the site's rate limit) is left quietly, the rest is
+    /// not.
+    pub fn shown(&self) -> Option<&str> {
+        match self {
+            Outcome::Failed(e) if !e.starts_with(LIST_UNREACHED) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+/// How a failure to get the list of releases begins.
+const LIST_UNREACHED: &str = "the list of releases could not be asked for: ";
+
 /// One check, as the background thread runs it.
 pub struct Check<'a> {
     pub paths: &'a Paths,
@@ -277,8 +297,27 @@ pub struct Check<'a> {
 }
 
 impl Check<'_> {
-    /// Runs the check at `now`.
+    /// Runs the check at `now`; a failure is kept in the state, and a check that went through
+    /// clears the one before it.
     pub fn run(&self, now: u64) -> Outcome {
+        let outcome = self.attempt(now);
+        let mut state = State::load(self.paths);
+        let error = match &outcome {
+            Outcome::Failed(e) => Some(Some(e.clone())),
+            // (not due, or not wanted: the last failure stays)
+            Outcome::Nothing if state.last_check != Some(now) => None,
+            _ => Some(None),
+        };
+        if let Some(error) = error {
+            if state.last_error != error {
+                state.last_error = error;
+                let _ = state.save(self.paths);
+            }
+        }
+        outcome
+    }
+
+    fn attempt(&self, now: u64) -> Outcome {
         let mut state = State::load(self.paths);
         if let Some(s) = &state.staged {
             if self.paths.staged_dir(&s.name).is_dir() {
@@ -300,7 +339,10 @@ impl Check<'_> {
             .and_then(|b| feed::parse(&b))
         {
             Ok(l) => l,
-            Err(e) => return Outcome::Failed(format!("the list of releases: {e}")),
+            Err(e) if e.starts_with("not a list") => {
+                return Outcome::Failed(format!("the list of releases: {e}"))
+            }
+            Err(e) => return Outcome::Failed(format!("{LIST_UNREACHED}{e}")),
         };
         let Some(release) = feed::newer(&list, self.own) else {
             return Outcome::Nothing;

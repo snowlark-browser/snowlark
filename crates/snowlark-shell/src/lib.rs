@@ -78,6 +78,7 @@ pub mod update_bubble;
 pub mod view_source;
 pub mod widgets;
 pub mod window_state;
+pub mod working_dir;
 
 use snowlark_paint::window::{self, WindowOptions};
 pub use tab_host::ProcessModel;

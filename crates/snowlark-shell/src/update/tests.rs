@@ -227,6 +227,73 @@ fn a_download_whose_checksum_differs_is_deleted() {
 }
 
 #[test]
+fn a_failed_check_is_kept_in_the_state_and_shown_until_one_goes_through() {
+    let s = setup("failed");
+    let bad = Table::release(&"0".repeat(64));
+    let outcome = check(&s, &bad, &accept).run(5_000_000);
+    let reason = match &outcome {
+        Outcome::Failed(e) => e.clone(),
+        other => panic!("{other:?}"),
+    };
+    // (shown to the user, and kept in state.json for the next start)
+    assert_eq!(outcome.shown(), Some(reason.as_str()));
+    assert_eq!(State::load(&s.paths).last_error, Some(reason.clone()));
+    let json = std::fs::read_to_string(s.paths.state_file()).unwrap();
+    assert!(json.contains("\"lastError\""), "{json}");
+    // A start the same day is not due: nothing runs, the reason stays.
+    assert_eq!(check(&s, &bad, &accept).run(5_000_100), Outcome::Nothing);
+    assert_eq!(State::load(&s.paths).last_error, Some(reason));
+    // The next day's check goes through: the reason is gone.
+    let good = Table::release(&sha256_hex(&release_zip()));
+    let day = CHECK_EVERY.as_secs();
+    assert!(matches!(
+        check(&s, &good, &accept).run(5_000_000 + day + 1),
+        Outcome::Staged(_)
+    ));
+    assert_eq!(State::load(&s.paths).last_error, None);
+}
+
+#[test]
+fn a_list_that_could_not_be_asked_for_is_recorded_but_not_shown() {
+    let s = setup("offline");
+    // (no entries: every URL is an HTTP 404, as a refusal or no network is)
+    let nothing = Table {
+        entries: Vec::new(),
+        requests: Cell::new(0),
+    };
+    let outcome = check(&s, &nothing, &accept).run(5_000_000);
+    assert!(matches!(&outcome, Outcome::Failed(_)), "{outcome:?}");
+    assert_eq!(outcome.shown(), None);
+    assert!(State::load(&s.paths).last_error.is_some());
+    // A list that came but is not one is shown.
+    let junk = Table {
+        entries: vec![("/releases".into(), b"<html>".to_vec())],
+        requests: Cell::new(0),
+    };
+    let outcome = check(&s, &junk, &accept).run(5_000_000 + CHECK_EVERY.as_secs());
+    assert!(
+        outcome.shown().is_some_and(|e| e.contains("not a list")),
+        "{outcome:?}"
+    );
+}
+
+#[test]
+fn a_zip_with_backslash_names_fails_and_says_why() {
+    let s = setup("backslash");
+    let bad_zip = zip::tests::make(&[(&format!(r"{NEXT}\snowlark.exe"), b"MZ")]);
+    let mut fetch = Table::release(&sha256_hex(&bad_zip));
+    fetch.entries.retain(|(e, _)| e != &format!("{NEXT}.zip"));
+    fetch.entries.push((format!("{NEXT}.zip"), bad_zip));
+    let outcome = check(&s, &fetch, &accept).run(5_000_000);
+    assert!(
+        outcome.shown().is_some_and(|e| e.starts_with("the zip")),
+        "{outcome:?}"
+    );
+    assert!(!s.paths.staged_dir(NEXT).exists());
+    assert!(State::load(&s.paths).last_error.is_some());
+}
+
+#[test]
 fn an_update_by_another_signer_is_deleted() {
     let s = setup("signer");
     let fetch = Table::release(&sha256_hex(&release_zip()));
