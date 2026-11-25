@@ -58,7 +58,9 @@ pub trait OffscreenCanvasImpl {
         this: Handle,
         context_id: OffscreenRenderingContextId,
         options: JsValue,
-    ) -> Result<Option<OffscreenCanvasRenderingContext2DOrWebGLRenderingContext>>;
+    ) -> Result<
+        Option<OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext>,
+    >;
     #[cfg(feature = "stubs")]
     fn get_context(
         &self,
@@ -66,7 +68,9 @@ pub trait OffscreenCanvasImpl {
         this: Handle,
         context_id: OffscreenRenderingContextId,
         options: JsValue,
-    ) -> Result<Option<OffscreenCanvasRenderingContext2DOrWebGLRenderingContext>> {
+    ) -> Result<
+        Option<OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext>,
+    > {
         rt::stub("OffscreenCanvas.get_context")
     }
     /// ImageBitmap transferToImageBitmap();

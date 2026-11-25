@@ -6,6 +6,7 @@
 
 mod service;
 mod threads;
+mod webgl2;
 
 #[test]
 fn every_test_file_is_listed() {

@@ -157,12 +157,13 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   attribute-node paths are not implemented. Frames share the top-level document's time origin. (ref 33)
 - **XPath resolvers from another realm.** When a namespace resolver made in another frame is not callable, the
   `TypeError` is created and reported in the calling frame instead of the resolver's. (ref 661)
-- **WebGL 1 only, without extensions or video textures; no WebGL 2 or WebGPU.**
-  `getContext('webgl')` gives a WebGL 1 context (`docs/webgl.md`), also on an `OffscreenCanvas` and in a worker,
-  but `getSupportedExtensions()` is empty, textures do not load from video, and `getContext('webgl2')` and
-  `navigator.gpu` are absent. Pages that need those fall back to their 2D-canvas drawing where they have one:
-  Google Maps, whose smooth renderer needs WebGL 2, then zooms without its animation, the imagery grey until the
-  new level's tiles arrive. WebGL objects are freed only with the page. (ref 117, 682, 700, 732, 734)
+- **WebGL without extensions or video textures; no WebGPU.**
+  `getContext('webgl')` and `getContext('webgl2')` give WebGL 1 and WebGL 2 contexts (`docs/webgl.md`), also on
+  an `OffscreenCanvas` and in a worker, but `getSupportedExtensions()` is empty, textures do not load from video,
+  and `navigator.gpu` is absent. WebGL 2 does not yet upload compressed textures from a pixel unpack buffer, an
+  image source into more than one layer of a 3D texture, or a sub-rectangle of an image source
+  (`UNPACK_ROW_LENGTH`, `UNPACK_SKIP_*`). Google Maps still zooms without its animation, the imagery grey until
+  the new level's tiles arrive. WebGL objects are freed only with the page. (ref 117, 682, 700, 732, 734)
 - **Service workers.** `navigator.serviceWorker` and the Cache API are not implemented. Pages that check for service
   workers print a warning. (ref 33)
 - **IndexedDB.** Names with lone surrogates are not supported, there is no storage partitioning by top-level site,

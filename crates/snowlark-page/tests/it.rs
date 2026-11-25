@@ -112,6 +112,7 @@ mod wasm_tasks;
 mod web_audio;
 mod web_storage;
 mod webgl;
+mod webgl2;
 mod wheel_legacy;
 mod xpath;
 

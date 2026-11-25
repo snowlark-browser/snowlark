@@ -27,6 +27,10 @@ use snowlark_gl::{Attributes, Backend, Command, ContextId, Kind, Query, Reply};
 use super::events::EventExt;
 use super::{Engine, InterfaceId, Object};
 
+#[path = "webgl2.rs"]
+mod webgl2;
+use webgl2::Gl2State;
+
 /// The OpenGL ES 2.0 and WebGL enums this file uses.
 mod c {
     pub const NO_ERROR: u32 = 0;
@@ -108,8 +112,11 @@ pub struct ContextObj {
     renderbuffer: Option<Handle>,
     program: Option<Handle>,
     active_unit: u32,
-    /// Per texture unit: TEXTURE_2D, TEXTURE_CUBE_MAP.
-    textures: Vec<[Option<Handle>; 2]>,
+    /// Per texture unit: TEXTURE_2D, TEXTURE_CUBE_MAP, and in WebGL 2.0 TEXTURE_3D,
+    /// TEXTURE_2D_ARRAY.
+    textures: Vec<[Option<Handle>; 4]>,
+    /// WebGL 2.0's bindings (empty in a WebGL 1.0 context).
+    gl2: Gl2State,
     attrib_buffers: Vec<Option<Handle>>,
     pack_alignment: i32,
     unpack_alignment: i32,
@@ -138,6 +145,13 @@ pub struct GlObject {
     pub links: u32,
     /// A framebuffer's attachments.
     pub attachments: Vec<(u32, Handle)>,
+    /// A vertex array's element array buffer and attribute buffers while it is not bound.
+    pub vao: Option<(Option<Handle>, Vec<Option<Handle>>)>,
+    /// A fence's checkpoint: its status is read only after the microtask checkpoint it was made
+    /// in (WebGL 2.0 §3.7.14: sync objects change state only between tasks).
+    pub epoch: u64,
+    /// A query's target, once it was begun.
+    pub target: u32,
 }
 
 /// Every WebGL object.
@@ -162,6 +176,7 @@ pub enum WebGlObject {
 impl WebGlObject {
     pub fn interface(&self) -> InterfaceId {
         match self {
+            WebGlObject::Context(c) if c.attributes.webgl2 => InterfaceId::WebGL2RenderingContext,
             WebGlObject::Context(_) => InterfaceId::WebGLRenderingContext,
             WebGlObject::Object(o) => match o.kind {
                 Kind::Buffer => InterfaceId::WebGLBuffer,
@@ -170,6 +185,11 @@ impl WebGlObject {
                 Kind::Renderbuffer => InterfaceId::WebGLRenderbuffer,
                 Kind::Shader => InterfaceId::WebGLShader,
                 Kind::Texture => InterfaceId::WebGLTexture,
+                Kind::Query => InterfaceId::WebGLQuery,
+                Kind::Sampler => InterfaceId::WebGLSampler,
+                Kind::Sync => InterfaceId::WebGLSync,
+                Kind::TransformFeedback => InterfaceId::WebGLTransformFeedback,
+                Kind::VertexArray => InterfaceId::WebGLVertexArrayObject,
             },
             WebGlObject::UniformLocation { .. } => InterfaceId::WebGLUniformLocation,
             WebGlObject::ActiveInfo { .. } => InterfaceId::WebGLActiveInfo,
@@ -198,11 +218,16 @@ impl WebGlObject {
                 );
                 objects.extend(c.textures.iter().flatten().flatten());
                 objects.extend(c.attrib_buffers.iter().flatten());
+                c.gl2.gc_refs(objects);
             }
             WebGlObject::Object(o) => {
                 objects.push(o.context);
                 objects.extend(&o.attached);
                 objects.extend(o.attachments.iter().map(|(_, h)| *h));
+                if let Some((element, attribs)) = &o.vao {
+                    objects.extend(element);
+                    objects.extend(attribs.iter().flatten());
+                }
             }
             WebGlObject::UniformLocation {
                 context, program, ..
@@ -223,6 +248,8 @@ pub struct GlState {
     pub contexts: FxHashMap<NodeId, Handle>,
     /// Canvases whose drawing buffer changed since the last rendering update.
     pub dirty: Vec<CanvasOwner>,
+    /// Microtask checkpoints so far (WebGL 2.0 fences change state only between them).
+    epoch: u64,
 }
 
 /// The pixels a canvas shows from a drawing buffer read back by the service (RGBA, bottom row
@@ -301,6 +328,11 @@ fn i32_array(cx: &mut Cx, v: &[i32]) -> JsValue {
     typed_array(cx, v.iter().flat_map(|x| x.to_le_bytes()).collect(), 4, 1)
 }
 
+/// A Uint32Array of the values' bits.
+fn u32_array(cx: &mut Cx, v: &[i32]) -> JsValue {
+    typed_array(cx, v.iter().flat_map(|x| x.to_le_bytes()).collect(), 4, 2)
+}
+
 fn bool_array(cx: &mut Cx, v: &[bool]) -> JsValue {
     let s = cx.scope();
     let items: Vec<v8::Local<v8::Value>> =
@@ -309,10 +341,20 @@ fn bool_array(cx: &mut Cx, v: &[bool]) -> JsValue {
     JsValue::new(s, a.into())
 }
 
-/// The element count of a uniform of `ty`, and whether it reads as floats, ints or booleans
-/// (0, 1, 2).
+/// The element count of a uniform of `ty`, and whether it reads as floats, ints, booleans or
+/// unsigned ints (0, 1, 2, 3).
 fn uniform_shape(ty: u32) -> (u8, u8) {
     match ty {
+        // OpenGL ES 3.0: non-square matrices (2x3, 2x4, 3x2, 3x4, 4x2, 4x3), unsigned ints and
+        // their vectors, and the samplers (int): 3D, 2D array, shadow, integer.
+        0x8B65 | 0x8B67 => (6, 0),
+        0x8B66 | 0x8B69 => (8, 0),
+        0x8B68 | 0x8B6A => (12, 0),
+        0x1405 => (1, 3),
+        0x8DC6 => (2, 3),
+        0x8DC7 => (3, 3),
+        0x8DC8 => (4, 3),
+        0x8B5F | 0x8DC1 | 0x8B62 | 0x8DC4 | 0x8DC5 | 0x8DCA..=0x8DCF | 0x8DD2..=0x8DD7 => (1, 1),
         0x1406 => (1, 0),
         0x8B50 => (2, 0),
         0x8B51 => (3, 0),
@@ -691,12 +733,13 @@ impl Engine {
         });
         self.gl_send(
             this,
-            if kind == Kind::Shader {
-                Command::CreateShader(id, shader_type)
-            } else {
-                Command::Create(kind, id)
+            match kind {
+                Kind::Shader => Command::CreateShader(id, shader_type),
+                Kind::Sync => Command::FenceSync(id),
+                _ => Command::Create(kind, id),
             },
         );
+        let epoch = self.gl.borrow().epoch;
         self.alloc(Object::WebGl(Box::new(WebGlObject::Object(GlObject {
             context: this,
             kind,
@@ -709,7 +752,20 @@ impl Engine {
             attached: Vec::new(),
             links: 0,
             attachments: Vec::new(),
+            vao: (kind == Kind::VertexArray).then(|| {
+                let attribs = self.gl_ctx(this, |c| c.attrib_buffers.len());
+                (None, vec![None; attribs])
+            }),
+            epoch,
+            target: 0,
         }))))
+    }
+
+    /// A microtask checkpoint ran: fences made before it may report their status.
+    pub(crate) fn webgl_checkpoint(&self) {
+        if let Ok(mut gl) = self.gl.try_borrow_mut() {
+            gl.epoch += 1;
+        }
     }
 
     fn gl_delete(&self, this: Handle, h: Option<Handle>, kind: Kind) {
@@ -746,6 +802,7 @@ impl Engine {
                     *a = None;
                 }
             }
+            c.forget(h);
         });
         self.gl_send(this, Command::Delete(kind, id));
     }
@@ -759,7 +816,11 @@ impl Engine {
             o.context == this
                 && o.kind == kind
                 && !o.deleted
-                && (o.bound || matches!(kind, Kind::Program | Kind::Shader))
+                && (o.bound
+                    || matches!(
+                        kind,
+                        Kind::Program | Kind::Shader | Kind::Sampler | Kind::Sync
+                    ))
         })
         .unwrap_or(false)
     }
@@ -771,9 +832,11 @@ impl Engine {
         cx: &mut Cx,
         el: CanvasOwner,
         options: &JsValue,
+        webgl2: bool,
     ) -> rt::Result<Option<Handle>> {
         if let Some(h) = self.source_webgl(el) {
-            return Ok(Some(h));
+            // (a canvas with a WebGL 1.0 context has no WebGL 2.0 one, and the reverse)
+            return Ok((self.gl_ctx(h, |c| c.attributes.webgl2) == webgl2).then_some(h));
         }
         let o = if options.is_undefined(cx) {
             g::WebGLContextAttributes::default()
@@ -800,6 +863,7 @@ impl Engine {
             },
             fail_if_major_performance_caveat: o.fail_if_major_performance_caveat,
             desynchronized: o.desynchronized,
+            webgl2,
         };
         let (w, h) = self.source_size(el);
         let id = {
@@ -835,7 +899,8 @@ impl Engine {
                 renderbuffer: None,
                 program: None,
                 active_unit: 0,
-                textures: vec![[None, None]; units],
+                textures: vec![[None; 4]; units],
+                gl2: Gl2State::new(&created.limits, units),
                 attrib_buffers: vec![None; attribs],
                 pack_alignment: 4,
                 unpack_alignment: 4,
@@ -1206,11 +1271,16 @@ impl WebGLRenderingContextBaseImpl for Engine {
         let Some(id) = self.gl_check_opt(this, buffer, Kind::Buffer) else {
             return Ok(());
         };
-        match target {
-            c::ARRAY_BUFFER => self.gl_ctx(this, |c| c.array_buffer = buffer),
-            c::ELEMENT_ARRAY_BUFFER => self.gl_ctx(this, |c| c.element_buffer = buffer),
+        self.gl_ctx(this, |c| match target {
+            c::ARRAY_BUFFER => c.array_buffer = buffer,
+            c::ELEMENT_ARRAY_BUFFER => c.element_buffer = buffer,
+            _ if c.attributes.webgl2 => {
+                if let Some(slot) = webgl2::buffer_slot(target) {
+                    c.gl2.buffers[slot] = buffer;
+                }
+            }
             _ => {}
-        }
+        });
         if let Some(b) = buffer {
             self.gl_obj(b, |o| o.bound = true);
         }
@@ -1230,9 +1300,16 @@ impl WebGLRenderingContextBaseImpl for Engine {
         let Some(id) = self.gl_check_opt(this, framebuffer, Kind::Framebuffer) else {
             return Ok(());
         };
-        if target == c::FRAMEBUFFER {
-            self.gl_ctx(this, |c| c.framebuffer = framebuffer);
-        }
+        // (WebGL 2.0: FRAMEBUFFER binds both; DRAW_FRAMEBUFFER and READ_FRAMEBUFFER one each)
+        self.gl_ctx(this, |c| match target {
+            c::FRAMEBUFFER => {
+                c.framebuffer = framebuffer;
+                c.gl2.read_framebuffer = framebuffer;
+            }
+            webgl2::DRAW_FRAMEBUFFER if c.attributes.webgl2 => c.framebuffer = framebuffer,
+            webgl2::READ_FRAMEBUFFER if c.attributes.webgl2 => c.gl2.read_framebuffer = framebuffer,
+            _ => {}
+        });
         if let Some(b) = framebuffer {
             self.gl_obj(b, |o| o.bound = true);
         }
@@ -1274,9 +1351,12 @@ impl WebGLRenderingContextBaseImpl for Engine {
         let Some(id) = self.gl_check_opt(this, texture, Kind::Texture) else {
             return Ok(());
         };
+        let webgl2 = self.webgl_version_2(this);
         let slot = match target {
             c::TEXTURE_2D => Some(0),
             c::TEXTURE_CUBE_MAP => Some(1),
+            webgl2::TEXTURE_3D if webgl2 => Some(2),
+            webgl2::TEXTURE_2D_ARRAY if webgl2 => Some(3),
             _ => None,
         };
         if let Some(slot) = slot {
@@ -1731,6 +1811,11 @@ impl WebGLRenderingContextBaseImpl for Engine {
         if self.gl_lost(this) {
             return Ok(null(cx));
         }
+        if self.webgl_version_2(this) {
+            if let Some(v) = self.gl2_parameter(cx, this, pname) {
+                return Ok(v);
+            }
+        }
         let object = |h: Option<Handle>, cx: &mut Cx| match h {
             Some(h) => js(cx, &h),
             None => null(cx),
@@ -1740,7 +1825,7 @@ impl WebGLRenderingContextBaseImpl for Engine {
                 c.textures
                     .get(c.active_unit as usize)
                     .copied()
-                    .unwrap_or([None, None]),
+                    .unwrap_or([None; 4]),
                 (
                     c.array_buffer,
                     c.element_buffer,
@@ -1841,7 +1926,13 @@ impl WebGLRenderingContextBaseImpl for Engine {
         pname: u32,
     ) -> rt::Result<JsValue> {
         if pname == c::FRAMEBUFFER_ATTACHMENT_OBJECT_NAME {
-            let fb = self.gl_ctx(this, |c| c.framebuffer);
+            let fb = self.gl_ctx(this, |c| {
+                if target == webgl2::READ_FRAMEBUFFER && c.attributes.webgl2 {
+                    c.gl2.read_framebuffer
+                } else {
+                    c.framebuffer
+                }
+            });
             let Some(fb) = fb else {
                 self.gl_error(this, c::INVALID_OPERATION);
                 return Ok(null(cx));
@@ -1891,6 +1982,11 @@ impl WebGLRenderingContextBaseImpl for Engine {
                 })
             }
             c::ATTACHED_SHADERS | c::ACTIVE_ATTRIBUTES | c::ACTIVE_UNIFORMS => {
+                Ok(self.int_param(this, Query::Program(p, pname), cx))
+            }
+            // WebGL 2.0: TRANSFORM_FEEDBACK_BUFFER_MODE, TRANSFORM_FEEDBACK_VARYINGS,
+            // ACTIVE_UNIFORM_BLOCKS
+            0x8C7F | 0x8C83 | 0x8A36 if self.webgl_version_2(this) => {
                 Ok(self.int_param(this, Query::Program(p, pname), cx))
             }
             _ => {
@@ -2054,6 +2150,14 @@ impl WebGLRenderingContextBaseImpl for Engine {
         let (n, kind) = uniform_shape(ty);
         if n == 0 {
             return Ok(null(cx));
+        }
+        if kind == 3 {
+            // (unsigned: a Number, or a Uint32Array)
+            return Ok(match self.gl_query(this, Query::UniformU(p, location, n)) {
+                Some(Reply::Ints(v)) if n == 1 => js(cx, &(v.first().copied().unwrap_or(0) as u32)),
+                Some(Reply::Ints(v)) => u32_array(cx, &v),
+                _ => null(cx),
+            });
         }
         Ok(
             match self.gl_query(this, Query::Uniform(p, location, n, kind == 0)) {

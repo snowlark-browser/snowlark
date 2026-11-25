@@ -55147,15 +55147,16 @@ impl ToJs for CSSStyleValueOrString {
     }
 }
 
-/// `(CanvasRenderingContext2D or WebGLRenderingContext)`
+/// `(CanvasRenderingContext2D or WebGLRenderingContext or WebGL2RenderingContext)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum CanvasRenderingContext2DOrWebGLRenderingContext {
+pub enum CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext {
     CanvasRenderingContext2D(Handle),
     WebGLRenderingContext(Handle),
+    WebGL2RenderingContext(Handle),
 }
 
-impl CanvasRenderingContext2DOrWebGLRenderingContext {
+impl CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext {
     pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
         if rt::unwrap_value(
             v,
@@ -55164,15 +55165,7 @@ impl CanvasRenderingContext2DOrWebGLRenderingContext {
         )
         .is_some()
         {
-            return (rt::to_interface(
-                scope,
-                v,
-                ids::CANVAS_RENDERING_CONTEXT2_D,
-                ids::CANVAS_RENDERING_CONTEXT2_D_END,
-                "The value",
-                "CanvasRenderingContext2D",
-            ))
-            .map(CanvasRenderingContext2DOrWebGLRenderingContext::CanvasRenderingContext2D);
+            return (rt::to_interface(scope, v, ids::CANVAS_RENDERING_CONTEXT2_D, ids::CANVAS_RENDERING_CONTEXT2_D_END, "The value", "CanvasRenderingContext2D")).map(CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::CanvasRenderingContext2D);
         }
         if rt::unwrap_value(
             v,
@@ -55181,32 +55174,27 @@ impl CanvasRenderingContext2DOrWebGLRenderingContext {
         )
         .is_some()
         {
-            return (rt::to_interface(
-                scope,
-                v,
-                ids::WEB_GL_RENDERING_CONTEXT,
-                ids::WEB_GL_RENDERING_CONTEXT_END,
-                "The value",
-                "WebGLRenderingContext",
-            ))
-            .map(CanvasRenderingContext2DOrWebGLRenderingContext::WebGLRenderingContext);
+            return (rt::to_interface(scope, v, ids::WEB_GL_RENDERING_CONTEXT, ids::WEB_GL_RENDERING_CONTEXT_END, "The value", "WebGLRenderingContext")).map(CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::WebGLRenderingContext);
         }
-        rt::type_error(
-            scope,
-            "The value is not of type '(CanvasRenderingContext2D or WebGLRenderingContext)'",
+        if rt::unwrap_value(
+            v,
+            ids::WEB_GL2_RENDERING_CONTEXT,
+            ids::WEB_GL2_RENDERING_CONTEXT_END,
         )
+        .is_some()
+        {
+            return (rt::to_interface(scope, v, ids::WEB_GL2_RENDERING_CONTEXT, ids::WEB_GL2_RENDERING_CONTEXT_END, "The value", "WebGL2RenderingContext")).map(CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::WebGL2RenderingContext);
+        }
+        rt::type_error(scope, "The value is not of type '(CanvasRenderingContext2D or WebGLRenderingContext or WebGL2RenderingContext)'")
     }
 }
 
-impl ToJs for CanvasRenderingContext2DOrWebGLRenderingContext {
+impl ToJs for CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext {
     fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
         match self {
-            CanvasRenderingContext2DOrWebGLRenderingContext::CanvasRenderingContext2D(x) => {
-                x.to_js(scope)
-            }
-            CanvasRenderingContext2DOrWebGLRenderingContext::WebGLRenderingContext(x) => {
-                x.to_js(scope)
-            }
+            CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::CanvasRenderingContext2D(x) => x.to_js(scope),
+            CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::WebGLRenderingContext(x) => x.to_js(scope),
+            CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::WebGL2RenderingContext(x) => x.to_js(scope),
         }
     }
 }
@@ -56567,15 +56555,16 @@ impl ToJs for ObjectOrString {
     }
 }
 
-/// `(OffscreenCanvasRenderingContext2D or WebGLRenderingContext)`
+/// `(OffscreenCanvasRenderingContext2D or WebGLRenderingContext or WebGL2RenderingContext)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum OffscreenCanvasRenderingContext2DOrWebGLRenderingContext {
+pub enum OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext {
     OffscreenCanvasRenderingContext2D(Handle),
     WebGLRenderingContext(Handle),
+    WebGL2RenderingContext(Handle),
 }
 
-impl OffscreenCanvasRenderingContext2DOrWebGLRenderingContext {
+impl OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext {
     pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
         if rt::unwrap_value(
             v,
@@ -56584,7 +56573,7 @@ impl OffscreenCanvasRenderingContext2DOrWebGLRenderingContext {
         )
         .is_some()
         {
-            return (rt::to_interface(scope, v, ids::OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D, ids::OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D_END, "The value", "OffscreenCanvasRenderingContext2D")).map(OffscreenCanvasRenderingContext2DOrWebGLRenderingContext::OffscreenCanvasRenderingContext2D);
+            return (rt::to_interface(scope, v, ids::OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D, ids::OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D_END, "The value", "OffscreenCanvasRenderingContext2D")).map(OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::OffscreenCanvasRenderingContext2D);
         }
         if rt::unwrap_value(
             v,
@@ -56593,25 +56582,27 @@ impl OffscreenCanvasRenderingContext2DOrWebGLRenderingContext {
         )
         .is_some()
         {
-            return (rt::to_interface(
-                scope,
-                v,
-                ids::WEB_GL_RENDERING_CONTEXT,
-                ids::WEB_GL_RENDERING_CONTEXT_END,
-                "The value",
-                "WebGLRenderingContext",
-            ))
-            .map(OffscreenCanvasRenderingContext2DOrWebGLRenderingContext::WebGLRenderingContext);
+            return (rt::to_interface(scope, v, ids::WEB_GL_RENDERING_CONTEXT, ids::WEB_GL_RENDERING_CONTEXT_END, "The value", "WebGLRenderingContext")).map(OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::WebGLRenderingContext);
         }
-        rt::type_error(scope, "The value is not of type '(OffscreenCanvasRenderingContext2D or WebGLRenderingContext)'")
+        if rt::unwrap_value(
+            v,
+            ids::WEB_GL2_RENDERING_CONTEXT,
+            ids::WEB_GL2_RENDERING_CONTEXT_END,
+        )
+        .is_some()
+        {
+            return (rt::to_interface(scope, v, ids::WEB_GL2_RENDERING_CONTEXT, ids::WEB_GL2_RENDERING_CONTEXT_END, "The value", "WebGL2RenderingContext")).map(OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::WebGL2RenderingContext);
+        }
+        rt::type_error(scope, "The value is not of type '(OffscreenCanvasRenderingContext2D or WebGLRenderingContext or WebGL2RenderingContext)'")
     }
 }
 
-impl ToJs for OffscreenCanvasRenderingContext2DOrWebGLRenderingContext {
+impl ToJs for OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext {
     fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
         match self {
-            OffscreenCanvasRenderingContext2DOrWebGLRenderingContext::OffscreenCanvasRenderingContext2D(x) => x.to_js(scope),
-            OffscreenCanvasRenderingContext2DOrWebGLRenderingContext::WebGLRenderingContext(x) => x.to_js(scope),
+            OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::OffscreenCanvasRenderingContext2D(x) => x.to_js(scope),
+            OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::WebGLRenderingContext(x) => x.to_js(scope),
+            OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext::WebGL2RenderingContext(x) => x.to_js(scope),
         }
     }
 }
@@ -58323,6 +58314,47 @@ impl ToJs for TrustedScriptURLOrString {
         match self {
             TrustedScriptURLOrString::TrustedScriptURL(x) => x.to_js(scope),
             TrustedScriptURLOrString::String(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(Uint32Array or sequence<unsigned long>)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum Uint32ArrayOrUnsignedLongSequence {
+    Uint32Array(JsObject),
+    UnsignedLongSequence(Vec<u32>),
+}
+
+impl Uint32ArrayOrUnsignedLongSequence {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if v.is_uint32_array() {
+            return (rt::to_buffer(scope, v, true, "The value"))
+                .map(Uint32ArrayOrUnsignedLongSequence::Uint32Array);
+        }
+        if v.is_object() && rt::is_iterable(scope, v)? {
+            return ({
+                let mut out = Vec::new();
+                rt::iterate(scope, v, |scope, item| {
+                    out.push(rt::to_unsigned_long(scope, item, rt::IntMode::Wrap)?);
+                    Some(())
+                })
+                .map(|_| out)
+            })
+            .map(Uint32ArrayOrUnsignedLongSequence::UnsignedLongSequence);
+        }
+        rt::type_error(
+            scope,
+            "The value is not of type '(Uint32Array or sequence<unsigned long>)'",
+        )
+    }
+}
+
+impl ToJs for Uint32ArrayOrUnsignedLongSequence {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            Uint32ArrayOrUnsignedLongSequence::Uint32Array(x) => x.to_js(scope),
+            Uint32ArrayOrUnsignedLongSequence::UnsignedLongSequence(x) => x.to_js(scope),
         }
     }
 }

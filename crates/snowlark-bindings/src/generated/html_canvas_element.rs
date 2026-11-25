@@ -58,7 +58,7 @@ pub trait HTMLCanvasElementImpl {
         this: Handle,
         context_id: &str,
         options: JsValue,
-    ) -> Result<Option<CanvasRenderingContext2DOrWebGLRenderingContext>>;
+    ) -> Result<Option<CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext>>;
     #[cfg(feature = "stubs")]
     fn get_context(
         &self,
@@ -66,7 +66,8 @@ pub trait HTMLCanvasElementImpl {
         this: Handle,
         context_id: &str,
         options: JsValue,
-    ) -> Result<Option<CanvasRenderingContext2DOrWebGLRenderingContext>> {
+    ) -> Result<Option<CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext>>
+    {
         rt::stub("HTMLCanvasElement.get_context")
     }
     /// USVString toDataURL(optional DOMString type = "image/png", optional any quality);

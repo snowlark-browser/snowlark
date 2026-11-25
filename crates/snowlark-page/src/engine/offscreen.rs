@@ -449,8 +449,8 @@ impl OffscreenCanvasImpl for Engine {
     fn set_height(&self, _cx: &mut Cx, this: Handle, value: u64) -> rt::Result<()> {
         self.set_offscreen_dim(this, value, false)
     }
-    /// HTML §4.12.5.3 `getContext(contextId, options)`: "2d" and "webgl"; a canvas keeps the kind
-    /// it first gave (another kind is null). "bitmaprenderer", "webgl2" and "webgpu" are not
+    /// HTML §4.12.5.3 `getContext(contextId, options)`: "2d", "webgl" and "webgl2"; a canvas keeps
+    /// the kind it first gave (another kind is null). "bitmaprenderer" and "webgpu" are not
     /// supported here (null).
     fn get_context(
         &self,
@@ -458,31 +458,45 @@ impl OffscreenCanvasImpl for Engine {
         this: Handle,
         context_id: g::OffscreenRenderingContextId,
         options: JsValue,
-    ) -> rt::Result<Option<g::OffscreenCanvasRenderingContext2DOrWebGLRenderingContext>> {
-        use g::OffscreenCanvasRenderingContext2DOrWebGLRenderingContext as R;
+    ) -> rt::Result<
+        Option<g::OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext>,
+    > {
+        use g::OffscreenCanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext as R;
         use g::OffscreenRenderingContextId as Id;
         let mode = self.offscreen(this, |o| o.mode).unwrap_or(Mode::Detached);
+        let wrap = |c: Handle, webgl2: bool| {
+            if webgl2 {
+                R::WebGL2RenderingContext(c)
+            } else {
+                R::WebGLRenderingContext(c)
+            }
+        };
         match (context_id, mode) {
             (_, Mode::Detached) => Err(exception(
                 ExceptionName::InvalidStateError,
                 "The OffscreenCanvas is detached",
             )),
             (Id::_2d, Mode::TwoD(c)) => Ok(Some(R::OffscreenCanvasRenderingContext2D(c))),
-            (Id::Webgl, Mode::WebGl(c)) => Ok(Some(R::WebGLRenderingContext(c))),
+            (id @ (Id::Webgl | Id::Webgl2), Mode::WebGl(c)) => {
+                let webgl2 = id == Id::Webgl2;
+                Ok((self.webgl_version_2(c) == webgl2).then(|| wrap(c, webgl2)))
+            }
             (Id::_2d, Mode::None) => {
                 let c = self.new_offscreen_2d(this);
                 self.offscreen(this, |o| o.mode = Mode::TwoD(c));
                 Ok(Some(R::OffscreenCanvasRenderingContext2D(c)))
             }
-            (Id::Webgl, Mode::None) => {
-                let Some(c) = self.webgl_get_context(cx, CanvasOwner::Offscreen(this), &options)?
+            (id @ (Id::Webgl | Id::Webgl2), Mode::None) => {
+                let webgl2 = id == Id::Webgl2;
+                let Some(c) =
+                    self.webgl_get_context(cx, CanvasOwner::Offscreen(this), &options, webgl2)?
                 else {
                     return Ok(None);
                 };
                 self.offscreen(this, |o| o.mode = Mode::WebGl(c));
                 // (a placeholder shows the cleared drawing buffer from the next update)
                 self.offscreen_drew(this);
-                Ok(Some(R::WebGLRenderingContext(c)))
+                Ok(Some(wrap(c, webgl2)))
             }
             _ => Ok(None),
         }

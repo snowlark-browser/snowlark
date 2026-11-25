@@ -13,7 +13,7 @@ mod service;
 mod thread;
 
 pub use protocol::{
-    Attributes, Backend, Command, ContextId, Created, Kind, Query, Readback, Reply,
+    Attributes, Backend, Command, ContextId, Created, Kind, Pixels, Query, Readback, Reply,
 };
 pub use thread::Service;
 

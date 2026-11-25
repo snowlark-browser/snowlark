@@ -4,7 +4,8 @@
 
 //! The service: runs the protocol's commands on ANGLE.
 //!
-//! Each context is an OpenGL ES 2.0 context created in ANGLE's WebGL compatibility mode, so ANGLE
+//! Each context is an OpenGL ES 2.0 context (3.0 for WebGL 2.0) created in ANGLE's WebGL
+//! compatibility mode, so ANGLE
 //! applies WebGL's own validation rules and translates and validates shaders as WebGL requires;
 //! with robust buffer access (no out-of-bounds reads from buffers), robust resource initialization
 //! (new textures, buffers and drawing buffers read as zero), no client-side arrays, no implicit
@@ -52,6 +53,33 @@ const GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS: u32 = 0x8B4D;
 const GL_MAX_TEXTURE_IMAGE_UNITS: u32 = 0x8872;
 /// The largest readback the service makes for a page (bytes).
 const MAX_READ: u32 = 1 << 30;
+// OpenGL ES 3.0 state the service saves around its own drawing buffer work.
+const GL_READ_FRAMEBUFFER: u32 = 0x8CA8;
+const GL_READ_FRAMEBUFFER_BINDING: u32 = 0x8CAA;
+const GL_PIXEL_PACK_BUFFER: u32 = 0x88EB;
+const GL_PIXEL_PACK_BUFFER_BINDING: u32 = 0x88ED;
+const GL_PACK_ROW_LENGTH: u32 = 0x0D02;
+const GL_PACK_SKIP_ROWS: u32 = 0x0D03;
+const GL_PACK_SKIP_PIXELS: u32 = 0x0D04;
+const GL_READ_BUFFER: u32 = 0x0C02;
+const GL_RASTERIZER_DISCARD: u32 = 0x8C89;
+const GL_MAP_READ_BIT: u32 = 0x0001;
+const GL_UNIFORM_BLOCK_NAME_LENGTH: u32 = 0x8A41;
+const GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS: u32 = 0x8A42;
+const GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES: u32 = 0x8A43;
+const GL_TRANSFORM_FEEDBACK_VARYING_MAX_LENGTH: u32 = 0x8C76;
+const GL_NUM_SAMPLE_COUNTS: u32 = 0x9380;
+const GL_SAMPLES: u32 = 0x80A9;
+
+/// The length and pointer ANGLE's robust calls take for a 3D upload's pixels (an offset into the
+/// bound pixel unpack buffer is passed as the pointer, with a size of 0).
+fn pixels_arg(px: &Pixels) -> (i32, *const c_void) {
+    match px {
+        Pixels::None => (0, null()),
+        Pixels::Data(d) => (d.len() as i32, d.as_ptr().cast()),
+        Pixels::Offset(o) => (0, *o as usize as *const c_void),
+    }
+}
 
 struct Context {
     context: EGLContext,
@@ -62,6 +90,8 @@ struct Context {
     height: u32,
     /// Client ids to ANGLE's names.
     names: HashMap<(Kind, u32), u32>,
+    /// Client ids of fences to ANGLE's sync objects (pointers, kept as addresses).
+    syncs: HashMap<u32, usize>,
 }
 
 /// ANGLE on one Direct3D 11 device, and the contexts on it. Used from one thread only: the
@@ -142,8 +172,13 @@ impl Device {
         let mut best: Option<(u32, EGLConfig)> = None;
         for c in configs {
             let attr = |x| self.config_attrib(c, x);
+            let api = if a.webgl2 {
+                EGL_OPENGL_ES3_BIT
+            } else {
+                EGL_OPENGL_ES2_BIT
+            };
             if attr(EGL_SURFACE_TYPE) & EGL_PBUFFER_BIT == 0
-                || attr(EGL_RENDERABLE_TYPE) & EGL_OPENGL_ES2_BIT == 0
+                || attr(EGL_RENDERABLE_TYPE) & api == 0
                 || attr(EGL_RED_SIZE) != 8
                 || attr(EGL_GREEN_SIZE) != 8
                 || attr(EGL_BLUE_SIZE) != 8
@@ -265,10 +300,15 @@ impl Device {
             .collect()
     }
 
-    fn limits(&self) -> Limits {
+    fn limits(&self, es3: bool) -> Limits {
         let one = |p| self.get_ints(p, 1).first().copied().unwrap_or(0);
+        let three = |p| if es3 { one(p) } else { 0 };
         let dims = self.get_ints(GL_MAX_VIEWPORT_DIMS, 2);
         Limits {
+            max_uniform_buffer_bindings: three(0x8A2F),
+            max_transform_feedback_separate_attribs: three(0x8C8B),
+            max_draw_buffers: three(0x8824),
+            max_color_attachments: three(0x8CDF),
             max_texture_size: one(GL_MAX_TEXTURE_SIZE),
             max_cube_map_texture_size: one(GL_MAX_CUBE_MAP_TEXTURE_SIZE),
             max_renderbuffer_size: one(GL_MAX_RENDERBUFFER_SIZE),
@@ -302,7 +342,11 @@ impl Device {
                         Kind::Renderbuffer => (gl.glGenRenderbuffers)(1, &mut name),
                         Kind::Texture => (gl.glGenTextures)(1, &mut name),
                         Kind::Program => name = (gl.glCreateProgram)(),
-                        Kind::Shader => {}
+                        Kind::Query => (gl.glGenQueries)(1, &mut name),
+                        Kind::Sampler => (gl.glGenSamplers)(1, &mut name),
+                        Kind::TransformFeedback => (gl.glGenTransformFeedbacks)(1, &mut name),
+                        Kind::VertexArray => (gl.glGenVertexArrays)(1, &mut name),
+                        Kind::Shader | Kind::Sync => {}
                     }
                     if name != 0 {
                         if let Some(c) = self.contexts.get_mut(&id) {
@@ -316,6 +360,15 @@ impl Device {
                         if let Some(c) = self.contexts.get_mut(&id) {
                             c.names.insert((Kind::Shader, *client), name);
                         }
+                    }
+                }
+                C::Delete(Kind::Sync, client) => {
+                    if let Some(s) = self
+                        .contexts
+                        .get_mut(&id)
+                        .and_then(|c| c.syncs.remove(client))
+                    {
+                        (gl.glDeleteSync)(s as *const c_void);
                     }
                 }
                 C::Delete(kind, client) => {
@@ -333,6 +386,11 @@ impl Device {
                         Kind::Texture => (gl.glDeleteTextures)(1, &name),
                         Kind::Program => (gl.glDeleteProgram)(name),
                         Kind::Shader => (gl.glDeleteShader)(name),
+                        Kind::Query => (gl.glDeleteQueries)(1, &name),
+                        Kind::Sampler => (gl.glDeleteSamplers)(1, &name),
+                        Kind::TransformFeedback => (gl.glDeleteTransformFeedbacks)(1, &name),
+                        Kind::VertexArray => (gl.glDeleteVertexArrays)(1, &name),
+                        Kind::Sync => {}
                     }
                 }
                 C::ActiveTexture(t) => (gl.glActiveTexture)(*t),
@@ -516,6 +574,236 @@ impl Device {
                     *offset as usize as *const c_void,
                 ),
                 C::Viewport(x, y, w, h) => (gl.glViewport)(*x, *y, *w, *h),
+                C::BeginQuery(t, q) => (gl.glBeginQuery)(*t, n(Kind::Query, *q)),
+                C::BeginTransformFeedback(m) => (gl.glBeginTransformFeedback)(*m),
+                C::BindBufferBase(t, i, bb) => (gl.glBindBufferBase)(*t, *i, n(Kind::Buffer, *bb)),
+                C::BindBufferRange(t, i, bb, o, s) => {
+                    (gl.glBindBufferRange)(*t, *i, n(Kind::Buffer, *bb), *o as isize, *s as isize)
+                }
+                C::BindSampler(u, s) => (gl.glBindSampler)(*u, n(Kind::Sampler, *s)),
+                C::BindTransformFeedback(t, tf) => {
+                    (gl.glBindTransformFeedback)(*t, n(Kind::TransformFeedback, *tf))
+                }
+                C::BindVertexArray(v) => (gl.glBindVertexArray)(n(Kind::VertexArray, *v)),
+                C::BlitFramebuffer(r, mask, filter) => (gl.glBlitFramebuffer)(
+                    r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], *mask, *filter,
+                ),
+                C::ClearBufferfv(bf, db, v) => (gl.glClearBufferfv)(*bf, *db, v.as_ptr()),
+                C::ClearBufferiv(bf, db, v) => (gl.glClearBufferiv)(*bf, *db, v.as_ptr()),
+                C::ClearBufferuiv(bf, db, v) => (gl.glClearBufferuiv)(*bf, *db, v.as_ptr()),
+                C::ClearBufferfi(bf, db, d, s) => (gl.glClearBufferfi)(*bf, *db, *d, *s),
+                C::CompressedTexImage3D(t, level, f, w, h, d, border, data) => (gl
+                    .glCompressedTexImage3D)(
+                    *t,
+                    *level,
+                    *f,
+                    *w,
+                    *h,
+                    *d,
+                    *border,
+                    data.len() as i32,
+                    data.as_ptr().cast(),
+                ),
+                C::CompressedTexSubImage3D(t, level, x, y, z, w, h, d, f, data) => (gl
+                    .glCompressedTexSubImage3D)(
+                    *t,
+                    *level,
+                    *x,
+                    *y,
+                    *z,
+                    *w,
+                    *h,
+                    *d,
+                    *f,
+                    data.len() as i32,
+                    data.as_ptr().cast(),
+                ),
+                C::CopyBufferSubData(r, w, ro, wo, s) => {
+                    (gl.glCopyBufferSubData)(*r, *w, *ro as isize, *wo as isize, *s as isize)
+                }
+                C::CopyTexSubImage3D(t, level, xo, yo, zo, x, y, w, h) => {
+                    (gl.glCopyTexSubImage3D)(*t, *level, *xo, *yo, *zo, *x, *y, *w, *h)
+                }
+                C::DrawArraysInstanced(m, first, count, inst) => {
+                    (gl.glDrawArraysInstanced)(*m, *first, *count, *inst)
+                }
+                C::DrawBuffers(v) => (gl.glDrawBuffers)(v.len() as i32, v.as_ptr()),
+                C::DrawElementsInstanced(m, count, ty, offset, inst) => (gl
+                    .glDrawElementsInstanced)(
+                    *m,
+                    *count,
+                    *ty,
+                    *offset as usize as *const c_void,
+                    *inst,
+                ),
+                C::DrawRangeElements(m, start, end, count, ty, offset) => (gl.glDrawRangeElements)(
+                    *m,
+                    *start,
+                    *end,
+                    *count,
+                    *ty,
+                    *offset as usize as *const c_void,
+                ),
+                C::EndQuery(t) => (gl.glEndQuery)(*t),
+                C::EndTransformFeedback => (gl.glEndTransformFeedback)(),
+                C::FenceSync(client) => {
+                    // (SYNC_GPU_COMMANDS_COMPLETE, the one condition; no flags)
+                    let s = (gl.glFenceSync)(0x9117, 0);
+                    if !s.is_null() {
+                        if let Some(c) = self.contexts.get_mut(&id) {
+                            if let Some(old) = c.syncs.insert(*client, s as usize) {
+                                (gl.glDeleteSync)(old as *const c_void);
+                            }
+                        }
+                    }
+                }
+                C::FramebufferTextureLayer(t, a, tex, level, layer) => {
+                    (gl.glFramebufferTextureLayer)(*t, *a, n(Kind::Texture, *tex), *level, *layer)
+                }
+                C::InvalidateFramebuffer(t, v) => {
+                    (gl.glInvalidateFramebuffer)(*t, v.len() as i32, v.as_ptr())
+                }
+                C::InvalidateSubFramebuffer(t, v, [x, y, w, h]) => {
+                    (gl.glInvalidateSubFramebuffer)(*t, v.len() as i32, v.as_ptr(), *x, *y, *w, *h)
+                }
+                C::PauseTransformFeedback => (gl.glPauseTransformFeedback)(),
+                C::ReadBuffer(s) => (gl.glReadBuffer)(*s),
+                C::ReadPixelsOffset(x, y, w, h, f, ty, offset) => {
+                    // (with no pixel pack buffer bound, a buffer of size 0: ANGLE refuses the call
+                    // rather than writing to the offset as an address)
+                    let (mut written, mut cols, mut rows) = (0, 0, 0);
+                    (gl.glReadPixelsRobustANGLE)(
+                        *x,
+                        *y,
+                        *w,
+                        *h,
+                        *f,
+                        *ty,
+                        0,
+                        &mut written,
+                        &mut cols,
+                        &mut rows,
+                        *offset as usize as *mut c_void,
+                    )
+                }
+                C::RenderbufferStorageMultisample(t, s, f, w, h) => {
+                    (gl.glRenderbufferStorageMultisample)(*t, *s, *f, *w, *h)
+                }
+                C::ResumeTransformFeedback => (gl.glResumeTransformFeedback)(),
+                C::SamplerParameteri(s, p, v) => {
+                    (gl.glSamplerParameteri)(n(Kind::Sampler, *s), *p, *v)
+                }
+                C::SamplerParameterf(s, p, v) => {
+                    (gl.glSamplerParameterf)(n(Kind::Sampler, *s), *p, *v)
+                }
+                // (an offset with no pixel unpack buffer bound: a buffer of size 0, refused as
+                // above)
+                C::TexImage2DOffset(t, level, ifmt, w, h, border, f, ty, offset) => (gl
+                    .glTexImage2DRobustANGLE)(
+                    *t,
+                    *level,
+                    *ifmt,
+                    *w,
+                    *h,
+                    *border,
+                    *f,
+                    *ty,
+                    0,
+                    *offset as usize as *const c_void,
+                ),
+                C::TexSubImage2DOffset(t, level, x, y, w, h, f, ty, offset) => (gl
+                    .glTexSubImage2DRobustANGLE)(
+                    *t,
+                    *level,
+                    *x,
+                    *y,
+                    *w,
+                    *h,
+                    *f,
+                    *ty,
+                    0,
+                    *offset as usize as *const c_void,
+                ),
+                C::TexImage3D(t, level, ifmt, w, h, d, border, f, ty, px) => {
+                    let (len, ptr) = pixels_arg(px);
+                    (gl.glTexImage3DRobustANGLE)(
+                        *t, *level, *ifmt, *w, *h, *d, *border, *f, *ty, len, ptr,
+                    )
+                }
+                C::TexSubImage3D(t, level, x, y, z, w, h, d, f, ty, px) => {
+                    let (len, ptr) = pixels_arg(px);
+                    (gl.glTexSubImage3DRobustANGLE)(
+                        *t, *level, *x, *y, *z, *w, *h, *d, *f, *ty, len, ptr,
+                    )
+                }
+                C::TexStorage2D(t, levels, f, w, h) => (gl.glTexStorage2D)(*t, *levels, *f, *w, *h),
+                C::TexStorage3D(t, levels, f, w, h, d) => {
+                    (gl.glTexStorage3D)(*t, *levels, *f, *w, *h, *d)
+                }
+                C::TransformFeedbackVaryings(p, names, mode) => {
+                    let names: Vec<CString> = names
+                        .iter()
+                        .filter_map(|s| CString::new(s.as_str()).ok())
+                        .collect();
+                    let ptrs: Vec<*const i8> = names.iter().map(|s| s.as_ptr()).collect();
+                    (gl.glTransformFeedbackVaryings)(
+                        n(Kind::Program, *p),
+                        ptrs.len() as i32,
+                        ptrs.as_ptr(),
+                        *mode,
+                    )
+                }
+                C::UniformBlockBinding(p, i, bnd) => {
+                    (gl.glUniformBlockBinding)(n(Kind::Program, *p), *i, *bnd)
+                }
+                C::Uniformui(loc, size, v) => {
+                    let size = *size as usize;
+                    if !(1..=4).contains(&size) || v.is_empty() || v.len() % size != 0 {
+                        return;
+                    }
+                    let count = (v.len() / size) as i32;
+                    let f = [
+                        gl.glUniform1uiv,
+                        gl.glUniform2uiv,
+                        gl.glUniform3uiv,
+                        gl.glUniform4uiv,
+                    ];
+                    (f[size - 1])(*loc, count, v.as_ptr())
+                }
+                C::UniformMatrixNxM(loc, cols, rows, transpose, v) => {
+                    let f = match (*cols, *rows) {
+                        (2, 3) => gl.glUniformMatrix2x3fv,
+                        (2, 4) => gl.glUniformMatrix2x4fv,
+                        (3, 2) => gl.glUniformMatrix3x2fv,
+                        (3, 4) => gl.glUniformMatrix3x4fv,
+                        (4, 2) => gl.glUniformMatrix4x2fv,
+                        (4, 3) => gl.glUniformMatrix4x3fv,
+                        _ => return,
+                    };
+                    let per = *cols as usize * *rows as usize;
+                    if v.is_empty() || v.len() % per != 0 {
+                        return;
+                    }
+                    f(*loc, (v.len() / per) as i32, b(*transpose), v.as_ptr())
+                }
+                C::VertexAttribDivisor(i, d) => (gl.glVertexAttribDivisor)(*i, *d),
+                C::VertexAttribI(i, v) => (gl.glVertexAttribI4iv)(*i, v.as_ptr()),
+                C::VertexAttribIu(i, v) => (gl.glVertexAttribI4uiv)(*i, v.as_ptr()),
+                C::VertexAttribIPointer(i, size, ty, stride, offset) => {
+                    (gl.glVertexAttribIPointer)(
+                        *i,
+                        *size,
+                        *ty,
+                        *stride,
+                        *offset as usize as *const c_void,
+                    )
+                }
+                C::WaitSync(s) => {
+                    if let Some(s) = self.contexts.get(&id).and_then(|c| c.syncs.get(s)) {
+                        // (TIMEOUT_IGNORED)
+                        (gl.glWaitSync)(*s as *const c_void, 0, u64::MAX)
+                    }
+                }
             }
         }
     }
@@ -768,6 +1056,303 @@ impl Device {
                     Reply::None
                 }
                 Q::ResetStatus => Reply::Int((gl.glGetGraphicsResetStatusEXT)() as i32),
+                Q::Integers64(p, count) => {
+                    let count = (*count as usize).min(16);
+                    let mut v = [0i64; 16];
+                    let mut len = 0;
+                    (gl.glGetInteger64vRobustANGLE)(*p, count as i32, &mut len, v.as_mut_ptr());
+                    Reply::Int64s(v[..len.clamp(0, count as i32) as usize].to_vec())
+                }
+                Q::IndexedInteger64(t, i) => {
+                    let (mut v, mut len) = (0i64, 0);
+                    (gl.glGetInteger64i_vRobustANGLE)(*t, *i, 1, &mut len, &mut v);
+                    if len == 1 {
+                        Reply::Int64s(vec![v])
+                    } else {
+                        Reply::None
+                    }
+                }
+                Q::ClientWaitSync(s, flags, timeout) => {
+                    match self.contexts.get(&id).and_then(|c| c.syncs.get(s)) {
+                        Some(s) => {
+                            Reply::Int(
+                                (gl.glClientWaitSync)(*s as *const c_void, *flags, *timeout) as i32
+                            )
+                        }
+                        None => Reply::None,
+                    }
+                }
+                Q::SyncParameter(s, p) => {
+                    match self.contexts.get(&id).and_then(|c| c.syncs.get(s)) {
+                        Some(s) => {
+                            let (mut v, mut len) = (0, 0);
+                            (gl.glGetSynciv)(*s as *const c_void, *p, 1, &mut len, &mut v);
+                            if len == 1 {
+                                Reply::Int(v)
+                            } else {
+                                Reply::None
+                            }
+                        }
+                        None => Reply::None,
+                    }
+                }
+                Q::QueryParameter(q, p) => {
+                    let (mut v, mut len) = (0u32, 0);
+                    (gl.glGetQueryObjectuivRobustANGLE)(
+                        n(Kind::Query, *q),
+                        *p,
+                        1,
+                        &mut len,
+                        &mut v,
+                    );
+                    if len == 1 {
+                        Reply::Int(v as i32)
+                    } else {
+                        Reply::None
+                    }
+                }
+                Q::SamplerParameter(s, p, float) => {
+                    let mut len = 0;
+                    if *float {
+                        let mut v = 0f32;
+                        (gl.glGetSamplerParameterfvRobustANGLE)(
+                            n(Kind::Sampler, *s),
+                            *p,
+                            1,
+                            &mut len,
+                            &mut v,
+                        );
+                        if len == 1 {
+                            Reply::Floats(vec![v])
+                        } else {
+                            Reply::None
+                        }
+                    } else {
+                        let mut v = 0;
+                        (gl.glGetSamplerParameterivRobustANGLE)(
+                            n(Kind::Sampler, *s),
+                            *p,
+                            1,
+                            &mut len,
+                            &mut v,
+                        );
+                        if len == 1 {
+                            Reply::Int(v)
+                        } else {
+                            Reply::None
+                        }
+                    }
+                }
+                Q::BufferSubData(t, offset, len) => {
+                    let len = (*len).min(MAX_READ);
+                    if len == 0 {
+                        return Reply::Bytes(Vec::new());
+                    }
+                    let p =
+                        (gl.glMapBufferRange)(*t, *offset as isize, len as isize, GL_MAP_READ_BIT);
+                    if p.is_null() {
+                        return Reply::None;
+                    }
+                    // SAFETY: a successful read mapping of `len` bytes, read before it is unmapped.
+                    let bytes = std::slice::from_raw_parts(p as *const u8, len as usize).to_vec();
+                    (gl.glUnmapBuffer)(*t);
+                    Reply::Bytes(bytes)
+                }
+                Q::UniformIndices(p, names) => {
+                    let names: Vec<CString> = names
+                        .iter()
+                        .map(|s| CString::new(s.as_str()).unwrap_or_default())
+                        .collect();
+                    let ptrs: Vec<*const i8> = names.iter().map(|s| s.as_ptr()).collect();
+                    let mut out = vec![0u32; ptrs.len()];
+                    (gl.glGetUniformIndices)(
+                        n(Kind::Program, *p),
+                        ptrs.len() as i32,
+                        ptrs.as_ptr(),
+                        out.as_mut_ptr(),
+                    );
+                    Reply::Ints(out.into_iter().map(|v| v as i32).collect())
+                }
+                Q::ActiveUniforms(p, indices, pname) => {
+                    // (sentinel values: a refused call leaves them, and is answered with nothing)
+                    let mut out = vec![i32::MIN; indices.len()];
+                    (gl.glGetActiveUniformsiv)(
+                        n(Kind::Program, *p),
+                        indices.len() as i32,
+                        indices.as_ptr(),
+                        *pname,
+                        out.as_mut_ptr(),
+                    );
+                    if out.contains(&i32::MIN) {
+                        Reply::None
+                    } else {
+                        Reply::Ints(out)
+                    }
+                }
+                Q::UniformBlockIndex(p, name) => match CString::new(name.as_str()) {
+                    Ok(name) => Reply::Int((gl.glGetUniformBlockIndex)(
+                        n(Kind::Program, *p),
+                        name.as_ptr(),
+                    ) as i32),
+                    Err(_) => Reply::Int(-1),
+                },
+                Q::ActiveUniformBlockParameter(p, i, pname) => {
+                    let prog = n(Kind::Program, *p);
+                    let count = if *pname == GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES {
+                        let (mut v, mut len) = (0, 0);
+                        (gl.glGetActiveUniformBlockivRobustANGLE)(
+                            prog,
+                            *i,
+                            GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS,
+                            1,
+                            &mut len,
+                            &mut v,
+                        );
+                        v.clamp(0, 1 << 16) as usize
+                    } else {
+                        1
+                    };
+                    let mut out = vec![0i32; count.max(1)];
+                    let mut len = 0;
+                    (gl.glGetActiveUniformBlockivRobustANGLE)(
+                        prog,
+                        *i,
+                        *pname,
+                        out.len() as i32,
+                        &mut len,
+                        out.as_mut_ptr(),
+                    );
+                    if len <= 0 && count > 0 {
+                        return Reply::None;
+                    }
+                    out.truncate(len.clamp(0, out.len() as i32) as usize);
+                    Reply::Ints(out)
+                }
+                Q::ActiveUniformBlockName(p, i) => {
+                    let prog = n(Kind::Program, *p);
+                    let (mut max, mut len) = (0, 0);
+                    (gl.glGetActiveUniformBlockivRobustANGLE)(
+                        prog,
+                        *i,
+                        GL_UNIFORM_BLOCK_NAME_LENGTH,
+                        1,
+                        &mut len,
+                        &mut max,
+                    );
+                    if len != 1 {
+                        return Reply::String(None);
+                    }
+                    let mut buf = vec![0u8; max.clamp(1, 1 << 16) as usize];
+                    let mut out = 0;
+                    (gl.glGetActiveUniformBlockName)(
+                        prog,
+                        *i,
+                        buf.len() as i32,
+                        &mut out,
+                        buf.as_mut_ptr().cast(),
+                    );
+                    buf.truncate(out.clamp(0, buf.len() as i32) as usize);
+                    Reply::String(Some(String::from_utf8_lossy(&buf).into_owned()))
+                }
+                Q::FragDataLocation(p, name) => match CString::new(name.as_str()) {
+                    Ok(name) => Reply::Int((gl.glGetFragDataLocation)(
+                        n(Kind::Program, *p),
+                        name.as_ptr(),
+                    )),
+                    Err(_) => Reply::Int(-1),
+                },
+                Q::TransformFeedbackVarying(p, i) => {
+                    let prog = n(Kind::Program, *p);
+                    let (mut max, mut written) = (0, 0);
+                    (gl.glGetProgramivRobustANGLE)(
+                        prog,
+                        GL_TRANSFORM_FEEDBACK_VARYING_MAX_LENGTH,
+                        1,
+                        &mut written,
+                        &mut max,
+                    );
+                    let mut buf = vec![0u8; max.clamp(1, 1 << 16) as usize];
+                    let (mut len, mut size, mut ty) = (0, 0, 0u32);
+                    (gl.glGetTransformFeedbackVarying)(
+                        prog,
+                        *i,
+                        buf.len() as i32,
+                        &mut len,
+                        &mut size,
+                        &mut ty,
+                        buf.as_mut_ptr().cast(),
+                    );
+                    if ty == 0 {
+                        return Reply::ActiveInfo(None);
+                    }
+                    buf.truncate(len.clamp(0, buf.len() as i32) as usize);
+                    Reply::ActiveInfo(Some((size, ty, String::from_utf8_lossy(&buf).into_owned())))
+                }
+                Q::InternalformatParameter(t, f, p) => {
+                    let count = if *p == GL_SAMPLES {
+                        let (mut v, mut len) = (0, 0);
+                        (gl.glGetInternalformativRobustANGLE)(
+                            *t,
+                            *f,
+                            GL_NUM_SAMPLE_COUNTS,
+                            1,
+                            &mut len,
+                            &mut v,
+                        );
+                        if len != 1 {
+                            return Reply::None;
+                        }
+                        v.clamp(0, 64) as usize
+                    } else {
+                        1
+                    };
+                    let mut out = vec![0i32; count.max(1)];
+                    let mut len = 0;
+                    (gl.glGetInternalformativRobustANGLE)(
+                        *t,
+                        *f,
+                        *p,
+                        out.len() as i32,
+                        &mut len,
+                        out.as_mut_ptr(),
+                    );
+                    out.truncate(len.clamp(0, count as i32) as usize);
+                    Reply::Ints(out)
+                }
+                Q::UniformU(p, loc, count) => {
+                    let count = (*count as usize).min(16);
+                    let mut v = [0u32; 16];
+                    let mut len = 0;
+                    (gl.glGetUniformuivRobustANGLE)(
+                        n(Kind::Program, *p),
+                        *loc,
+                        (count * 4) as i32,
+                        &mut len,
+                        v.as_mut_ptr(),
+                    );
+                    Reply::Ints(
+                        v[..len.clamp(0, count as i32) as usize]
+                            .iter()
+                            .map(|x| *x as i32)
+                            .collect(),
+                    )
+                }
+                Q::VertexAttribI(i, p, unsigned) => {
+                    let mut v = [0i32; 4];
+                    let mut len = 0;
+                    if *unsigned {
+                        (gl.glGetVertexAttribIuivRobustANGLE)(
+                            *i,
+                            *p,
+                            4,
+                            &mut len,
+                            v.as_mut_ptr().cast(),
+                        );
+                    } else {
+                        (gl.glGetVertexAttribIivRobustANGLE)(*i, *p, 4, &mut len, v.as_mut_ptr());
+                    }
+                    Reply::Ints(v[..len.clamp(0, 4) as usize].to_vec())
+                }
             }
         }
     }
@@ -788,9 +1373,20 @@ impl Device {
         let at = |v: &[f32], i| v.get(i).copied().unwrap_or(0.0);
         let bit = |v: &[bool], i| v.get(i).copied().unwrap_or(true) as u8;
         let int = |v: &[i32]| v.first().copied().unwrap_or(0);
+        // (OpenGL ES 3.0: the read framebuffer is bound apart, and rasterizer discard stops a
+        // clear)
+        let es3 = a.webgl2.then(|| {
+            (
+                int(&self.get_ints(GL_READ_FRAMEBUFFER_BINDING, 1)),
+                self.get_bools(GL_RASTERIZER_DISCARD, 1).first() == Some(&true),
+            )
+        });
         // SAFETY: plain state calls on the current context; values were read from it.
         unsafe {
             (gl.glBindFramebuffer)(GL_FRAMEBUFFER, 0);
+            if es3.is_some_and(|(_, discard)| discard) {
+                (gl.glDisable)(GL_RASTERIZER_DISCARD);
+            }
             (gl.glDisable)(GL_SCISSOR_TEST);
             (gl.glClearColor)(0.0, 0.0, 0.0, 0.0);
             (gl.glColorMask)(1, 1, 1, 1);
@@ -822,6 +1418,12 @@ impl Device {
                 (gl.glEnable)(GL_SCISSOR_TEST);
             }
             (gl.glBindFramebuffer)(GL_FRAMEBUFFER, int(&fb) as u32);
+            if let Some((read, discard)) = es3 {
+                (gl.glBindFramebuffer)(GL_READ_FRAMEBUFFER, read as u32);
+                if discard {
+                    (gl.glEnable)(GL_RASTERIZER_DISCARD);
+                }
+            }
         }
     }
 }
@@ -840,7 +1442,7 @@ impl Backend for Device {
             .ok_or("no EGL config for the attributes")?;
         let mut attrs = vec![
             EGL_CONTEXT_MAJOR_VERSION,
-            2,
+            if a.webgl2 { 3 } else { 2 },
             EGL_CONTEXT_MINOR_VERSION,
             0,
             EGL_CONTEXT_WEBGL_COMPATIBILITY_ANGLE,
@@ -913,6 +1515,7 @@ impl Backend for Device {
                 width,
                 height,
                 names: HashMap::new(),
+                syncs: HashMap::new(),
             },
         );
         self.current = None;
@@ -922,7 +1525,7 @@ impl Backend for Device {
         }
         Ok(Created {
             attributes: granted,
-            limits: self.limits(),
+            limits: self.limits(a.webgl2),
         })
     }
 
@@ -990,9 +1593,30 @@ impl Backend for Device {
         let pack = self.get_ints(GL_PACK_ALIGNMENT, 1);
         let mut rgba = vec![0u8; (w * h * 4) as usize];
         let (mut written, mut cols, mut rows) = (0, 0, 0);
+        // OpenGL ES 3.0: the read framebuffer, the pixel pack buffer and the pack parameters
+        // apply to the readback too; they are set aside and put back.
+        let es3 = a.webgl2.then(|| {
+            let one = |p| self.get_ints(p, 1).first().copied().unwrap_or(0);
+            [
+                one(GL_READ_FRAMEBUFFER_BINDING),
+                one(GL_PIXEL_PACK_BUFFER_BINDING),
+                one(GL_PACK_ROW_LENGTH),
+                one(GL_PACK_SKIP_ROWS),
+                one(GL_PACK_SKIP_PIXELS),
+            ]
+        });
+        let mut read_buffer = None;
         // SAFETY: the buffer holds w*h*4 bytes and ANGLE is told so; state is put back after.
         unsafe {
             (gl.glBindFramebuffer)(GL_FRAMEBUFFER, 0);
+            if es3.is_some() {
+                (gl.glBindBuffer)(GL_PIXEL_PACK_BUFFER, 0);
+                (gl.glPixelStorei)(GL_PACK_ROW_LENGTH, 0);
+                (gl.glPixelStorei)(GL_PACK_SKIP_ROWS, 0);
+                (gl.glPixelStorei)(GL_PACK_SKIP_PIXELS, 0);
+                read_buffer = self.get_ints(GL_READ_BUFFER, 1).first().copied();
+                (gl.glReadBuffer)(GL_BACK);
+            }
             (gl.glPixelStorei)(GL_PACK_ALIGNMENT, 4);
             (gl.glReadPixelsRobustANGLE)(
                 0,
@@ -1008,7 +1632,17 @@ impl Backend for Device {
                 rgba.as_mut_ptr().cast(),
             );
             (gl.glPixelStorei)(GL_PACK_ALIGNMENT, pack.first().copied().unwrap_or(4));
+            if let Some(rb) = read_buffer {
+                (gl.glReadBuffer)(rb as u32);
+            }
             (gl.glBindFramebuffer)(GL_FRAMEBUFFER, fb.first().copied().unwrap_or(0) as u32);
+            if let Some([read, pack_buffer, row, skip_rows, skip_pixels]) = es3 {
+                (gl.glBindFramebuffer)(GL_READ_FRAMEBUFFER, read as u32);
+                (gl.glBindBuffer)(GL_PIXEL_PACK_BUFFER, pack_buffer as u32);
+                (gl.glPixelStorei)(GL_PACK_ROW_LENGTH, row);
+                (gl.glPixelStorei)(GL_PACK_SKIP_ROWS, skip_rows);
+                (gl.glPixelStorei)(GL_PACK_SKIP_PIXELS, skip_pixels);
+            }
         }
         if !a.preserve_drawing_buffer {
             self.clear_drawing_buffer(&a);

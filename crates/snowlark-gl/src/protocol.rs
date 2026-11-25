@@ -28,12 +28,15 @@ pub struct Attributes {
     pub power_preference: u8,
     pub fail_if_major_performance_caveat: bool,
     pub desynchronized: bool,
+    /// A WebGL 2.0 context, on OpenGL ES 3.0 (not a dictionary member: the context type asked).
+    pub webgl2: bool,
 }
 
 impl Default for Attributes {
     /// The dictionary's defaults.
     fn default() -> Self {
         Attributes {
+            webgl2: false,
             alpha: true,
             depth: true,
             stencil: false,
@@ -64,6 +67,11 @@ pub struct Limits {
     pub max_vertex_attribs: i32,
     pub max_combined_texture_image_units: i32,
     pub max_texture_image_units: i32,
+    /// OpenGL ES 3.0 only (0 in a WebGL 1.0 context).
+    pub max_uniform_buffer_bindings: i32,
+    pub max_transform_feedback_separate_attribs: i32,
+    pub max_draw_buffers: i32,
+    pub max_color_attachments: i32,
 }
 
 /// The kinds of objects the client names.
@@ -75,6 +83,21 @@ pub enum Kind {
     Renderbuffer,
     Shader,
     Texture,
+    // OpenGL ES 3.0:
+    Query,
+    Sampler,
+    /// A fence (made by [`Command::FenceSync`], not [`Command::Create`]).
+    Sync,
+    TransformFeedback,
+    VertexArray,
+}
+
+/// The pixels of a 3D upload: none (zeros), bytes, or an offset into the bound pixel unpack buffer.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Pixels {
+    None,
+    Data(Vec<u8>),
+    Offset(i64),
 }
 
 /// A command that returns nothing. Argument order follows the OpenGL ES 2.0 call; object
@@ -160,6 +183,83 @@ pub enum Command {
     /// index, size, type, normalized, stride, byte offset into the array buffer
     VertexAttribPointer(u32, i32, u32, bool, i32, i64),
     Viewport(i32, i32, i32, i32),
+    // OpenGL ES 3.0 (WebGL 2.0):
+    BeginQuery(u32, u32),
+    BeginTransformFeedback(u32),
+    /// target, index, buffer
+    BindBufferBase(u32, u32, u32),
+    /// target, index, buffer, offset, size
+    BindBufferRange(u32, u32, u32, i64, i64),
+    BindSampler(u32, u32),
+    BindTransformFeedback(u32, u32),
+    BindVertexArray(u32),
+    /// source and destination rectangles (x0, y0, x1, y1 each), mask, filter
+    BlitFramebuffer([i32; 8], u32, u32),
+    ClearBufferfv(u32, i32, [f32; 4]),
+    ClearBufferiv(u32, i32, [i32; 4]),
+    ClearBufferuiv(u32, i32, [u32; 4]),
+    ClearBufferfi(u32, i32, f32, i32),
+    /// target, level, internalformat, width, height, depth, border, data
+    CompressedTexImage3D(u32, i32, u32, i32, i32, i32, i32, Vec<u8>),
+    /// target, level, xoffset, yoffset, zoffset, width, height, depth, format, data
+    CompressedTexSubImage3D(u32, i32, i32, i32, i32, i32, i32, i32, u32, Vec<u8>),
+    /// read target, write target, read offset, write offset, size
+    CopyBufferSubData(u32, u32, i64, i64, i64),
+    /// target, level, xoffset, yoffset, zoffset, x, y, width, height
+    CopyTexSubImage3D(u32, i32, i32, i32, i32, i32, i32, i32, i32),
+    /// mode, first, count, instances
+    DrawArraysInstanced(u32, i32, i32, i32),
+    DrawBuffers(Vec<u32>),
+    /// mode, count, type, byte offset, instances
+    DrawElementsInstanced(u32, i32, u32, i64, i32),
+    /// mode, start, end, count, type, byte offset
+    DrawRangeElements(u32, u32, u32, i32, u32, i64),
+    EndQuery(u32),
+    EndTransformFeedback,
+    /// A new fence with the client id (SYNC_GPU_COMMANDS_COMPLETE, no flags).
+    FenceSync(u32),
+    /// target, attachment, texture, level, layer
+    FramebufferTextureLayer(u32, u32, u32, i32, i32),
+    InvalidateFramebuffer(u32, Vec<u32>),
+    /// target, attachments, x, y, width, height
+    InvalidateSubFramebuffer(u32, Vec<u32>, [i32; 4]),
+    PauseTransformFeedback,
+    ReadBuffer(u32),
+    /// x, y, width, height, format, type, offset into the bound pixel pack buffer
+    ReadPixelsOffset(i32, i32, i32, i32, u32, u32, i64),
+    /// target, samples, internalformat, width, height
+    RenderbufferStorageMultisample(u32, i32, u32, i32, i32),
+    ResumeTransformFeedback,
+    SamplerParameteri(u32, u32, i32),
+    SamplerParameterf(u32, u32, f32),
+    /// target, level, internalformat, width, height, border, format, type, offset into the bound
+    /// pixel unpack buffer
+    TexImage2DOffset(u32, i32, i32, i32, i32, i32, u32, u32, i64),
+    /// target, level, internalformat, width, height, depth, border, format, type, pixels
+    TexImage3D(u32, i32, i32, i32, i32, i32, i32, u32, u32, Pixels),
+    /// target, levels, internalformat, width, height
+    TexStorage2D(u32, i32, u32, i32, i32),
+    /// target, levels, internalformat, width, height, depth
+    TexStorage3D(u32, i32, u32, i32, i32, i32),
+    /// target, level, xoffset, yoffset, width, height, format, type, offset into the bound pixel
+    /// unpack buffer
+    TexSubImage2DOffset(u32, i32, i32, i32, i32, i32, u32, u32, i64),
+    /// target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, pixels
+    TexSubImage3D(u32, i32, i32, i32, i32, i32, i32, i32, u32, u32, Pixels),
+    /// program, varyings, buffer mode
+    TransformFeedbackVaryings(u32, Vec<String>, u32),
+    UniformBlockBinding(u32, u32, u32),
+    /// location, components per element (1 to 4), values
+    Uniformui(i32, u8, Vec<u32>),
+    /// location, columns, rows (2 to 4 each, not equal), transpose, values
+    UniformMatrixNxM(i32, u8, u8, bool, Vec<f32>),
+    VertexAttribDivisor(u32, u32),
+    VertexAttribI(u32, [i32; 4]),
+    VertexAttribIu(u32, [u32; 4]),
+    /// index, size, type, stride, byte offset into the array buffer
+    VertexAttribIPointer(u32, i32, u32, i32, i64),
+    /// A fence the server waits for (no flags, GL's TIMEOUT_IGNORED).
+    WaitSync(u32),
 }
 
 /// A command that answers.
@@ -198,6 +298,34 @@ pub enum Query {
     Finish,
     /// Whether the context was lost (a graphics reset): `glGetGraphicsResetStatus`.
     ResetStatus,
+    // OpenGL ES 3.0 (WebGL 2.0):
+    /// `glGetInteger64v` (pname, number of values).
+    Integers64(u32, u8),
+    /// `glGetInteger64i_v` (target, index).
+    IndexedInteger64(u32, u32),
+    /// fence, flags, timeout in nanoseconds: the status `glClientWaitSync` returns.
+    ClientWaitSync(u32, u32, u64),
+    SyncParameter(u32, u32),
+    QueryParameter(u32, u32),
+    /// sampler, pname, whether the value is a float
+    SamplerParameter(u32, u32, bool),
+    /// target, offset, length: the bytes of the bound buffer.
+    BufferSubData(u32, i64, u32),
+    UniformIndices(u32, Vec<String>),
+    /// program, uniform indices, pname
+    ActiveUniforms(u32, Vec<u32>, u32),
+    UniformBlockIndex(u32, String),
+    /// program, block index, pname
+    ActiveUniformBlockParameter(u32, u32, u32),
+    ActiveUniformBlockName(u32, u32),
+    FragDataLocation(u32, String),
+    TransformFeedbackVarying(u32, u32),
+    /// target, internalformat, pname
+    InternalformatParameter(u32, u32, u32),
+    /// program, location, number of values: unsigned values (as their bits)
+    UniformU(u32, i32, u8),
+    /// index, pname, unsigned: an integer attribute's current value
+    VertexAttribI(u32, u32, bool),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -213,6 +341,7 @@ pub enum Reply {
     /// rangeMin, rangeMax, precision
     Precision([i32; 3]),
     Bytes(Vec<u8>),
+    Int64s(Vec<i64>),
 }
 
 impl Reply {

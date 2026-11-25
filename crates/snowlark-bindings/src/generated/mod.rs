@@ -1157,6 +1157,12 @@ pub mod visual_viewport;
 pub use visual_viewport::VisualViewportImpl;
 pub mod wave_shaper_node;
 pub use wave_shaper_node::WaveShaperNodeImpl;
+pub mod web_gl2_rendering_context;
+pub use web_gl2_rendering_context::WebGL2RenderingContextImpl;
+pub mod web_gl2_rendering_context_base;
+pub use web_gl2_rendering_context_base::WebGL2RenderingContextBaseImpl;
+pub mod web_gl2_rendering_context_overloads;
+pub use web_gl2_rendering_context_overloads::WebGL2RenderingContextOverloadsImpl;
 pub mod web_gl_active_info;
 pub use web_gl_active_info::WebGLActiveInfoImpl;
 pub mod web_gl_buffer;
@@ -1169,6 +1175,8 @@ pub mod web_gl_object;
 pub use web_gl_object::WebGLObjectImpl;
 pub mod web_gl_program;
 pub use web_gl_program::WebGLProgramImpl;
+pub mod web_gl_query;
+pub use web_gl_query::WebGLQueryImpl;
 pub mod web_gl_renderbuffer;
 pub use web_gl_renderbuffer::WebGLRenderbufferImpl;
 pub mod web_gl_rendering_context;
@@ -1177,14 +1185,22 @@ pub mod web_gl_rendering_context_base;
 pub use web_gl_rendering_context_base::WebGLRenderingContextBaseImpl;
 pub mod web_gl_rendering_context_overloads;
 pub use web_gl_rendering_context_overloads::WebGLRenderingContextOverloadsImpl;
+pub mod web_gl_sampler;
+pub use web_gl_sampler::WebGLSamplerImpl;
 pub mod web_gl_shader;
 pub use web_gl_shader::WebGLShaderImpl;
 pub mod web_gl_shader_precision_format;
 pub use web_gl_shader_precision_format::WebGLShaderPrecisionFormatImpl;
+pub mod web_gl_sync;
+pub use web_gl_sync::WebGLSyncImpl;
 pub mod web_gl_texture;
 pub use web_gl_texture::WebGLTextureImpl;
+pub mod web_gl_transform_feedback;
+pub use web_gl_transform_feedback::WebGLTransformFeedbackImpl;
 pub mod web_gl_uniform_location;
 pub use web_gl_uniform_location::WebGLUniformLocationImpl;
+pub mod web_gl_vertex_array_object;
+pub use web_gl_vertex_array_object::WebGLVertexArrayObjectImpl;
 pub mod web_socket;
 pub use web_socket::WebSocketImpl;
 pub mod wheel_event;
@@ -2259,48 +2275,60 @@ pub mod ids {
     pub const VIEW_TRANSITION_END: u16 = 511;
     pub const VIEW_TRANSITION_TYPE_SET: u16 = 511;
     pub const VIEW_TRANSITION_TYPE_SET_END: u16 = 512;
-    pub const WEB_GL_ACTIVE_INFO: u16 = 512;
-    pub const WEB_GL_ACTIVE_INFO_END: u16 = 513;
-    pub const WEB_GL_OBJECT: u16 = 513;
-    pub const WEB_GL_OBJECT_END: u16 = 520;
-    pub const WEB_GL_BUFFER: u16 = 514;
-    pub const WEB_GL_BUFFER_END: u16 = 515;
-    pub const WEB_GL_FRAMEBUFFER: u16 = 515;
-    pub const WEB_GL_FRAMEBUFFER_END: u16 = 516;
-    pub const WEB_GL_PROGRAM: u16 = 516;
-    pub const WEB_GL_PROGRAM_END: u16 = 517;
-    pub const WEB_GL_RENDERBUFFER: u16 = 517;
-    pub const WEB_GL_RENDERBUFFER_END: u16 = 518;
-    pub const WEB_GL_SHADER: u16 = 518;
-    pub const WEB_GL_SHADER_END: u16 = 519;
-    pub const WEB_GL_TEXTURE: u16 = 519;
-    pub const WEB_GL_TEXTURE_END: u16 = 520;
-    pub const WEB_GL_RENDERING_CONTEXT: u16 = 520;
-    pub const WEB_GL_RENDERING_CONTEXT_END: u16 = 521;
-    pub const WEB_GL_SHADER_PRECISION_FORMAT: u16 = 521;
-    pub const WEB_GL_SHADER_PRECISION_FORMAT_END: u16 = 522;
-    pub const WEB_GL_UNIFORM_LOCATION: u16 = 522;
-    pub const WEB_GL_UNIFORM_LOCATION_END: u16 = 523;
-    pub const WORKER_LOCATION: u16 = 523;
-    pub const WORKER_LOCATION_END: u16 = 524;
-    pub const WORKER_NAVIGATOR: u16 = 524;
-    pub const WORKER_NAVIGATOR_END: u16 = 525;
-    pub const WRITABLE_STREAM: u16 = 525;
-    pub const WRITABLE_STREAM_END: u16 = 526;
-    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER: u16 = 526;
-    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 527;
-    pub const WRITABLE_STREAM_DEFAULT_WRITER: u16 = 527;
-    pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 528;
-    pub const XML_SERIALIZER: u16 = 528;
-    pub const XML_SERIALIZER_END: u16 = 529;
-    pub const X_PATH_EVALUATOR: u16 = 529;
-    pub const X_PATH_EVALUATOR_END: u16 = 530;
-    pub const X_PATH_EXPRESSION: u16 = 530;
-    pub const X_PATH_EXPRESSION_END: u16 = 531;
-    pub const X_PATH_RESULT: u16 = 531;
-    pub const X_PATH_RESULT_END: u16 = 532;
+    pub const WEB_GL2_RENDERING_CONTEXT: u16 = 512;
+    pub const WEB_GL2_RENDERING_CONTEXT_END: u16 = 513;
+    pub const WEB_GL_ACTIVE_INFO: u16 = 513;
+    pub const WEB_GL_ACTIVE_INFO_END: u16 = 514;
+    pub const WEB_GL_OBJECT: u16 = 514;
+    pub const WEB_GL_OBJECT_END: u16 = 526;
+    pub const WEB_GL_BUFFER: u16 = 515;
+    pub const WEB_GL_BUFFER_END: u16 = 516;
+    pub const WEB_GL_FRAMEBUFFER: u16 = 516;
+    pub const WEB_GL_FRAMEBUFFER_END: u16 = 517;
+    pub const WEB_GL_PROGRAM: u16 = 517;
+    pub const WEB_GL_PROGRAM_END: u16 = 518;
+    pub const WEB_GL_QUERY: u16 = 518;
+    pub const WEB_GL_QUERY_END: u16 = 519;
+    pub const WEB_GL_RENDERBUFFER: u16 = 519;
+    pub const WEB_GL_RENDERBUFFER_END: u16 = 520;
+    pub const WEB_GL_SAMPLER: u16 = 520;
+    pub const WEB_GL_SAMPLER_END: u16 = 521;
+    pub const WEB_GL_SHADER: u16 = 521;
+    pub const WEB_GL_SHADER_END: u16 = 522;
+    pub const WEB_GL_SYNC: u16 = 522;
+    pub const WEB_GL_SYNC_END: u16 = 523;
+    pub const WEB_GL_TEXTURE: u16 = 523;
+    pub const WEB_GL_TEXTURE_END: u16 = 524;
+    pub const WEB_GL_TRANSFORM_FEEDBACK: u16 = 524;
+    pub const WEB_GL_TRANSFORM_FEEDBACK_END: u16 = 525;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT: u16 = 525;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT_END: u16 = 526;
+    pub const WEB_GL_RENDERING_CONTEXT: u16 = 526;
+    pub const WEB_GL_RENDERING_CONTEXT_END: u16 = 527;
+    pub const WEB_GL_SHADER_PRECISION_FORMAT: u16 = 527;
+    pub const WEB_GL_SHADER_PRECISION_FORMAT_END: u16 = 528;
+    pub const WEB_GL_UNIFORM_LOCATION: u16 = 528;
+    pub const WEB_GL_UNIFORM_LOCATION_END: u16 = 529;
+    pub const WORKER_LOCATION: u16 = 529;
+    pub const WORKER_LOCATION_END: u16 = 530;
+    pub const WORKER_NAVIGATOR: u16 = 530;
+    pub const WORKER_NAVIGATOR_END: u16 = 531;
+    pub const WRITABLE_STREAM: u16 = 531;
+    pub const WRITABLE_STREAM_END: u16 = 532;
+    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER: u16 = 532;
+    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 533;
+    pub const WRITABLE_STREAM_DEFAULT_WRITER: u16 = 533;
+    pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 534;
+    pub const XML_SERIALIZER: u16 = 534;
+    pub const XML_SERIALIZER_END: u16 = 535;
+    pub const X_PATH_EVALUATOR: u16 = 535;
+    pub const X_PATH_EVALUATOR_END: u16 = 536;
+    pub const X_PATH_EXPRESSION: u16 = 536;
+    pub const X_PATH_EXPRESSION_END: u16 = 537;
+    pub const X_PATH_RESULT: u16 = 537;
+    pub const X_PATH_RESULT_END: u16 = 538;
     /// The number of generated interfaces.
-    pub const COUNT: usize = 531;
+    pub const COUNT: usize = 537;
 }
 
 /// The generated interfaces; the engine names an object's most derived one in `Host::interface_of`.
@@ -2818,26 +2846,32 @@ pub enum InterfaceId {
     VideoTrack = 509,
     ViewTransition = 510,
     ViewTransitionTypeSet = 511,
-    WebGLActiveInfo = 512,
-    WebGLObject = 513,
-    WebGLBuffer = 514,
-    WebGLFramebuffer = 515,
-    WebGLProgram = 516,
-    WebGLRenderbuffer = 517,
-    WebGLShader = 518,
-    WebGLTexture = 519,
-    WebGLRenderingContext = 520,
-    WebGLShaderPrecisionFormat = 521,
-    WebGLUniformLocation = 522,
-    WorkerLocation = 523,
-    WorkerNavigator = 524,
-    WritableStream = 525,
-    WritableStreamDefaultController = 526,
-    WritableStreamDefaultWriter = 527,
-    XMLSerializer = 528,
-    XPathEvaluator = 529,
-    XPathExpression = 530,
-    XPathResult = 531,
+    WebGL2RenderingContext = 512,
+    WebGLActiveInfo = 513,
+    WebGLObject = 514,
+    WebGLBuffer = 515,
+    WebGLFramebuffer = 516,
+    WebGLProgram = 517,
+    WebGLQuery = 518,
+    WebGLRenderbuffer = 519,
+    WebGLSampler = 520,
+    WebGLShader = 521,
+    WebGLSync = 522,
+    WebGLTexture = 523,
+    WebGLTransformFeedback = 524,
+    WebGLVertexArrayObject = 525,
+    WebGLRenderingContext = 526,
+    WebGLShaderPrecisionFormat = 527,
+    WebGLUniformLocation = 528,
+    WorkerLocation = 529,
+    WorkerNavigator = 530,
+    WritableStream = 531,
+    WritableStreamDefaultController = 532,
+    WritableStreamDefaultWriter = 533,
+    XMLSerializer = 534,
+    XPathEvaluator = 535,
+    XPathExpression = 536,
+    XPathResult = 537,
 }
 
 impl InterfaceId {
@@ -3356,14 +3390,20 @@ impl InterfaceId {
             InterfaceId::VideoTrack => "VideoTrack",
             InterfaceId::ViewTransition => "ViewTransition",
             InterfaceId::ViewTransitionTypeSet => "ViewTransitionTypeSet",
+            InterfaceId::WebGL2RenderingContext => "WebGL2RenderingContext",
             InterfaceId::WebGLActiveInfo => "WebGLActiveInfo",
             InterfaceId::WebGLObject => "WebGLObject",
             InterfaceId::WebGLBuffer => "WebGLBuffer",
             InterfaceId::WebGLFramebuffer => "WebGLFramebuffer",
             InterfaceId::WebGLProgram => "WebGLProgram",
+            InterfaceId::WebGLQuery => "WebGLQuery",
             InterfaceId::WebGLRenderbuffer => "WebGLRenderbuffer",
+            InterfaceId::WebGLSampler => "WebGLSampler",
             InterfaceId::WebGLShader => "WebGLShader",
+            InterfaceId::WebGLSync => "WebGLSync",
             InterfaceId::WebGLTexture => "WebGLTexture",
+            InterfaceId::WebGLTransformFeedback => "WebGLTransformFeedback",
+            InterfaceId::WebGLVertexArrayObject => "WebGLVertexArrayObject",
             InterfaceId::WebGLRenderingContext => "WebGLRenderingContext",
             InterfaceId::WebGLShaderPrecisionFormat => "WebGLShaderPrecisionFormat",
             InterfaceId::WebGLUniformLocation => "WebGLUniformLocation",
@@ -3959,20 +3999,28 @@ pub trait Dom:
     + VisibilityStateEntryImpl
     + VisualViewportImpl
     + WaveShaperNodeImpl
+    + WebGL2RenderingContextImpl
+    + WebGL2RenderingContextBaseImpl
+    + WebGL2RenderingContextOverloadsImpl
     + WebGLActiveInfoImpl
     + WebGLBufferImpl
     + WebGLContextEventImpl
     + WebGLFramebufferImpl
     + WebGLObjectImpl
     + WebGLProgramImpl
+    + WebGLQueryImpl
     + WebGLRenderbufferImpl
     + WebGLRenderingContextImpl
     + WebGLRenderingContextBaseImpl
     + WebGLRenderingContextOverloadsImpl
+    + WebGLSamplerImpl
     + WebGLShaderImpl
     + WebGLShaderPrecisionFormatImpl
+    + WebGLSyncImpl
     + WebGLTextureImpl
+    + WebGLTransformFeedbackImpl
     + WebGLUniformLocationImpl
+    + WebGLVertexArrayObjectImpl
     + WebSocketImpl
     + WheelEventImpl
     + WindowImpl
@@ -4577,20 +4625,28 @@ impl<T> Dom for T where
         + VisibilityStateEntryImpl
         + VisualViewportImpl
         + WaveShaperNodeImpl
+        + WebGL2RenderingContextImpl
+        + WebGL2RenderingContextBaseImpl
+        + WebGL2RenderingContextOverloadsImpl
         + WebGLActiveInfoImpl
         + WebGLBufferImpl
         + WebGLContextEventImpl
         + WebGLFramebufferImpl
         + WebGLObjectImpl
         + WebGLProgramImpl
+        + WebGLQueryImpl
         + WebGLRenderbufferImpl
         + WebGLRenderingContextImpl
         + WebGLRenderingContextBaseImpl
         + WebGLRenderingContextOverloadsImpl
+        + WebGLSamplerImpl
         + WebGLShaderImpl
         + WebGLShaderPrecisionFormatImpl
+        + WebGLSyncImpl
         + WebGLTextureImpl
+        + WebGLTransformFeedbackImpl
         + WebGLUniformLocationImpl
+        + WebGLVertexArrayObjectImpl
         + WebSocketImpl
         + WheelEventImpl
         + WindowImpl
@@ -5194,20 +5250,28 @@ macro_rules! for_each_trait {
         $m!(VisibilityStateEntryImpl);
         $m!(VisualViewportImpl);
         $m!(WaveShaperNodeImpl);
+        $m!(WebGL2RenderingContextImpl);
+        $m!(WebGL2RenderingContextBaseImpl);
+        $m!(WebGL2RenderingContextOverloadsImpl);
         $m!(WebGLActiveInfoImpl);
         $m!(WebGLBufferImpl);
         $m!(WebGLContextEventImpl);
         $m!(WebGLFramebufferImpl);
         $m!(WebGLObjectImpl);
         $m!(WebGLProgramImpl);
+        $m!(WebGLQueryImpl);
         $m!(WebGLRenderbufferImpl);
         $m!(WebGLRenderingContextImpl);
         $m!(WebGLRenderingContextBaseImpl);
         $m!(WebGLRenderingContextOverloadsImpl);
+        $m!(WebGLSamplerImpl);
         $m!(WebGLShaderImpl);
         $m!(WebGLShaderPrecisionFormatImpl);
+        $m!(WebGLSyncImpl);
         $m!(WebGLTextureImpl);
+        $m!(WebGLTransformFeedbackImpl);
         $m!(WebGLUniformLocationImpl);
+        $m!(WebGLVertexArrayObjectImpl);
         $m!(WebSocketImpl);
         $m!(WheelEventImpl);
         $m!(WindowImpl);
@@ -6912,6 +6976,13 @@ pub fn init_isolate<D: Dom>(
         scope,
         t_view_transition_type_set,
     );
+    let t_web_gl2_rendering_context =
+        web_gl2_rendering_context::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEB_GL2_RENDERING_CONTEXT,
+        scope,
+        t_web_gl2_rendering_context,
+    );
     let t_web_gl_active_info = web_gl_active_info::template::<D>(scope, None, &options);
     st.set_template(ids::WEB_GL_ACTIVE_INFO, scope, t_web_gl_active_info);
     let t_web_gl_object = web_gl_object::template::<D>(scope, None, &options);
@@ -6923,13 +6994,33 @@ pub fn init_isolate<D: Dom>(
     st.set_template(ids::WEB_GL_FRAMEBUFFER, scope, t_web_gl_framebuffer);
     let t_web_gl_program = web_gl_program::template::<D>(scope, Some(t_web_gl_object), &options);
     st.set_template(ids::WEB_GL_PROGRAM, scope, t_web_gl_program);
+    let t_web_gl_query = web_gl_query::template::<D>(scope, Some(t_web_gl_object), &options);
+    st.set_template(ids::WEB_GL_QUERY, scope, t_web_gl_query);
     let t_web_gl_renderbuffer =
         web_gl_renderbuffer::template::<D>(scope, Some(t_web_gl_object), &options);
     st.set_template(ids::WEB_GL_RENDERBUFFER, scope, t_web_gl_renderbuffer);
+    let t_web_gl_sampler = web_gl_sampler::template::<D>(scope, Some(t_web_gl_object), &options);
+    st.set_template(ids::WEB_GL_SAMPLER, scope, t_web_gl_sampler);
     let t_web_gl_shader = web_gl_shader::template::<D>(scope, Some(t_web_gl_object), &options);
     st.set_template(ids::WEB_GL_SHADER, scope, t_web_gl_shader);
+    let t_web_gl_sync = web_gl_sync::template::<D>(scope, Some(t_web_gl_object), &options);
+    st.set_template(ids::WEB_GL_SYNC, scope, t_web_gl_sync);
     let t_web_gl_texture = web_gl_texture::template::<D>(scope, Some(t_web_gl_object), &options);
     st.set_template(ids::WEB_GL_TEXTURE, scope, t_web_gl_texture);
+    let t_web_gl_transform_feedback =
+        web_gl_transform_feedback::template::<D>(scope, Some(t_web_gl_object), &options);
+    st.set_template(
+        ids::WEB_GL_TRANSFORM_FEEDBACK,
+        scope,
+        t_web_gl_transform_feedback,
+    );
+    let t_web_gl_vertex_array_object =
+        web_gl_vertex_array_object::template::<D>(scope, Some(t_web_gl_object), &options);
+    st.set_template(
+        ids::WEB_GL_VERTEX_ARRAY_OBJECT,
+        scope,
+        t_web_gl_vertex_array_object,
+    );
     let t_web_gl_rendering_context = web_gl_rendering_context::template::<D>(scope, None, &options);
     st.set_template(
         ids::WEB_GL_RENDERING_CONTEXT,
@@ -10935,6 +11026,17 @@ pub fn install_context_for<D: Dom>(
         f_view_transition_type_set,
         "values",
     )?;
+    let f_web_gl2_rendering_context = st
+        .template(scope, ids::WEB_GL2_RENDERING_CONTEXT)?
+        .get_function(scope)?;
+    if kind.exposes(&["Window", "Worker"]) {
+        rt::expose(
+            scope,
+            global,
+            "WebGL2RenderingContext",
+            f_web_gl2_rendering_context,
+        )?;
+    }
     let f_web_gl_active_info = st
         .template(scope, ids::WEB_GL_ACTIVE_INFO)?
         .get_function(scope)?;
@@ -10968,6 +11070,11 @@ pub fn install_context_for<D: Dom>(
         rt::expose(scope, global, "WebGLProgram", f_web_gl_program)?;
     }
     f_web_gl_program.set_prototype(scope, f_web_gl_object.into())?;
+    let f_web_gl_query = st.template(scope, ids::WEB_GL_QUERY)?.get_function(scope)?;
+    if kind.exposes(&["Window", "Worker"]) {
+        rt::expose(scope, global, "WebGLQuery", f_web_gl_query)?;
+    }
+    f_web_gl_query.set_prototype(scope, f_web_gl_object.into())?;
     let f_web_gl_renderbuffer = st
         .template(scope, ids::WEB_GL_RENDERBUFFER)?
         .get_function(scope)?;
@@ -10975,6 +11082,13 @@ pub fn install_context_for<D: Dom>(
         rt::expose(scope, global, "WebGLRenderbuffer", f_web_gl_renderbuffer)?;
     }
     f_web_gl_renderbuffer.set_prototype(scope, f_web_gl_object.into())?;
+    let f_web_gl_sampler = st
+        .template(scope, ids::WEB_GL_SAMPLER)?
+        .get_function(scope)?;
+    if kind.exposes(&["Window", "Worker"]) {
+        rt::expose(scope, global, "WebGLSampler", f_web_gl_sampler)?;
+    }
+    f_web_gl_sampler.set_prototype(scope, f_web_gl_object.into())?;
     let f_web_gl_shader = st
         .template(scope, ids::WEB_GL_SHADER)?
         .get_function(scope)?;
@@ -10982,6 +11096,11 @@ pub fn install_context_for<D: Dom>(
         rt::expose(scope, global, "WebGLShader", f_web_gl_shader)?;
     }
     f_web_gl_shader.set_prototype(scope, f_web_gl_object.into())?;
+    let f_web_gl_sync = st.template(scope, ids::WEB_GL_SYNC)?.get_function(scope)?;
+    if kind.exposes(&["Window", "Worker"]) {
+        rt::expose(scope, global, "WebGLSync", f_web_gl_sync)?;
+    }
+    f_web_gl_sync.set_prototype(scope, f_web_gl_object.into())?;
     let f_web_gl_texture = st
         .template(scope, ids::WEB_GL_TEXTURE)?
         .get_function(scope)?;
@@ -10989,6 +11108,30 @@ pub fn install_context_for<D: Dom>(
         rt::expose(scope, global, "WebGLTexture", f_web_gl_texture)?;
     }
     f_web_gl_texture.set_prototype(scope, f_web_gl_object.into())?;
+    let f_web_gl_transform_feedback = st
+        .template(scope, ids::WEB_GL_TRANSFORM_FEEDBACK)?
+        .get_function(scope)?;
+    if kind.exposes(&["Window", "Worker"]) {
+        rt::expose(
+            scope,
+            global,
+            "WebGLTransformFeedback",
+            f_web_gl_transform_feedback,
+        )?;
+    }
+    f_web_gl_transform_feedback.set_prototype(scope, f_web_gl_object.into())?;
+    let f_web_gl_vertex_array_object = st
+        .template(scope, ids::WEB_GL_VERTEX_ARRAY_OBJECT)?
+        .get_function(scope)?;
+    if kind.exposes(&["Window", "Worker"]) {
+        rt::expose(
+            scope,
+            global,
+            "WebGLVertexArrayObject",
+            f_web_gl_vertex_array_object,
+        )?;
+    }
+    f_web_gl_vertex_array_object.set_prototype(scope, f_web_gl_object.into())?;
     let f_web_gl_rendering_context = st
         .template(scope, ids::WEB_GL_RENDERING_CONTEXT)?
         .get_function(scope)?;

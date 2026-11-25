@@ -689,7 +689,7 @@ impl HTMLCanvasElementImpl for Engine {
         self.transfer_control(self.n(this))
     }
     /// HTML §4.12.5 `getContext(contextId, options)`: "2d", "webgl" (and its old name
-    /// "experimental-webgl"); a canvas keeps the kind of context it first gave (another kind is
+    /// "experimental-webgl"), "webgl2"; a canvas keeps the kind of context it first gave (another kind is
     /// null); other kinds are not supported (null). A placeholder canvas (one whose control went
     /// to an OffscreenCanvas) throws `InvalidStateError`.
     fn get_context(
@@ -698,8 +698,10 @@ impl HTMLCanvasElementImpl for Engine {
         this: Handle,
         context_id: &str,
         options: JsValue,
-    ) -> rt::Result<Option<g::CanvasRenderingContext2DOrWebGLRenderingContext>> {
-        use g::CanvasRenderingContext2DOrWebGLRenderingContext as R;
+    ) -> rt::Result<
+        Option<g::CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext>,
+    > {
+        use g::CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContext as R;
         let el = self.n(this);
         if self.is_placeholder(el) {
             return Err(exception(
@@ -707,13 +709,17 @@ impl HTMLCanvasElementImpl for Engine {
                 "The canvas's control was transferred to an OffscreenCanvas",
             ));
         }
-        if context_id == "webgl" || context_id == "experimental-webgl" {
+        let webgl2 = context_id == "webgl2";
+        if webgl2 || context_id == "webgl" || context_id == "experimental-webgl" {
             if self.canvases.borrow().contains_key(&el) {
                 return Ok(None);
             }
-            return Ok(self
-                .webgl_get_context(cx, CanvasOwner::Element(el), &options)?
-                .map(R::WebGLRenderingContext));
+            let c = self.webgl_get_context(cx, CanvasOwner::Element(el), &options, webgl2)?;
+            return Ok(c.map(if webgl2 {
+                R::WebGL2RenderingContext
+            } else {
+                R::WebGLRenderingContext
+            }));
         }
         if context_id != "2d" || self.has_webgl(el) {
             return Ok(None);

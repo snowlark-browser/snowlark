@@ -375,6 +375,8 @@ impl Engine {
         self.notify_rejected_promises(cx);
         // "Cleanup Indexed Database transactions" (IndexedDB §2.7.1).
         self.idb_cleanup();
+        // WebGL 2.0 fences may change state from here on.
+        self.webgl_checkpoint();
         // ClearKeptObjects(): WeakRef targets kept during the job may go now.
         cx.scope().clear_kept_objects();
         self.performing_checkpoint.set(false);

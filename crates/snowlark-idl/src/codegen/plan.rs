@@ -366,6 +366,13 @@ pub const SCOPE: &[&str] = &[
     "WebGLActiveInfo",
     "WebGLShaderPrecisionFormat",
     "WebGLContextEvent",
+    // WebGL 2.0.
+    "WebGL2RenderingContext",
+    "WebGLQuery",
+    "WebGLSampler",
+    "WebGLSync",
+    "WebGLTransformFeedback",
+    "WebGLVertexArrayObject",
     // Web Cryptography (getRandomValues, randomUUID).
     "Crypto",
     "SubtleCrypto",
@@ -666,6 +673,16 @@ pub const NOT_YET: &[(&str, &str, &str)] = &[
     ),
     (
         "WebGLRenderingContext",
+        "drawingBufferStorage",
+        "sized drawing buffer formats are not implemented",
+    ),
+    (
+        "WebGL2RenderingContext",
+        "makeXRCompatible",
+        "WebXR is not implemented",
+    ),
+    (
+        "WebGL2RenderingContext",
         "drawingBufferStorage",
         "sized drawing buffer formats are not implemented",
     ),
