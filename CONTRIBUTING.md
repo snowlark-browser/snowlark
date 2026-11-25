@@ -32,6 +32,12 @@ libraries) and chooses the V8 library to link ([docs/v8-build.md](docs/v8-build.
   timings across the two profiles.
 - A plain `.\dev.ps1 build` is a debug build; `.\dev.ps1 test` uses it.
 
+Two native libraries are built once from their official source and found by `dev.ps1` in the dev folder:
+ANGLE, for WebGL (`tools\angle\build.ps1`, `docs/webgl.md`), and dav1d, the AV1 decoder of AVIF images
+(`.\tools\dav1d\build.ps1`: a static library of the release `tools\dav1d\pin.txt` names, about two minutes; it
+fetches NASM, meson and ninja for itself). Without ANGLE the build has no WebGL; without dav1d it decodes AVIF
+through Windows' codec instead, and the AVIF tests in `snowlark-paint` fail.
+
 `snowlark.exe` is a Windows-subsystem program: the window opens without a console, and PowerShell neither waits
 for it nor captures its output. Scripts use `snowlark-cli.exe`, the same program built for the console
 subsystem.
@@ -49,6 +55,7 @@ All optional. Set them in the environment, or as `KEY=VALUE` lines in a file `de
 | `SNOWLARK_MIN_FREE_GB` | `dev.ps1` waits, and says so, while the build drive has less free space than this: a build that runs out of disk leaves a broken target directory that looks like a compile failure. | 25 |
 | `SNOWLARK_SLOTS` | `1` queues builds, test runs and WPT runs on machine-wide slots (3 builds, 2 test runs, 2 WPT runs; 8 cargo jobs each), for a machine where several checkouts build at once. `SNOWLARK_NO_SLOTS=1` turns it off for one command. | off |
 | `SNOWLARK_V8_DIR` | The folder with `rusty_v8.lib` and `src_binding.rs` to link; the pinned library is downloaded into it when they are missing. | `<dev dir>\v8\<name in tools\v8-pgo\pin.txt>`, or `target\v8\<name>` without a dev folder |
+| `SNOWLARK_DAV1D_DIR` | The folder with the static `dav1d.lib` to link (`tools\dav1d\build.ps1` makes it). | `<dev dir>\dav1d\<name in tools\dav1d\pin.txt>` |
 | `SNOWLARK_V8_PREBUILT` | `1` leaves V8 to the `v8` crate (its own published library, where one exists for the version and features). | off |
 | `SNOWLARK_WPT` | The web-platform-tests checkout. | a folder `wpt` next to the repository |
 | `SNOWLARK_WPT_STATE` | Where WPT results and baselines are kept. | `<dev dir>\wpt` |

@@ -41,3 +41,8 @@ taffy = { path = "vendor/taffy" }
 url = { path = "vendor/url" }
 # v8 158.0.0 (V8 15.8), the crate's own roll, not on crates.io yet. See vendor/v8/SNOWLARK-PATCHES.md.
 v8 = { path = "vendor/v8" }
+
+# CrabbyAvif's dav1d bindings, linked to the static dav1d tools/dav1d/build.ps1 builds (SNOWLARK_DAV1D_DIR) instead
+# of one found by pkg-config, with the bindings checked in. See vendor/dav1d-sys/SNOWLARK-PATCHES.md.
+[patch."https://github.com/webmproject/CrabbyAvif"]
+dav1d-sys = { path = "vendor/dav1d-sys" }

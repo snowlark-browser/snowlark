@@ -42,3 +42,10 @@
   The same script makes `orient-6.jpg` (a progressive JPEG stored 16 × 8, red | blue, with EXIF orientation 6:
   shown 8 × 16, red above blue) and `cmyk.jpg` (Adobe's inverted CMYK, 16 × 8: cyan, then 50% black; shown as
   (0, 255, 255) and (127, 127, 127)).
+- AVIF, by the same script: `p3-patches.avif` (the P3 patches with the ICC profile), `p3-nclx.avif` (the same
+  patches tagged with an nclx colour description of P3 primaries instead), `alpha.avif` (16 × 8: red at alpha 128,
+  lime, transparent), `odd-7x5.avif` (4:2:0, blue with a yellow last column and row), `orient-6.avif` (the
+  `orient-6.jpg` picture, turned by `irot`/`imir` instead of EXIF) and `anim-rgb.avif` (an image sequence: red
+  100 ms, lime 200 ms, blue 300 ms).
+- `anim-12bit.avif`: `colors-animated-12bpc-keyframes-0-2-3.avif` from the test data of
+  [CrabbyAvif](https://github.com/webmproject/CrabbyAvif) (Apache-2.0), a 12-bit image sequence.

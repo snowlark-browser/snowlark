@@ -250,3 +250,5 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py` can read one arm slower than the other for the same binary when the arms share a core (ref 509).
 - **Reftest hangs.** Two reftests, `background-size-near-zero-png` and the flexbox `flex-1-N-N-shrink` pages, hang in
   the runner in ways its watchdog cannot stop. (ref 39)
+- **Animated images in reftest captures.** A reftest capture shows an animated image's first frame even when the page
+  waits for later ones (WPT `avif/animated-avif-timeout.html`). (ref 747)

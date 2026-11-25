@@ -88,6 +88,16 @@ NON_RUST = [
         "texts": ["vendor/woff2/LICENSE"],
     },
     {
+        "name": "dav1d",
+        "version": "the release in tools/dav1d/pin.txt",
+        "license": "BSD-2-Clause; ISC (x86inc.asm)",
+        "home": "https://code.videolan.org/videolan/dav1d",
+        "note": "The AV1 decoder of AVIF images (through CrabbyAvif), a static library built from "
+        "its unmodified source by tools/dav1d/build.ps1. Its assembly uses the x264 project's "
+        "x86inc.asm, under the ISC license.",
+        "texts": ["tools/dav1d/LICENSE.dav1d", "tools/dav1d/LICENSE.x86inc"],
+    },
+    {
         "name": "uBlock Origin scriptlets and redirect resources",
         "version": "",
         "license": "GPL-3.0",
@@ -169,6 +179,25 @@ def read_text(f):
     return s.replace("\r\n", "\n").strip("\n") + "\n"
 
 
+# Crates whose manifest names no license, with the license of the license file in their source.
+MANIFEST_LICENSES = {
+    # (CrabbyAvif, a git dependency: its LICENSE is the Apache License 2.0)
+    "crabby-avif": "Apache-2.0",
+}
+
+
+def package_license(pkg):
+    return (pkg.get("license") or MANIFEST_LICENSES.get(pkg["name"])
+            or ("see the license file" if pkg.get("license_file") else ""))
+
+
+def package_home(pkg):
+    """The package's home page: its manifest's, else its git repository, else its crates.io page."""
+    source = pkg.get("source") or ""
+    git = source[4:].split("?")[0].split("#")[0] if source.startswith("git+") else None
+    return pkg.get("homepage") or pkg.get("repository") or git or f"https://crates.io/crates/{pkg['name']}"
+
+
 def build():
     md = metadata()
     texts, index = [], {}
@@ -187,12 +216,11 @@ def build():
         ids = []
         for f in license_files(pkg):
             ids.append(text_id(read_text(f)))
-        home = pkg.get("homepage") or pkg.get("repository") or f"https://crates.io/crates/{pkg['name']}"
         comps.append({
             "name": pkg["name"],
             "version": pkg["version"],
-            "license": pkg.get("license") or ("see the license file" if pkg.get("license_file") else ""),
-            "home": home,
+            "license": package_license(pkg),
+            "home": package_home(pkg),
             "texts": sorted(set(ids)),
             **({"vendored": True} if pkg["source"] is None else {}),
         })

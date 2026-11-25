@@ -217,6 +217,26 @@ if ($command -ne 'fmt' -and -not $env:SNOWLARK_ANGLE_DIR -and $devDir) {
         }
     }
 }
+# dav1d, the AV1 decoder of AVIF images: tools\dav1d\pin.txt names the build; its static dav1d.lib is in
+# SNOWLARK_DAV1D_DIR or <dev dir>\dav1d\<name> (tools\dav1d\build.ps1 makes it). vendor\dav1d-sys links it; without
+# it the build decodes AVIF through WIC.
+if ($command -ne 'fmt' -and -not $env:SNOWLARK_DAV1D_DIR -and $devDir) {
+    $dav1dPin = @{}
+    foreach ($line in Get-Content (Join-Path $root 'tools\dav1d\pin.txt')) {
+        if ($line -match '^([a-z0-9-]+)=(.*)$') { $dav1dPin[$matches[1]] = $matches[2].Trim() }
+    }
+    $dav1dDir = Join-Path $devDir "dav1d\$($dav1dPin['name'])"
+    $dav1dLib = Join-Path $dav1dDir 'dav1d.lib'
+    if (Test-Path $dav1dLib) {
+        $env:SNOWLARK_DAV1D_DIR = $dav1dDir
+        $hash = (Get-FileHash $dav1dLib -Algorithm SHA256).Hash.ToLower()
+        if ($hash -ne $dav1dPin['lib-sha256']) {
+            Write-Host "dev.ps1: $dav1dLib differs from tools\dav1d\pin.txt's SHA-256 (a local rebuild?)"
+        }
+    } else {
+        Write-Host "dev.ps1: no dav1d library ($($dav1dPin['name'])): AVIF goes through WIC; tools\dav1d\build.ps1 builds it"
+    }
+}
 # LTO is for what ships: a test run would pay for it again in every test binary.
 if ($command -eq 'test' -and -not $env:CARGO_PROFILE_RELEASE_LTO) { $env:CARGO_PROFILE_RELEASE_LTO = 'false' }
 try {

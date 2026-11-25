@@ -108,4 +108,45 @@ stored.save(f"{out}/orient-6.jpg", quality=95, subsampling=0, progressive=True, 
 cmyk = Image.new("CMYK", (16, 8), (255, 0, 0, 0))
 cmyk.paste((0, 0, 0, 128), (8, 0, 16, 8))
 cmyk.save(f"{out}/cmyk.jpg", quality=100)
+
+# AVIF (4:4:4 at the highest quality, so the colours survive): the P3 patches with the ICC profile,
+# and again with an nclx colour description of P3 primaries (12) instead, patched into the 'colr'
+# box Pillow writes (BT.709 primaries, sRGB transfer, BT.601 matrix).
+img.save(f"{out}/p3-patches.avif", icc_profile=P3, quality=100, subsampling="4:4:4")
+img.save(f"{out}/p3-nclx.avif", quality=100, subsampling="4:4:4")
+with open(f"{out}/p3-nclx.avif", "rb") as f:
+    data = bytearray(f.read())
+at = data.index(b"colrnclx") + 8
+assert struct.unpack(">HHH", data[at : at + 6]) == (1, 13, 6), data[at : at + 6]
+data[at : at + 2] = struct.pack(">H", 12)
+with open(f"{out}/p3-nclx.avif", "wb") as f:
+    f.write(data)
+
+# Alpha: 16 x 8, the left half red at alpha 128, the right half lime, fully transparent in its
+# right quarter.
+rgba = Image.new("RGBA", (16, 8), (0, 255, 0, 255))
+rgba.paste((255, 0, 0, 128), (0, 0, 8, 8))
+rgba.paste((0, 255, 0, 0), (12, 0, 16, 8))
+rgba.save(f"{out}/alpha.avif", quality=100, subsampling="4:4:4")
+
+# An odd size with 4:2:0 chroma: 7 x 5, blue with a yellow last column and row.
+odd = Image.new("RGB", (7, 5), (0, 0, 255))
+odd.paste((255, 255, 0), (6, 0, 7, 5))
+odd.paste((255, 255, 0), (0, 4, 7, 5))
+odd.save(f"{out}/odd-7x5.avif", quality=95, subsampling="4:2:0")
+
+# Stored 16 x 8 (red left half, blue right half) with EXIF orientation 6, which Pillow writes as
+# 'irot' and 'imir': shown 8 x 16, red on top.
+stored.save(f"{out}/orient-6.avif", quality=95, subsampling="4:4:4", exif=exif)
+
+# An image sequence: red 100 ms, lime 200 ms, blue 300 ms, 16 x 16.
+frames = [Image.new("RGB", (16, 16), c) for c in [(255, 0, 0), (0, 255, 0), (0, 0, 255)]]
+frames[0].save(
+    f"{out}/anim-rgb.avif",
+    save_all=True,
+    append_images=frames[1:],
+    duration=[100, 200, 300],
+    quality=95,
+    subsampling="4:4:4",
+)
 print("ok", len(P3))

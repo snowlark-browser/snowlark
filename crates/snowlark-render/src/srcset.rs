@@ -368,7 +368,9 @@ pub fn select(candidates: &[Candidate], source_size: f32, dpr: f32) -> Option<(S
     best
 }
 
-/// Whether a `<source type>` names an image format this engine decodes (WIC's codecs).
+/// Whether a `<source type>` names an image format this engine decodes (HTML §4.8.4.3 "update the
+/// source set": a `type` that is not a supported image type skips the source). AVIF counts when
+/// the build decodes it itself ([`snowlark_paint::image::AVIF`]).
 pub fn supported_type(mime: &str) -> bool {
     let mime = mime.trim();
     if mime.is_empty() {
@@ -380,6 +382,9 @@ pub fn supported_type(mime: &str) -> bool {
         .unwrap_or("")
         .trim()
         .to_ascii_lowercase();
+    if essence == "image/avif" {
+        return snowlark_paint::image::AVIF;
+    }
     matches!(
         essence.as_str(),
         "image/png"

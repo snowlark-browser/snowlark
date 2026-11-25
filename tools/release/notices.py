@@ -15,7 +15,8 @@ What it covers, and where each part comes from:
   its source (the crate cache, or vendor/). A crate whose package has no licence file gets the
   standard text of its licence, with the authors from its manifest as the copyright holders, and
   says so.
-- The C++ libraries vendored here and compiled in (VENDORED_LIBRARIES: OTS and woff2, from vendor/).
+- The C and C++ libraries compiled in (VENDORED_LIBRARIES: OTS and woff2, from vendor/, and dav1d,
+  whose licence files are kept in tools/dav1d).
 - The Rust standard library (from the toolchain's share/doc/rust/licenses).
 - V8 and the third-party code its build links into the library we link (`--v8-src`: the rusty_v8
   checkout at the commit vendor/v8 is taken from; tools/v8-pgo builds the pinned library from it).
@@ -51,9 +52,15 @@ DEFAULT_V8_SRC = devenv.dev_dir() / "v8" / "rusty-v8-roll"
 # Where the source of our modified MPL-2.0 code is published.
 STYLO_SOURCE = "https://github.com/snowlark-browser/third-party/tree/main/stylo"
 
-# The C++ libraries vendored in this repository and compiled into the program (THIRD-PARTY.md):
-# (name, licence, home, licence files relative to the repository).
+# The C and C++ libraries compiled into the program (THIRD-PARTY.md): those vendored in this
+# repository, and dav1d, built from its release by tools/dav1d/build.ps1 (its licence files are
+# kept in tools/dav1d). (name, licence, home, licence files relative to the repository).
 VENDORED_LIBRARIES = [
+    ("dav1d (the AV1 decoder)", "BSD-2-Clause; x86inc.asm: ISC",
+     "https://code.videolan.org/videolan/dav1d, release " + dict(
+         line.split("=", 1) for line in (ROOT / "tools" / "dav1d" / "pin.txt").read_text(encoding="utf-8").splitlines()
+         if "=" in line and not line.startswith("#"))["tag"],
+     ["tools/dav1d/LICENSE.dav1d", "tools/dav1d/LICENSE.x86inc"]),
     ("OTS (OpenType Sanitizer)", "BSD-3-Clause",
      "https://github.com/khaledhosny/ots, commit c5d249ce90ab0aa3e76eb0dfad28746f407201d0",
      ["vendor/ots/LICENSE"]),
@@ -236,10 +243,10 @@ def crate_texts(md):
     mpl = []
     for pkg in pkgs:
         name, version = pkg["name"], pkg["version"]
-        license = pkg.get("license") or ""
+        license = pkg.get("license") or credits.MANIFEST_LICENSES.get(name) or ""
         group = norm_license(license)
         vendored = pkg["source"] is None
-        home = pkg.get("repository") or pkg.get("homepage") or f"https://crates.io/crates/{name}"
+        home = pkg.get("repository") or credits.package_home(pkg)
         line = f"{name} {version}  ({home})"
         if vendored:
             line += "  [modified copy]"
@@ -375,7 +382,7 @@ def write(out_path, v8_src, angle_src):
             w(file_text(angle_src / f).rstrip("\n"))
     w("")
     w(RULE)
-    w("4. Other C++ libraries")
+    w("4. Other C and C++ libraries")
     w(RULE)
     w("")
     w("These libraries are compiled from their unmodified source into the program.")

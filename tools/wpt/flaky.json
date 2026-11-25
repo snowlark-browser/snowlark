@@ -3,9 +3,23 @@
   "/FileAPI/file/File-lastModified.html": [
    "lastModified defaults to the time of construction"
   ],
+  "/IndexedDB/reading-autoincrement-store.any.html": [
+   "IDBObjectStore.get() for an autoincrement store",
+   "IDBObjectStore.getAll() for an autoincrement store",
+   "IDBObjectStore.getAllKeys() for an autoincrement store"
+  ],
   "/connection-allowlist/tentative/dedicated-worker.sub.window.html": [
    "Cross-origin dedicated worker main script fetch should be blocked by creator policy.",
    "Same-origin dedicated worker main script fetch succeeds."
+  ],
+  "/console/console-namespace-object-class-string.any.worker.html": [
+   "@@toStringTag exists on the namespace object with the appropriate descriptor",
+   "Object.prototype.toString applied after deleting @@toStringTag",
+   "Object.prototype.toString applied after modifying the namespace object's @@toStringTag",
+   "Object.prototype.toString applied to the namespace object"
+  ],
+  "/content-security-policy/frame-ancestors/frame-ancestors-nested-same-in-cross-star-allow.html": [
+   "A 'frame-ancestors' CSP directive with a value '*' should render in nested frames."
   ],
   "/content-security-policy/gen/top.http-rp/worker-src-wildcard/worker-import-data.http.html": [
    "Content Security Policy: Expects blocked for worker-import-data to cross-http origin and keep-origin redirection from http context.",
@@ -36,7 +50,12 @@
    "Content Security Policy: Expects blocked for worker-import-data to same-http origin and swap-origin redirection from http context.: securitypolicyviolation"
   ],
   "/content-security-policy/generic/only-valid-whitespaces-are-allowed.html": [
-   "U+000B VT    should not be parsed inside directive value - meta tag"
+   "U+000B VT    should not be parsed between directive name and value - meta tag",
+   "U+000B VT    should not be parsed inside directive value - meta tag",
+   "U+00A0 NBSP  should not be parsed inside directive value - HTTP header"
+  ],
+  "/content-security-policy/img-src/img-src-host-partial-wildcard-allowed.sub.html": [
+   "img src matches correctly partial wildcard host csp directive"
   ],
   "/content-security-policy/unsafe-eval/eval-in-iframe.html": [
    "(default-src) Eval code should execute from iframe in parent",
@@ -51,6 +70,49 @@
   ],
   "/css/css-align/blocks/align-content-block-007.html": [
    ".test 17: normal"
+  ],
+  "/css/css-align/content-distribution/parse-justify-content-004.html": [
+   "Checking invalid combination - justify-content: auto",
+   "Checking invalid combination - justify-content: auto left",
+   "Checking invalid combination - justify-content: auto safe",
+   "Checking invalid combination - justify-content: baseline",
+   "Checking invalid combination - justify-content: baseline center",
+   "Checking invalid combination - justify-content: baseline first",
+   "Checking invalid combination - justify-content: baseline last",
+   "Checking invalid combination - justify-content: baseline normal",
+   "Checking invalid combination - justify-content: baseline safe",
+   "Checking invalid combination - justify-content: center start",
+   "Checking invalid combination - justify-content: first baseline",
+   "Checking invalid combination - justify-content: first baseline center",
+   "Checking invalid combination - justify-content: first baseline space-around",
+   "Checking invalid combination - justify-content: last baseline",
+   "Checking invalid combination - justify-content: last baseline center",
+   "Checking invalid combination - justify-content: left safe unsafe safe",
+   "Checking invalid combination - justify-content: legacy",
+   "Checking invalid combination - justify-content: normal stretch",
+   "Checking invalid combination - justify-content: normal unsafe",
+   "Checking invalid combination - justify-content: safe",
+   "Checking invalid combination - justify-content: safe stretch",
+   "Checking invalid combination - justify-content: self-start",
+   "Checking invalid combination - justify-content: space-around center",
+   "Checking invalid combination - justify-content: space-around unsafe",
+   "Checking invalid combination - justify-content: space-between left",
+   "Checking invalid combination - justify-content: space-between safe",
+   "Checking invalid combination - justify-content: space-between stretch",
+   "Checking invalid combination - justify-content: space-evenly right",
+   "Checking invalid combination - justify-content: space-evenly safe flex-start",
+   "Checking invalid combination - justify-content: start safe",
+   "Checking invalid combination - justify-content: stretch baseline",
+   "Checking invalid combination - justify-content: stretch right",
+   "Checking invalid combination - justify-content: stretch safe start",
+   "Checking invalid combination - justify-content: stretch start",
+   "Checking invalid combination - justify-content: stretch unsafe",
+   "Checking invalid combination - justify-content: unsafe baseline",
+   "Checking invalid combination - justify-content: unsafe left safe",
+   "Checking invalid combination - justify-content: unsafe safe",
+   "Checking invalid combination - justify-content: unsafe safe left",
+   "Checking invalid combination - justify-content: unsafe stretch",
+   "Checking invalid combination - justify-content: unsafe unsafe"
   ],
   "/css/css-animations/event-dispatch.tentative.html": [
    "After -> Active"
@@ -353,6 +415,32 @@
    "Property color value 'oklch(from oklab(0.5 0.1 none) l c h)'",
    "Property color value 'oklch(from oklab(0.5 none 0.1) l c h)'"
   ],
+  "/css/css-flexbox/abspos/flex-abspos-staticpos-align-self-rtl-004.html": [
+   ".container > div 1",
+   ".container > div 10",
+   ".container > div 11",
+   ".container > div 12",
+   ".container > div 13",
+   ".container > div 14",
+   ".container > div 15",
+   ".container > div 16",
+   ".container > div 17",
+   ".container > div 18",
+   ".container > div 19",
+   ".container > div 2",
+   ".container > div 20",
+   ".container > div 21",
+   ".container > div 22",
+   ".container > div 23",
+   ".container > div 24",
+   ".container > div 3",
+   ".container > div 4",
+   ".container > div 5",
+   ".container > div 6",
+   ".container > div 7",
+   ".container > div 8",
+   ".container > div 9"
+  ],
   "/css/css-flexbox/alignment/flex-align-baseline-grid-002.html": [
    ".target > * 1",
    ".target > * 10",
@@ -362,6 +450,29 @@
    ".target > * 6",
    ".target > * 8",
    ".target > * 9"
+  ],
+  "/css/css-flexbox/getcomputedstyle/flexbox_computedstyle_flex-shorthand-auto.html": [
+   "flexbox | computed style | flex: auto"
+  ],
+  "/css/css-flexbox/image-as-flexitem-size-002v.html": [
+   ".flexbox > img 1",
+   ".flexbox > img 10",
+   ".flexbox > img 11",
+   ".flexbox > img 12",
+   ".flexbox > img 13",
+   ".flexbox > img 14",
+   ".flexbox > img 15",
+   ".flexbox > img 16",
+   ".flexbox > img 17",
+   ".flexbox > img 18",
+   ".flexbox > img 2",
+   ".flexbox > img 3",
+   ".flexbox > img 4",
+   ".flexbox > img 5",
+   ".flexbox > img 6",
+   ".flexbox > img 7",
+   ".flexbox > img 8",
+   ".flexbox > img 9"
   ],
   "/css/css-grid/abspos/grid-positioned-items-content-alignment-001.html": [
    ".grid 1",
@@ -413,6 +524,10 @@
    ".grid 8",
    ".grid 9"
   ],
+  "/css/css-grid/alignment/grid-alignment-implies-size-change-029.html": [
+   ".after 2",
+   ".before 1"
+  ],
   "/css/css-grid/alignment/grid-alignment-implies-size-change-039.html": [
    ".after 3",
    ".after 4",
@@ -429,6 +544,101 @@
    ".gridAutoContent 1",
    ".gridAutoContent 2",
    ".gridAutoContent 3"
+  ],
+  "/css/css-logical/logical-box-size.html": [
+   "Test that logical max sizing properties are supported.",
+   "Test that logical max sizing properties share computed values with their physical associates, with 'writing-mode: horizontal-tb; direction: ltr; '.",
+   "Test that logical max sizing properties share computed values with their physical associates, with 'writing-mode: horizontal-tb; direction: rtl; '.",
+   "Test that logical max sizing properties share computed values with their physical associates, with 'writing-mode: sideways-lr; direction: ltr; '.",
+   "Test that logical max sizing properties share computed values with their physical associates, with 'writing-mode: sideways-lr; direction: rtl; '.",
+   "Test that logical max sizing properties share computed values with their physical associates, with 'writing-mode: sideways-rl; direction: ltr; '.",
+   "Test that logical max sizing properties share computed values with their physical associates, with 'writing-mode: sideways-rl; direction: rtl; '.",
+   "Test that logical max sizing properties share computed values with their physical associates, with 'writing-mode: vertical-lr; direction: ltr; '.",
+   "Test that logical max sizing properties share computed values with their physical associates, with 'writing-mode: vertical-lr; direction: rtl; '.",
+   "Test that logical max sizing properties share computed values with their physical associates, with 'writing-mode: vertical-rl; direction: ltr; '.",
+   "Test that logical max sizing properties share computed values with their physical associates, with 'writing-mode: vertical-rl; direction: rtl; '.",
+   "Test that logical min sizing properties are supported.",
+   "Test that logical min sizing properties share computed values with their physical associates, with 'writing-mode: horizontal-tb; direction: ltr; '.",
+   "Test that logical min sizing properties share computed values with their physical associates, with 'writing-mode: horizontal-tb; direction: rtl; '.",
+   "Test that logical min sizing properties share computed values with their physical associates, with 'writing-mode: sideways-lr; direction: ltr; '.",
+   "Test that logical min sizing properties share computed values with their physical associates, with 'writing-mode: sideways-lr; direction: rtl; '.",
+   "Test that logical min sizing properties share computed values with their physical associates, with 'writing-mode: sideways-rl; direction: ltr; '.",
+   "Test that logical min sizing properties share computed values with their physical associates, with 'writing-mode: sideways-rl; direction: rtl; '.",
+   "Test that logical min sizing properties share computed values with their physical associates, with 'writing-mode: vertical-lr; direction: ltr; '.",
+   "Test that logical min sizing properties share computed values with their physical associates, with 'writing-mode: vertical-lr; direction: rtl; '.",
+   "Test that logical min sizing properties share computed values with their physical associates, with 'writing-mode: vertical-rl; direction: ltr; '.",
+   "Test that logical min sizing properties share computed values with their physical associates, with 'writing-mode: vertical-rl; direction: rtl; '.",
+   "Test that logical sizing properties are supported.",
+   "Test that logical sizing properties share computed values with their physical associates, with 'writing-mode: horizontal-tb; direction: ltr; '.",
+   "Test that logical sizing properties share computed values with their physical associates, with 'writing-mode: horizontal-tb; direction: rtl; '.",
+   "Test that logical sizing properties share computed values with their physical associates, with 'writing-mode: sideways-lr; direction: ltr; '.",
+   "Test that logical sizing properties share computed values with their physical associates, with 'writing-mode: sideways-lr; direction: rtl; '.",
+   "Test that logical sizing properties share computed values with their physical associates, with 'writing-mode: sideways-rl; direction: ltr; '.",
+   "Test that logical sizing properties share computed values with their physical associates, with 'writing-mode: sideways-rl; direction: rtl; '.",
+   "Test that logical sizing properties share computed values with their physical associates, with 'writing-mode: vertical-lr; direction: ltr; '.",
+   "Test that logical sizing properties share computed values with their physical associates, with 'writing-mode: vertical-lr; direction: rtl; '.",
+   "Test that logical sizing properties share computed values with their physical associates, with 'writing-mode: vertical-rl; direction: ltr; '.",
+   "Test that logical sizing properties share computed values with their physical associates, with 'writing-mode: vertical-rl; direction: rtl; '.",
+   "Test that max sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: ltr; '.",
+   "Test that max sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: rtl; '.",
+   "Test that max sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: ltr; '.",
+   "Test that max sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: rtl; '.",
+   "Test that max sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: ltr; '.",
+   "Test that max sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: rtl; '.",
+   "Test that max sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: ltr; '.",
+   "Test that max sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: rtl; '.",
+   "Test that max sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: ltr; '.",
+   "Test that max sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: rtl; '.",
+   "Test that max sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: ltr; '.",
+   "Test that max sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: rtl; '.",
+   "Test that max sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: ltr; '.",
+   "Test that max sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: rtl; '.",
+   "Test that max sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: ltr; '.",
+   "Test that max sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: rtl; '.",
+   "Test that max sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: ltr; '.",
+   "Test that max sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: rtl; '.",
+   "Test that max sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: ltr; '.",
+   "Test that max sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: rtl; '.",
+   "Test that min sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: ltr; '.",
+   "Test that min sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: rtl; '.",
+   "Test that min sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: ltr; '.",
+   "Test that min sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: rtl; '.",
+   "Test that min sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: ltr; '.",
+   "Test that min sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: rtl; '.",
+   "Test that min sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: ltr; '.",
+   "Test that min sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: rtl; '.",
+   "Test that min sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: ltr; '.",
+   "Test that min sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: rtl; '.",
+   "Test that min sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: ltr; '.",
+   "Test that min sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: rtl; '.",
+   "Test that min sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: ltr; '.",
+   "Test that min sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: rtl; '.",
+   "Test that min sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: ltr; '.",
+   "Test that min sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: rtl; '.",
+   "Test that min sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: ltr; '.",
+   "Test that min sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: rtl; '.",
+   "Test that min sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: ltr; '.",
+   "Test that min sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: rtl; '.",
+   "Test that sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: ltr; '.",
+   "Test that sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: rtl; '.",
+   "Test that sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: ltr; '.",
+   "Test that sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: rtl; '.",
+   "Test that sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: ltr; '.",
+   "Test that sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: rtl; '.",
+   "Test that sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: ltr; '.",
+   "Test that sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: rtl; '.",
+   "Test that sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: ltr; '.",
+   "Test that sizing properties honor order of appearance when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: rtl; '.",
+   "Test that sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: ltr; '.",
+   "Test that sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: horizontal-tb; direction: rtl; '.",
+   "Test that sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: ltr; '.",
+   "Test that sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-lr; direction: rtl; '.",
+   "Test that sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: ltr; '.",
+   "Test that sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: sideways-rl; direction: rtl; '.",
+   "Test that sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: ltr; '.",
+   "Test that sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-lr; direction: rtl; '.",
+   "Test that sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: ltr; '.",
+   "Test that sizing properties honor selector specificty when both logical and physical associates are declared, with 'writing-mode: vertical-rl; direction: rtl; '."
   ],
   "/css/css-logical/parsing/border-block-width-computed.html": [
    "Property border-block-end-width value 'calc(10px + 0.5em)'",
@@ -513,6 +723,14 @@
   "/css/css-view-transitions/scoped/negative-playback-rate.html": [
    "View transition duration affected by playback rate"
   ],
+  "/css/css-viewport/zoom/calc-computed.html": [
+   "Property text-indent value 'calc(10% + 10px)' calc value no zoom",
+   "Property text-indent value 'calc(10% + 10px)' calc value with zoom: 2"
+  ],
+  "/css/cssom-view/mouseEvent-offsetXY-svg.html": [
+   "rect offsetX/Y is relative to the root svg",
+   "tspan offsetX/Y is relative to the root svg"
+  ],
   "/css/cssom/cssimportrule-sheet-identity.html": [
    "CSSImportRule has different sheets even if referencing the same URL"
   ],
@@ -533,6 +751,10 @@
    "shape on HTMLAreaElement must enqueue an attributeChanged reaction when replacing an existing attribute",
    "target on HTMLAreaElement must enqueue an attributeChanged reaction when adding a new attribute",
    "target on HTMLAreaElement must enqueue an attributeChanged reaction when replacing an existing attribute"
+  ],
+  "/dom/nodes/insertion-removing-steps/change-event.window.html": [
+   "<input> element does not fire change event upon DOM removal",
+   "<textarea> element does not fire change event upon DOM removal"
   ],
   "/editing/other/insertparagraph-with-white-space-style.tentative.html?white-space=pre-line&command=insertParagraph": [
    "<div contenteditable style=\"display:block\"><div style=\"white-space:pre-line\">[]abc</div></div> (defaultParagraphSeparator: div)",
@@ -596,11 +818,20 @@
    "<div contenteditable><p style=\"display:block; white-space:pre-line\">abc[]</p></div> (defaultParagraphSeparator: div)",
    "<div contenteditable><p style=\"display:block; white-space:pre-line\">abc[]</p></div> (defaultParagraphSeparator: p)"
   ],
+  "/editing/other/typing-space-in-editable-summary.tentative.html": [
+   "Type space key in editable <summary> shouldn't be handled by the <summary> when it's not focused",
+   "Type space key in editable element in <summary> shouldn't be handled by the <summary>"
+  ],
+  "/encoding/streams/realms.window.html": [
+   "a TextDecoderStream object should be associated with the realm the constructor came from",
+   "a TextEncoderStream object should be associated with the realm the constructor came from"
+  ],
   "/fetch/api/abort/general.any.html": [
    "response.arrayBuffer() rejects if already aborted",
    "response.blob() rejects if already aborted"
   ],
   "/fetch/api/abort/general.any.worker.html": [
+   "response.arrayBuffer() rejects if already aborted",
    "response.bytes() rejects with abort reason if already aborted",
    "response.json() rejects if already aborted"
   ],
@@ -617,12 +848,21 @@
    "Include mode: 1 cookie",
    "Include mode: local cookies are not sent with remote request"
   ],
+  "/fetch/api/credentials/authentication-basic.any.html": [
+   "User-added Authorization header with include mode",
+   "User-added Authorization header with omit mode",
+   "User-added Authorization header with same-origin mode",
+   "User-added bogus Authorization header with omit mode"
+  ],
   "/fetch/api/credentials/cookies.any.html": [
    "Include mode: 1 cookie",
    "Include mode: 2 cookies",
    "Omit mode: no cookie is stored",
    "Same-origin mode: 1 cookie",
    "Same-origin mode: 2 cookies"
+  ],
+  "/fetch/api/policies/referrer-origin-when-cross-origin-worker.html": [
+   "Request's referrer is origin"
   ],
   "/fetch/api/request/request-bad-port.any.html": [
    "Request on bad port 0 should throw TypeError.",
@@ -709,8 +949,26 @@
    "Request on bad port 993 should throw TypeError.",
    "Request on bad port 995 should throw TypeError."
   ],
+  "/html/browsers/browsing-the-web/navigating-across-documents/007.html": [
+   "Link with onclick javascript url and href navigation "
+  ],
+  "/html/browsers/browsing-the-web/overlapping-navigations-and-traversals/same-document-nav-same-document-traversal.html": [
+   "fragment navigation then back()",
+   "pushState then back()"
+  ],
   "/html/browsers/browsing-the-web/remote-context-helper-tests/getRequestHeaders.window.html": [
    "RemoteContextHelper with defaults"
+  ],
+  "/html/browsers/history/the-history-interface/history_go_plus.html": [
+   "history go plus"
+  ],
+  "/html/browsers/history/the-location-interface/location_assign.html": [
+   "URL that fails to parse",
+   "location assign"
+  ],
+  "/html/browsers/windows/consume-user-activation/window-open.html": [
+   "Opening a new window should consume user activation",
+   "Opening an existing window should not consume user activation"
   ],
   "/html/canvas/element/canvas-host/2d.canvas.host.initial.reset.clip.html": [
    "Resetting the canvas state resets the current clip region"
@@ -740,8 +998,24 @@
    "Size attribute value is not a presentational hint",
    "The width depends on a size attribute"
   ],
+  "/html/semantics/document-metadata/the-base-element/base_srcdoc.html": [
+   "base element in srcdoc document should resolve against its fallback base URI"
+  ],
+  "/html/semantics/document-metadata/the-link-element/link-stylesheet-error-status-fires-error.html": [
+   "link stylesheet should fire error event for 404 response and not apply styles",
+   "link stylesheet should fire error event for 503 response and not apply styles"
+  ],
   "/html/semantics/embedded-content/media-elements/error-sequence.html": [
    "error event while HAVE_METADATA"
+  ],
+  "/html/semantics/embedded-content/the-audio-element/audio-loading-lazy-in-scroller.html": [
+   "Audio with loading=lazy inside scroll container loads when scrolled into view within container"
+  ],
+  "/html/semantics/embedded-content/the-canvas-element/toDataURL.bogustype.html": [
+   "toDataURL with a syntactically invalid type returns a PNG"
+  ],
+  "/html/semantics/embedded-content/the-img-element/decode/image-decode-image-document.html": [
+   "HTMLImageElement.prototype.decode(), image document tests. Decode from iframe with image document, succeeds (img not loaded)"
   ],
   "/html/semantics/embedded-content/the-object-element/object-in-object-fallback-2.html": [
    "Test <object> nesting inside <object>"
@@ -749,20 +1023,49 @@
   "/html/semantics/forms/form-control-infrastructure/form_owner_and_table_2.html": [
    "Controls nested in tables are not associated with form element inside the table if the form had been removed by script before the controls were inserted by the parser"
   ],
+  "/html/semantics/forms/the-fieldset-element/fieldset-validity.html": [
+   "Forms"
+  ],
+  "/html/semantics/forms/the-input-element/number-lang-change.html": [
+   "Moving to container with different language",
+   "Setting parent language"
+  ],
   "/html/semantics/forms/the-select-element/show-picker-cross-origin-iframe.html": [
    "Test showPicker() called from cross-origin iframe",
    "Test showPicker() called from cross-origin iframe 1",
    "Test showPicker() called from cross-origin iframe 2",
    "Test showPicker() called from cross-origin iframe 3"
   ],
+  "/html/semantics/forms/the-textarea-element/selection-after-whitespace-change.html": [
+   "Changing white-space should not change selection"
+  ],
   "/html/semantics/popovers/popover-focus-inert-invoker.html": [
    "Popover focus navigation with an inert invoker"
+  ],
+  "/html/semantics/scripting-1/the-script-element/execution-timing/013.html": [
+   " scheduler: DOM added inline script earlier in document"
+  ],
+  "/html/semantics/scripting-1/the-script-element/execution-timing/041.html": [
+   " scheduler: document.write scripts that write scripts"
+  ],
+  "/html/semantics/scripting-1/the-script-element/execution-timing/079.html": [
+   " setting location to javascript URL from event handler "
+  ],
+  "/html/semantics/scripting-1/the-script-element/execution-timing/099.html": [
+   " scheduler: defer adding iframe containing script"
+  ],
+  "/html/semantics/scripting-1/the-script-element/microtasks/checkpoint-after-workerglobalscope-onerror.html": [
+   "Promise resolved during #report-the-error",
+   "Promise resolved during event handlers other than error"
   ],
   "/html/semantics/scripting-1/the-script-element/module/dynamic-import/string-compilation-nonce-module.html": [
    "direct eval must inherit the nonce from the triggering script, thus execute",
    "indirect eval must inherit the nonce from the triggering script, thus execute",
    "setTimeout must inherit the nonce from the triggering script, thus execute",
    "the Function constructor must inherit the nonce from the triggering script, thus execute"
+  ],
+  "/html/semantics/scripting-1/the-script-element/text-module/credentials.sub.html": [
+   "Text Modules should be loaded with or without the credentials based on the same-origin-ness and the crossOrigin attribute"
   ],
   "/html/syntax/parsing/html5lib_url.html?file=tests3": [
    "<!DOCTYPE html><HTML><HEAD><head></HEAD></HTML>",
@@ -842,6 +1145,12 @@
   "/infrastructure/testdriver/click_iframe.html": [
    "TestDriver click on a document in an iframe"
   ],
+  "/input-events/contenteditable-insertfrompaste-type-inputevent-data.html": [
+   "Input event data for inputType insertFromPaste should not be set for contenteditable"
+  ],
+  "/input-events/input-events-get-target-ranges-deleting-range-across-editing-host-boundaries.tentative.html": [
+   "Backspace at \"<p><span contenteditable=\"false\"><span contenteditable>a[bc</span>non-editable</span>de]f</p>\""
+  ],
   "/media-source/mediasource-play.html": [
    "Test normal playback case with MediaSource API"
   ],
@@ -872,8 +1181,53 @@
    "idl_test setup",
    "idl_test validation"
   ],
+  "/pointerevents/compat/pointerevent_mouse-pointer-updown-events.html": [
+   "pointerup/down events are fired correctly for corresponding mouse events"
+  ],
   "/pointerevents/pointer_boundary_events_after_removing_last_over_element_through_innerhtml.html": [
    "pointer boundary events fired"
+  ],
+  "/pointerevents/pointerevent_constructor.html": [
+   "PointerEvent: Constructor test",
+   "default event.pointerType",
+   "default getPredictedEvents().length",
+   "event.clientX",
+   "event.currentTarget",
+   "event.eventPhase",
+   "event.pointerType",
+   "event.target",
+   "getPredictedEvents().length",
+   "getPredictedEvents()[0].bubbles",
+   "getPredictedEvents()[0].cancelable",
+   "getPredictedEvents()[0].clientX",
+   "getPredictedEvents()[0].currentTarget",
+   "getPredictedEvents()[0].eventPhase",
+   "getPredictedEvents()[0].getPredictedEvents().length",
+   "getPredictedEvents()[0].isPrimary",
+   "getPredictedEvents()[0].offsetX",
+   "getPredictedEvents()[0].offsetY",
+   "getPredictedEvents()[0].pointerId",
+   "getPredictedEvents()[0].pointerType",
+   "getPredictedEvents()[0].target",
+   "getPredictedEvents()[1].bubbles",
+   "getPredictedEvents()[1].cancelable",
+   "getPredictedEvents()[1].clientX",
+   "getPredictedEvents()[1].currentTarget",
+   "getPredictedEvents()[1].eventPhase",
+   "getPredictedEvents()[1].getPredictedEvents().length",
+   "getPredictedEvents()[1].isPrimary",
+   "getPredictedEvents()[1].offsetX",
+   "getPredictedEvents()[1].offsetY",
+   "getPredictedEvents()[1].pointerId",
+   "getPredictedEvents()[1].pointerType",
+   "getPredictedEvents()[1].target",
+   "type event.pointerType"
+  ],
+  "/pointerevents/pointerevent_pointer_boundary_events_after_removing_last_over_element.html": [
+   "After removing the last over element, redundant pointerenter events should not be fired on the ancestors"
+  ],
+  "/pointerevents/pointerevent_pointerout_no_pointer_movement.html": [
+   "Layout change under a stationary pointer (a new element appears) fires boundary events and no pointermove event"
   ],
   "/referrer-policy/4K+1/gen/top.http-rp/unsafe-url/script-tag.http.html": [
    "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and no-redirect redirection from http context."
@@ -916,6 +1270,10 @@
    "Referrer Policy: Expects origin for script-tag-dynamic-import to cross-http origin and keep-origin redirection from http context.",
    "Referrer Policy: Expects origin for script-tag-dynamic-import to cross-http origin and no-redirect redirection from http context.",
    "Referrer Policy: Expects origin for script-tag-dynamic-import to cross-http origin and swap-origin redirection from http context."
+  ],
+  "/referrer-policy/gen/srcdoc-inherit.meta/no-referrer/worker-module.http.html": [
+   "Referrer Policy: Expects omitted for worker-module to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects omitted for worker-module to same-http origin and no-redirect redirection from http context."
   ],
   "/referrer-policy/gen/srcdoc-inherit.meta/strict-origin-when-cross-origin/a-tag.http.html": [
    "Referrer Policy: Expects origin for a-tag to cross-http origin and no-redirect redirection from http context."
@@ -971,6 +1329,31 @@
   "/resource-timing/resource-timing-failed-fetch.html": [
    "Resource fetched by HTTP protocol should have resource timing entry emitted,   even when the fetch failed."
   ],
+  "/scheduler/task-signal-onprioritychange.any.html": [
+   "Test that TaskSignal.onprioritychange listens for prioritychange events"
+  ],
+  "/streams/queuing-strategies.any.worker.html": [
+   "ByteLengthQueuingStrategy: Can construct a with a valid high water mark",
+   "ByteLengthQueuingStrategy: Constructor behaves as expected with strange arguments",
+   "ByteLengthQueuingStrategy: highWaterMark constructor values are converted per the unrestricted double rules",
+   "ByteLengthQueuingStrategy: size behaves as expected with strange arguments",
+   "ByteLengthQueuingStrategy: size is the same function across all instances",
+   "ByteLengthQueuingStrategy: size should have the right length",
+   "ByteLengthQueuingStrategy: size should have the right name",
+   "ByteLengthQueuingStrategy: size should not be a constructor",
+   "ByteLengthQueuingStrategy: size should not have a prototype property",
+   "ByteLengthQueuingStrategy: subclassing should work correctly",
+   "CountQueuingStrategy: Can construct a with a valid high water mark",
+   "CountQueuingStrategy: Constructor behaves as expected with strange arguments",
+   "CountQueuingStrategy: highWaterMark constructor values are converted per the unrestricted double rules",
+   "CountQueuingStrategy: size behaves as expected with strange arguments",
+   "CountQueuingStrategy: size is the same function across all instances",
+   "CountQueuingStrategy: size should have the right length",
+   "CountQueuingStrategy: size should have the right name",
+   "CountQueuingStrategy: size should not be a constructor",
+   "CountQueuingStrategy: size should not have a prototype property",
+   "CountQueuingStrategy: subclassing should work correctly"
+  ],
   "/streams/transform-streams/general.any.html": [
    "Identity TransformStream: can read from readable what is put into writable",
    "Subclassing TransformStream should work",
@@ -1016,16 +1399,136 @@
    "ws.getWriter() on an aborted WritableStream",
    "ws.getWriter() on an errored WritableStream"
   ],
+  "/svg/animations/svgangle-animation-rad-to-grad.html": [
+   "Tests SVGAngle animation from rad to grad."
+  ],
   "/svg/animations/svglength-animation-invalid-value-7.html": [
    "Test SVGLength animation with invalid value: No spaces between number and unit in from attribute."
   ],
+  "/third_party/test262/test/annexB/built-ins/String/prototype/anchor/prop-desc.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/annexB/language/eval-code/indirect/global-if-decl-else-decl-b-eval-global-init.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/annexB/language/eval-code/indirect/global-if-decl-no-else-eval-global-skip-early-err-for.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/annexB/language/eval-code/indirect/global-switch-dflt-eval-global-existing-block-fn-no-init.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/annexB/language/expressions/logical-assignment/emulates-undefined-or.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Array/prototype/flatMap/array-like-objects.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Array/prototype/forEach/15.4.4.18-2-10.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Array/prototype/forEach/15.4.4.18-3-6.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-9-b-i-12.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/built-ins/Array/prototype/map/15.4.4.19-5-16.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Array/prototype/push/call-with-boolean.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Array/prototype/reduceRight/15.4.4.22-3-12.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Array/prototype/some/15.4.4.17-7-c-i-25.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Array/prototype/some/15.4.4.17-7-c-i-6.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Array/prototype/some/15.4.4.17-7-c-ii-6.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Array/prototype/some/not-a-constructor.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/ArrayBuffer/prototype/detached/this-is-not-object.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/ArrayBuffer/prototype/transferToFixedLength/this-is-detached.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/built-ins/AsyncDisposableStack/prototype/disposeAsync/length.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/built-ins/BigInt/asIntN/bigint-tobigint-errors.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/BigInt/asIntN/not-a-constructor.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Boolean/is-a-constructor.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/DataView/prototype/byteOffset/resizable-array-buffer-auto.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/built-ins/DataView/prototype/getInt8/return-values-custom-offset.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Date/prototype/toISOString/15.9.5.43-0-14.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Date/prototype/toISOString/name.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/DisposableStack/prototype/use/this-not-object-throws.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Error/isError/symbols.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Error/prototype/S15.11.3.1_A4_T1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/GeneratorFunction/invoked-as-function-multiple-arguments.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Iterator/prototype/map/length.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Iterator/prototype/reduce/iterator-already-exhausted-initial-value.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Iterator/prototype/some/predicate-args.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Iterator/prototype/take/return-is-forwarded.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/JSON/stringify/value-symbol.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Map/name.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Math/acosh/not-a-constructor.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Math/tan/S15.8.2.18_A4.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/NativeErrors/cause_property_native_error.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/NativeErrors/message_property_native_error.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Object/assign/assign-length.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Object/create/15.2.3.5-4-38.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/built-ins/Object/defineProperties/15.2.3.7-6-a-193.test262.html": [
@@ -1040,10 +1543,85 @@
   "/third_party/test262/test/built-ins/Object/defineProperty/15.2.3.6-2-1.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/built-ins/Object/internals/DefineOwnProperty/consistent-value-regexp-dollar1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Promise/all/S25.4.4.1_A2.3_T1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Promise/prototype/no-promise-state.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Promise/race/S25.4.4.3_A4.1_T2.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Reflect/apply/not-a-constructor.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Reflect/construct/return-with-newtarget-argument.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Reflect/ownKeys/not-a-constructor.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Reflect/set/symbol-property.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Reflect/setPrototypeOf/length.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/RegExp/early-err-modifiers-should-not-case-fold-m.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/RegExp/escape/not-a-constructor.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/RegExp/property-escapes/generated/General_Category_-_Initial_Punctuation.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/RegExp/property-escapes/generated/Pattern_White_Space.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/RegExp/property-escapes/generated/Script_-_Coptic.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/RegExp/prototype/Symbol.search/get-lastindex-err.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/RegExp/syntax-err-arithmetic-modifiers-reverse-add-remove-s.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/RegExp/unicodeSets/generated/property-of-strings-escape-union-character-class-escape.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/String/S15.5.1.1_A1_T8.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/String/prototype/charAt/S15.5.4.4_A1_T5.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/String/prototype/charCodeAt/S15.5.4.5_A1.1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/String/prototype/charCodeAt/S15.5.4.5_A2.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/String/prototype/substring/S15.5.4.15_A2_T2.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/String/prototype/toString/non-generic.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/built-ins/Temporal/PlainDate/prototype/daysInWeek/prop-desc.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-undefined.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/built-ins/Temporal/PlainDate/prototype/subtract/month-boundary.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Temporal/PlainDate/prototype/subtract/subclassing-ignored.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/built-ins/Temporal/PlainDate/prototype/with/leap-year.test262.html": [
@@ -1052,22 +1630,193 @@
   "/third_party/test262/test/built-ins/Temporal/PlainTime/prototype/since/argument-number.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/built-ins/Temporal/ZonedDateTime/compare/argument-propertybag-calendar-string.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Temporal/ZonedDateTime/prototype/toInstant/builtin.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Temporal/ZonedDateTime/prototype/toPlainDateTime/prop-desc.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/infinity-throws-rangeerror.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArray/prototype/map/BigInt/speciesctor-get-species.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArray/prototype/map/BigInt/values-are-not-cached.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArray/prototype/map/invoked-as-func.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArray/prototype/reduce/BigInt/values-are-not-cached.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArray/prototype/set/BigInt/bigint-tobiguint64.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArray/prototype/slice/BigInt/return-abrupt-from-start-symbol.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArray/prototype/slice/BigInt/tointeger-end.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArray/prototype/toLocaleString/BigInt/calls-tolocalestring-from-each-value.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArray/prototype/toLocaleString/invoked-as-method.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArrayConstructors/internals/GetOwnProperty/BigInt/key-is-not-numeric-index.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArrayConstructors/internals/GetOwnProperty/key-is-out-of-bounds.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/TypedArrayConstructors/internals/Set/key-is-out-of-bounds-receiver-is-not-typed-array.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Uint8Array/prototype/setFromHex/illegal-characters.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/WeakMap/iterable-with-symbol-keys.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/eval/length-non-configurable.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/eval/no-construct.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/eval/private-identifiers-not-empty.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/built-ins/global/S15.1_A2_T1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/isFinite/return-abrupt-from-tonumber-number.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/isNaN/prop-desc.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/parseFloat/S15.1.2.3_A2_T6.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/parseFloat/S15.1.2.3_A2_T7.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/parseFloat/S15.1.2.3_A2_T8.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/Collator/this-value-ignored.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/DurationFormat/prototype/format/negative-duration-style-short-en.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/ListFormat/prototype/resolvedOptions/length.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/Locale/prototype/getHourCycles/subdivision-region.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/Number/prototype/toLocaleString/builtin.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/NumberFormat/prototype/format/signDisplay-en-US.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/NumberFormat/prototype/formatToParts/unit-en-US.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/intl402/NumberFormat/prototype/resolvedOptions/this-value-not-numberformat.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/intl402/Temporal/PlainDateTime/prototype/toString/calendarname-never.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/Temporal/PlainDateTime/prototype/withCalendar/canonicalize-calendar.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/Temporal/PlainMonthDay/prototype/toLocaleString/lone-options-accepted.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/intl402/Temporal/PlainYearMonth/prototype/toLocaleString/dateStyle-undefined.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/Temporal/ZonedDateTime/prototype/subtract/era-boundary-ethiopic.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/Temporal/ZonedDateTime/prototype/toLocaleString/dateStyle.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/asi/S7.9_A10_T3.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/asi/S7.9_A6.2_T8.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/asi/S7.9_A7_T7.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/block-scope/syntax/redeclaration/async-function-name-redeclaration-attempt-with-let.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/assignment/dstr/obj-id-simple-no-strict.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/language/expressions/assignment/member-expr-ident-name-return-escaped.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/language/expressions/assignmenttargettype/parenthesized-equalityexpression-abstract-not-equal-relationalexpression-2.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/async-arrow-function/rest-param-strict-body.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/async-function/early-errors-expression-not-simple-assignment-target.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/async-generator/dstr/obj-ptrn-empty.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/async-generator/forbidden-ext/b1/async-gen-named-func-expr-forbidden-ext-direct-access-prop-arguments.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/bitwise-and/S11.10.1_A2.1_T2.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/class/async-gen-method-static/yield-star-getiter-async-not-callable-object-throw.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/class/cpn-class-expr-fields-methods-computed-property-name-from-expression-logical-or.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/class/dstr/async-gen-meth-dflt-obj-ptrn-id-init-fn-name-class.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/language/expressions/class/elements/same-line-method-rs-static-privatename-identifier-alt.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/language/expressions/class/ident-name-method-def-break-escaped.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/language/expressions/class/private-method-brand-check-multiple-evaluations-of-class-realm-function-ctor.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/compound-assignment/S11.13.2_A4.7_T2.7.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/conditional/S11.12_A2.1_T2.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/delete/11.4.1-4.a-15.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/delete/S11.4.1_A3.3_T4.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/language/expressions/division/no-magic-asi.test262.html": [
@@ -1079,7 +1828,67 @@
   "/third_party/test262/test/language/expressions/dynamic-import/for-await-resolution-and-error-agen.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/language/expressions/dynamic-import/namespace/promise-then-ns-own-property-keys-sort.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/dynamic-import/usage/nested-async-function-return-await-eval-gtbndng-indirect-update-dflt.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/dynamic-import/usage/nested-function-import-then-eval-gtbndng-indirect-update-dflt.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/greater-than-or-equal/S11.8.4_A3.1_T2.9.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/grouping/S11.1.6_A2_T1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/grouping/S11.1.6_A3_T3.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/grouping/S11.1.6_A3_T6.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/in/S11.8.7_A2.4_T3.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/less-than-or-equal/S11.8.3_A3.1_T1.1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/multiplication/S11.5.1_A4_T8.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/object/dstr/meth-ary-ptrn-elem-obj-prop-id-init.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/object/fn-name-gen.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/object/method-definition/async-returns-async-function-returns-newtarget.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/language/expressions/prefix-increment/S11.4.4_A4_T3.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/subtraction/S11.6.2_A3_T2.9.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/super/call-construct-error.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/super/call-spread-err-sngl-err-itr-get-value.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/super/call-spread-mult-obj-null.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/unsigned-right-shift/S11.7.3_A3_T2.5.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/void/S11.4.2_A4_T5.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/function-code/10.4.3-1-83-s.test262.html": [
    "Test"
   ],
   "/third_party/test262/test/language/module-code/instn-resolve-order-src.test262-module.html": [
@@ -1088,10 +1897,73 @@
   "/third_party/test262/test/language/module-code/top-level-await/syntax/export-dft-class-decl-await-expr-null.test262-module.html": [
    "Test"
   ],
+  "/third_party/test262/test/language/statements/async-generator/dstr/dflt-ary-ptrn-elem-ary-elem-iter.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/class/dstr/gen-meth-dflt-obj-ptrn-prop-id-init-unresolvable.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/language/statements/class/dstr/private-gen-meth-obj-ptrn-id-init-fn-name-arrow.test262.html": [
    "Test"
   ],
+  "/third_party/test262/test/language/statements/class/dstr/private-meth-ary-ptrn-elem-id-init-fn-name-arrow.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/class/dstr/private-meth-ary-ptrn-rest-obj-prop-id.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/class/dstr/private-meth-static-ary-ptrn-rest-ary-elem.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/class/dstr/private-meth-static-ary-ptrn-rest-ary-elision.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-iter-complete.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-iter-val-array-prototype.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/class/elements/nested-derived-cls-direct-eval-contains-superproperty-1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/class/syntax/class-body-method-definition-super-property.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/for-in/dstr/obj-id-init-yield-ident-invalid.test262.strict.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/for-of/break-label-from-try.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/for-of/dstr/obj-empty-null.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/for-of/dstr/obj-rest-val-null.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/for/scope-head-lex-open.test262.html": [
+   "Test"
+  ],
   "/third_party/test262/test/language/statements/let/syntax/let-let-declaration-split-across-two-lines.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/types/number/S8.5_A4_T2.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/staging/sm/Iterator/prototype/some/coerce-result-to-boolean.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/staging/sm/Iterator/prototype/some/error-from-correct-realm.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/staging/sm/global/eval-01.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/staging/sm/regress/regress-469625-03.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/staging/top-level-await/tla-hang-entry.test262-module.html": [
    "Test"
   ],
   "/trusted-types/inheriting-csp-for-local-schemes.html": [
@@ -1110,13 +1982,116 @@
   "/user-timing/case-sensitivity.any.worker.html": [
    "getEntriesByType values are case sensitive"
   ],
+  "/wasm/core/conversions.wast.js.html": [
+   "#1212 Test that WebAssembly compilation succeeds (wrapper)",
+   "#1213 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#1214 Run a WebAssembly test without special assertions (conversions.wast:271)"
+  ],
   "/wasm/core/f32.wast.js.html": [
+   "#3095 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3096 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3097 Run a WebAssembly test without special assertions (f32.wast:211)",
    "#3098 Test that WebAssembly compilation succeeds (wrapper)",
    "#3099 Test that WebAssembly instantiation succeeds (wrapper)",
    "#3100 Run a WebAssembly test without special assertions (f32.wast:212)",
    "#3101 Test that WebAssembly compilation succeeds (wrapper)",
    "#3102 Test that WebAssembly instantiation succeeds (wrapper)",
-   "#3103 Run a WebAssembly test without special assertions (f32.wast:213)"
+   "#3103 Run a WebAssembly test without special assertions (f32.wast:213)",
+   "#3104 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3105 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3106 Run a WebAssembly test without special assertions (f32.wast:214)"
+  ],
+  "/wasm/core/f32_bitwise.wast.js.html": [
+   "#957 Test that WebAssembly compilation succeeds (wrapper)",
+   "#958 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#959 Run a WebAssembly test without special assertions (f32_bitwise.wast:206)"
+  ],
+  "/wasm/core/f32_cmp.wast.js.html": [
+   "#2997 Test that WebAssembly compilation succeeds (wrapper)",
+   "#2998 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#2999 Run a WebAssembly test without special assertions (f32_cmp.wast:208)"
+  ],
+  "/wasm/core/f64.wast.js.html": [
+   "#3101 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3102 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3103 Run a WebAssembly test without special assertions (f64.wast:213)"
+  ],
+  "/wasm/core/f64_bitwise.wast.js.html": [
+   "#957 Test that WebAssembly compilation succeeds (wrapper)",
+   "#958 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#959 Run a WebAssembly test without special assertions (f64_bitwise.wast:206)"
+  ],
+  "/wasm/core/float_exprs.wast.js.html": [
+   "#1448 Test that WebAssembly compilation succeeds (wrapper)",
+   "#1449 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#1450 Run a WebAssembly test without special assertions (float_exprs.wast:436)"
+  ],
+  "/wasm/core/float_misc.wast.js.html": [
+   "#1064 Test that WebAssembly compilation succeeds (wrapper)",
+   "#1065 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#1066 Run a WebAssembly test without special assertions (float_misc.wast:330)"
+  ],
+  "/wasm/core/memory64/table_grow64.wast.js.html": [
+   "#1 Reinitialize the default imports",
+   "#10 Test that a WebAssembly code returns a specific result (table_grow64.wast:16)",
+   "#11 Test that a WebAssembly code returns a specific result (table_grow64.wast:17)",
+   "#12 Test that a WebAssembly code returns a specific result (table_grow64.wast:18)",
+   "#13 Test that a WebAssembly code returns a specific result (table_grow64.wast:19)",
+   "#14 Test that a WebAssembly code returns a specific result (table_grow64.wast:20)",
+   "#15 Test that a WebAssembly code traps (table_grow64.wast:21)",
+   "#16 Test that a WebAssembly code traps (table_grow64.wast:22)",
+   "#17 Test that a WebAssembly code returns a specific result (table_grow64.wast:24)",
+   "#18 Test that a WebAssembly code returns a specific result (table_grow64.wast:25)",
+   "#19 Test that a WebAssembly code returns a specific result (table_grow64.wast:26)",
+   "#2 Test that WebAssembly compilation succeeds (table_grow64.wast:1)",
+   "#20 Test that a WebAssembly code returns a specific result (table_grow64.wast:27)",
+   "#21 Test that a WebAssembly code returns a specific result (table_grow64.wast:28)",
+   "#22 Test that a WebAssembly code returns a specific result (table_grow64.wast:29)",
+   "#23 Test that a WebAssembly code returns a specific result (table_grow64.wast:30)",
+   "#24 Test that a WebAssembly code returns a specific result (table_grow64.wast:31)",
+   "#25 Test that a WebAssembly code returns a specific result (table_grow64.wast:32)",
+   "#26 Test that a WebAssembly code traps (table_grow64.wast:33)",
+   "#27 Test that a WebAssembly code traps (table_grow64.wast:34)",
+   "#28 Test that WebAssembly compilation succeeds (table_grow64.wast:37)",
+   "#29 Test that WebAssembly instantiation succeeds (table_grow64.wast:37)",
+   "#3 Test that WebAssembly compilation succeeds (table_grow64.wast:37)",
+   "#30 Test that a WebAssembly code returns a specific result (table_grow64.wast:44)",
+   "#31 Test that a WebAssembly code returns a specific result (table_grow64.wast:45)",
+   "#4 Reinitialize the default imports",
+   "#5 Test that WebAssembly compilation succeeds (table_grow64.wast:1)",
+   "#6 Test that WebAssembly instantiation succeeds (table_grow64.wast:1)",
+   "#7 Test that a WebAssembly code returns a specific result (table_grow64.wast:12)",
+   "#8 Test that a WebAssembly code traps (table_grow64.wast:13)",
+   "#9 Test that a WebAssembly code traps (table_grow64.wast:14)"
+  ],
+  "/wasm/core/simd/simd_boolean.wast.js.html": [
+   "#869 Test that WebAssembly compilation succeeds (wrapper)",
+   "#870 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#871 Run a WebAssembly test without special assertions (simd_boolean.wast:790)"
+  ],
+  "/wasm/core/simd/simd_const.wast.js.html": [
+   "#1069 Test that WebAssembly compilation fails (simd_const.wast:485)"
+  ],
+  "/wasm/core/simd/simd_f32x4.wast.js.html": [
+   "#1383 Test that WebAssembly compilation succeeds (wrapper)",
+   "#1384 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#1385 Run a WebAssembly test without special assertions (simd_f32x4.wast:622)"
+  ],
+  "/wasm/core/simd/simd_f32x4_arith.wast.js.html": [
+   "#2406 Test that WebAssembly compilation succeeds (wrapper)",
+   "#2407 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#2408 Run a WebAssembly test without special assertions (simd_f32x4_arith.wast:592)",
+   "#2409 Test that WebAssembly compilation succeeds (wrapper)",
+   "#2410 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#2411 Run a WebAssembly test without special assertions (simd_f32x4_arith.wast:595)",
+   "#2412 Test that WebAssembly compilation succeeds (wrapper)",
+   "#2413 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#2414 Run a WebAssembly test without special assertions (simd_f32x4_arith.wast:598)"
+  ],
+  "/wasm/core/simd/simd_f32x4_cmp.wast.js.html": [
+   "#3181 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3182 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3183 Run a WebAssembly test without special assertions (simd_f32x4_cmp.wast:595)"
   ],
   "/wasm/core/simd/simd_f32x4_pmin_pmax.wast.js.html": [
    "#4459 Test that WebAssembly compilation succeeds (wrapper)",
@@ -1129,7 +2104,26 @@
    "#4466 Test that WebAssembly instantiation succeeds (wrapper)",
    "#4467 Run a WebAssembly test without special assertions (simd_f32x4_pmin_pmax.wast:582)"
   ],
+  "/wasm/core/simd/simd_f64x2.wast.js.html": [
+   "#1393 Test that WebAssembly compilation succeeds (wrapper)",
+   "#1394 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#1395 Run a WebAssembly test without special assertions (simd_f64x2.wast:620)",
+   "#1396 Test that WebAssembly compilation succeeds (wrapper)",
+   "#1397 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#1398 Run a WebAssembly test without special assertions (simd_f64x2.wast:623)"
+  ],
+  "/wasm/core/simd/simd_f64x2_arith.wast.js.html": [
+   "#2412 Test that WebAssembly compilation succeeds (wrapper)",
+   "#2413 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#2414 Run a WebAssembly test without special assertions (simd_f64x2_arith.wast:595)"
+  ],
   "/wasm/core/simd/simd_f64x2_cmp.wast.js.html": [
+   "#3250 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3251 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3252 Run a WebAssembly test without special assertions (simd_f64x2_cmp.wast:586)",
+   "#3253 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3254 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3255 Run a WebAssembly test without special assertions (simd_f64x2_cmp.wast:589)",
    "#3256 Test that WebAssembly compilation succeeds (wrapper)",
    "#3257 Test that WebAssembly instantiation succeeds (wrapper)",
    "#3258 Run a WebAssembly test without special assertions (simd_f64x2_cmp.wast:592)",
@@ -1137,10 +2131,45 @@
    "#3260 Test that WebAssembly instantiation succeeds (wrapper)",
    "#3261 Run a WebAssembly test without special assertions (simd_f64x2_cmp.wast:595)"
   ],
+  "/wasm/core/simd/simd_f64x2_pmin_pmax.wast.js.html": [
+   "#4465 Test that WebAssembly compilation succeeds (wrapper)",
+   "#4466 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#4467 Run a WebAssembly test without special assertions (simd_f64x2_pmin_pmax.wast:582)"
+  ],
   "/wasm/core/simd/simd_i16x8_cmp.wast.js.html": [
+   "#1042 Test that WebAssembly compilation succeeds (wrapper)",
+   "#1043 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#1044 Run a WebAssembly test without special assertions (simd_i16x8_cmp.wast:684)",
    "#1045 Test that WebAssembly compilation succeeds (wrapper)",
    "#1046 Test that WebAssembly instantiation succeeds (wrapper)",
    "#1047 Run a WebAssembly test without special assertions (simd_i16x8_cmp.wast:687)"
+  ],
+  "/wasm/core/table_get.wast.js.html": [
+   "#1 Reinitialize the default imports",
+   "#10 Test that WebAssembly instantiation succeeds (table_get.wast:1)",
+   "#11 Run a WebAssembly test without special assertions (table_get.wast:23)",
+   "#12 Test that a WebAssembly code returns a specific result (table_get.wast:25)",
+   "#13 Test that a WebAssembly code returns a specific result (table_get.wast:26)",
+   "#14 Test that a WebAssembly code returns a specific result (table_get.wast:28)",
+   "#15 Test that a WebAssembly code returns a specific result (table_get.wast:29)",
+   "#16 Test that a WebAssembly code returns a specific result (table_get.wast:30)",
+   "#17 Test that a WebAssembly code traps (table_get.wast:32)",
+   "#18 Test that a WebAssembly code traps (table_get.wast:33)",
+   "#19 Test that a WebAssembly code traps (table_get.wast:34)",
+   "#2 Test that WebAssembly compilation succeeds (table_get.wast:1)",
+   "#20 Test that a WebAssembly code traps (table_get.wast:35)",
+   "#21 Test that WebAssembly compilation fails (table_get.wast:40)",
+   "#22 Test that WebAssembly compilation fails (table_get.wast:49)",
+   "#23 Test that WebAssembly compilation fails (table_get.wast:59)",
+   "#24 Test that WebAssembly compilation fails (table_get.wast:68)",
+   "#25 Test that WebAssembly compilation fails (table_get.wast:78)",
+   "#3 Test that WebAssembly compilation fails (table_get.wast:40)",
+   "#4 Test that WebAssembly compilation fails (table_get.wast:49)",
+   "#5 Test that WebAssembly compilation fails (table_get.wast:59)",
+   "#6 Test that WebAssembly compilation fails (table_get.wast:68)",
+   "#7 Test that WebAssembly compilation fails (table_get.wast:78)",
+   "#8 Reinitialize the default imports",
+   "#9 Test that WebAssembly compilation succeeds (table_get.wast:1)"
   ],
   "/web-animations/animation-model/animation-types/addition-per-property-001.html": [
    "Setup",
@@ -1503,9 +2532,202 @@
    "image-orientation: \"from-image\" onto \"none\"",
    "image-orientation: \"none\" onto \"from-image\""
   ],
+  "/web-animations/interfaces/DocumentOrShadowRoot/getAnimations.html": [
+   "Document.getAnimations() does NOT return animations in shadow trees",
+   "Document.getAnimations() does not return a disconnected node",
+   "Document.getAnimations() does not return an animation with a null target",
+   "Document.getAnimations() returns an empty sequence for non-animated content",
+   "Document.getAnimations() returns animations on elements inside same-origin iframes",
+   "Document.getAnimations() returns script-generated animations",
+   "Document.getAnimations() returns script-generated animations in the order they were created",
+   "Document.getAnimations() triggers a style change event",
+   "ShadowRoot.getAnimations() does NOT return animations in parent document",
+   "ShadowRoot.getAnimations() return all animations in the shadow tree",
+   "iframe.contentDocument.getAnimations() returns animations on elements inside same-origin Document"
+  ],
   "/web-animations/timing-model/timelines/update-and-send-events.html": [
    "Playback events with the same timeline retain the order in which they arequeued",
    "Sorts finish events by composite order"
+  ],
+  "/webaudio/the-audio-api/the-audionode-interface/audionode-channel-rules.html": [
+   "  Rendered number of channels is equal to 8.",
+   "  Rendered number of frames is equal to 1360.",
+   "  connections: 1, clamped-max(4), discrete is true.",
+   "  connections: 1, clamped-max(4), speakers is true.",
+   "  connections: 1, explicit(1), speakers is true.",
+   "  connections: 1, explicit(2), speakers is true.",
+   "  connections: 1, explicit(4), discrete is true.",
+   "  connections: 1, explicit(4), speakers is true.",
+   "  connections: 1, explicit(6), speakers is true.",
+   "  connections: 1, explicit(8), discrete is true.",
+   "  connections: 1, max, discrete is true.",
+   "  connections: 1, max, speakers is true.",
+   "  connections: 11, clamped-max(4), discrete is true.",
+   "  connections: 11, clamped-max(4), speakers is true.",
+   "  connections: 11, explicit(1), speakers is true.",
+   "  connections: 11, explicit(2), speakers is true.",
+   "  connections: 11, explicit(4), discrete is true.",
+   "  connections: 11, explicit(4), speakers is true.",
+   "  connections: 11, explicit(6), speakers is true.",
+   "  connections: 11, explicit(8), discrete is true.",
+   "  connections: 11, max, discrete is true.",
+   "  connections: 11, max, speakers is true.",
+   "  connections: 111, clamped-max(4), discrete is true.",
+   "  connections: 111, clamped-max(4), speakers is true.",
+   "  connections: 111, explicit(1), speakers is true.",
+   "  connections: 111, explicit(2), speakers is true.",
+   "  connections: 111, explicit(4), discrete is true.",
+   "  connections: 111, explicit(4), speakers is true.",
+   "  connections: 111, explicit(6), speakers is true.",
+   "  connections: 111, explicit(8), discrete is true.",
+   "  connections: 111, max, discrete is true.",
+   "  connections: 111, max, speakers is true.",
+   "  connections: 12, clamped-max(4), discrete is true.",
+   "  connections: 12, clamped-max(4), speakers is true.",
+   "  connections: 12, explicit(1), speakers is true.",
+   "  connections: 12, explicit(2), speakers is true.",
+   "  connections: 12, explicit(4), discrete is true.",
+   "  connections: 12, explicit(4), speakers is true.",
+   "  connections: 12, explicit(6), speakers is true.",
+   "  connections: 12, explicit(8), discrete is true.",
+   "  connections: 12, max, discrete is true.",
+   "  connections: 12, max, speakers is true.",
+   "  connections: 122, clamped-max(4), discrete is true.",
+   "  connections: 122, clamped-max(4), speakers is true.",
+   "  connections: 122, explicit(1), speakers is true.",
+   "  connections: 122, explicit(2), speakers is true.",
+   "  connections: 122, explicit(4), discrete is true.",
+   "  connections: 122, explicit(4), speakers is true.",
+   "  connections: 122, explicit(6), speakers is true.",
+   "  connections: 122, explicit(8), discrete is true.",
+   "  connections: 122, max, discrete is true.",
+   "  connections: 122, max, speakers is true.",
+   "  connections: 123, clamped-max(4), discrete is true.",
+   "  connections: 123, clamped-max(4), speakers is true.",
+   "  connections: 123, explicit(1), speakers is true.",
+   "  connections: 123, explicit(2), speakers is true.",
+   "  connections: 123, explicit(4), discrete is true.",
+   "  connections: 123, explicit(4), speakers is true.",
+   "  connections: 123, explicit(6), speakers is true.",
+   "  connections: 123, explicit(8), discrete is true.",
+   "  connections: 123, max, discrete is true.",
+   "  connections: 123, max, speakers is true.",
+   "  connections: 124, clamped-max(4), discrete is true.",
+   "  connections: 124, clamped-max(4), speakers is true.",
+   "  connections: 124, explicit(1), speakers is true.",
+   "  connections: 124, explicit(2), speakers is true.",
+   "  connections: 124, explicit(4), discrete is true.",
+   "  connections: 124, explicit(4), speakers is true.",
+   "  connections: 124, explicit(6), speakers is true.",
+   "  connections: 124, explicit(8), discrete is true.",
+   "  connections: 124, max, discrete is true.",
+   "  connections: 124, max, speakers is true.",
+   "  connections: 128, clamped-max(4), discrete is true.",
+   "  connections: 128, clamped-max(4), speakers is true.",
+   "  connections: 128, explicit(1), speakers is true.",
+   "  connections: 128, explicit(2), speakers is true.",
+   "  connections: 128, explicit(4), discrete is true.",
+   "  connections: 128, explicit(4), speakers is true.",
+   "  connections: 128, explicit(6), speakers is true.",
+   "  connections: 128, explicit(8), discrete is true.",
+   "  connections: 128, max, discrete is true.",
+   "  connections: 128, max, speakers is true.",
+   "  connections: 14, clamped-max(4), discrete is true.",
+   "  connections: 14, clamped-max(4), speakers is true.",
+   "  connections: 14, explicit(1), speakers is true.",
+   "  connections: 14, explicit(2), speakers is true.",
+   "  connections: 14, explicit(4), discrete is true.",
+   "  connections: 14, explicit(4), speakers is true.",
+   "  connections: 14, explicit(6), speakers is true.",
+   "  connections: 14, explicit(8), discrete is true.",
+   "  connections: 14, max, discrete is true.",
+   "  connections: 14, max, speakers is true.",
+   "  connections: 18, clamped-max(4), discrete is true.",
+   "  connections: 18, clamped-max(4), speakers is true.",
+   "  connections: 18, explicit(1), speakers is true.",
+   "  connections: 18, explicit(2), speakers is true.",
+   "  connections: 18, explicit(4), discrete is true.",
+   "  connections: 18, explicit(4), speakers is true.",
+   "  connections: 18, explicit(6), speakers is true.",
+   "  connections: 18, explicit(8), discrete is true.",
+   "  connections: 18, max, discrete is true.",
+   "  connections: 18, max, speakers is true.",
+   "  connections: 2, clamped-max(4), discrete is true.",
+   "  connections: 2, clamped-max(4), speakers is true.",
+   "  connections: 2, explicit(1), speakers is true.",
+   "  connections: 2, explicit(2), speakers is true.",
+   "  connections: 2, explicit(4), discrete is true.",
+   "  connections: 2, explicit(4), speakers is true.",
+   "  connections: 2, explicit(6), speakers is true.",
+   "  connections: 2, explicit(8), discrete is true.",
+   "  connections: 2, max, discrete is true.",
+   "  connections: 2, max, speakers is true.",
+   "  connections: 3, clamped-max(4), discrete is true.",
+   "  connections: 3, clamped-max(4), speakers is true.",
+   "  connections: 3, explicit(1), speakers is true.",
+   "  connections: 3, explicit(2), speakers is true.",
+   "  connections: 3, explicit(4), discrete is true.",
+   "  connections: 3, explicit(4), speakers is true.",
+   "  connections: 3, explicit(6), speakers is true.",
+   "  connections: 3, explicit(8), discrete is true.",
+   "  connections: 3, max, discrete is true.",
+   "  connections: 3, max, speakers is true.",
+   "  connections: 4, clamped-max(4), discrete is true.",
+   "  connections: 4, clamped-max(4), speakers is true.",
+   "  connections: 4, explicit(1), speakers is true.",
+   "  connections: 4, explicit(2), speakers is true.",
+   "  connections: 4, explicit(4), discrete is true.",
+   "  connections: 4, explicit(4), speakers is true.",
+   "  connections: 4, explicit(6), speakers is true.",
+   "  connections: 4, explicit(8), discrete is true.",
+   "  connections: 4, max, discrete is true.",
+   "  connections: 4, max, speakers is true.",
+   "  connections: 5, clamped-max(4), discrete is true.",
+   "  connections: 5, clamped-max(4), speakers is true.",
+   "  connections: 5, explicit(1), speakers is true.",
+   "  connections: 5, explicit(2), speakers is true.",
+   "  connections: 5, explicit(4), discrete is true.",
+   "  connections: 5, explicit(4), speakers is true.",
+   "  connections: 5, explicit(6), speakers is true.",
+   "  connections: 5, explicit(8), discrete is true.",
+   "  connections: 5, max, discrete is true.",
+   "  connections: 5, max, speakers is true.",
+   "  connections: 6, clamped-max(4), discrete is true.",
+   "  connections: 6, clamped-max(4), speakers is true.",
+   "  connections: 6, explicit(1), speakers is true.",
+   "  connections: 6, explicit(2), speakers is true.",
+   "  connections: 6, explicit(4), discrete is true.",
+   "  connections: 6, explicit(4), speakers is true.",
+   "  connections: 6, explicit(6), speakers is true.",
+   "  connections: 6, explicit(8), discrete is true.",
+   "  connections: 6, max, discrete is true.",
+   "  connections: 6, max, speakers is true.",
+   "  connections: 7, clamped-max(4), discrete is true.",
+   "  connections: 7, clamped-max(4), speakers is true.",
+   "  connections: 7, explicit(1), speakers is true.",
+   "  connections: 7, explicit(2), speakers is true.",
+   "  connections: 7, explicit(4), discrete is true.",
+   "  connections: 7, explicit(4), speakers is true.",
+   "  connections: 7, explicit(6), speakers is true.",
+   "  connections: 7, explicit(8), discrete is true.",
+   "  connections: 7, max, discrete is true.",
+   "  connections: 7, max, speakers is true.",
+   "  connections: 8, clamped-max(4), discrete is true.",
+   "  connections: 8, clamped-max(4), speakers is true.",
+   "  connections: 8, explicit(1), speakers is true.",
+   "  connections: 8, explicit(2), speakers is true.",
+   "  connections: 8, explicit(4), discrete is true.",
+   "  connections: 8, explicit(4), speakers is true.",
+   "  connections: 8, explicit(6), speakers is true.",
+   "  connections: 8, explicit(8), discrete is true.",
+   "  connections: 8, max, discrete is true.",
+   "  connections: 8, max, speakers is true.",
+   "# AUDIT TASK RUNNER FINISHED: 1 tasks ran successfully.",
+   "# AUDIT TASK RUNNER STARTED.",
+   "< [test] All assertions passed. (total 172 assertions)",
+   "> [test] Channel mixing rules for AudioNodes",
+   "Audit report",
+   "Executing \"test\""
   ],
   "/webaudio/the-audio-api/the-audioparam-interface/k-rate-biquad-connection.html": [
    "  All k-rate AudioParams equals [0,0.3311063051223755,0.6248595118522644,0.8481203317642212,0.9757021069526672,0.9932119250297546,0.898674488067627,0.7027547359466553,0.4275550842285156,0.104121632874012,-0.23105810582637787,-0.5401714444160461,-0.7883464097976685,-0.9475855827331543,-0.9999247193336487,-0.9394592046737671...] with an element-wise tolerance of {\"absoluteThreshold\":0,\"relativeThreshold\":0}.",
@@ -1609,6 +2831,17 @@
    "Executing \"Gain AudioParam\"",
    "Executing \"Q AudioParam\""
   ],
+  "/webaudio/the-audio-api/the-gainnode-interface/no-dezippering.html": [
+   "Automation effects",
+   "Compare value setter and setValueAtTime",
+   "Dezippering of GainNode removed"
+  ],
+  "/webidl/ecmascript-binding/observable-array-ownkeys.window.html": [
+   "ObservableArray's ownKeys trap"
+  ],
+  "/webmessaging/multi-globals/messageport-incumbent.html": [
+   "Making the incumbent page become non-active must not prevent message transmission"
+  ],
   "/webmessaging/postMessage_ArrayBuffer.sub.htm": [
    "ArrayBuffer is supported.",
    "Test Description: postMessage with ArrayBuffer object."
@@ -1619,6 +2852,14 @@
   ],
   "/webvtt/parsing/file-parsing/tests/signature-no-newline.html": [
    "signature, no newline"
+  ],
+  "/workers/modules/dedicated-worker-options-type.html": [
+   "Test worker construction with the \"classic\" worker type.",
+   "Test worker construction with the \"module\" worker type.",
+   "Test worker construction with the default worker type."
+  ],
+  "/xhr/access-control-basic-allow-async.any.html": [
+   "Basic async cross-origin XHR request"
   ],
   "/xhr/access-control-basic-allow-preflight-cache-invalidation-by-method.any.html": [
    "Preflight cache should be invalidated by changed method"
@@ -1636,7 +2877,37 @@
    "cookie"
   ]
  },
- "reftests": [],
+ "reftests": [
+  "/content-security-policy/img-src/shared-stylesheet-image-set-cache-bypass-strict-first.html",
+  "/css/CSS2/backgrounds/background-328.xht",
+  "/css/CSS2/backgrounds/background-329.xht",
+  "/css/CSS2/backgrounds/background-attachment-009.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-001.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-002.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-003.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-004.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-005.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-006.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-007.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-009.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-012.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-013.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-014.xht",
+  "/css/CSS2/backgrounds/background-attachment-applies-to-015.xht",
+  "/css/CSS2/backgrounds/background-bg-pos-204.xht",
+  "/css/CSS2/backgrounds/background-bg-pos-206.xht",
+  "/css/CSS2/backgrounds/background-bg-pos-208.xht",
+  "/css/CSS2/backgrounds/background-color-129.xht",
+  "/css/CSS2/backgrounds/background-color-174.xht",
+  "/css/CSS2/backgrounds/background-image-002.xht",
+  "/css/CSS2/backgrounds/background-image-applies-to-001.xht",
+  "/css/CSS2/backgrounds/background-image-applies-to-002.xht",
+  "/css/CSS2/backgrounds/background-image-applies-to-003.xht",
+  "/css/CSS2/backgrounds/background-image-applies-to-012.xht",
+  "/css/CSS2/backgrounds/background-image-applies-to-013.xht",
+  "/css/CSS2/backgrounds/background-position-001.xht",
+  "/css/CSS2/backgrounds/background-position-029.xht"
+ ],
  "built": "2026-11-25",
  "from": [
   "l3-base-1.jsonl",
@@ -1715,7 +2986,8 @@
   "bf10-flake-r4.jsonl",
   "bf10-flake-r5.jsonl",
   "gate re-check of gate-affected.jsonl",
-  "gate re-check of gate.jsonl"
+  "gate re-check of gate.jsonl",
+  "gate re-check of avif1-gate.jsonl"
  ],
  "note": "Subtests and reftests whose result differed across runs of one binary; the gate reports their losses apart."
 }

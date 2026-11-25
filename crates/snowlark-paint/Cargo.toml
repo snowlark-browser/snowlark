@@ -32,6 +32,10 @@ png = "0.18"
 qcms = "0.3"
 zune-core = "0.5"
 zune-jpeg = "0.5"
+# AVIF (`decoders::avif`): CrabbyAvif, with dav1d decoding the AV1 frames. `dav1d_sys::LINKED` says whether the
+# build has the library (tools/dav1d/build.ps1); without it AVIF goes through WIC.
+crabby-avif = { git = "https://github.com/webmproject/CrabbyAvif", rev = "193e354e10f6a9f82217dfdbae836c4310ea3992", default-features = false, features = ["dav1d"] }
+dav1d-sys = { path = "../../vendor/dav1d-sys" }
 
 [dependencies.windows]
 version = "0.62"

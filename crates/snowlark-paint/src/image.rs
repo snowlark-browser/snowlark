@@ -2,9 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Images: decoding to premultiplied BGRA pixels (PNG, JPEG, GIF and WebP in Rust with their colour
-//! profiles applied, `crate::decoders`; BMP, ICO, TIFF and the others Windows has a codec for
-//! through WIC; animated GIF, APNG and WebP with their frames composited, see
+//! Images: decoding to premultiplied BGRA pixels (PNG, JPEG, GIF, WebP and AVIF in Rust with their
+//! colour profiles applied, `crate::decoders`; BMP, ICO, TIFF and the others Windows has a codec for
+//! through WIC; animated GIF, APNG, WebP and AVIF with their frames composited, see
 //! [`crate::animation`]), the store display lists refer to images by, and PNG encoding of
 //! rendered pixmaps.
 //!
@@ -24,7 +24,7 @@ use windows::Win32::System::Com::StructuredStorage::{PropVariantClear, PROPVARIA
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::System::Variant::{VT_UI1, VT_UI2};
 
-use crate::animation::{self, Blend, Canvas, Region, Timing};
+use crate::animation::{self, Blend, Canvas, Dispose, Region, Timing};
 use crate::color_profile::ColorTransform;
 use crate::com;
 use crate::decoders::{self, Format, GifDecoder};
@@ -38,6 +38,10 @@ pub const MAX_PIXELS: u64 = 100_000_000;
 /// keeps its file instead and decodes each frame as it shows ([`Animation::encoded`],
 /// [`FrameDecoder`]). 32 MiB holds 33 frames of 500 × 500, or 8 of 1000 × 1000.
 pub const ANIMATION_FRAMES_BYTES: u64 = 32 << 20;
+
+/// Whether AVIF images are decoded here (CrabbyAvif with dav1d), with their colour profiles and
+/// image sequences; a build without the dav1d library leaves them to WIC.
+pub const AVIF: bool = decoders::AVIF;
 
 /// One frame: premultiplied BGRA, rows `width * 4` bytes apart.
 #[derive(Clone, Debug)]
@@ -146,6 +150,7 @@ fn decode_with_budget(bytes: &[u8], budget: u64) -> Result<DecodedImage> {
         Format::Gif => Some(Kind::Gif(None)),
         Format::Webp => animation::parse_webp_animation(bytes).map(Kind::Webp),
         Format::Jpeg => None,
+        Format::Avif => return decode_avif(bytes, budget),
     };
     if let Some(kind) = kind {
         // (the still image when the animation doesn't decode)
@@ -163,8 +168,22 @@ fn decode_with_budget(bytes: &[u8], budget: u64) -> Result<DecodedImage> {
         Format::Jpeg => (decoders::jpeg(bytes)?, exif_orientation(bytes).unwrap_or(1)),
         // (no EXIF orientation for WebP, as in other engines)
         Format::Webp => (decoders::webp(bytes)?, 1),
-        Format::Gif => return Err(E_INVALIDARG.into()),
+        Format::Gif | Format::Avif => return Err(E_INVALIDARG.into()),
     };
+    let mut image = DecodedImage::still(oriented(frame, orientation));
+    image.orientation = orientation;
+    Ok(image)
+}
+
+/// An AVIF image, or an image sequence's frames (each a whole image: no blending or disposal).
+/// A still image's `irot` and `imir` turn it as an EXIF orientation would.
+fn decode_avif(bytes: &[u8], budget: u64) -> Result<DecodedImage> {
+    let mut d = decoders::avif_decoder(bytes)?;
+    if d.frames() > 1 {
+        return decode_animation(Arc::from(bytes), Kind::Avif(Some(Box::new(d))), budget);
+    }
+    let orientation = d.orientation;
+    let frame = decoders::avif_next(&mut d)?;
     let mut image = DecodedImage::still(oriented(frame, orientation));
     image.orientation = orientation;
     Ok(image)
@@ -435,6 +454,9 @@ enum Kind {
     /// Each frame is made a WebP of its own ([`animation::WebpAnimation::frame_webp`]) for the
     /// WebP decoder; composition is ours.
     Webp(animation::WebpAnimation),
+    /// An AVIF image sequence: CrabbyAvif decodes its frames in order (each depends on the ones
+    /// before it, back to a key frame).
+    Avif(Option<Box<decoders::AvifDecoder>>),
 }
 
 /// Decodes an animation's frames one after another (composited to full size, as they show): what
@@ -462,12 +484,16 @@ impl FrameDecoder {
             Some(Format::Webp) => {
                 Kind::Webp(animation::parse_webp_animation(&bytes).ok_or(E_INVALIDARG)?)
             }
+            Some(Format::Avif) => Kind::Avif(None),
             _ => return Err(E_INVALIDARG.into()),
         };
         FrameDecoder::with_kind(bytes, kind)
     }
 
-    fn with_kind(bytes: Arc<[u8]>, kind: Kind) -> Result<FrameDecoder> {
+    fn with_kind(bytes: Arc<[u8]>, mut kind: Kind) -> Result<FrameDecoder> {
+        if let Kind::Avif(d @ None) = &mut kind {
+            *d = Some(Box::new(decoders::avif_decoder(&bytes)?));
+        }
         let (width, height, timing) = match &kind {
             Kind::Gif(_) => {
                 let layout = decoders::gif_layout(bytes.clone())?;
@@ -480,6 +506,14 @@ impl FrameDecoder {
                 a.height,
                 Timing::new(a.durations.iter().copied(), a.plays),
             ),
+            Kind::Avif(d) => {
+                let d = d.as_ref().ok_or(E_INVALIDARG)?;
+                (
+                    d.width,
+                    d.height,
+                    Timing::new(d.durations.iter().copied(), d.plays),
+                )
+            }
         };
         decoders::check_size(width, height)?;
         Ok(FrameDecoder {
@@ -540,6 +574,12 @@ impl FrameDecoder {
             return Err(E_INVALIDARG.into());
         }
         if index < self.next || self.canvas.width == 0 {
+            // (a decoder that has gone past the first frame starts again from the file)
+            if let Kind::Avif(d) = &mut self.kind {
+                if self.next > 0 {
+                    *d = None;
+                }
+            }
             self.next = 0;
             if self.canvas.width == 0 {
                 self.canvas = Canvas::new(self.width, self.height);
@@ -602,6 +642,21 @@ impl FrameDecoder {
                 };
                 self.canvas
                     .draw(&piece.pixels, piece.width, at, f.blend, f.dispose);
+            }
+            Kind::Avif(d) => {
+                if d.is_none() {
+                    *d = Some(Box::new(decoders::avif_decoder(&self.bytes)?));
+                }
+                let d = d.as_mut().ok_or(E_INVALIDARG)?;
+                let piece = decoders::avif_next(d)?;
+                let at = Region {
+                    x: 0,
+                    y: 0,
+                    width: piece.width.min(self.width),
+                    height: piece.height.min(self.height),
+                };
+                self.canvas
+                    .draw(&piece.pixels, piece.width, at, Blend::Source, Dispose::None);
             }
         }
         self.next = i + 1;
@@ -1196,6 +1251,117 @@ mod tests {
         let raw = img.unoriented().unwrap();
         assert_eq!((raw.width(), raw.height()), (16, 8));
         assert_near(&raw.frames[0], (3, 4), [255, 0, 0], 8, "stored left");
+    }
+
+    // The AVIF tests need the dav1d library (`AVIF`); without it AVIF goes to WIC, which reads
+    // neither the colour profile, alpha, odd sizes nor `irot`/`imir` as other engines do. The
+    // expected values are the ones headless Chrome paints for these files.
+
+    #[test]
+    fn avif_colour_profiles_are_converted_to_srgb() {
+        // The P3 patches, tagged by an ICC profile and by an nclx colour description.
+        let want = [[255, 0, 0], [0, 255, 0], [215, 93, 97], [128, 128, 128]];
+        for name in ["p3-patches.avif", "p3-nclx.avif"] {
+            let img = decode(&fixture(name)).unwrap();
+            assert_eq!((img.width(), img.height()), (32, 8), "{name}");
+            assert!(img.animation.is_none(), "{name}");
+            for (i, w) in want.iter().enumerate() {
+                assert_near(&img.frames[0], (i as u32 * 8 + 4, 4), *w, 1, name);
+            }
+        }
+    }
+
+    #[test]
+    fn avif_alpha_is_premultiplied() {
+        let img = decode(&fixture("alpha.avif")).unwrap();
+        let f = &img.frames[0];
+        assert_eq!((f.width, f.height), (16, 8));
+        // red at alpha 128: premultiplied BGRA (0, 0, 128, 128)
+        let at = |x: usize, y: usize| &f.pixels[(y * 16 + x) * 4..][..4];
+        let red = at(3, 4);
+        assert!(
+            red[0] <= 1 && red[1] <= 1 && red[2].abs_diff(128) <= 1,
+            "{red:?}"
+        );
+        assert!(red[3].abs_diff(128) <= 1, "{red:?}");
+        assert_near(f, (9, 4), [0, 255, 0], 2, "lime");
+        assert_eq!(at(14, 4), &[0, 0, 0, 0], "transparent");
+    }
+
+    #[test]
+    fn avif_odd_sizes_and_chroma_subsampling() {
+        let img = decode(&fixture("odd-7x5.avif")).unwrap();
+        let f = &img.frames[0];
+        assert_eq!((f.width, f.height), (7, 5));
+        assert_near(f, (0, 0), [0, 0, 253], 2, "blue");
+        assert_near(f, (3, 2), [0, 1, 253], 2, "blue");
+        // the last row is yellow blended with the blue chroma above it, as Chrome upsamples it
+        assert_near(f, (2, 4), [240, 241, 113], 2, "bottom row");
+    }
+
+    #[test]
+    fn avif_rotation_and_mirroring_turn_the_image() {
+        // Stored 16 x 8, red | blue, with 'irot' and 'imir' making orientation 6: shown 8 x 16,
+        // red above blue.
+        let img = decode(&fixture("orient-6.avif")).unwrap();
+        assert_eq!(img.orientation, 6);
+        assert_eq!((img.width(), img.height()), (8, 16));
+        assert_near(&img.frames[0], (4, 3), [255, 0, 0], 2, "top");
+        assert_near(&img.frames[0], (4, 12), [0, 0, 254], 2, "bottom");
+        let raw = img.unoriented().unwrap();
+        assert_eq!((raw.width(), raw.height()), (16, 8));
+    }
+
+    #[test]
+    fn avif_image_sequences_animate() {
+        let img = decode(&fixture("anim-rgb.avif")).unwrap();
+        let a = img.animation.as_ref().expect("an animation");
+        assert_eq!(img.frames.len(), 3);
+        assert!(a.encoded.is_none());
+        for (i, f) in img.frames.iter().enumerate() {
+            assert_eq!((f.width, f.height), (16, 16));
+            let want = [[255, 0, 0], [0, 255, 0], [0, 0, 255]][i];
+            assert_near(f, (8, 8), want, 2, &format!("frame {i}"));
+            assert_eq!(f.delay_ms, [100, 200, 300][i], "frame {i}");
+        }
+        // (no edit list: it loops forever)
+        assert_eq!(a.timing.plays(), None);
+        // decoded again as it shows, starting over after the last frame
+        let mut d = FrameDecoder::new(Arc::from(fixture("anim-rgb.avif"))).unwrap();
+        assert_near(&d.frame(2).unwrap(), (8, 8), [0, 0, 255], 2, "frame 2");
+        assert_near(
+            &d.frame(0).unwrap(),
+            (8, 8),
+            [255, 0, 0],
+            2,
+            "frame 0 again",
+        );
+        assert_near(&d.frame(1).unwrap(), (8, 8), [0, 255, 0], 2, "frame 1");
+    }
+
+    #[test]
+    fn high_bit_depth_avif_sequences_decode() {
+        // 12 bits per channel, five frames of a second, key frames 0, 2 and 3
+        let img = decode(&fixture("anim-12bit.avif")).unwrap();
+        let a = img.animation.as_ref().expect("an animation");
+        assert_eq!(img.frames.len(), 5);
+        assert_eq!((img.width(), img.height()), (64, 64));
+        assert!(img.frames.iter().all(|f| f.delay_ms == 1000));
+        assert_eq!(a.timing.plays(), None);
+        assert_near(&img.frames[0], (32, 32), [255, 120, 255], 1, "frame 0");
+        // frame 4 follows frame 3 (a key frame): the same picture as when decoded in order
+        let mut d = FrameDecoder::new(Arc::from(fixture("anim-12bit.avif"))).unwrap();
+        let f4 = d.frame(4).unwrap();
+        assert_eq!(f4.pixels, img.frames[4].pixels);
+    }
+
+    #[test]
+    fn broken_avif_files_are_refused() {
+        let avif = fixture("p3-patches.avif");
+        assert!(decode(&avif[..avif.len() / 2]).is_err());
+        assert!(decode(&avif[..avif.len() - 8]).is_err());
+        // an 'ftyp' with the AVIF brand and nothing after it
+        assert!(decode(&avif[..32]).is_err());
     }
 
     /// A PNG of `width` x 1 pixels of the given colour type and depth, with `extra` chunks

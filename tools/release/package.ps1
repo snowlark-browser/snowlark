@@ -52,6 +52,22 @@ $sha = $head.Substring(0, 8)
 $date = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')
 $name = "snowlark-preview-$date-$sha"
 
+# dav1d, linked statically (AVIF): the build takes the library tools\dav1d\pin.txt names from the dev folder; a
+# release needs that one, or it would decode AVIF through Windows and the notices would not describe it.
+$dav1dPin = @{}
+foreach ($line in Get-Content (Join-Path $root 'tools\dav1d\pin.txt')) {
+    if ($line -match '^([A-Za-z0-9-]+)=(.*)$') { $dav1dPin[$matches[1]] = $matches[2].Trim() }
+}
+$dav1dDir = if ($env:SNOWLARK_DAV1D_DIR) { $env:SNOWLARK_DAV1D_DIR } else {
+    Join-Path (Get-DevSetting 'SNOWLARK_DEV_DIR') "dav1d\$($dav1dPin['name'])"
+}
+$dav1dLib = Join-Path $dav1dDir 'dav1d.lib'
+if (-not (Test-Path $dav1dLib)) { throw "no $dav1dLib (build dav1d with tools\dav1d\build.ps1)" }
+$hash = (Get-FileHash $dav1dLib -Algorithm SHA256).Hash.ToLower()
+if ($hash -ne $dav1dPin['lib-sha256'] -and -not $AllowOther) {
+    throw "$dav1dLib has SHA-256 $hash, not the one tools\dav1d\pin.txt pins ($($dav1dPin['lib-sha256']))"
+}
+
 if (-not $SkipBuild) {
     $drive = ([IO.Path]::GetPathRoot([IO.Path]::GetFullPath($OutDir))).TrimEnd('\', ':')
     $free = [math]::Round((Get-PSDrive $drive).Free / 1GB)

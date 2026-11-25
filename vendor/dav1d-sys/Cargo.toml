@@ -1,0 +1,18 @@
+[package]
+name = "dav1d-sys"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/webmproject/CrabbyAvif"
+description = "CrabbyAvif's dav1d bindings, linked to a prebuilt static dav1d (see SNOWLARK-PATCHES.md)"
+links = "dav1d"
+build = "build.rs"
+
+[lib]
+doctest = false
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(google3)', 'cfg(dav1d_missing)'] }
+
+[features]
+dav1d = []

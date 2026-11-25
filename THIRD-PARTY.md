@@ -17,6 +17,10 @@ Patched copies, taken through `[patch.crates-io]` in `Cargo.toml`. Each keeps it
 | `vendor/taffy` | [DioxusLabs/taffy](https://github.com/DioxusLabs/taffy) 0.15.1 | MIT |
 | `vendor/url` | [servo/rust-url](https://github.com/servo/rust-url) 2.5.8 | MIT or Apache-2.0 |
 | `vendor/v8` | [denoland/rusty_v8](https://github.com/denoland/rusty_v8), its roll to V8 15.8 | MIT |
+| `vendor/dav1d-sys` | [webmproject/CrabbyAvif](https://github.com/webmproject/CrabbyAvif)'s `sys/dav1d-sys`, taken through `[patch."https://github.com/webmproject/CrabbyAvif"]` | Apache-2.0 |
+
+CrabbyAvif itself (the AVIF decoder) is a git dependency of `crates/snowlark-paint`, pinned to a commit, under
+the Apache License 2.0.
 
 ## Vendored C++ libraries (`vendor/`)
 
@@ -39,6 +43,14 @@ under the BSD 3-Clause licence. It is not in the repository: `tools/angle/build.
 `tools/angle/pin.txt` from its official source, and the browser loads the two libraries it makes, `libEGL.dll` and
 `libGLESv2.dll`, from its own folder at run time (`docs/webgl.md`). The code ANGLE links from its own
 `third_party` folder keeps its licences there.
+
+## dav1d (AVIF)
+
+AVIF images are decoded by CrabbyAvif with [dav1d](https://code.videolan.org/videolan/dav1d), the AV1 decoder,
+under the BSD 2-Clause licence; its x86 assembly uses the x264 project's `x86inc.asm`, under the ISC licence. dav1d
+is not in the repository: `tools/dav1d/build.ps1` builds the release pinned in `tools/dav1d/pin.txt` from its
+official source as a static library, which is linked into the program. Both licence texts are kept in
+`tools/dav1d/` (`LICENSE.dav1d`, `LICENSE.x86inc`) for the notices file and the credits page.
 
 ## Specifications' Web IDL (`idl/`)
 

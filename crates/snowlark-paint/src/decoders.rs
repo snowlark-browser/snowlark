@@ -2,8 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! The image formats decoded in Rust: PNG (`png`), JPEG (`zune-jpeg`), GIF (`gif`) and WebP
-//! (`image-webp`), each to premultiplied BGRA with its colour profile applied
+//! The image formats decoded in Rust: PNG (`png`), JPEG (`zune-jpeg`), GIF (`gif`), WebP
+//! (`image-webp`) and AVIF (`crabby-avif`, whose AV1 frames dav1d decodes, in a build that has
+//! it), each to premultiplied BGRA with its colour profile applied
 //! ([`crate::color_profile`]). Which format a file is comes from its signature (MIME Sniffing
 //! §6.1, "Matching an image type pattern"), not from its Content-Type. Animations are put
 //! together by [`crate::image`] from the frames these give.
@@ -24,9 +25,12 @@ pub(crate) enum Format {
     Jpeg,
     Gif,
     Webp,
+    /// (only in a build with dav1d: [`AVIF`])
+    Avif,
 }
 
-/// The format `bytes` start like (MIME Sniffing §6.1's image patterns); `None` for the others.
+/// The format `bytes` start like (MIME Sniffing §6.1's image patterns, and AVIF's `ftyp` brands as
+/// other engines sniff them); `None` for the others.
 pub(crate) fn sniff(bytes: &[u8]) -> Option<Format> {
     if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
         Some(Format::Jpeg)
@@ -36,6 +40,8 @@ pub(crate) fn sniff(bytes: &[u8]) -> Option<Format> {
         Some(Format::Gif)
     } else if bytes.len() >= 14 && &bytes[0..4] == b"RIFF" && &bytes[8..14] == b"WEBPVP" {
         Some(Format::Webp)
+    } else if AVIF && is_avif(bytes) {
+        Some(Format::Avif)
     } else {
         None
     }
@@ -432,6 +438,176 @@ pub(crate) fn webp(bytes: &[u8]) -> Result<Frame> {
         let bgra = expand(&pixels, |&[r, g, b]| [b, g, r, 255]);
         opaque(width, height, bgra, color.as_ref())
     })
+}
+
+// --- AVIF ---
+
+/// Whether AVIF is decoded here: the build has the dav1d library (`dav1d_sys::LINKED`). Without
+/// it AVIF goes to WIC.
+pub(crate) const AVIF: bool = dav1d_sys::LINKED;
+
+fn avif_error(e: crabby_avif::AvifError) -> windows::core::Error {
+    match e {
+        crabby_avif::AvifError::OutOfMemory => E_OUTOFMEMORY.into(),
+        _ => invalid(),
+    }
+}
+
+/// An AVIF file being decoded (AV1 Image File Format, with the defaults of MIAF §7.3.6.4 for what
+/// it leaves unsaid): the image, or an image sequence's frames one after another.
+pub(crate) struct AvifDecoder {
+    decoder: Box<crabby_avif::decoder::Decoder>,
+    color: Option<ColorTransform>,
+    /// The size shown: the clean aperture's, when it has one starting at the origin (a valid
+    /// `clap` elsewhere, or an invalid one, is ignored, as other engines do).
+    pub width: u32,
+    pub height: u32,
+    /// The EXIF orientation that its `irot` and `imir` properties make (MIAF §7.3.6.7: rotation,
+    /// then mirroring).
+    pub orientation: u8,
+    /// The frames' durations (ms) and how many times the sequence plays (`None`: forever).
+    pub durations: Vec<u32>,
+    pub plays: Option<u32>,
+}
+
+/// Opens an AVIF file and reads its container (ISO/IEC 23000-22): size, colour, orientation and,
+/// for an image sequence, the frames' timing. Its pixels come from [`avif_next`].
+pub(crate) fn avif_decoder(bytes: &[u8]) -> Result<AvifDecoder> {
+    use crabby_avif::decoder::{Decoder, StrictnessFlag};
+    use crabby_avif::{ColorPrimaries, RepetitionCount, TransferCharacteristics};
+    if !AVIF {
+        return Err(invalid());
+    }
+    let mut decoder = Box::new(Decoder::default());
+    let settings = &mut decoder.settings;
+    settings.codec_choice = crabby_avif::CodecChoice::Dav1d;
+    settings.max_threads = 2;
+    settings.ignore_exif = true;
+    settings.ignore_xmp = true;
+    // (a 'clap' is checked here, and a missing 'pixi' is allowed: older encoders left it out)
+    settings.strictness = crabby_avif::decoder::Strictness::SpecificExclude(vec![
+        StrictnessFlag::ClapValid,
+        StrictnessFlag::PixiRequired,
+    ]);
+    settings.image_size_limit = std::num::NonZeroU32::new(MAX_PIXELS as u32);
+    decoder.set_io_vec(bytes.to_vec());
+    decoder.parse().map_err(avif_error)?;
+    let count = decoder.image_count();
+    let image = decoder.image().ok_or_else(invalid)?;
+    if image.depth == 0 || count == 0 {
+        return Err(invalid());
+    }
+    let (mut width, mut height) = (image.width, image.height);
+    if let Some(clap) = &image.clap {
+        let rect = crabby_avif::utils::clap::CropRect::create_from(
+            clap,
+            image.width,
+            image.height,
+            image.yuv_format,
+        );
+        if let Ok(r) = rect {
+            if r.x == 0 && r.y == 0 && r.width > 0 && r.height > 0 {
+                (width, height) = (r.width, r.height);
+            }
+        }
+    }
+    check_size(width, height)?;
+    // An ICC profile, else the colour description (H.273), its unspecified primaries and transfer
+    // taken as sRGB's. The pixels are converted to full-range RGB first, so the matrix and range
+    // are not part of the colour space here.
+    let color = if !image.icc.is_empty() {
+        transform_for(&ColorInfo {
+            icc: Some(&image.icc),
+            ..ColorInfo::default()
+        })
+    } else if image.color_primaries != ColorPrimaries::Unspecified
+        || image.transfer_characteristics != TransferCharacteristics::Unspecified
+    {
+        let primaries = match image.color_primaries {
+            ColorPrimaries::Unspecified => ColorPrimaries::Srgb,
+            p => p,
+        };
+        let transfer = match image.transfer_characteristics {
+            TransferCharacteristics::Unspecified => TransferCharacteristics::Srgb,
+            t => t,
+        };
+        transform_for(&ColorInfo {
+            cicp: Some((primaries as u8, transfer as u8, 0, true)),
+            ..ColorInfo::default()
+        })
+    } else {
+        None
+    };
+    // (angle × 90° anti-clockwise, then mirroring: axis 0 swaps top and bottom, 1 left and right)
+    const ORIENTATION: [[u8; 4]; 3] = [[1, 8, 3, 6], [4, 5, 2, 7], [2, 7, 4, 5]];
+    let angle = image.irot_angle.unwrap_or(0).min(3) as usize;
+    let axis = image.imir_axis.map_or(0, |a| a.min(1) as usize + 1);
+    let orientation = ORIENTATION[axis][angle];
+    let durations = (0..count)
+        .map(|i| {
+            decoder.nth_image_timing(i).map_or(0, |t| {
+                (t.duration * 1000.0).round().clamp(0.0, u32::MAX as f64) as u32
+            })
+        })
+        .collect();
+    // (a sequence without an edit list loops forever, as before edit lists were read)
+    let plays = match decoder.repetition_count() {
+        RepetitionCount::Finite(n) => Some(n.saturating_add(1)),
+        RepetitionCount::Infinite | RepetitionCount::Unknown => None,
+    };
+    Ok(AvifDecoder {
+        decoder,
+        color,
+        width,
+        height,
+        orientation,
+        durations,
+        plays,
+    })
+}
+
+impl AvifDecoder {
+    pub fn frames(&self) -> usize {
+        self.durations.len()
+    }
+}
+
+/// The next image of an AVIF file (its first image after [`avif_decoder`]) as premultiplied BGRA,
+/// cropped to the clean aperture, with its colour profile applied, before orientation.
+pub(crate) fn avif_next(d: &mut AvifDecoder) -> Result<Frame> {
+    use crabby_avif::reformat::rgb;
+    d.decoder.next_image().map_err(avif_error)?;
+    let image = d.decoder.image().ok_or_else(invalid)?;
+    if image.width < d.width || image.height < d.height {
+        return Err(invalid());
+    }
+    let mut out = rgb::Image::create_from_yuv(image);
+    out.depth = 8;
+    out.max_threads = 2;
+    // Straight alpha: the colour profile applies before premultiplying.
+    out.format = if image.alpha_present {
+        rgb::Format::Rgba
+    } else {
+        rgb::Format::Bgra
+    };
+    out.allocate().map_err(avif_error)?;
+    out.convert_from_yuv(image).map_err(avif_error)?;
+    let (w, h) = (d.width as usize, d.height as usize);
+    let mut pixels = Vec::with_capacity(w * h * 4);
+    for y in 0..d.height {
+        let row = out.row(y).map_err(avif_error)?;
+        pixels.extend_from_slice(row.get(..w * 4).ok_or_else(invalid)?);
+    }
+    Ok(if image.alpha_present {
+        with_alpha(d.width, d.height, pixels, d.color.as_ref())
+    } else {
+        opaque(d.width, d.height, pixels, d.color.as_ref())
+    })
+}
+
+/// Whether `bytes` are an AVIF file (an ISO BMFF `ftyp` box with an AVIF brand).
+fn is_avif(bytes: &[u8]) -> bool {
+    crabby_avif::decoder::Decoder::peek_compatible_file_type(bytes)
 }
 
 #[cfg(test)]

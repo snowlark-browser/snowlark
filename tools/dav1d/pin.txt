@@ -1,0 +1,15 @@
+# dav1d, the AV1 decoder AVIF images are decoded with (crabby-avif, vendor/dav1d-sys). tools/dav1d/build.ps1 builds
+# this tag of https://code.videolan.org/videolan/dav1d as a static library into <dev dir>/dav1d/<name>; dev.ps1
+# hands that folder to the build (SNOWLARK_DAV1D_DIR). The build tools are pinned too: NASM by the SHA-256 of its
+# release zip, meson and ninja by version from PyPI.
+tag=1.5.5
+commit=6c7bee685677fd997a431302be4fea8ea4017606
+name=dav1d-1.5.5
+lib-sha256=e8e090fcc9189d8c22a5a6e713ee9d1ab412785ee09f59d5a0bf8d6afae096f9
+nasm-url=https://www.nasm.us/pub/nasm/releasebuilds/3.02/win64/nasm-3.02-win64.zip
+nasm-sha256=161d0bfaff53c2f9e9f3e69fd0672323ebabafd1268976a5cec11be92a19aee7
+meson=1.12.1
+ninja=1.13.2
+# Only for -Bindings (regenerating vendor/dav1d-sys/src/bindings.rs): libclang from PyPI and bindgen-cli.
+libclang=18.1.1
+bindgen=0.72.1
