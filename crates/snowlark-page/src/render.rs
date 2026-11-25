@@ -1364,6 +1364,7 @@ impl Engine {
         // "Update the rendering or user interface of doc": canvases that drew, then style and layout.
         self.flush_canvases();
         self.flush_webgl();
+        self.flush_offscreen();
         self.sync_media_rendering(cx);
         self.sync_form_states(Some(cx), crate::engine::forms::FormSync::Connected);
         self.sync_controls();

@@ -28,7 +28,7 @@ pub trait CanvasDrawImageImpl {
         &self,
         cx: &mut Cx,
         this: Handle,
-        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas,
         dx: f64,
         dy: f64,
     ) -> Result<()>;
@@ -37,7 +37,7 @@ pub trait CanvasDrawImageImpl {
         &self,
         cx: &mut Cx,
         this: Handle,
-        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas,
         dx: f64,
         dy: f64,
     ) -> Result<()> {
@@ -49,7 +49,7 @@ pub trait CanvasDrawImageImpl {
         &self,
         cx: &mut Cx,
         this: Handle,
-        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas,
         dx: f64,
         dy: f64,
         dw: f64,
@@ -60,7 +60,7 @@ pub trait CanvasDrawImageImpl {
         &self,
         cx: &mut Cx,
         this: Handle,
-        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas,
         dx: f64,
         dy: f64,
         dw: f64,
@@ -74,7 +74,7 @@ pub trait CanvasDrawImageImpl {
         &self,
         cx: &mut Cx,
         this: Handle,
-        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas,
         sx: f64,
         sy: f64,
         sw: f64,
@@ -89,7 +89,7 @@ pub trait CanvasDrawImageImpl {
         &self,
         cx: &mut Cx,
         this: Handle,
-        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas,
         sx: f64,
         sy: f64,
         sw: f64,
@@ -112,7 +112,7 @@ fn op_draw_image_0<'s, D: Dom, const LO: u16, const HI: u16>(
 ) -> Option<v8::Local<'s, v8::Value>> {
     let a0 = {
         let v = args.get(0);
-        HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::from_js(scope, v)
+        HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::from_js(scope, v)
     }?;
     let a1 = {
         let v = args.get(1);
@@ -144,7 +144,7 @@ fn op_draw_image_1<'s, D: Dom, const LO: u16, const HI: u16>(
 ) -> Option<v8::Local<'s, v8::Value>> {
     let a0 = {
         let v = args.get(0);
-        HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::from_js(scope, v)
+        HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::from_js(scope, v)
     }?;
     let a1 = {
         let v = args.get(1);
@@ -186,7 +186,7 @@ fn op_draw_image_2<'s, D: Dom, const LO: u16, const HI: u16>(
 ) -> Option<v8::Local<'s, v8::Value>> {
     let a0 = {
         let v = args.get(0);
-        HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::from_js(scope, v)
+        HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::from_js(scope, v)
     }?;
     let a1 = {
         let v = args.get(1);

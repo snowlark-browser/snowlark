@@ -30,13 +30,25 @@ use super::{exception, Engine, Object};
 /// that falls further behind shows its frames at later paints instead of holding every one back.
 pub(crate) const CANVAS_PAINT_WAIT_MS: f64 = 50.0;
 
-/// A `CanvasRenderingContext2D`: the canvas element and its bitmap.
+/// What a rendering context draws for: a `<canvas>` element, or an `OffscreenCanvas` (HTML
+/// §4.12.5.3), which may be in a worker.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CanvasOwner {
+    Element(NodeId),
+    Offscreen(Handle),
+}
+
+/// A `CanvasRenderingContext2D` (or an `OffscreenCanvasRenderingContext2D`): its canvas and its
+/// bitmap.
 pub struct ContextObj {
-    pub element: NodeId,
+    pub owner: CanvasOwner,
     pub canvas: Canvas2D,
     /// The objects `fillStyle`/`strokeStyle` return when they are a gradient or pattern.
     pub fill_object: Option<Handle>,
     pub stroke_object: Option<Handle>,
+    /// The bitmap's origin-clean flag (HTML §4.12.5.1.14): false once anything script may not
+    /// read was drawn into it, after which its pixels cannot be read back. Never set again.
+    pub origin_clean: bool,
 }
 
 /// An `ImageData`.
@@ -44,6 +56,25 @@ pub struct ImageDataObj {
     pub width: u32,
     pub height: u32,
     pub data: JsObject,
+}
+
+/// A drawImage, createPattern or texture source (HTML §4.12.5.1.14 `CanvasImageSource`, the kinds
+/// generated).
+pub(crate) type ImageSource =
+    g::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas;
+
+/// A bitmap as a frame: premultiplied BGRA, top row first.
+pub(crate) fn frame_of(pm: &tiny_skia::Pixmap) -> snowlark_paint::image::Frame {
+    let mut pixels = pm.data().to_vec();
+    for px in pixels.as_chunks_mut::<4>().0 {
+        px.swap(0, 2);
+    }
+    snowlark_paint::image::Frame {
+        width: pm.width(),
+        height: pm.height(),
+        pixels,
+        delay_ms: 0,
+    }
 }
 
 fn f(v: f64) -> f32 {
@@ -60,18 +91,23 @@ impl Engine {
 
     /// Runs a drawing operation and marks the canvas for the next rendering update.
     fn draw<R>(&self, h: Handle, op: impl FnOnce(&mut Canvas2D) -> R) -> R {
-        let (r, element) = self.ctx(h, |c| (op(&mut c.canvas), c.element));
-        let mut dirty = self.canvas_dirty.borrow_mut();
-        if !dirty.contains(&element) {
-            dirty.push(element);
+        let (r, owner) = self.ctx(h, |c| (op(&mut c.canvas), c.owner));
+        match owner {
+            CanvasOwner::Element(element) => {
+                let mut dirty = self.canvas_dirty.borrow_mut();
+                if !dirty.contains(&element) {
+                    dirty.push(element);
+                }
+                drop(dirty);
+                self.render.borrow_mut().dirty = true;
+            }
+            CanvasOwner::Offscreen(oc) => self.offscreen_drew(oc),
         }
-        drop(dirty);
-        self.render.borrow_mut().dirty = true;
         r
     }
 
     /// The canvas element's bitmap size from its attributes (HTML: 300×150 by default).
-    fn canvas_size(&self, el: NodeId) -> (u32, u32) {
+    pub(crate) fn canvas_size(&self, el: NodeId) -> (u32, u32) {
         (
             self.dim_attr(el, "width", 300),
             self.dim_attr(el, "height", 150),
@@ -80,7 +116,7 @@ impl Engine {
 
     /// A canvas's `width` or `height` attribute changed: its context's bitmap is reset.
     pub(crate) fn canvas_resized(&self, el: NodeId) {
-        self.webgl_resized(el);
+        self.webgl_resized(CanvasOwner::Element(el));
         let Some(h) = self.canvases.borrow().get(&el).copied() else {
             return;
         };
@@ -245,55 +281,208 @@ impl Engine {
     fn draw_image_with(
         &self,
         this: Handle,
-        image: &g::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: &ImageSource,
         rects: impl Fn(f32, f32) -> ((f32, f32, f32, f32), (f32, f32, f32, f32)),
-    ) {
-        use g::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement as S;
-        if let S::HTMLCanvasElement(h) = image {
-            let el = self.n(*h);
-            let ctx = self.canvases.borrow().get(&el).copied();
+    ) -> rt::Result<()> {
+        self.check_canvas_source(image)?;
+        // HTML §4.12.5.1.14 `drawImage()`: "If image is not origin-clean, then set the
+        // CanvasRenderingContext2D's origin-clean flag to false" (once it is drawn: a source with
+        // nothing to draw returns before).
+        if self.draw_image_pixels(this, image, rects) && !self.source_origin_clean(image) {
+            self.ctx(this, |c| c.origin_clean = false);
+        }
+        Ok(())
+    }
+
+    /// HTML §4.12.5.1.14 "check the usability of the image argument": an `OffscreenCanvas` that
+    /// was transferred (detached) or a canvas with no pixels (width or height 0) throws
+    /// `InvalidStateError`.
+    fn check_canvas_source(&self, image: &ImageSource) -> rt::Result<()> {
+        if let ImageSource::ImageBitmap(h) = image {
+            if self.bitmap_closed(*h) {
+                return Err(exception(
+                    ExceptionName::InvalidStateError,
+                    "The ImageBitmap is closed",
+                ));
+            }
+        }
+        let Some(src) = self.canvas_of(image) else {
+            return Ok(());
+        };
+        if let CanvasOwner::Offscreen(h) = src {
+            if self.offscreen_detached(h) {
+                return Err(exception(
+                    ExceptionName::InvalidStateError,
+                    "The OffscreenCanvas is detached",
+                ));
+            }
+        }
+        let (w, h) = self.source_size(src);
+        if w == 0 || h == 0 {
+            return Err(exception(
+                ExceptionName::InvalidStateError,
+                "The canvas has no pixels",
+            ));
+        }
+        Ok(())
+    }
+
+    /// The canvas a `CanvasImageSource` is, if it is one.
+    fn canvas_of(&self, image: &ImageSource) -> Option<CanvasOwner> {
+        match image {
+            ImageSource::HTMLCanvasElement(h) => Some(CanvasOwner::Element(self.n(*h))),
+            ImageSource::OffscreenCanvas(h) => Some(CanvasOwner::Offscreen(*h)),
+            _ => None,
+        }
+    }
+
+    /// [`Engine::draw_image_with`]'s drawing: whether the source had pixels to draw.
+    fn draw_image_pixels(
+        &self,
+        this: Handle,
+        image: &ImageSource,
+        rects: impl Fn(f32, f32) -> ((f32, f32, f32, f32), (f32, f32, f32, f32)),
+    ) -> bool {
+        if let Some(src) = self.canvas_of(image) {
+            let ctx = self.source_2d(src);
             if let Some(snapshot) = ctx.and_then(|ctx| self.ctx(ctx, |c| c.canvas.gpu_snapshot())) {
                 let (src, dst) = rects(snapshot.width as f32, snapshot.height as f32);
                 if self.draw(this, |c| c.draw_canvas_image(&snapshot, src, dst)) {
-                    return;
+                    return true;
                 }
             }
         }
-        if let S::HTMLImageElement(h) = image {
+        if let ImageSource::HTMLImageElement(h) = image {
             // (the decoded image itself: a canvas on the GPU keeps it uploaded between draws)
             let el = self.n(*h);
             let Some(decoded) = self
                 .with_node_renderer(el, |r, _| r.image_pixels(el))
                 .flatten()
             else {
-                return;
+                return false;
             };
             // HTML §4.12.5.1.14: an animated image draws "the default image of the animation
             // ... or, if there is no such image, the first frame", whichever frame shows.
             let frame = decoded.default_frame();
             let (w, h) = (frame.width.max(1), frame.height.max(1));
             if frame.pixels.len() != (w as usize) * (h as usize) * 4 {
-                return;
+                return false;
             }
             let (src, dst) = rects(w as f32, h as f32);
             self.draw(this, |c| c.draw_decoded_image(&decoded, src, dst));
-            return;
+            return true;
         }
         let Some(pm) = self.image_source(image) else {
-            return;
+            return false;
         };
         let (src, dst) = rects(pm.width() as f32, pm.height() as f32);
         self.draw(this, |c| c.draw_image(&pm, src, dst));
+        true
+    }
+
+    /// Whether an `<img>`'s image is CORS-same-origin (HTML §2.5.4): script may read its pixels.
+    /// False while it shows no image.
+    pub(crate) fn img_origin_clean(&self, el: NodeId) -> bool {
+        let cors_mode = self
+            .dom()
+            .attr(
+                el,
+                &snowlark_dom::ns!(),
+                &snowlark_dom::LocalName::from("crossorigin"),
+            )
+            .is_some();
+        self.with_node_renderer(el, |r, _| r.image_readable(el, cors_mode))
+            .unwrap_or(false)
+    }
+
+    /// Whether a canvas's bitmap is origin-clean (HTML §4.12.5.1.14): a 2D context's flag; a WebGL
+    /// drawing buffer always is (WebGL refuses sources script may not read instead of tainting),
+    /// as is a canvas with no context. A placeholder canvas has its OffscreenCanvas's frames,
+    /// which carry the flag they were drawn with.
+    pub(crate) fn canvas_origin_clean(&self, src: CanvasOwner) -> bool {
+        if let Some(ctx) = self.source_2d(src) {
+            return self.ctx(ctx, |c| c.origin_clean);
+        }
+        match src {
+            CanvasOwner::Element(el) => self.placeholder_origin_clean(el),
+            CanvasOwner::Offscreen(_) => true,
+        }
+    }
+
+    /// HTML §4.12.5.1.14 "the image argument is not origin-clean": an image that is not
+    /// CORS-same-origin, a canvas whose bitmap is not origin-clean. (A video or SVG `image`
+    /// element draws nothing here yet, so it cannot taint.)
+    fn source_origin_clean(&self, source: &ImageSource) -> bool {
+        if let Some(src) = self.canvas_of(source) {
+            return self.canvas_origin_clean(src);
+        }
+        match source {
+            ImageSource::HTMLImageElement(h) => self.img_origin_clean(self.n(*h)),
+            ImageSource::ImageBitmap(h) => self.bitmap_pixels(*h).is_none_or(|(_, clean, _)| clean),
+            _ => true,
+        }
+    }
+
+    /// The `SecurityError` reading back a bitmap that is not origin-clean throws.
+    pub(crate) fn tainted_error() -> rt::Error {
+        exception(
+            ExceptionName::SecurityError,
+            "The canvas has been tainted by cross-origin data",
+        )
+    }
+
+    /// The 2D context of a canvas, if it has one.
+    pub(crate) fn source_2d(&self, src: CanvasOwner) -> Option<Handle> {
+        match src {
+            CanvasOwner::Element(el) => self.canvases.borrow().get(&el).copied(),
+            CanvasOwner::Offscreen(h) => self.offscreen_2d(h),
+        }
+    }
+
+    /// The WebGL context of a canvas, if it has one.
+    pub(crate) fn source_webgl(&self, src: CanvasOwner) -> Option<Handle> {
+        match src {
+            CanvasOwner::Element(el) => self.gl.borrow().contexts.get(&el).copied(),
+            CanvasOwner::Offscreen(h) => self.offscreen_webgl(h),
+        }
+    }
+
+    /// A canvas's bitmap size: its attributes', or an OffscreenCanvas's own.
+    pub(crate) fn source_size(&self, src: CanvasOwner) -> (u32, u32) {
+        match src {
+            CanvasOwner::Element(el) => self.canvas_size(el),
+            CanvasOwner::Offscreen(h) => self.offscreen_size(h),
+        }
+    }
+
+    /// A canvas's pixels as a frame (premultiplied BGRA, top row first): its 2D bitmap, its WebGL
+    /// drawing buffer as it is now, or a placeholder canvas's last frame. `None` for a canvas with
+    /// no context.
+    pub(crate) fn source_frame(&self, src: CanvasOwner) -> Option<snowlark_paint::image::Frame> {
+        if let Some(ctx) = self.source_2d(src) {
+            let pm = self.ctx(ctx, |c| c.canvas.snapshot())?;
+            return Some(frame_of(&pm));
+        }
+        if let Some(ctx) = self.source_webgl(src) {
+            return self.webgl_snapshot_of(ctx);
+        }
+        match src {
+            CanvasOwner::Element(el) => self.placeholder_frame(el),
+            CanvasOwner::Offscreen(_) => None,
+        }
     }
 
     /// The pixels of a `drawImage`/`createPattern` source.
-    fn image_source(
-        &self,
-        source: &g::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
-    ) -> Option<tiny_skia::Pixmap> {
-        use g::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement as S;
+    fn image_source(&self, source: &ImageSource) -> Option<tiny_skia::Pixmap> {
+        if let Some(src) = self.canvas_of(source) {
+            if let Some(ctx) = self.source_2d(src) {
+                return self.ctx(ctx, |c| c.canvas.snapshot());
+            }
+            // (a WebGL canvas draws its drawing buffer as it is now)
+            return cv::pixmap_from_frame(&self.source_frame(src)?);
+        }
         match source {
-            S::HTMLImageElement(h) => {
+            ImageSource::HTMLImageElement(h) => {
                 let el = self.n(*h);
                 let image = self
                     .with_node_renderer(el, |r, _| r.image_pixels(el))
@@ -302,36 +491,41 @@ impl Engine {
                 // ... or, if there is no such image, the first frame", whichever frame shows.
                 cv::pixmap_from_frame(image.default_frame())
             }
-            S::HTMLCanvasElement(h) => {
-                let el = self.n(*h);
-                match self.canvases.borrow().get(&el).copied() {
-                    Some(ctx) => self.ctx(ctx, |c| c.canvas.snapshot()),
-                    // (a WebGL canvas draws its drawing buffer as it is now)
-                    None => cv::pixmap_from_frame(&self.webgl_snapshot(el)?),
-                }
-            }
+            ImageSource::ImageBitmap(h) => cv::pixmap_from_frame(&self.bitmap_pixels(*h)?.0),
             // (an SVG `image` element's image is not exposed to canvas yet)
-            S::HTMLVideoElement(_) | S::SVGImageElement(_) => None,
+            _ => None,
         }
     }
 
-    /// A canvas element's pixels as a WebGL texture upload reads them (WebGL 1.0 §5.14.8): its 2D
-    /// bitmap, its WebGL drawing buffer as it is now, or, with no context, transparent black of
-    /// its size. Width, height and premultiplied RGBA, the top row first.
-    pub(crate) fn canvas_source_pixels(&self, el: NodeId) -> Option<(u32, u32, Vec<u8>)> {
-        if let Some(ctx) = self.canvases.borrow().get(&el).copied() {
+    /// Makes a 2D context's bitmap transparent black, its drawing state kept
+    /// (`transferToImageBitmap`).
+    pub(crate) fn clear_2d_bitmap(&self, ctx: Handle) {
+        self.draw(ctx, |c| {
+            let (w, h) = c.size();
+            let transform = std::mem::replace(&mut c.state.transform, Transform::identity());
+            let clip = c.state.clip.take();
+            c.clear_rect(0.0, 0.0, w as f32, h as f32);
+            c.state.transform = transform;
+            c.state.clip = clip;
+        });
+    }
+
+    /// A canvas's pixels as a WebGL texture upload reads them (WebGL 1.0 §5.14.8): its 2D bitmap,
+    /// its WebGL drawing buffer as it is now, a placeholder's last frame, or, with no context,
+    /// transparent black of its size. Width, height and premultiplied RGBA, the top row first.
+    pub(crate) fn canvas_source_pixels(&self, src: CanvasOwner) -> Option<(u32, u32, Vec<u8>)> {
+        if let Some(ctx) = self.source_2d(src) {
             let pm = self.ctx(ctx, |c| c.canvas.snapshot())?;
             return Some((pm.width(), pm.height(), pm.data().to_vec()));
         }
-        if self.has_webgl(el) {
-            let frame = self.webgl_snapshot(el)?;
+        if let Some(frame) = self.source_frame(src) {
             return Some((
                 frame.width,
                 frame.height,
                 super::webgl::bgra_to_rgba(&frame.pixels),
             ));
         }
-        let (w, h) = self.canvas_size(el);
+        let (w, h) = self.source_size(src);
         // (a quarter of a gigabyte at most: no device takes a texture larger than 16384 x 4096)
         if w as u64 * h as u64 * 4 > 1 << 28 {
             return None;
@@ -386,9 +580,19 @@ impl Engine {
                 _ => None,
             },
             g::StringOrCanvasGradientOrCanvasPattern::CanvasPattern(h) => match &*self.obj(*h) {
-                Object::CanvasPattern(p) => Some((Style::Pattern(p.clone()), Some(*h))),
+                Object::CanvasPattern(p, _) => Some((Style::Pattern(p.clone()), Some(*h))),
                 _ => None,
             },
+        }
+    }
+
+    /// HTML §4.12.5.1.10: setting `fillStyle` or `strokeStyle` to a pattern that is not
+    /// origin-clean sets the context's origin-clean flag to false.
+    fn taint_by_style(&self, this: Handle, value: &g::StringOrCanvasGradientOrCanvasPattern) {
+        if let g::StringOrCanvasGradientOrCanvasPattern::CanvasPattern(h) = value {
+            if matches!(&*self.obj(*h), Object::CanvasPattern(_, false)) {
+                self.ctx(this, |c| c.origin_clean = false);
+            }
         }
     }
 
@@ -469,6 +673,7 @@ impl HTMLCanvasElementImpl for Engine {
         self.dim_attr(self.n(this), "width", 300)
     }
     fn set_width(&self, cx: &mut Cx, this: Handle, value: u32) -> rt::Result<()> {
+        self.check_not_placeholder(self.n(this))?;
         self.set_dim_attr(cx, self.n(this), "width", value, 300);
         Ok(())
     }
@@ -476,12 +681,17 @@ impl HTMLCanvasElementImpl for Engine {
         self.dim_attr(self.n(this), "height", 150)
     }
     fn set_height(&self, cx: &mut Cx, this: Handle, value: u32) -> rt::Result<()> {
+        self.check_not_placeholder(self.n(this))?;
         self.set_dim_attr(cx, self.n(this), "height", value, 150);
         Ok(())
     }
+    fn transfer_control_to_offscreen(&self, _cx: &mut Cx, this: Handle) -> rt::Result<Handle> {
+        self.transfer_control(self.n(this))
+    }
     /// HTML §4.12.5 `getContext(contextId, options)`: "2d", "webgl" (and its old name
     /// "experimental-webgl"); a canvas keeps the kind of context it first gave (another kind is
-    /// null); other kinds are not supported (null).
+    /// null); other kinds are not supported (null). A placeholder canvas (one whose control went
+    /// to an OffscreenCanvas) throws `InvalidStateError`.
     fn get_context(
         &self,
         cx: &mut Cx,
@@ -491,12 +701,18 @@ impl HTMLCanvasElementImpl for Engine {
     ) -> rt::Result<Option<g::CanvasRenderingContext2DOrWebGLRenderingContext>> {
         use g::CanvasRenderingContext2DOrWebGLRenderingContext as R;
         let el = self.n(this);
+        if self.is_placeholder(el) {
+            return Err(exception(
+                ExceptionName::InvalidStateError,
+                "The canvas's control was transferred to an OffscreenCanvas",
+            ));
+        }
         if context_id == "webgl" || context_id == "experimental-webgl" {
             if self.canvases.borrow().contains_key(&el) {
                 return Ok(None);
             }
             return Ok(self
-                .webgl_get_context(cx, el, &options)?
+                .webgl_get_context(cx, CanvasOwner::Element(el), &options)?
                 .map(R::WebGLRenderingContext));
         }
         if context_id != "2d" || self.has_webgl(el) {
@@ -507,10 +723,11 @@ impl HTMLCanvasElementImpl for Engine {
         }
         let (w, h) = self.canvas_size(el);
         let ctx = self.alloc(Object::Canvas2D(Box::new(ContextObj {
-            element: el,
+            owner: CanvasOwner::Element(el),
             canvas: Canvas2D::new(w, h),
             fill_object: None,
             stroke_object: None,
+            origin_clean: true,
         })));
         self.canvases.borrow_mut().insert(el, ctx);
         Ok(Some(R::CanvasRenderingContext2D(ctx)))
@@ -524,11 +741,19 @@ impl HTMLCanvasElementImpl for Engine {
         _quality: Option<JsValue>,
     ) -> rt::Result<DomStr<'_>> {
         let el = self.n(this);
+        // HTML §4.12.5 `toDataURL()`: "If this canvas element's bitmap's origin-clean flag is
+        // set to false, then throw a SecurityError".
+        if !self.canvas_origin_clean(CanvasOwner::Element(el)) {
+            return Err(Self::tainted_error());
+        }
         let (w, h) = self.canvas_size(el);
         if w == 0 || h == 0 {
             return Ok(DomStr::Borrowed("data:,"));
         }
-        if let Some(frame) = self.webgl_snapshot(el) {
+        if let Some(frame) = self
+            .webgl_snapshot(el)
+            .or_else(|| self.placeholder_frame(el))
+        {
             let png = cv::pixmap_from_frame(&frame).and_then(|p| p.encode_png().ok());
             return Ok(DomStr::Owned(match png {
                 Some(bytes) => format!("data:image/png;base64,{}", base64_encode(&bytes)),
@@ -549,11 +774,16 @@ impl HTMLCanvasElementImpl for Engine {
     fn to_blob(
         &self,
         _cx: &mut Cx,
-        _this: Handle,
+        this: Handle,
         _callback: g::BlobCallback,
         _type_: &str,
         _quality: Option<JsValue>,
     ) -> rt::Result<()> {
+        // HTML §4.12.5 `toBlob()`: "If this canvas element's bitmap's origin-clean flag is set
+        // to false, then throw a SecurityError".
+        if !self.canvas_origin_clean(CanvasOwner::Element(self.n(this))) {
+            return Err(Self::tainted_error());
+        }
         // (encoding a Blob is later work: the callback is not called)
         Ok(())
     }
@@ -587,7 +817,16 @@ fn base64_encode(bytes: &[u8]) -> String {
 
 impl CanvasRenderingContext2DImpl for Engine {
     fn canvas(&self, this: Handle) -> Handle {
-        super::node_handle(self.ctx(this, |c| c.element))
+        match self.ctx(this, |c| c.owner) {
+            CanvasOwner::Element(el) => super::node_handle(el),
+            CanvasOwner::Offscreen(h) => h,
+        }
+    }
+}
+
+impl g::OffscreenCanvasRenderingContext2DImpl for Engine {
+    fn canvas(&self, this: Handle) -> Handle {
+        CanvasRenderingContext2DImpl::canvas(self, this)
     }
 }
 
@@ -785,6 +1024,7 @@ impl CanvasFillStrokeStylesImpl for Engine {
             return Ok(());
         }
         if let Some((s, o)) = self.style_from(&value) {
+            self.taint_by_style(this, &value);
             self.ctx(this, |c| {
                 c.canvas.state.stroke = s;
                 c.stroke_object = o;
@@ -806,6 +1046,7 @@ impl CanvasFillStrokeStylesImpl for Engine {
             return Ok(());
         }
         if let Some((s, o)) = self.style_from(&value) {
+            self.taint_by_style(this, &value);
             self.ctx(this, |c| {
                 c.canvas.state.fill = s;
                 c.fill_object = o;
@@ -889,7 +1130,7 @@ impl CanvasFillStrokeStylesImpl for Engine {
         &self,
         _cx: &mut Cx,
         _this: Handle,
-        image: g::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: ImageSource,
         repetition: &str,
     ) -> rt::Result<Option<Handle>> {
         let (rx, ry) = match repetition {
@@ -907,13 +1148,16 @@ impl CanvasFillStrokeStylesImpl for Engine {
         let Some(pixmap) = self.image_source(&image) else {
             return Ok(None);
         };
-        Ok(Some(self.alloc(Object::CanvasPattern(Arc::new(
-            cv::Pattern {
+        // "If image is not origin-clean, then mark pattern as not origin-clean."
+        let clean = self.source_origin_clean(&image);
+        Ok(Some(self.alloc(Object::CanvasPattern(
+            Arc::new(cv::Pattern {
                 image: Arc::new(pixmap),
                 repeat_x: rx,
                 repeat_y: ry,
-            },
-        )))))
+            }),
+            clean,
+        ))))
     }
 }
 
@@ -1644,21 +1888,20 @@ impl CanvasDrawImageImpl for Engine {
         &self,
         _cx: &mut Cx,
         this: Handle,
-        image: g::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: ImageSource,
         dx: f64,
         dy: f64,
     ) -> rt::Result<()> {
         self.draw_image_with(this, &image, |w, h| {
             ((0.0, 0.0, w, h), (f(dx), f(dy), w, h))
-        });
-        Ok(())
+        })
     }
     #[allow(clippy::too_many_arguments)]
     fn draw_image_image_dx_dy_dw_dh(
         &self,
         _cx: &mut Cx,
         this: Handle,
-        image: g::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: ImageSource,
         dx: f64,
         dy: f64,
         dw: f64,
@@ -1666,15 +1909,14 @@ impl CanvasDrawImageImpl for Engine {
     ) -> rt::Result<()> {
         self.draw_image_with(this, &image, |w, h| {
             ((0.0, 0.0, w, h), (f(dx), f(dy), f(dw), f(dh)))
-        });
-        Ok(())
+        })
     }
     #[allow(clippy::too_many_arguments)]
     fn draw_image_image_sx_sy_sw_sh_dx_dy_dw_dh(
         &self,
         _cx: &mut Cx,
         this: Handle,
-        image: g::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: ImageSource,
         sx: f64,
         sy: f64,
         sw: f64,
@@ -1686,8 +1928,7 @@ impl CanvasDrawImageImpl for Engine {
     ) -> rt::Result<()> {
         self.draw_image_with(this, &image, |_, _| {
             ((f(sx), f(sy), f(sw), f(sh)), (f(dx), f(dy), f(dw), f(dh)))
-        });
-        Ok(())
+        })
     }
 }
 
@@ -1727,6 +1968,9 @@ impl CanvasImageDataImpl for Engine {
     ) -> rt::Result<Handle> {
         if sw == 0 || sh == 0 {
             return Err(exception(ExceptionName::IndexSizeError, "The size is zero"));
+        }
+        if !self.ctx(this, |c| c.origin_clean) {
+            return Err(Self::tainted_error());
         }
         let (x, w) = if sw < 0 { (sx + sw, -sw) } else { (sx, sw) };
         let (y, h) = if sh < 0 { (sy + sh, -sh) } else { (sy, sh) };

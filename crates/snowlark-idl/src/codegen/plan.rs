@@ -321,6 +321,9 @@ pub const SCOPE: &[&str] = &[
     "TextMetrics",
     "Path2D",
     "ImageData",
+    "OffscreenCanvas",
+    "OffscreenCanvasRenderingContext2D",
+    "ImageBitmap",
     // WebGL 1.0.
     "WebGLRenderingContext",
     "WebGLObject",

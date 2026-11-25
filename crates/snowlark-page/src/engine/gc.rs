@@ -117,6 +117,14 @@ fn class(o: &Object) -> Class {
         // A media query list lives while script can reach it or it has a `change` listener
         // ([`Engine::media_list_pins`]): pages make one per `matchMedia(..).matches` read.
         Object::MediaQueryList(_) => Class::Weak,
+        // ImageBitmaps, and OffscreenCanvases with no placeholder with their 2D contexts (each
+        // refers to the other), live while script reaches them: pages make many (a map's labels,
+        // its tiles). One with a placeholder stays: its frames go to the canvas element.
+        Object::ImageBitmap(_) => Class::Weak,
+        Object::OffscreenCanvas(o) if o.placeholder.is_none() => Class::Weak,
+        Object::Canvas2D(c) if matches!(c.owner, super::canvas::CanvasOwner::Offscreen(_)) => {
+            Class::Weak
+        }
         // WebGL objects without state of their own; contexts and GL objects stay (their GL
         // objects are freed with the page).
         Object::WebGl(o) => match **o {
@@ -261,9 +269,17 @@ fn refs(o: &Object, r: &mut Refs) {
         Object::StyleDeclaration(Decl::Rule(h) | Decl::FontFace(h)) => r.objects.push(*h),
         Object::WebGl(o) => o.gc_refs(&mut r.nodes, &mut r.objects),
         Object::Canvas2D(c) => {
-            r.nodes.push(c.element);
+            // (an OffscreenCanvas's 2D context is in its canvas's wrapper group: [`Engine::keep`])
+            if let super::canvas::CanvasOwner::Element(el) = c.owner {
+                r.nodes.push(el);
+            }
             r.opt(c.fill_object);
             r.opt(c.stroke_object);
+        }
+        Object::OffscreenCanvas(o) => {
+            if let super::offscreen::Mode::WebGl(h) = o.mode {
+                r.objects.push(h);
+            }
         }
         Object::ElementInternals(i) => {
             r.nodes.extend(i.element);
@@ -1335,6 +1351,25 @@ impl Engine {
             let Some(o) = objects.get(h.get() as usize - 1) else {
                 return Keep::Weak;
             };
+            // An OffscreenCanvas and its 2D context live and die together: the context is in the
+            // canvas's wrapper group (each reaches the other from script).
+            match o {
+                Object::Canvas2D(c) => {
+                    if let super::canvas::CanvasOwner::Offscreen(oc) = c.owner {
+                        if !snap.pinned_objects.contains(&oc.get()) {
+                            return Keep::Anchored(oc);
+                        }
+                    }
+                }
+                Object::OffscreenCanvas(oc)
+                    if oc.placeholder.is_none()
+                        && matches!(oc.mode, super::offscreen::Mode::TwoD(_))
+                        && !snap.pinned_objects.contains(&h.get()) =>
+                {
+                    return Keep::Anchored(h);
+                }
+                _ => {}
+            }
             match class(o) {
                 Class::Strong if !matches!(o, Object::Free) => Keep::Strong,
                 Class::Strong => Keep::Weak,
@@ -2316,6 +2351,9 @@ impl Engine {
             .borrow_mut()
             .retain(|n| !freed.contains(n));
         self.canvases.borrow_mut().retain(|n, _| !freed.contains(n));
+        self.placeholders
+            .borrow_mut()
+            .retain(|n, _| !freed.contains(n));
         self.gl
             .borrow_mut()
             .contexts

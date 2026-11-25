@@ -326,7 +326,7 @@ fn a_texture_from_an_image_element() {
 
 /// A tiny HTTP/1.1 server answering `/a.png` and `/shared.png` (with
 /// `Access-Control-Allow-Origin: *`) with `png`.
-fn serve_png(png: Vec<u8>) -> u16 {
+pub(crate) fn serve_png(png: Vec<u8>) -> u16 {
     use std::io::{BufRead, BufReader, Write};
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();

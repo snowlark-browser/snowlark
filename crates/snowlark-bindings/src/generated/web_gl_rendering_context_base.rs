@@ -24,9 +24,9 @@ use crate::rt::{self, Cx, DomStr, Handle, JsObject, JsPromise, JsValue, Record, 
 pub trait WebGLRenderingContextBaseImpl {
     /// readonly attribute (HTMLCanvasElement or OffscreenCanvas) canvas;
     #[cfg(not(feature = "stubs"))]
-    fn canvas(&self, this: Handle) -> Handle;
+    fn canvas(&self, this: Handle) -> HTMLCanvasElementOrOffscreenCanvas;
     #[cfg(feature = "stubs")]
-    fn canvas(&self, this: Handle) -> Handle {
+    fn canvas(&self, this: Handle) -> HTMLCanvasElementOrOffscreenCanvas {
         rt::stub("WebGLRenderingContextBase.canvas")
     }
     /// readonly attribute GLsizei drawingBufferWidth;
@@ -1799,7 +1799,7 @@ pub(crate) fn attr_canvas_get<D: Dom, const LO: u16, const HI: u16>(call: rt::Ca
     let this = unsafe { call.receiver() };
     let dom = call.state().engine::<D>();
     let v = <D as WebGLRenderingContextBaseImpl>::canvas(dom, this);
-    call.return_handle(Some(v));
+    call.return_value(&v);
 }
 
 /// Getter of `readonly attribute GLsizei drawingBufferWidth;`.

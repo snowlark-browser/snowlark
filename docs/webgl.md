@@ -116,12 +116,25 @@ uploads bytes:
 - The sources: `ImageData` (straight alpha); `<img>` (the decoded image, premultiplied, as `drawImage` draws it:
   an animation's default image); a 2D canvas (its bitmap); a WebGL canvas (its drawing buffer as it is now, read
   back without clearing: after the rendering update presented a buffer that is not preserved, that is the cleared
-  buffer); a canvas without a context (transparent black of its size). An `<img>` with nothing decoded is
+  buffer); a canvas without a context (transparent black of its size); an `OffscreenCanvas` the same way, and a
+  placeholder canvas its last frame; an `ImageBitmap` as it is (the unpack flip and premultiply parameters do not
+  apply to it; it is straight when made with `premultiplyAlpha: "none"`). An `<img>` with nothing decoded is
   `INVALID_VALUE`. A premultiplied source uploaded without `UNPACK_PREMULTIPLY_ALPHA_WEBGL` has its alpha divided
   out, which loses precision where alpha is low (other engines decode the image again unpremultiplied).
 - Not yet: `<video>` (its frames are on the graphics card the media pipeline decodes to; the call does nothing),
-  `ImageBitmap` and `OffscreenCanvas` (not implemented), `UNPACK_COLORSPACE_CONVERSION_WEBGL` set to `NONE` (images
-  are uploaded with their colour profile applied either way).
+  `UNPACK_COLORSPACE_CONVERSION_WEBGL` set to `NONE` (images are uploaded with their colour profile applied either
+  way).
+- A source whose pixels script may not read (an image that is not CORS-same-origin, a canvas or ImageBitmap whose
+  origin-clean flag is false) throws `SecurityError`.
+
+## OffscreenCanvas and workers
+
+A WebGL context belongs to a canvas element or an `OffscreenCanvas` (HTML §4.12.5.3). In a dedicated worker it is
+made the same way: the worker's engine has its own client and queue, and its commands go to the process's one
+WebGL thread like the page's, so a worker needs nothing of its own. An OffscreenCanvas that came from
+`transferControlToOffscreen()` presents its drawing buffer at its event loop's rendering update (a worker's comes
+after its animation frame callbacks) to its placeholder canvas: the newest frame waits in a slot both event loops
+share, and the placeholder's rendering update shows it. The readback per frame is the same as an element's.
 
 `drawImage` of a WebGL canvas into a 2D canvas draws its drawing buffer the same way.
 
@@ -153,8 +166,8 @@ a WebGL page waits for each canvas's frame at the rendering update, as it does f
 |---|---|---|
 | S1 | WebGL 1 context through the generated bindings; buffers, shaders, programs, uniforms, attributes, draws, framebuffers and renderbuffers, `readPixels`; texture uploads from typed arrays; the drawing buffer shown in the window and in `--render`; context loss detected | A page that clears, draws a triangle and reads it back; the same pixels as other engines in `--render`; `getContext` returns the same context twice and null for another kind |
 | S2 | Texture uploads from images, canvases, video, `ImageData` (with `UNPACK_FLIP_Y`, premultiply, colour space conversion); the drawing buffer as a shared texture; `drawImage` and `texImage2D` of a WebGL canvas | Image and video textures; WebGL canvases inside 2D canvases |
-| S3 | Extensions (`OES_*`, `EXT_*`, `WEBGL_*` as ANGLE offers them in WebGL mode), `WEBGL_lose_context` and the context events and restore; WebGL 2 (`WebGL2RenderingContext`, an OpenGL ES 3.0 context) | Sites that need extensions or WebGL 2 (map viewers, 3D libraries) |
-| S4 | Conformance: WPT `webgl/` and the Khronos WebGL conformance suite where it runs; `OffscreenCanvas` and WebGL in workers; the service in the GPU process | The conformance counts; WebGL with the renderer sandbox on |
+| S3 | Extensions (`OES_*`, `EXT_*`, `WEBGL_*` as ANGLE offers them in WebGL mode), `WEBGL_lose_context` and the context events and restore; WebGL 2 (`WebGL2RenderingContext`, an OpenGL ES 3.0 context: about as large as WebGL 1 again, about 100 more members and five object interfaces) | Sites that need extensions or WebGL 2 (map viewers, 3D libraries; Google Maps' smooth renderer asks for WebGL 2 in a worker) |
+| S4 | Conformance: WPT `webgl/` and the Khronos WebGL conformance suite where it runs; `OffscreenCanvas` and WebGL in workers (done: WebGL 1 on an OffscreenCanvas in a window or a worker, `createImageBitmap`); the service in the GPU process | The conformance counts; WebGL with the renderer sandbox on |
 
 S2 so far: uploads from `ImageData`, images and canvases with the unpack parameters, and WebGL canvases in 2D
 ones (above); left: video frames, colour space conversion `NONE`, and the drawing buffer as a shared texture.

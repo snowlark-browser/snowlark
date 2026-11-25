@@ -7,6 +7,20 @@
    "Cross-origin dedicated worker main script fetch should be blocked by creator policy.",
    "Same-origin dedicated worker main script fetch succeeds."
   ],
+  "/content-security-policy/gen/top.http-rp/worker-src-wildcard/worker-import-data.http.html": [
+   "Content Security Policy: Expects blocked for worker-import-data to cross-http origin and keep-origin redirection from http context.",
+   "Content Security Policy: Expects blocked for worker-import-data to cross-http origin and keep-origin redirection from http context.: securitypolicyviolation",
+   "Content Security Policy: Expects blocked for worker-import-data to cross-http origin and no-redirect redirection from http context.",
+   "Content Security Policy: Expects blocked for worker-import-data to cross-http origin and no-redirect redirection from http context.: securitypolicyviolation",
+   "Content Security Policy: Expects blocked for worker-import-data to cross-http origin and swap-origin redirection from http context.",
+   "Content Security Policy: Expects blocked for worker-import-data to cross-http origin and swap-origin redirection from http context.: securitypolicyviolation",
+   "Content Security Policy: Expects blocked for worker-import-data to same-http origin and keep-origin redirection from http context.",
+   "Content Security Policy: Expects blocked for worker-import-data to same-http origin and keep-origin redirection from http context.: securitypolicyviolation",
+   "Content Security Policy: Expects blocked for worker-import-data to same-http origin and no-redirect redirection from http context.",
+   "Content Security Policy: Expects blocked for worker-import-data to same-http origin and no-redirect redirection from http context.: securitypolicyviolation",
+   "Content Security Policy: Expects blocked for worker-import-data to same-http origin and swap-origin redirection from http context.",
+   "Content Security Policy: Expects blocked for worker-import-data to same-http origin and swap-origin redirection from http context.: securitypolicyviolation"
+  ],
   "/content-security-policy/gen/top.meta/script-src-wildcard/worker-import-data.http.html": [
    "Content Security Policy: Expects blocked for worker-import-data to cross-http origin and keep-origin redirection from http context.",
    "Content Security Policy: Expects blocked for worker-import-data to cross-http origin and keep-origin redirection from http context.: securitypolicyviolation",
@@ -31,6 +45,12 @@
    "(script-src) Eval code should execute from iframe in parent",
    "(script-src) Eval code should not execute from iframe in iframe",
    "(script-src) Eval code should not execute from parent in iframe"
+  ],
+  "/cookies/set-and-delete-document-cookie.window.html": [
+   "Deleting a cookie via a past expiration date via document.cookie"
+  ],
+  "/css/css-align/blocks/align-content-block-007.html": [
+   ".test 17: normal"
   ],
   "/css/css-animations/event-dispatch.tentative.html": [
    "After -> Active"
@@ -410,10 +430,47 @@
    ".gridAutoContent 2",
    ".gridAutoContent 3"
   ],
+  "/css/css-logical/parsing/border-block-width-computed.html": [
+   "Property border-block-end-width value 'calc(10px + 0.5em)'",
+   "Property border-block-end-width value 'calc(10px - 0.5em)'",
+   "Property border-block-end-width value 'thick'",
+   "Property border-block-start-width value 'calc(10px + 0.5em)'",
+   "Property border-block-start-width value 'calc(10px - 0.5em)'",
+   "Property border-block-start-width value 'medium'",
+   "Property border-block-start-width value 'thin'",
+   "Property border-block-width value '10px 10px'",
+   "Property border-block-width value '10px 20px'",
+   "Property border-block-width value '10px'",
+   "width is zero if the border block style is none or hidden"
+  ],
+  "/css/css-paint-api/idlharness.html": [
+   "CSS namespace: operation escape(CSSOMString)",
+   "PaintRenderingContext2D includes CanvasCompositing: member names are unique",
+   "PaintRenderingContext2D includes CanvasDrawImage: member names are unique",
+   "PaintRenderingContext2D includes CanvasDrawPath: member names are unique",
+   "PaintRenderingContext2D includes CanvasFillStrokeStyles: member names are unique",
+   "PaintRenderingContext2D includes CanvasImageSmoothing: member names are unique",
+   "PaintRenderingContext2D includes CanvasPath: member names are unique",
+   "PaintRenderingContext2D includes CanvasPathDrawingStyles: member names are unique",
+   "PaintRenderingContext2D includes CanvasRect: member names are unique",
+   "PaintRenderingContext2D includes CanvasShadowStyles: member names are unique",
+   "PaintRenderingContext2D includes CanvasState: member names are unique",
+   "PaintRenderingContext2D includes CanvasTransform: member names are unique",
+   "PaintRenderingContext2D interface: existence and properties of interface object",
+   "PaintSize interface: existence and properties of interface object",
+   "PaintWorkletGlobalScope interface: existence and properties of interface object",
+   "Partial namespace CSS: member names are unique",
+   "Partial namespace CSS: original namespace defined",
+   "idl_test setup",
+   "idl_test validation"
+  ],
   "/css/css-position/parsing/left-invalid.html": [
    "e.style['left'] = \"10px 20%\" should not set the property value",
    "e.style['left'] = \"60\" should not set the property value",
    "e.style['left'] = \"min-content\" should not set the property value"
+  ],
+  "/css/css-syntax/charset/page-windows-1251-css-at-charset-utf16be.html": [
+   "CSS charset: page windows-1251, CSS @charset utf-16be"
   ],
   "/css/css-text/parsing/text-wrap-valid.html": [
    "e.style['text-wrap'] = \"auto nowrap\" should set the property value",
@@ -452,6 +509,9 @@
    "max(10%, min(20%, 15%)) should be used-value-equivalent to 15%",
    "min(1%) should be used-value-equivalent to 1%",
    "min(20%, max(10%, 15%)) should be used-value-equivalent to 15%"
+  ],
+  "/css/css-view-transitions/scoped/negative-playback-rate.html": [
+   "View transition duration affected by playback rate"
   ],
   "/css/cssom/cssimportrule-sheet-identity.html": [
    "CSSImportRule has different sheets even if referencing the same URL"
@@ -547,6 +607,11 @@
   "/fetch/api/cors/cors-cookies-redirect.any.worker.html": [
    "Testing credentials after cross-origin redirection with CORS and no preflight",
    "Testing credentials after cross-origin redirection with CORS and preflight"
+  ],
+  "/fetch/api/cors/cors-cookies.any.html": [
+   "Include mode: 1 cookie",
+   "Include mode: local cookies are not sent with remote request",
+   "Include mode: remote cookies are not sent with local request"
   ],
   "/fetch/api/cors/cors-cookies.any.worker.html": [
    "Include mode: 1 cookie",
@@ -644,6 +709,12 @@
    "Request on bad port 993 should throw TypeError.",
    "Request on bad port 995 should throw TypeError."
   ],
+  "/html/browsers/browsing-the-web/remote-context-helper-tests/getRequestHeaders.window.html": [
+   "RemoteContextHelper with defaults"
+  ],
+  "/html/canvas/element/canvas-host/2d.canvas.host.initial.reset.clip.html": [
+   "Resetting the canvas state resets the current clip region"
+  ],
   "/html/canvas/element/compositing/2d.composite.globalAlpha.canvas.html": [
    "Canvas test: 2d.composite.globalAlpha.canvas"
   ],
@@ -656,9 +727,18 @@
    "Empty value",
    "document has no cookie"
   ],
+  "/html/interaction/focus/focusgroup/tentative/behavior-first-requirement.html": [
+   "Empty focusgroup attribute is rejected and does not enable navigation",
+   "Invalid first token 'inline' is rejected and does not enable navigation",
+   "Invalid first token 'wrap' is rejected and does not enable navigation"
+  ],
   "/html/rendering/replaced-elements/attributes-for-embedded-content-and-images/video-aspect-ratio.html": [
    "Aspect ratio for regular video",
    "Aspect ratio for regular video with width:auto"
+  ],
+  "/html/rendering/widgets/input-text-size.html": [
+   "Size attribute value is not a presentational hint",
+   "The width depends on a size attribute"
   ],
   "/html/semantics/embedded-content/media-elements/error-sequence.html": [
    "error event while HAVE_METADATA"
@@ -684,6 +764,32 @@
    "setTimeout must inherit the nonce from the triggering script, thus execute",
    "the Function constructor must inherit the nonce from the triggering script, thus execute"
   ],
+  "/html/syntax/parsing/html5lib_url.html?file=tests3": [
+   "<!DOCTYPE html><HTML><HEAD><head></HEAD></HTML>",
+   "<!DOCTYPE html><HTML><META><HEAD></HEAD></HTML>",
+   "<!DOCTYPE html><html><head></head><body><pre>\\n</pre></body></html>",
+   "<!DOCTYPE html><html><head></head><body><pre>\\n\\nfoo</pre></body></html>",
+   "<!DOCTYPE html><html><head></head><body><pre>\\nfoo</pre></body></html>",
+   "<!DOCTYPE html><html><head></head><body><pre>\\nfoo\\n</pre></body></html>",
+   "<!DOCTYPE html><html><head></head><body><pre>x</pre><span>\\n</span></body></html>",
+   "<!DOCTYPE html><html><head></head><body><pre>x<div>\\ny</pre></body></html>",
+   "<!DOCTYPE html><html><head></head><body><pre>x\\ny</pre></body></html>",
+   "<!DOCTYPE html><html><head></head><body><ul><li><div><p><li></ul></body></html>",
+   "<!DOCTYPE html><pre>&#x0a;&#x0a;A</pre>",
+   "<!DOCTYPE html><textarea>\\n</textarea>",
+   "<!DOCTYPE html><textarea>\\n\\nfoo</textarea>",
+   "<!DOCTYPE html><textarea>\\nfoo</textarea>",
+   "<!doctype html><html><body><p><table></table></body></html>",
+   "<!doctype html><nobr><nobr></nobr><nobr>",
+   "<!doctype html><nobr><nobr><nobr>",
+   "<head></head><!-- --><style></style><!-- --><script></script>",
+   "<head></head><!-- -->x<style></style><!-- --><script></script>",
+   "<head></head><script></script>",
+   "<head></head><style></style>",
+   "<p><table></table>",
+   "<textarea>foo<span>bar</span><i>baz",
+   "<title>foo<span>bar</em><i>baz"
+  ],
   "/html/syntax/parsing/template/additions-to-the-in-head-insertion-mode/generating-of-implied-end-tags.html": [
    "Generating of implied end tags. Test div element. Load HTML document from file",
    "Generating of implied end tags. Test table elements. Load HTML document from file"
@@ -704,9 +810,37 @@
    "addEventListener() listener runs for an element in a sandboxed document without allow-scripts",
    "addEventListener() listener runs for the Window of a sandboxed document without allow-scripts"
   ],
+  "/import-maps/data-driven/resolving.html?url-specifiers-schemes.json": [
+   "URL-like specifiers: Non-special vs. special schemes: about:text/",
+   "URL-like specifiers: Non-special vs. special schemes: about:text/foo",
+   "URL-like specifiers: Non-special vs. special schemes: blah:text/",
+   "URL-like specifiers: Non-special vs. special schemes: blah:text/foo",
+   "URL-like specifiers: Non-special vs. special schemes: blob:text/",
+   "URL-like specifiers: Non-special vs. special schemes: blob:text/foo",
+   "URL-like specifiers: Non-special vs. special schemes: data:text/",
+   "URL-like specifiers: Non-special vs. special schemes: data:text/javascript,console.log('foo')",
+   "URL-like specifiers: Non-special vs. special schemes: file:text/",
+   "URL-like specifiers: Non-special vs. special schemes: file:text/foo",
+   "URL-like specifiers: Non-special vs. special schemes: ftp:text/",
+   "URL-like specifiers: Non-special vs. special schemes: ftp:text/foo",
+   "URL-like specifiers: Non-special vs. special schemes: http:text/",
+   "URL-like specifiers: Non-special vs. special schemes: http:text/foo",
+   "URL-like specifiers: Non-special vs. special schemes: https:text/",
+   "URL-like specifiers: Non-special vs. special schemes: https:text/foo",
+   "URL-like specifiers: Non-special vs. special schemes: ws:text/",
+   "URL-like specifiers: Non-special vs. special schemes: ws:text/foo",
+   "URL-like specifiers: Non-special vs. special schemes: wss:text/",
+   "URL-like specifiers: Non-special vs. special schemes: wss:text/foo"
+  ],
   "/import-maps/import-maps-base-url.sub.html": [
    "bare/bare: dynamic import (from module)",
    "bare/bare: dynamic import (from text/javascript)"
+  ],
+  "/import-maps/not-overridden/external-script-descendent-with-scope.html": [
+   "Testing descendent resolution with scopes"
+  ],
+  "/infrastructure/testdriver/click_iframe.html": [
+   "TestDriver click on a document in an iframe"
   ],
   "/media-source/mediasource-play.html": [
    "Test normal playback case with MediaSource API"
@@ -717,10 +851,45 @@
    "loadEventEnd is the same after document open.",
    "loadEventStart is the same after document open."
   ],
+  "/page-lifecycle/idlharness.html": [
+   "Document includes DocumentOrShadowRoot: member names are unique",
+   "Document includes GlobalEventHandlers: member names are unique",
+   "Document includes NonElementParentNode: member names are unique",
+   "Document includes ParentNode: member names are unique",
+   "Document includes XPathEvaluatorBase: member names are unique",
+   "Document interface: attribute onfreeze",
+   "Document interface: attribute onresume",
+   "Document interface: attribute wasDiscarded",
+   "Document interface: document must inherit property \"onfreeze\" with the proper type",
+   "Document interface: document must inherit property \"onresume\" with the proper type",
+   "Document interface: document must inherit property \"wasDiscarded\" with the proper type",
+   "Partial interface Client: member names are unique",
+   "Partial interface Client: original interface defined",
+   "Partial interface Document: member names are unique",
+   "Partial interface Document: original interface defined",
+   "Partial interface Document[2]: member names are unique",
+   "Partial interface Document[3]: member names are unique",
+   "idl_test setup",
+   "idl_test validation"
+  ],
+  "/pointerevents/pointer_boundary_events_after_removing_last_over_element_through_innerhtml.html": [
+   "pointer boundary events fired"
+  ],
+  "/referrer-policy/4K+1/gen/top.http-rp/unsafe-url/script-tag.http.html": [
+   "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and no-redirect redirection from http context."
+  ],
   "/referrer-policy/4K+1/gen/top.meta/unsafe-url/fetch.http.html": [
    "Referrer Policy: Expects stripped-referrer for fetch to same-http origin and no-redirect redirection from http context."
   ],
   "/referrer-policy/4K-1/gen/top.http-rp/same-origin/script-tag.http.html": [
+   "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/4K/gen/top.http-rp/same-origin/iframe-tag.http.html": [
+   "Referrer Policy: Expects stripped-referrer for iframe-tag to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for iframe-tag to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/4K/gen/top.http-rp/strict-origin-when-cross-origin/script-tag.http.html": [
    "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and keep-origin redirection from http context.",
    "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and no-redirect redirection from http context."
   ],
@@ -733,6 +902,20 @@
   ],
   "/referrer-policy/gen/iframe.meta/always/a-tag.http.html": [
    "Referrer Policy: Expects stripped-referrer for a-tag to cross-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/gen/iframe.meta/no-referrer-when-downgrade/worker-classic.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/gen/req.attr/no-referrer-when-downgrade/script-tag.http.html": [
+   "Referrer Policy: Expects stripped-referrer for script-tag to cross-http origin and no-redirect redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for script-tag to cross-http origin and swap-origin redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for script-tag to same-http origin and swap-origin redirection from http context."
+  ],
+  "/referrer-policy/gen/req.attr/origin-when-cross-origin/script-tag-dynamic-import.http.html": [
+   "Referrer Policy: Expects origin for script-tag-dynamic-import to cross-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects origin for script-tag-dynamic-import to cross-http origin and no-redirect redirection from http context.",
+   "Referrer Policy: Expects origin for script-tag-dynamic-import to cross-http origin and swap-origin redirection from http context."
   ],
   "/referrer-policy/gen/srcdoc-inherit.meta/strict-origin-when-cross-origin/a-tag.http.html": [
    "Referrer Policy: Expects origin for a-tag to cross-http origin and no-redirect redirection from http context."
@@ -750,10 +933,25 @@
    "Referrer Policy: Expects origin for xhr to same-http origin and no-redirect redirection from http context.",
    "Referrer Policy: Expects origin for xhr to same-http origin and swap-origin redirection from http context."
   ],
+  "/referrer-policy/gen/top.meta/always/worker-classic.http.html": [
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and no-redirect redirection from http context."
+  ],
   "/referrer-policy/gen/top.meta/default/fetch.http.html": [
    "Referrer Policy: Expects origin for fetch to cross-http origin and keep-origin redirection from http context.",
    "Referrer Policy: Expects origin for fetch to cross-http origin and swap-origin redirection from http context.",
    "Referrer Policy: Expects origin for fetch to same-http origin and swap-origin redirection from http context."
+  ],
+  "/referrer-policy/gen/top.meta/never/script-tag.http.html": [
+   "Referrer Policy: Expects omitted for script-tag to cross-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects omitted for script-tag to cross-http origin and no-redirect redirection from http context.",
+   "Referrer Policy: Expects omitted for script-tag to cross-http origin and swap-origin redirection from http context.",
+   "Referrer Policy: Expects omitted for script-tag to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects omitted for script-tag to same-http origin and no-redirect redirection from http context."
+  ],
+  "/referrer-policy/gen/top.meta/no-referrer-when-downgrade/fetch.http.html": [
+   "Referrer Policy: Expects stripped-referrer for fetch to same-http origin and keep-origin redirection from http context.",
+   "Referrer Policy: Expects stripped-referrer for fetch to same-http origin and swap-origin redirection from http context."
   ],
   "/referrer-policy/gen/top.meta/no-referrer/fetch.http.html": [
    "Referrer Policy: Expects omitted for fetch to cross-http origin and swap-origin redirection from http context.",
@@ -769,6 +967,9 @@
   "/referrer-policy/gen/worker-module.http-rp/unsafe-url/worker-classic.http.html": [
    "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and keep-origin redirection from http context.",
    "Referrer Policy: Expects stripped-referrer for worker-classic to same-http origin and no-redirect redirection from http context."
+  ],
+  "/resource-timing/resource-timing-failed-fetch.html": [
+   "Resource fetched by HTTP protocol should have resource timing entry emitted,   even when the fetch failed."
   ],
   "/streams/transform-streams/general.any.html": [
    "Identity TransformStream: can read from readable what is put into writable",
@@ -818,11 +1019,128 @@
   "/svg/animations/svglength-animation-invalid-value-7.html": [
    "Test SVGLength animation with invalid value: No spaces between number and unit in from attribute."
   ],
+  "/third_party/test262/test/built-ins/Array/prototype/map/15.4.4.19-5-16.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/AsyncDisposableStack/prototype/disposeAsync/length.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/DataView/prototype/getInt8/return-values-custom-offset.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Object/defineProperties/15.2.3.7-6-a-193.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Object/defineProperties/15.2.3.7-6-a-287.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Object/defineProperties/15.2.3.7-6-a-64.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Object/defineProperty/15.2.3.6-2-1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Temporal/PlainDate/prototype/daysInWeek/prop-desc.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Temporal/PlainDate/prototype/subtract/month-boundary.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Temporal/PlainDate/prototype/with/leap-year.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/Temporal/PlainTime/prototype/since/argument-number.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/built-ins/global/S15.1_A2_T1.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/NumberFormat/prototype/resolvedOptions/this-value-not-numberformat.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/intl402/Temporal/PlainYearMonth/prototype/toLocaleString/dateStyle-undefined.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/assignment/member-expr-ident-name-return-escaped.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/class/elements/same-line-method-rs-static-privatename-identifier-alt.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/class/private-method-brand-check-multiple-evaluations-of-class-realm-function-ctor.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/division/no-magic-asi.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/dynamic-import/assignment-expression/cover-call-expr.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/dynamic-import/for-await-resolution-and-error-agen.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/expressions/prefix-increment/S11.4.4_A4_T3.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/module-code/instn-resolve-order-src.test262-module.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/module-code/top-level-await/syntax/export-dft-class-decl-await-expr-null.test262-module.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/class/dstr/private-gen-meth-obj-ptrn-id-init-fn-name-arrow.test262.html": [
+   "Test"
+  ],
+  "/third_party/test262/test/language/statements/let/syntax/let-let-declaration-split-across-two-lines.test262.html": [
+   "Test"
+  ],
+  "/trusted-types/inheriting-csp-for-local-schemes.html": [
+   "require-trusted-types-for directive should not be inherited in local blank.html frames",
+   "trusted-types directive should not be inherited in local blank.html frames"
+  ],
+  "/trusted-types/trusted-types-reporting-check-report-DedicatedWorker-create-policy.html": [
+   "Creating policy works for policy in the allowlist.",
+   "Creating policy works for policy in the blocklist, since it's report-only.",
+   "Test number of sent reports.",
+   "Test report-uri works with trusted-types violation."
+  ],
   "/urlpattern/urlpattern-generate.tentative.any.html": [
    "Loading data..."
   ],
   "/user-timing/case-sensitivity.any.worker.html": [
    "getEntriesByType values are case sensitive"
+  ],
+  "/wasm/core/f32.wast.js.html": [
+   "#3098 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3099 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3100 Run a WebAssembly test without special assertions (f32.wast:212)",
+   "#3101 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3102 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3103 Run a WebAssembly test without special assertions (f32.wast:213)"
+  ],
+  "/wasm/core/simd/simd_f32x4_pmin_pmax.wast.js.html": [
+   "#4459 Test that WebAssembly compilation succeeds (wrapper)",
+   "#4460 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#4461 Run a WebAssembly test without special assertions (simd_f32x4_pmin_pmax.wast:576)",
+   "#4462 Test that WebAssembly compilation succeeds (wrapper)",
+   "#4463 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#4464 Run a WebAssembly test without special assertions (simd_f32x4_pmin_pmax.wast:579)",
+   "#4465 Test that WebAssembly compilation succeeds (wrapper)",
+   "#4466 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#4467 Run a WebAssembly test without special assertions (simd_f32x4_pmin_pmax.wast:582)"
+  ],
+  "/wasm/core/simd/simd_f64x2_cmp.wast.js.html": [
+   "#3256 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3257 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3258 Run a WebAssembly test without special assertions (simd_f64x2_cmp.wast:592)",
+   "#3259 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3260 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3261 Run a WebAssembly test without special assertions (simd_f64x2_cmp.wast:595)"
+  ],
+  "/wasm/core/simd/simd_i16x8_cmp.wast.js.html": [
+   "#1045 Test that WebAssembly compilation succeeds (wrapper)",
+   "#1046 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#1047 Run a WebAssembly test without special assertions (simd_i16x8_cmp.wast:687)"
   ],
   "/web-animations/animation-model/animation-types/addition-per-property-001.html": [
    "Setup",
@@ -1189,6 +1507,112 @@
    "Playback events with the same timeline retain the order in which they arequeued",
    "Sorts finish events by composite order"
   ],
+  "/webaudio/the-audio-api/the-audioparam-interface/k-rate-biquad-connection.html": [
+   "  All k-rate AudioParams equals [0,0.3311063051223755,0.6248595118522644,0.8481203317642212,0.9757021069526672,0.9932119250297546,0.898674488067627,0.7027547359466553,0.4275550842285156,0.104121632874012,-0.23105810582637787,-0.5401714444160461,-0.7883464097976685,-0.9475855827331543,-0.9999247193336487,-0.9394592046737671...] with an element-wise tolerance of {\"absoluteThreshold\":0,\"relativeThreshold\":0}.",
+   "  All k-rate AudioParams is not constantly 0 (contains 4094 different values).",
+   "  Automate 0: mod[Q].offset.setValueAtTime(0, 0) did not throw an exception.",
+   "  Automate 0: mod[detune].offset.setValueAtTime(4800, 0) did not throw an exception.",
+   "  Automate 0: mod[frequency].offset.setValueAtTime(1760, 0) did not throw an exception.",
+   "  Automate 0: mod[gain].offset.setValueAtTime(0, 0) did not throw an exception.",
+   "  Automate 0: refNode.Q.setValueAtTime(0, 0) did not throw an exception.",
+   "  Automate 0: refNode.detune.setValueAtTime(4800, 0) did not throw an exception.",
+   "  Automate 0: refNode.frequency.setValueAtTime(1760, 0) did not throw an exception.",
+   "  Automate 0: refNode.gain.setValueAtTime(0, 0) did not throw an exception.",
+   "  Automate 1: mod[Q].offset.linearRampToValueAtTime(40, 0.125) did not throw an exception.",
+   "  Automate 1: mod[detune].offset.linearRampToValueAtTime(0, 0.125) did not throw an exception.",
+   "  Automate 1: mod[frequency].offset.linearRampToValueAtTime(440, 0.125) did not throw an exception.",
+   "  Automate 1: mod[gain].offset.linearRampToValueAtTime(-100, 0.125) did not throw an exception.",
+   "  Automate 1: refNode[Q].linearRampToValueAtTime(40, 0.125) did not throw an exception.",
+   "  Automate 1: refNode[detune].linearRampToValueAtTime(0, 0.125) did not throw an exception.",
+   "  Automate 1: refNode[frequency].linearRampToValueAtTime(440, 0.125) did not throw an exception.",
+   "  Automate 1: refNode[gain].linearRampToValueAtTime(-100, 0.125) did not throw an exception.",
+   "  Connect: mod[Q].connect(tstNode.Q) did not throw an exception.",
+   "  Connect: mod[detune].connect(tstNode.detune) did not throw an exception.",
+   "  Connect: mod[frequency].connect(tstNode.frequency) did not throw an exception.",
+   "  Connect: mod[gain].connect(tstNode.gain) did not throw an exception.",
+   "  Create: mod[Q] = new ConstantSourceNode(context, {offset: 0}) did not throw an exception.",
+   "  Create: mod[detune] = new ConstantSourceNode(context, {offset: 0}) did not throw an exception.",
+   "  Create: mod[frequency] = new ConstantSourceNode(context, {offset: 0}) did not throw an exception.",
+   "  Create: mod[gain] = new ConstantSourceNode(context, {offset: 0}) did not throw an exception.",
+   "  Create: refNode = new BiquadFilterNode(context, {\"type\":\"peaking\",\"frequency\":0,\"detune\":0,\"gain\":0,\"Q\":0}) did not throw an exception.",
+   "  Create: tstNode = new BiquadFilterNode(context, {\"type\":\"peaking\",\"frequency\":0,\"detune\":0,\"gain\":0,\"Q\":0}) did not throw an exception.",
+   "  Expected k-rate frequency with automation output[0:2047] is not constantly 0 (contains 1023 different values).",
+   "  Expected k-rate frequency with automation output[2048:] contains only the constant 0.",
+   "  Q: mod.offset.linearRampToValueAtTime(100,0.125) did not throw an exception.",
+   "  Q: mod.offset.setValueAtTime(0,0) did not throw an exception.",
+   "  Q: new OscillatorNode(context, {frequency: 1760}) did not throw an exception.",
+   "  Reference BiquadFilterNode(c, {\"type\":\"bandpass\",\"frequency\":440,\"Q\":0}) did not throw an exception.",
+   "  Reference BiquadFilterNode(c, {\"type\":\"lowpass\",\"frequency\":0}) did not throw an exception.",
+   "  Reference BiquadFilterNode(c, {\"type\":\"lowpass\",\"frequency\":2200,\"detune\":0,\"gain\":0}) did not throw an exception.",
+   "  Reference BiquadFilterNode(c, {\"type\":\"peaking\",\"frequency\":1760,\"Q\":100,\"gain\":0}) did not throw an exception.",
+   "  Set rate: mod[Q].offset.automationRate = 'a-rate' did not throw an exception.",
+   "  Set rate: mod[detune].offset.automationRate = 'a-rate' did not throw an exception.",
+   "  Set rate: mod[frequency].offset.automationRate = 'a-rate' did not throw an exception.",
+   "  Set rate: mod[gain].offset.automationRate = 'a-rate' did not throw an exception.",
+   "  Set rate: refNode[Q].automationRate = 'k-rate' did not throw an exception.",
+   "  Set rate: refNode[detune].automationRate = 'k-rate' did not throw an exception.",
+   "  Set rate: refNode[frequency].automationRate = 'k-rate' did not throw an exception.",
+   "  Set rate: refNode[gain].automationRate = 'k-rate' did not throw an exception.",
+   "  Set rate: tstNode[Q].automationRate = 'k-rate' did not throw an exception.",
+   "  Set rate: tstNode[detune].automationRate = 'k-rate' did not throw an exception.",
+   "  Set rate: tstNode[frequency].automationRate = 'k-rate' did not throw an exception.",
+   "  Set rate: tstNode[gain].automationRate = 'k-rate' did not throw an exception.",
+   "  Start: mod[Q].start() did not throw an exception.",
+   "  Start: mod[detune].start() did not throw an exception.",
+   "  Start: mod[frequency].start() did not throw an exception.",
+   "  Start: mod[gain].start() did not throw an exception.",
+   "  Test BiquadFilterNode(context, {\"type\":\"bandpass\",\"frequency\":440,\"Q\":0}) did not throw an exception.",
+   "  Test BiquadFilterNode(context, {\"type\":\"lowpass\",\"frequency\":0}) did not throw an exception.",
+   "  Test BiquadFilterNode(context, {\"type\":\"lowpass\",\"frequency\":2200,\"detune\":0,\"gain\":0}) did not throw an exception.",
+   "  Test BiquadFilterNode(context, {\"type\":\"peaking\",\"frequency\":1760,\"Q\":100,\"gain\":0}) did not throw an exception.",
+   "  detune: mod.offset.linearRampToValueAtTime(-13323.945370094427,0.125) did not throw an exception.",
+   "  detune: mod.offset.setValueAtTime(0,0) did not throw an exception.",
+   "  detune: new OscillatorNode(context, {frequency: 440}) did not throw an exception.",
+   "  frequency: mod.offset.linearRampToValueAtTime(0,0.125) did not throw an exception.",
+   "  frequency: mod.offset.setValueAtTime(880,0) did not throw an exception.",
+   "  frequency: new OscillatorNode(context, {frequency: 440}) did not throw an exception.",
+   "  gain: mod.offset.linearRampToValueAtTime(-100,0.125) did not throw an exception.",
+   "  gain: mod.offset.setValueAtTime(0,0) did not throw an exception.",
+   "  gain: new OscillatorNode(context, {frequency: 1760}) did not throw an exception.",
+   "  k-rate Q with input: output[0,2048] equals [0,0.9757021069526672,0.4275550842285156,-0.7883464097976685,-0.7730104327201843,0.4496113359928131,0.9700312614440918,-0.024541229009628296,-0.9807852506637573,-0.40524131059646606,0.803207516670227,0.7572088241577148,-0.4713967442512512,-0.9637760519981384,0.049067676067352295,0.9852776527404785...] with an element-wise tolerance of {\"absoluteThreshold\":0,\"relativeThreshold\":0}.",
+   "  k-rate Q with input: output[2048:] equals [0.0014363843947649002,0.0028171620797365904,0.004582749214023352,0.0029107490554451942,-0.001067840727046132,-0.00286692101508379,-0.0014562716241925955,-0.0006699473015032709,-0.0030350687447935343,-0.005679761525243521,-0.00472744507715106,-0.0013245485024526715,0.00010961925727315247,-0.0013177355285733938,-0.001731738680973649,0.00127205322496593...] with an element-wise tolerance of {\"absoluteThreshold\":0,\"relativeThreshold\":0}.",
+   "  k-rate detune with input: output[0,2048] equals [0,0.12810896337032318,0.47732436656951904,0.8133140802383423,0.9599840044975281,0.9983929991722107,0.9618628025054932,0.8107287883758545,0.5545527338981628,0.24036026000976562,-0.09643321484327316,-0.42483171820640564,-0.706647515296936,-0.9075677394866943,-1.0057729482650757,-0.9910215139389038...] with an element-wise tolerance of {\"absoluteThreshold\":0,\"relativeThreshold\":0}.",
+   "  k-rate detune with input: output[2048:] equals [0.005766825284808874,0.005750597454607487,0.005734566133469343,0.005718899890780449,0.005703725386410952,0.005689115729182959,0.005675080232322216,0.005661564879119396,0.005648456513881683,0.005635598208755255,0.005622805096209049,0.005609885323792696,0.0055966624058783054,0.005582994781434536,0.005568791646510363,0.005554023198783398...] with an element-wise tolerance of {\"absoluteThreshold\":0,\"relativeThreshold\":0}.",
+   "  k-rate frequency with input: output[0,2048] equals [0,0.02839340642094612,0.1450495570898056,0.36942505836486816,0.6520541310310364,0.9131435751914978,1.0783559083938599,1.1012734174728394,0.9707123637199402,0.7065790295600891,0.3498469591140747,-0.04851161688566208,-0.43676120042800903,-0.7688571214675903,-1.0084279775619507,-1.131049394607544...] with an element-wise tolerance of {\"absoluteThreshold\":0,\"relativeThreshold\":0}.",
+   "  k-rate frequency with input: output[2048:] equals [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0...] with an element-wise tolerance of {\"absoluteThreshold\":0,\"relativeThreshold\":0}.",
+   "  k-rate gain with input: output[0,2048] equals [0,0.9757021069526672,0.4275550842285156,-0.7883464097976685,-0.7730104327201843,0.4496113359928131,0.9700312614440918,-0.024541229009628296,-0.9807852506637573,-0.40524131059646606,0.803207516670227,0.7572088241577148,-0.4713967442512512,-0.9637760519981384,0.049067676067352295,0.9852776527404785...] with an element-wise tolerance of {\"absoluteThreshold\":0,\"relativeThreshold\":0}.",
+   "  k-rate gain with input: output[2048:] equals [-2.0395565236697166e-9,0.000009756151484907605,0.000004275325409253128,-0.000007884170372562949,-0.000007728846867394168,0.000004502126103034243,0.000009711887287267018,-2.412545825336565e-7,-0.00000978964180831099,-0.000004052363237860845,0.000008041254659474362,0.000007568784440081799,-0.000004717470801551826,-0.000009641153155826032,4.847307195632311e-7,0.000009860224963631481...] with an element-wise tolerance of {\"absoluteThreshold\":0,\"relativeThreshold\":0}.",
+   "  refNode.Q.linearRampToValueAtTime.(100,0.125) did not throw an exception.",
+   "  refNode.Q.setValueAtTime(0,0) did not throw an exception.",
+   "  refNode.detune.linearRampToValueAtTime.(-13323.945370094427,0.125) did not throw an exception.",
+   "  refNode.detune.setValueAtTime(0,0) did not throw an exception.",
+   "  refNode.frequency.linearRampToValueAtTime.(0,0.125) did not throw an exception.",
+   "  refNode.frequency.setValueAtTime(880,0) did not throw an exception.",
+   "  refNode.gain.linearRampToValueAtTime.(-100,0.125) did not throw an exception.",
+   "  refNode.gain.setValueAtTime(0,0) did not throw an exception.",
+   "# AUDIT TASK RUNNER FINISHED: 5 tasks ran successfully.",
+   "# AUDIT TASK RUNNER STARTED.",
+   "< [All k-rate inputs] All assertions passed. (total 44 assertions)",
+   "< [Detune AudioParam] All assertions passed. (total 9 assertions)",
+   "< [Frequency AudioParam] All assertions passed. (total 11 assertions)",
+   "< [Gain AudioParam] All assertions passed. (total 9 assertions)",
+   "< [Q AudioParam] All assertions passed. (total 9 assertions)",
+   "> [All k-rate inputs] ",
+   "> [Detune AudioParam] k-rate input works",
+   "> [Frequency AudioParam] k-rate input works",
+   "> [Gain AudioParam] k-rate input works",
+   "> [Q AudioParam] k-rate input works",
+   "Audit report",
+   "Executing \"All k-rate inputs\"",
+   "Executing \"Detune AudioParam\"",
+   "Executing \"Frequency AudioParam\"",
+   "Executing \"Gain AudioParam\"",
+   "Executing \"Q AudioParam\""
+  ],
+  "/webmessaging/postMessage_ArrayBuffer.sub.htm": [
+   "ArrayBuffer is supported.",
+   "Test Description: postMessage with ArrayBuffer object."
+  ],
   "/webrtc-stats/idlharness.window.html": [
    "idl_test setup",
    "idl_test validation"
@@ -1213,7 +1637,7 @@
   ]
  },
  "reftests": [],
- "built": "2026-11-24",
+ "built": "2026-11-25",
  "from": [
   "l3-base-1.jsonl",
   "l3-base-2.jsonl",
@@ -1290,7 +1714,8 @@
   "bf10-flake-r3.jsonl",
   "bf10-flake-r4.jsonl",
   "bf10-flake-r5.jsonl",
-  "gate re-check of gate-affected.jsonl"
+  "gate re-check of gate-affected.jsonl",
+  "gate re-check of gate.jsonl"
  ],
  "note": "Subtests and reftests whose result differed across runs of one binary; the gate reports their losses apart."
 }

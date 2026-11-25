@@ -147,7 +147,7 @@ pub trait CanvasFillStrokeStylesImpl {
         &self,
         cx: &mut Cx,
         this: Handle,
-        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas,
         repetition: &str,
     ) -> Result<Option<Handle>>;
     #[cfg(feature = "stubs")]
@@ -155,7 +155,7 @@ pub trait CanvasFillStrokeStylesImpl {
         &self,
         cx: &mut Cx,
         this: Handle,
-        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas,
         repetition: &str,
     ) -> Result<Option<Handle>> {
         rt::stub("CanvasFillStrokeStyles.create_pattern")
@@ -361,20 +361,9 @@ pub(crate) fn op_create_pattern<D: Dom, const LO: u16, const HI: u16>(call: rt::
     }
     let dom = call.state().engine::<D>();
     let v = call.with_scope(|scope, mut rv| {
-        let a0 = {
-            let v = call.arg(0);
-            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::from_js(
-                scope, v,
-            )
-        }?;
-        let a1 = {
-            let v = call.arg(1);
-            rt::to_dom_string_null_empty(scope, v)
-        }?;
-        let r = {
-            let mut cx = Cx::new(scope);
-            <D as CanvasFillStrokeStylesImpl>::create_pattern(dom, &mut cx, this, a0, &a1)
-        };
+        let a0 = { let v = call.arg(0); HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::from_js(scope, v) }?;
+        let a1 = { let v = call.arg(1); rt::to_dom_string_null_empty(scope, v) }?;
+        let r = { let mut cx = Cx::new(scope); <D as CanvasFillStrokeStylesImpl>::create_pattern(dom, &mut cx, this, a0, &a1) };
         let v = rt::check(scope, r)?;
         Some(v)
     });

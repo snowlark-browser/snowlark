@@ -5725,6 +5725,12 @@ impl Renderer {
             .is_some_and(|d| d.canvases.contains_key(&node))
     }
 
+    /// The frame a canvas shows (its bitmap as the last rendering update handed it over).
+    pub fn canvas_pixels(&self, node: NodeId) -> Option<Arc<snowlark_paint::image::DecodedImage>> {
+        let id = *self.doc.as_deref()?.canvases.get(&node)?;
+        self.images.get(id)
+    }
+
     pub fn set_canvas_frame(&mut self, node: NodeId, frame: snowlark_paint::image::Frame) {
         let Some(doc) = self.doc.as_deref_mut() else {
             return;

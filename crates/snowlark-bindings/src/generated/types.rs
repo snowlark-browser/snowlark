@@ -1369,6 +1369,43 @@ impl ToJs for ColorGamut {
     }
 }
 
+/// `enum ColorSpaceConversion` (html.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ColorSpaceConversion {
+    /// `"none"`
+    None,
+    /// `"default"`
+    Default,
+}
+
+impl ColorSpaceConversion {
+    pub const VALUES: &'static [&'static str] = &["none", "default"];
+    const ALL: &'static [ColorSpaceConversion] =
+        &[ColorSpaceConversion::None, ColorSpaceConversion::Default];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "ColorSpaceConversion").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for ColorSpaceConversion {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
 /// `enum CompositeOperation` (web-animations.idl).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CompositeOperation {
@@ -2746,6 +2783,43 @@ impl ToJs for ImageDataPixelFormat {
     }
 }
 
+/// `enum ImageOrientation` (html.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ImageOrientation {
+    /// `"from-image"`
+    FromImage,
+    /// `"flipY"`
+    FlipY,
+}
+
+impl ImageOrientation {
+    pub const VALUES: &'static [&'static str] = &["from-image", "flipY"];
+    const ALL: &'static [ImageOrientation] =
+        &[ImageOrientation::FromImage, ImageOrientation::FlipY];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "ImageOrientation").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for ImageOrientation {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
 /// `enum ImageSmoothingQuality` (html.idl).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ImageSmoothingQuality {
@@ -3548,6 +3622,55 @@ impl ToJs for OTPCredentialTransportType {
     }
 }
 
+/// `enum OffscreenRenderingContextId` (html.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum OffscreenRenderingContextId {
+    /// `"2d"`
+    _2d,
+    /// `"bitmaprenderer"`
+    Bitmaprenderer,
+    /// `"webgl"`
+    Webgl,
+    /// `"webgl2"`
+    Webgl2,
+    /// `"webgpu"`
+    Webgpu,
+}
+
+impl OffscreenRenderingContextId {
+    pub const VALUES: &'static [&'static str] =
+        &["2d", "bitmaprenderer", "webgl", "webgl2", "webgpu"];
+    const ALL: &'static [OffscreenRenderingContextId] = &[
+        OffscreenRenderingContextId::_2d,
+        OffscreenRenderingContextId::Bitmaprenderer,
+        OffscreenRenderingContextId::Webgl,
+        OffscreenRenderingContextId::Webgl2,
+        OffscreenRenderingContextId::Webgpu,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "OffscreenRenderingContextId").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for OffscreenRenderingContextId {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
 /// `enum OperationType` (trust-token-api.idl).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OperationType {
@@ -4012,6 +4135,48 @@ impl PredefinedColorSpace {
 }
 
 impl ToJs for PredefinedColorSpace {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
+/// `enum PremultiplyAlpha` (html.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PremultiplyAlpha {
+    /// `"none"`
+    None,
+    /// `"premultiply"`
+    Premultiply,
+    /// `"default"`
+    Default,
+}
+
+impl PremultiplyAlpha {
+    pub const VALUES: &'static [&'static str] = &["none", "premultiply", "default"];
+    const ALL: &'static [PremultiplyAlpha] = &[
+        PremultiplyAlpha::None,
+        PremultiplyAlpha::Premultiply,
+        PremultiplyAlpha::Default,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "PremultiplyAlpha").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for PremultiplyAlpha {
     fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
         self.as_str().to_js(scope)
     }
@@ -4699,6 +4864,51 @@ impl ResizeObserverBoxOptions {
 }
 
 impl ToJs for ResizeObserverBoxOptions {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
+/// `enum ResizeQuality` (html.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ResizeQuality {
+    /// `"pixelated"`
+    Pixelated,
+    /// `"low"`
+    Low,
+    /// `"medium"`
+    Medium,
+    /// `"high"`
+    High,
+}
+
+impl ResizeQuality {
+    pub const VALUES: &'static [&'static str] = &["pixelated", "low", "medium", "high"];
+    const ALL: &'static [ResizeQuality] = &[
+        ResizeQuality::Pixelated,
+        ResizeQuality::Low,
+        ResizeQuality::Medium,
+        ResizeQuality::High,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "ResizeQuality").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for ResizeQuality {
     fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
         self.as_str().to_js(scope)
     }
@@ -23089,6 +23299,215 @@ impl ToJs for IdleRequestOptions {
     }
 }
 
+/// `dictionary ImageBitmapOptions` (html.idl).
+#[derive(Clone)]
+pub struct ImageBitmapOptions {
+    /// `ColorSpaceConversion colorSpaceConversion = "default"`
+    pub color_space_conversion: ColorSpaceConversion,
+    /// `ImageOrientation imageOrientation = "from-image"`
+    pub image_orientation: ImageOrientation,
+    /// `PremultiplyAlpha premultiplyAlpha = "default"`
+    pub premultiply_alpha: PremultiplyAlpha,
+    /// `unsigned long resizeHeight`
+    pub resize_height: Option<u32>,
+    /// `ResizeQuality resizeQuality = "low"`
+    pub resize_quality: ResizeQuality,
+    /// `unsigned long resizeWidth`
+    pub resize_width: Option<u32>,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for ImageBitmapOptions {
+    fn default() -> Self {
+        ImageBitmapOptions {
+            color_space_conversion: ColorSpaceConversion::Default,
+            image_orientation: ImageOrientation::FromImage,
+            premultiply_alpha: PremultiplyAlpha::Default,
+            resize_height: None,
+            resize_quality: ResizeQuality::Low,
+            resize_width: None,
+        }
+    }
+}
+
+impl ImageBitmapOptions {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "ImageBitmapOptions")?;
+        let m_color_space_conversion = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("colorSpaceConversion");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    ColorSpaceConversion::Default
+                } else {
+                    ColorSpaceConversion::from_js(scope, v)?
+                }
+            }
+            None => ColorSpaceConversion::Default,
+        };
+        let m_image_orientation = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("imageOrientation");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    ImageOrientation::FromImage
+                } else {
+                    ImageOrientation::from_js(scope, v)?
+                }
+            }
+            None => ImageOrientation::FromImage,
+        };
+        let m_premultiply_alpha = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("premultiplyAlpha");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    PremultiplyAlpha::Default
+                } else {
+                    PremultiplyAlpha::from_js(scope, v)?
+                }
+            }
+            None => PremultiplyAlpha::Default,
+        };
+        let m_resize_height = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("resizeHeight");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_unsigned_long(scope, v, rt::IntMode::EnforceRange)?)
+                }
+            }
+            None => None,
+        };
+        let m_resize_quality = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("resizeQuality");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    ResizeQuality::Low
+                } else {
+                    ResizeQuality::from_js(scope, v)?
+                }
+            }
+            None => ResizeQuality::Low,
+        };
+        let m_resize_width = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("resizeWidth");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_unsigned_long(scope, v, rt::IntMode::EnforceRange)?)
+                }
+            }
+            None => None,
+        };
+        Some(ImageBitmapOptions {
+            color_space_conversion: m_color_space_conversion,
+            image_orientation: m_image_orientation,
+            premultiply_alpha: m_premultiply_alpha,
+            resize_height: m_resize_height,
+            resize_quality: m_resize_quality,
+            resize_width: m_resize_width,
+        })
+    }
+}
+
+impl ToJs for ImageBitmapOptions {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.color_space_conversion.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("colorSpaceConversion");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.image_orientation.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("imageOrientation");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.premultiply_alpha.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("premultiplyAlpha");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.resize_height {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("resizeHeight");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.resize_quality.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("resizeQuality");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.resize_width {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("resizeWidth");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
 /// `dictionary ImageDataSettings` (html.idl).
 #[derive(Clone)]
 pub struct ImageDataSettings {
@@ -23168,6 +23587,95 @@ impl ToJs for ImageDataSettings {
                 scope,
                 rt::cached_name(scope, {
                     static K: rt::Name = rt::Name::new("pixelFormat");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary ImageEncodeOptions` (html.idl).
+#[derive(Clone)]
+pub struct ImageEncodeOptions {
+    /// `unrestricted double quality`
+    pub quality: Option<f64>,
+    /// `DOMString type = "image/png"`
+    pub type_: String,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for ImageEncodeOptions {
+    fn default() -> Self {
+        ImageEncodeOptions {
+            quality: None,
+            type_: String::from("image/png"),
+        }
+    }
+}
+
+impl ImageEncodeOptions {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "ImageEncodeOptions")?;
+        let m_quality = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("quality");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_double(scope, v, false)?)
+                }
+            }
+            None => None,
+        };
+        let m_type_ = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("type");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    String::from("image/png")
+                } else {
+                    rt::to_dom_string(scope, v)?
+                }
+            }
+            None => String::from("image/png"),
+        };
+        Some(ImageEncodeOptions {
+            quality: m_quality,
+            type_: m_type_,
+        })
+    }
+}
+
+impl ToJs for ImageEncodeOptions {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        if let Some(x) = &self.quality {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("quality");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.type_.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("type");
                     &K
                 })
                 .into(),
@@ -54719,6 +55227,54 @@ impl ToJs for Float32ArrayOrUnrestrictedFloatSequence {
     }
 }
 
+/// `(HTMLCanvasElement or OffscreenCanvas)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum HTMLCanvasElementOrOffscreenCanvas {
+    HTMLCanvasElement(Handle),
+    OffscreenCanvas(Handle),
+}
+
+impl HTMLCanvasElementOrOffscreenCanvas {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(v, ids::HTML_CANVAS_ELEMENT, ids::HTML_CANVAS_ELEMENT_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::HTML_CANVAS_ELEMENT,
+                ids::HTML_CANVAS_ELEMENT_END,
+                "The value",
+                "HTMLCanvasElement",
+            ))
+            .map(HTMLCanvasElementOrOffscreenCanvas::HTMLCanvasElement);
+        }
+        if rt::unwrap_value(v, ids::OFFSCREEN_CANVAS, ids::OFFSCREEN_CANVAS_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::OFFSCREEN_CANVAS,
+                ids::OFFSCREEN_CANVAS_END,
+                "The value",
+                "OffscreenCanvas",
+            ))
+            .map(HTMLCanvasElementOrOffscreenCanvas::OffscreenCanvas);
+        }
+        rt::type_error(
+            scope,
+            "The value is not of type '(HTMLCanvasElement or OffscreenCanvas)'",
+        )
+    }
+}
+
+impl ToJs for HTMLCanvasElementOrOffscreenCanvas {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            HTMLCanvasElementOrOffscreenCanvas::HTMLCanvasElement(x) => x.to_js(scope),
+            HTMLCanvasElementOrOffscreenCanvas::OffscreenCanvas(x) => x.to_js(scope),
+        }
+    }
+}
+
 /// `(HTMLCollection or Element)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -54804,41 +55360,84 @@ impl ToJs for HTMLElementOrLong {
     }
 }
 
-/// `(HTMLImageElement or SVGImageElement or HTMLVideoElement or HTMLCanvasElement)`
+/// `(HTMLImageElement or SVGImageElement or HTMLVideoElement or HTMLCanvasElement or ImageBitmap or OffscreenCanvas)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement {
+pub enum HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas
+{
     HTMLImageElement(Handle),
     SVGImageElement(Handle),
     HTMLVideoElement(Handle),
     HTMLCanvasElement(Handle),
+    ImageBitmap(Handle),
+    OffscreenCanvas(Handle),
 }
 
-impl HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement {
+impl HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas {
     pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
-        if rt::unwrap_value(v, ids::HTML_IMAGE_ELEMENT, ids::HTML_IMAGE_ELEMENT_END).is_some() {
-            return (rt::to_interface(scope, v, ids::HTML_IMAGE_ELEMENT, ids::HTML_IMAGE_ELEMENT_END, "The value", "HTMLImageElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::HTMLImageElement);
-        }
-        if rt::unwrap_value(v, ids::SVG_IMAGE_ELEMENT, ids::SVG_IMAGE_ELEMENT_END).is_some() {
-            return (rt::to_interface(scope, v, ids::SVG_IMAGE_ELEMENT, ids::SVG_IMAGE_ELEMENT_END, "The value", "SVGImageElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::SVGImageElement);
-        }
-        if rt::unwrap_value(v, ids::HTML_VIDEO_ELEMENT, ids::HTML_VIDEO_ELEMENT_END).is_some() {
-            return (rt::to_interface(scope, v, ids::HTML_VIDEO_ELEMENT, ids::HTML_VIDEO_ELEMENT_END, "The value", "HTMLVideoElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::HTMLVideoElement);
-        }
-        if rt::unwrap_value(v, ids::HTML_CANVAS_ELEMENT, ids::HTML_CANVAS_ELEMENT_END).is_some() {
-            return (rt::to_interface(scope, v, ids::HTML_CANVAS_ELEMENT, ids::HTML_CANVAS_ELEMENT_END, "The value", "HTMLCanvasElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::HTMLCanvasElement);
-        }
-        rt::type_error(scope, "The value is not of type '(HTMLImageElement or SVGImageElement or HTMLVideoElement or HTMLCanvasElement)'")
+if rt::unwrap_value(v, ids::HTML_IMAGE_ELEMENT, ids::HTML_IMAGE_ELEMENT_END).is_some() { return (rt::to_interface(scope, v, ids::HTML_IMAGE_ELEMENT, ids::HTML_IMAGE_ELEMENT_END, "The value", "HTMLImageElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::HTMLImageElement); }
+if rt::unwrap_value(v, ids::SVG_IMAGE_ELEMENT, ids::SVG_IMAGE_ELEMENT_END).is_some() { return (rt::to_interface(scope, v, ids::SVG_IMAGE_ELEMENT, ids::SVG_IMAGE_ELEMENT_END, "The value", "SVGImageElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::SVGImageElement); }
+if rt::unwrap_value(v, ids::HTML_VIDEO_ELEMENT, ids::HTML_VIDEO_ELEMENT_END).is_some() { return (rt::to_interface(scope, v, ids::HTML_VIDEO_ELEMENT, ids::HTML_VIDEO_ELEMENT_END, "The value", "HTMLVideoElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::HTMLVideoElement); }
+if rt::unwrap_value(v, ids::HTML_CANVAS_ELEMENT, ids::HTML_CANVAS_ELEMENT_END).is_some() { return (rt::to_interface(scope, v, ids::HTML_CANVAS_ELEMENT, ids::HTML_CANVAS_ELEMENT_END, "The value", "HTMLCanvasElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::HTMLCanvasElement); }
+if rt::unwrap_value(v, ids::IMAGE_BITMAP, ids::IMAGE_BITMAP_END).is_some() { return (rt::to_interface(scope, v, ids::IMAGE_BITMAP, ids::IMAGE_BITMAP_END, "The value", "ImageBitmap")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::ImageBitmap); }
+if rt::unwrap_value(v, ids::OFFSCREEN_CANVAS, ids::OFFSCREEN_CANVAS_END).is_some() { return (rt::to_interface(scope, v, ids::OFFSCREEN_CANVAS, ids::OFFSCREEN_CANVAS_END, "The value", "OffscreenCanvas")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::OffscreenCanvas); }
+rt::type_error(scope, "The value is not of type '(HTMLImageElement or SVGImageElement or HTMLVideoElement or HTMLCanvasElement or ImageBitmap or OffscreenCanvas)'")
     }
 }
 
-impl ToJs for HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement {
+impl ToJs for HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas {
     fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
         match self {
-            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::HTMLImageElement(x) => x.to_js(scope),
-            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::SVGImageElement(x) => x.to_js(scope),
-            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::HTMLVideoElement(x) => x.to_js(scope),
-            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElement::HTMLCanvasElement(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::HTMLImageElement(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::SVGImageElement(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::HTMLVideoElement(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::HTMLCanvasElement(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::ImageBitmap(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvas::OffscreenCanvas(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(HTMLImageElement or SVGImageElement or HTMLVideoElement or HTMLCanvasElement or ImageBitmap or OffscreenCanvas or Blob or ImageData)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData
+{
+    HTMLImageElement(Handle),
+    SVGImageElement(Handle),
+    HTMLVideoElement(Handle),
+    HTMLCanvasElement(Handle),
+    ImageBitmap(Handle),
+    OffscreenCanvas(Handle),
+    Blob(Handle),
+    ImageData(Handle),
+}
+
+impl HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+if rt::unwrap_value(v, ids::HTML_IMAGE_ELEMENT, ids::HTML_IMAGE_ELEMENT_END).is_some() { return (rt::to_interface(scope, v, ids::HTML_IMAGE_ELEMENT, ids::HTML_IMAGE_ELEMENT_END, "The value", "HTMLImageElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::HTMLImageElement); }
+if rt::unwrap_value(v, ids::SVG_IMAGE_ELEMENT, ids::SVG_IMAGE_ELEMENT_END).is_some() { return (rt::to_interface(scope, v, ids::SVG_IMAGE_ELEMENT, ids::SVG_IMAGE_ELEMENT_END, "The value", "SVGImageElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::SVGImageElement); }
+if rt::unwrap_value(v, ids::HTML_VIDEO_ELEMENT, ids::HTML_VIDEO_ELEMENT_END).is_some() { return (rt::to_interface(scope, v, ids::HTML_VIDEO_ELEMENT, ids::HTML_VIDEO_ELEMENT_END, "The value", "HTMLVideoElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::HTMLVideoElement); }
+if rt::unwrap_value(v, ids::HTML_CANVAS_ELEMENT, ids::HTML_CANVAS_ELEMENT_END).is_some() { return (rt::to_interface(scope, v, ids::HTML_CANVAS_ELEMENT, ids::HTML_CANVAS_ELEMENT_END, "The value", "HTMLCanvasElement")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::HTMLCanvasElement); }
+if rt::unwrap_value(v, ids::IMAGE_BITMAP, ids::IMAGE_BITMAP_END).is_some() { return (rt::to_interface(scope, v, ids::IMAGE_BITMAP, ids::IMAGE_BITMAP_END, "The value", "ImageBitmap")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::ImageBitmap); }
+if rt::unwrap_value(v, ids::OFFSCREEN_CANVAS, ids::OFFSCREEN_CANVAS_END).is_some() { return (rt::to_interface(scope, v, ids::OFFSCREEN_CANVAS, ids::OFFSCREEN_CANVAS_END, "The value", "OffscreenCanvas")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::OffscreenCanvas); }
+if rt::unwrap_value(v, ids::BLOB, ids::BLOB_END).is_some() { return (rt::to_interface(scope, v, ids::BLOB, ids::BLOB_END, "The value", "Blob")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::Blob); }
+if rt::unwrap_value(v, ids::IMAGE_DATA, ids::IMAGE_DATA_END).is_some() { return (rt::to_interface(scope, v, ids::IMAGE_DATA, ids::IMAGE_DATA_END, "The value", "ImageData")).map(HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::ImageData); }
+rt::type_error(scope, "The value is not of type '(HTMLImageElement or SVGImageElement or HTMLVideoElement or HTMLCanvasElement or ImageBitmap or OffscreenCanvas or Blob or ImageData)'")
+    }
+}
+
+impl ToJs for HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::HTMLImageElement(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::SVGImageElement(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::HTMLVideoElement(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::HTMLCanvasElement(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::ImageBitmap(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::OffscreenCanvas(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::Blob(x) => x.to_js(scope),
+            HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::ImageData(x) => x.to_js(scope),
         }
     }
 }
@@ -55054,87 +55653,54 @@ impl ToJs for IDBObjectStoreOrIDBIndexOrIDBCursor {
     }
 }
 
-/// `(ImageData or HTMLImageElement or HTMLCanvasElement or HTMLVideoElement)`
+/// `(ImageBitmap or ImageData or HTMLImageElement or HTMLCanvasElement or HTMLVideoElement or OffscreenCanvas)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement {
+pub enum ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas
+{
+    ImageBitmap(Handle),
     ImageData(Handle),
     HTMLImageElement(Handle),
     HTMLCanvasElement(Handle),
     HTMLVideoElement(Handle),
+    OffscreenCanvas(Handle),
 }
 
-impl ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement {
+impl
+    ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas
+{
     pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(v, ids::IMAGE_BITMAP, ids::IMAGE_BITMAP_END).is_some() {
+            return (rt::to_interface(scope, v, ids::IMAGE_BITMAP, ids::IMAGE_BITMAP_END, "The value", "ImageBitmap")).map(ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::ImageBitmap);
+        }
         if rt::unwrap_value(v, ids::IMAGE_DATA, ids::IMAGE_DATA_END).is_some() {
-            return (rt::to_interface(
-                scope,
-                v,
-                ids::IMAGE_DATA,
-                ids::IMAGE_DATA_END,
-                "The value",
-                "ImageData",
-            ))
-            .map(ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::ImageData);
+            return (rt::to_interface(scope, v, ids::IMAGE_DATA, ids::IMAGE_DATA_END, "The value", "ImageData")).map(ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::ImageData);
         }
         if rt::unwrap_value(v, ids::HTML_IMAGE_ELEMENT, ids::HTML_IMAGE_ELEMENT_END).is_some() {
-            return (rt::to_interface(
-                scope,
-                v,
-                ids::HTML_IMAGE_ELEMENT,
-                ids::HTML_IMAGE_ELEMENT_END,
-                "The value",
-                "HTMLImageElement",
-            ))
-            .map(
-                ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLImageElement,
-            );
+            return (rt::to_interface(scope, v, ids::HTML_IMAGE_ELEMENT, ids::HTML_IMAGE_ELEMENT_END, "The value", "HTMLImageElement")).map(ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::HTMLImageElement);
         }
         if rt::unwrap_value(v, ids::HTML_CANVAS_ELEMENT, ids::HTML_CANVAS_ELEMENT_END).is_some() {
-            return (rt::to_interface(
-                scope,
-                v,
-                ids::HTML_CANVAS_ELEMENT,
-                ids::HTML_CANVAS_ELEMENT_END,
-                "The value",
-                "HTMLCanvasElement",
-            ))
-            .map(
-                ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLCanvasElement,
-            );
+            return (rt::to_interface(scope, v, ids::HTML_CANVAS_ELEMENT, ids::HTML_CANVAS_ELEMENT_END, "The value", "HTMLCanvasElement")).map(ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::HTMLCanvasElement);
         }
         if rt::unwrap_value(v, ids::HTML_VIDEO_ELEMENT, ids::HTML_VIDEO_ELEMENT_END).is_some() {
-            return (rt::to_interface(
-                scope,
-                v,
-                ids::HTML_VIDEO_ELEMENT,
-                ids::HTML_VIDEO_ELEMENT_END,
-                "The value",
-                "HTMLVideoElement",
-            ))
-            .map(
-                ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLVideoElement,
-            );
+            return (rt::to_interface(scope, v, ids::HTML_VIDEO_ELEMENT, ids::HTML_VIDEO_ELEMENT_END, "The value", "HTMLVideoElement")).map(ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::HTMLVideoElement);
         }
-        rt::type_error(scope, "The value is not of type '(ImageData or HTMLImageElement or HTMLCanvasElement or HTMLVideoElement)'")
+        if rt::unwrap_value(v, ids::OFFSCREEN_CANVAS, ids::OFFSCREEN_CANVAS_END).is_some() {
+            return (rt::to_interface(scope, v, ids::OFFSCREEN_CANVAS, ids::OFFSCREEN_CANVAS_END, "The value", "OffscreenCanvas")).map(ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::OffscreenCanvas);
+        }
+        rt::type_error(scope, "The value is not of type '(ImageBitmap or ImageData or HTMLImageElement or HTMLCanvasElement or HTMLVideoElement or OffscreenCanvas)'")
     }
 }
 
-impl ToJs for ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement {
+impl ToJs for ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas {
     fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
         match self {
-            ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::ImageData(x) => {
-                x.to_js(scope)
-            }
-            ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLImageElement(
-                x,
-            ) => x.to_js(scope),
-            ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLCanvasElement(
-                x,
-            ) => x.to_js(scope),
-            ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::HTMLVideoElement(
-                x,
-            ) => x.to_js(scope),
+            ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::ImageBitmap(x) => x.to_js(scope),
+            ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::ImageData(x) => x.to_js(scope),
+            ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::HTMLImageElement(x) => x.to_js(scope),
+            ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::HTMLCanvasElement(x) => x.to_js(scope),
+            ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::HTMLVideoElement(x) => x.to_js(scope),
+            ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::OffscreenCanvas(x) => x.to_js(scope),
         }
     }
 }
@@ -55383,6 +55949,55 @@ impl ToJs for ObjectOrString {
         match self {
             ObjectOrString::Object(x) => x.to_js(scope),
             ObjectOrString::String(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(OffscreenCanvasRenderingContext2D or WebGLRenderingContext)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum OffscreenCanvasRenderingContext2DOrWebGLRenderingContext {
+    OffscreenCanvasRenderingContext2D(Handle),
+    WebGLRenderingContext(Handle),
+}
+
+impl OffscreenCanvasRenderingContext2DOrWebGLRenderingContext {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(
+            v,
+            ids::OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D,
+            ids::OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D_END,
+        )
+        .is_some()
+        {
+            return (rt::to_interface(scope, v, ids::OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D, ids::OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D_END, "The value", "OffscreenCanvasRenderingContext2D")).map(OffscreenCanvasRenderingContext2DOrWebGLRenderingContext::OffscreenCanvasRenderingContext2D);
+        }
+        if rt::unwrap_value(
+            v,
+            ids::WEB_GL_RENDERING_CONTEXT,
+            ids::WEB_GL_RENDERING_CONTEXT_END,
+        )
+        .is_some()
+        {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::WEB_GL_RENDERING_CONTEXT,
+                ids::WEB_GL_RENDERING_CONTEXT_END,
+                "The value",
+                "WebGLRenderingContext",
+            ))
+            .map(OffscreenCanvasRenderingContext2DOrWebGLRenderingContext::WebGLRenderingContext);
+        }
+        rt::type_error(scope, "The value is not of type '(OffscreenCanvasRenderingContext2D or WebGLRenderingContext)'")
+    }
+}
+
+impl ToJs for OffscreenCanvasRenderingContext2DOrWebGLRenderingContext {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            OffscreenCanvasRenderingContext2DOrWebGLRenderingContext::OffscreenCanvasRenderingContext2D(x) => x.to_js(scope),
+            OffscreenCanvasRenderingContext2DOrWebGLRenderingContext::WebGLRenderingContext(x) => x.to_js(scope),
         }
     }
 }

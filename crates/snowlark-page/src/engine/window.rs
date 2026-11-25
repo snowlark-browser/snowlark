@@ -2480,6 +2480,29 @@ impl AnimationFrameProviderImpl for Engine {
 }
 
 impl WindowOrWorkerGlobalScopeImpl for Engine {
+    fn create_image_bitmap_image_options(
+        &self,
+        cx: &mut Cx,
+        _this: Handle,
+        image: snowlark_bindings::generated::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData,
+        options: snowlark_bindings::generated::ImageBitmapOptions,
+    ) -> rt::Result<JsPromise> {
+        self.create_bitmap(cx, image, None, options)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn create_image_bitmap_image_sx_sy_sw_sh_options(
+        &self,
+        cx: &mut Cx,
+        _this: Handle,
+        image: snowlark_bindings::generated::HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData,
+        sx: i32,
+        sy: i32,
+        sw: i32,
+        sh: i32,
+        options: snowlark_bindings::generated::ImageBitmapOptions,
+    ) -> rt::Result<JsPromise> {
+        self.create_bitmap(cx, image, Some((sx, sy, sw, sh)), options)
+    }
     /// Prioritized Task Scheduling: the global's Scheduler (one per global).
     fn scheduler(&self, this: Handle) -> Handle {
         self.window_singleton(this, "scheduler", || Object::Scheduler)

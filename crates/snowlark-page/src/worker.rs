@@ -22,18 +22,20 @@ use snowlark_bindings::rt::{self, Cx, DomStr, ExceptionName, Handle, JsObject, J
 use snowlark_bindings::InterfaceId;
 
 use crate::engine::events::EventExt;
+use crate::engine::offscreen::Transferred;
 use crate::engine::{exception, Engine, Object};
 use crate::event_loop::{TaskSource, Waker};
 
 /// From the page to its worker.
 pub enum ToWorker {
-    Message(Vec<u8>),
+    /// The serialized message and the objects it transferred.
+    Message(Vec<u8>, Vec<Transferred>),
     Terminate,
 }
 
 /// From a worker to its page.
 pub enum FromWorker {
-    Message(Vec<u8>),
+    Message(Vec<u8>, Vec<Transferred>),
     /// An uncaught exception the worker's global did not handle (HTML §10.2.5 "runtime script errors").
     Error {
         message: String,
@@ -85,7 +87,7 @@ pub struct WorkerScope {
     /// The parent's messages that came before the main script ran: HTML "run a worker" enables
     /// the port message queue only after running it (a module worker's script runs when its graph
     /// has loaded, after the event loop started).
-    pub held: Option<Vec<Vec<u8>>>,
+    pub held: Option<Vec<(Vec<u8>, Vec<Transferred>)>>,
 }
 
 /// What a worker thread starts from.
@@ -204,17 +206,17 @@ impl Engine {
                     }
                     return true;
                 }
-                ToWorker::Message(bytes) => {
+                ToWorker::Message(bytes, transferred) => {
                     if let Some(held) = self
                         .worker_scope
                         .borrow_mut()
                         .as_mut()
                         .and_then(|w| w.held.as_mut())
                     {
-                        held.push(bytes);
+                        held.push((bytes, transferred));
                         continue;
                     }
-                    self.queue_worker_message(bytes);
+                    self.queue_worker_message(bytes, transferred);
                 }
             }
         }
@@ -227,16 +229,16 @@ impl Engine {
             .borrow_mut()
             .as_mut()
             .and_then(|w| w.held.take());
-        for bytes in held.into_iter().flatten() {
-            self.queue_worker_message(bytes);
+        for (bytes, transferred) in held.into_iter().flatten() {
+            self.queue_worker_message(bytes, transferred);
         }
     }
 
     /// Queues a `message` (or `messageerror`) event of the parent's at the global scope.
-    fn queue_worker_message(&self, bytes: Vec<u8>) {
+    fn queue_worker_message(&self, bytes: Vec<u8>, transferred: Vec<Transferred>) {
         self.queue_task(TaskSource::DomManipulation, move |e, cx| {
             let Some(global) = e.window() else { return };
-            match e.deserialize_value(cx, &bytes) {
+            match e.deserialize_with_transfer(cx, &bytes, transferred) {
                 Ok(data) => e.fire_port_message(cx, global, Some(data), "message"),
                 Err(()) => e.fire_port_message(cx, global, None, "messageerror"),
             }
@@ -465,9 +467,9 @@ impl Engine {
                     continue;
                 }
                 _ if terminated => {}
-                FromWorker::Message(bytes) => {
+                FromWorker::Message(bytes, transferred) => {
                     self.queue_task(TaskSource::DomManipulation, move |e, cx| {
-                        match e.deserialize_value(cx, &bytes) {
+                        match e.deserialize_with_transfer(cx, &bytes, transferred) {
                             Ok(data) => e.fire_port_message(cx, worker, Some(data), "message"),
                             Err(()) => e.fire_port_message(cx, worker, None, "messageerror"),
                         }
@@ -552,12 +554,12 @@ impl WorkerImpl for Engine {
         cx: &mut Cx,
         this: Handle,
         message: JsValue,
-        _transfer: Vec<JsObject>,
+        transfer: Vec<JsObject>,
     ) -> rt::Result<()> {
-        let bytes = self.serialize_value(cx, &message)?;
+        let (bytes, transferred) = self.serialize_with_transfer(cx, &message, &transfer)?;
         self.worker_object(this, |w| {
             if !w.terminated {
-                let _ = w.tx.send(ToWorker::Message(bytes));
+                let _ = w.tx.send(ToWorker::Message(bytes, transferred));
                 w.waker.wake();
             }
         });
@@ -568,9 +570,9 @@ impl WorkerImpl for Engine {
         cx: &mut Cx,
         this: Handle,
         message: JsValue,
-        _options: StructuredSerializeOptions,
+        options: StructuredSerializeOptions,
     ) -> rt::Result<()> {
-        WorkerImpl::post_message_message_transfer(self, cx, this, message, Vec::new())
+        WorkerImpl::post_message_message_transfer(self, cx, this, message, options.transfer)
     }
     /// HTML §10.2.6.3 `new Worker(scriptURL, options)`.
     fn constructor(
@@ -739,11 +741,11 @@ impl DedicatedWorkerGlobalScopeImpl for Engine {
         cx: &mut Cx,
         _this: Handle,
         message: JsValue,
-        _transfer: Vec<JsObject>,
+        transfer: Vec<JsObject>,
     ) -> rt::Result<()> {
-        let bytes = self.serialize_value(cx, &message)?;
+        let (bytes, transferred) = self.serialize_with_transfer(cx, &message, &transfer)?;
         if let Some(ws) = self.worker_scope.borrow().as_ref() {
-            let _ = ws.to_parent.send(FromWorker::Message(bytes));
+            let _ = ws.to_parent.send(FromWorker::Message(bytes, transferred));
             ws.parent_waker.wake();
         }
         Ok(())
@@ -753,14 +755,14 @@ impl DedicatedWorkerGlobalScopeImpl for Engine {
         cx: &mut Cx,
         this: Handle,
         message: JsValue,
-        _options: StructuredSerializeOptions,
+        options: StructuredSerializeOptions,
     ) -> rt::Result<()> {
         DedicatedWorkerGlobalScopeImpl::post_message_message_transfer(
             self,
             cx,
             this,
             message,
-            Vec::new(),
+            options.transfer,
         )
     }
     fn close(&self, _cx: &mut Cx, _this: Handle) -> rt::Result<()> {

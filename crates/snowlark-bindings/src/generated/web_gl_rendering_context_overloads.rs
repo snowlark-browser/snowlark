@@ -218,7 +218,7 @@ pub trait WebGLRenderingContextOverloadsImpl {
         internalformat: i32,
         format: u32,
         type_: u32,
-        source: ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        source: ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas,
     ) -> Result<()>;
     #[cfg(feature = "stubs")]
     fn tex_image2_d_target_level_internalformat_format_type_source(
@@ -230,7 +230,7 @@ pub trait WebGLRenderingContextOverloadsImpl {
         internalformat: i32,
         format: u32,
         type_: u32,
-        source: ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        source: ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas,
     ) -> Result<()> {
         rt::stub("WebGLRenderingContextOverloads.tex_image2_d_target_level_internalformat_format_type_source")
     }
@@ -279,7 +279,7 @@ pub trait WebGLRenderingContextOverloadsImpl {
         yoffset: i32,
         format: u32,
         type_: u32,
-        source: ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        source: ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas,
     ) -> Result<()>;
     #[cfg(feature = "stubs")]
     fn tex_sub_image2_d_target_level_xoffset_yoffset_format_type_source(
@@ -292,7 +292,7 @@ pub trait WebGLRenderingContextOverloadsImpl {
         yoffset: i32,
         format: u32,
         type_: u32,
-        source: ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        source: ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas,
     ) -> Result<()> {
         rt::stub("WebGLRenderingContextOverloads.tex_sub_image2_d_target_level_xoffset_yoffset_format_type_source")
     }
@@ -858,7 +858,7 @@ fn op_tex_image2_d_1<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let a5 = {
         let v = args.get(5);
-        ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::from_js(scope, v)
+        ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::from_js(scope, v)
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
@@ -1000,7 +1000,7 @@ fn op_tex_sub_image2_d_1<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let a6 = {
         let v = args.get(6);
-        ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement::from_js(scope, v)
+        ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::from_js(scope, v)
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();

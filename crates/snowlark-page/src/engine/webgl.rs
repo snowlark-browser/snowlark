@@ -18,6 +18,8 @@ use snowlark_bindings::generated::{
 };
 use snowlark_bindings::rt::{self, Cx, DomStr, Handle, JsObject, JsValue, ToJs};
 use snowlark_dom::NodeId;
+
+use super::canvas::CanvasOwner;
 use snowlark_gl::pixels;
 use snowlark_gl::protocol::Limits;
 use snowlark_gl::{Attributes, Backend, Command, ContextId, Kind, Query, Reply};
@@ -88,7 +90,8 @@ mod c {
 
 /// A `WebGLRenderingContext`.
 pub struct ContextObj {
-    pub element: NodeId,
+    /// Its canvas: an element, or an OffscreenCanvas.
+    pub owner: CanvasOwner,
     pub id: ContextId,
     /// The attributes as granted.
     pub attributes: Attributes,
@@ -178,7 +181,10 @@ impl WebGlObject {
     pub fn gc_refs(&self, nodes: &mut Vec<NodeId>, objects: &mut Vec<Handle>) {
         match self {
             WebGlObject::Context(c) => {
-                nodes.push(c.element);
+                match c.owner {
+                    CanvasOwner::Element(el) => nodes.push(el),
+                    CanvasOwner::Offscreen(h) => objects.push(h),
+                }
                 objects.extend(
                     [
                         c.array_buffer,
@@ -216,7 +222,7 @@ pub struct GlState {
     next_context: ContextId,
     pub contexts: FxHashMap<NodeId, Handle>,
     /// Canvases whose drawing buffer changed since the last rendering update.
-    pub dirty: Vec<NodeId>,
+    pub dirty: Vec<CanvasOwner>,
 }
 
 /// The pixels a canvas shows from a drawing buffer read back by the service (RGBA, bottom row
@@ -472,7 +478,7 @@ impl Engine {
 
     /// The drawing buffer changed: it is shown at the next rendering update.
     fn gl_drew(&self, this: Handle) {
-        let (el, fb) = self.gl_ctx(this, |c| (c.element, c.framebuffer));
+        let (el, fb) = self.gl_ctx(this, |c| (c.owner, c.framebuffer));
         if fb.is_some() {
             return;
         }
@@ -554,9 +560,9 @@ impl Engine {
     fn tex_source_pixels(
         &self,
         cx: &mut Cx,
-        source: &g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        source: &g::ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas,
     ) -> Result<Option<(u32, u32, Vec<u8>, bool)>, Option<rt::Error>> {
-        use g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement as S;
+        use g::ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas as S;
         match source {
             S::ImageData(h) => {
                 let (w, hh, data) = self.image_data_bytes(cx, *h).ok_or(None)?;
@@ -570,18 +576,7 @@ impl Engine {
                     .ok_or(None)?;
                 // WebGL 1.0 §5.14.8: an image that is not CORS-same-origin throws (HTML's
                 // origin-clean rules).
-                let cors_mode = self
-                    .dom()
-                    .attr(
-                        el,
-                        &snowlark_dom::ns!(),
-                        &snowlark_dom::LocalName::from("crossorigin"),
-                    )
-                    .is_some();
-                let readable = self
-                    .with_node_renderer(el, |r, _| r.image_readable(el, cors_mode))
-                    .unwrap_or(false);
-                if !readable {
+                if !self.img_origin_clean(el) {
                     return Err(Some(super::exception(
                         rt::ExceptionName::SecurityError,
                         "The image is cross-origin and not shared by CORS",
@@ -599,9 +594,46 @@ impl Engine {
                     true,
                 )))
             }
-            S::HTMLCanvasElement(h) => {
-                let (w, hh, rgba) = self.canvas_source_pixels(self.n(*h)).ok_or(None)?;
+            S::HTMLCanvasElement(_) | S::OffscreenCanvas(_) => {
+                let src = match source {
+                    S::OffscreenCanvas(h) => {
+                        // WebGL 1.0 §5.14.8: a detached OffscreenCanvas throws.
+                        if self.offscreen_detached(*h) {
+                            return Err(Some(super::exception(
+                                rt::ExceptionName::InvalidStateError,
+                                "The OffscreenCanvas is detached",
+                            )));
+                        }
+                        CanvasOwner::Offscreen(*h)
+                    }
+                    S::HTMLCanvasElement(h) => CanvasOwner::Element(self.n(*h)),
+                    _ => unreachable!(),
+                };
+                // WebGL 1.0 §5.14.8: a canvas whose bitmap is not origin-clean throws.
+                if !self.canvas_origin_clean(src) {
+                    return Err(Some(super::Engine::tainted_error()));
+                }
+                let (w, hh, rgba) = self.canvas_source_pixels(src).ok_or(None)?;
                 Ok(Some((w, hh, rgba, true)))
+            }
+            S::ImageBitmap(h) => {
+                // WebGL 1.0 §5.14.8: a closed ImageBitmap throws InvalidStateError, one that is
+                // not origin-clean SecurityError.
+                let Some((frame, clean, _)) = self.bitmap_pixels(*h) else {
+                    return Err(Some(super::exception(
+                        rt::ExceptionName::InvalidStateError,
+                        "The ImageBitmap is closed",
+                    )));
+                };
+                if !clean {
+                    return Err(Some(super::Engine::tainted_error()));
+                }
+                Ok(Some((
+                    frame.width,
+                    frame.height,
+                    bgra_to_rgba(&frame.pixels),
+                    true,
+                )))
             }
             S::HTMLVideoElement(_) => Ok(None),
         }
@@ -615,7 +647,7 @@ impl Engine {
         &self,
         cx: &mut Cx,
         this: Handle,
-        source: &g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        source: &g::ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas,
         format: u32,
         type_: u32,
         upload: impl FnOnce(i32, i32, Option<Vec<u8>>) -> Command,
@@ -638,7 +670,16 @@ impl Engine {
             data: &data,
             premultiplied,
         };
-        let bytes = pixels::pack(&src, format, type_, self.gl_unpack(this));
+        let mut unpack = self.gl_unpack(this);
+        if let g::ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas::ImageBitmap(b) = source {
+            // WebGL 2.0 §5.40 (and 1.0 with ImageBitmap): an ImageBitmap is uploaded as it is,
+            // `UNPACK_FLIP_Y_WEBGL` and `UNPACK_PREMULTIPLY_ALPHA_WEBGL` ignored; its alpha is
+            // premultiplied unless it was made with `premultiplyAlpha: "none"`.
+            let straight = self.bitmap_pixels(*b).is_some_and(|(_, _, s)| s);
+            unpack.flip_y = false;
+            unpack.premultiply_alpha = !straight;
+        }
+        let bytes = pixels::pack(&src, format, type_, unpack);
         self.gl_send(this, upload(w as i32, h as i32, bytes));
         Ok(())
     }
@@ -724,15 +765,15 @@ impl Engine {
     }
 
     /// HTML §4.12.5 `getContext("webgl")`: the canvas's WebGL context, made on first use; null when
-    /// WebGL cannot run here.
+    /// WebGL cannot run here. (An OffscreenCanvas keeps the context it gets itself.)
     pub(crate) fn webgl_get_context(
         &self,
         cx: &mut Cx,
-        el: NodeId,
+        el: CanvasOwner,
         options: &JsValue,
     ) -> rt::Result<Option<Handle>> {
-        if let Some(h) = self.gl.borrow().contexts.get(&el) {
-            return Ok(Some(*h));
+        if let Some(h) = self.source_webgl(el) {
+            return Ok(Some(h));
         }
         let o = if options.is_undefined(cx) {
             g::WebGLContextAttributes::default()
@@ -760,10 +801,7 @@ impl Engine {
             fail_if_major_performance_caveat: o.fail_if_major_performance_caveat,
             desynchronized: o.desynchronized,
         };
-        let (w, h) = (
-            self.dim_attr(el, "width", 300),
-            self.dim_attr(el, "height", 150),
-        );
+        let (w, h) = self.source_size(el);
         let id = {
             let mut gl = self.gl.borrow_mut();
             gl.next_context += 1;
@@ -782,7 +820,7 @@ impl Engine {
         let attribs = created.limits.max_vertex_attribs.clamp(1, 64) as usize;
         let ctx = self.alloc(Object::WebGl(Box::new(WebGlObject::Context(Box::new(
             ContextObj {
-                element: el,
+                owner: el,
                 id,
                 attributes: created.attributes,
                 limits: created.limits,
@@ -809,7 +847,9 @@ impl Engine {
             },
         )))));
         let mut gl = self.gl.borrow_mut();
-        gl.contexts.insert(el, ctx);
+        if let CanvasOwner::Element(el) = el {
+            gl.contexts.insert(el, ctx);
+        }
         // (the canvas shows its cleared drawing buffer from the next rendering update)
         gl.dirty.push(el);
         drop(gl);
@@ -819,14 +859,11 @@ impl Engine {
 
     /// A canvas's `width` or `height` changed: its WebGL drawing buffer is made again at the new
     /// size (WebGL 1.0 §2.2), cleared.
-    pub(crate) fn webgl_resized(&self, el: NodeId) {
-        let Some(h) = self.gl.borrow().contexts.get(&el).copied() else {
+    pub(crate) fn webgl_resized(&self, el: CanvasOwner) {
+        let Some(h) = self.source_webgl(el) else {
             return;
         };
-        let (w, hh) = (
-            self.dim_attr(el, "width", 300),
-            self.dim_attr(el, "height", 150),
-        );
+        let (w, hh) = self.source_size(el);
         let id = self.gl_ctx(h, |c| {
             c.width = w;
             c.height = hh;
@@ -851,7 +888,7 @@ impl Engine {
         }
         self.gl_flush();
         for el in dirty {
-            let Some(h) = self.gl.borrow().contexts.get(&el).copied() else {
+            let Some(h) = self.source_webgl(el) else {
                 continue;
             };
             let (id, attrs, lost) = self.gl_ctx(h, |c| (c.id, c.attributes, c.lost));
@@ -874,7 +911,14 @@ impl Engine {
                 continue;
             }
             if let Some(rb) = readback {
-                self.show_canvas_frame(el, Some(to_frame(&rb, &attrs)));
+                let frame = to_frame(&rb, &attrs);
+                match el {
+                    CanvasOwner::Element(el) => {
+                        self.show_canvas_frame(el, Some(frame));
+                    }
+                    // (a WebGL drawing buffer is always origin-clean)
+                    CanvasOwner::Offscreen(oc) => self.commit_offscreen_frame(oc, frame, true),
+                }
             }
         }
     }
@@ -882,6 +926,11 @@ impl Engine {
     /// The drawing buffer's pixels now (`toDataURL`), un-premultiplied BGRA... as a frame.
     pub(crate) fn webgl_snapshot(&self, el: NodeId) -> Option<snowlark_paint::image::Frame> {
         let h = self.gl.borrow().contexts.get(&el).copied()?;
+        self.webgl_snapshot_of(h)
+    }
+
+    /// [`Engine::webgl_snapshot`] of the context `h`.
+    pub(crate) fn webgl_snapshot_of(&self, h: Handle) -> Option<snowlark_paint::image::Frame> {
         let (id, attrs, lost) = self.gl_ctx(h, |c| (c.id, c.attributes, c.lost));
         if lost {
             return None;
@@ -1002,8 +1051,13 @@ impl Engine {
 }
 
 impl WebGLRenderingContextBaseImpl for Engine {
-    fn canvas(&self, this: Handle) -> Handle {
-        super::node_handle(self.gl_ctx(this, |c| c.element))
+    fn canvas(&self, this: Handle) -> g::HTMLCanvasElementOrOffscreenCanvas {
+        match self.gl_ctx(this, |c| c.owner) {
+            CanvasOwner::Element(el) => {
+                g::HTMLCanvasElementOrOffscreenCanvas::HTMLCanvasElement(super::node_handle(el))
+            }
+            CanvasOwner::Offscreen(h) => g::HTMLCanvasElementOrOffscreenCanvas::OffscreenCanvas(h),
+        }
     }
     fn drawing_buffer_width(&self, this: Handle) -> i32 {
         self.gl_ctx(this, |c| if c.lost { 0 } else { c.width as i32 })
@@ -2804,7 +2858,7 @@ impl WebGLRenderingContextOverloadsImpl for Engine {
         internalformat: i32,
         format: u32,
         type_: u32,
-        source: g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        source: g::ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas,
     ) -> rt::Result<()> {
         self.tex_from_source(cx, this, &source, format, type_, |w, h, bytes| {
             Command::TexImage2D(target, level, internalformat, w, h, 0, format, type_, bytes)
@@ -2848,7 +2902,7 @@ impl WebGLRenderingContextOverloadsImpl for Engine {
         yoffset: i32,
         format: u32,
         type_: u32,
-        source: g::ImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElement,
+        source: g::ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvas,
     ) -> rt::Result<()> {
         self.tex_from_source(cx, this, &source, format, type_, |w, h, bytes| {
             Command::TexSubImage2D(

@@ -109,6 +109,13 @@ pub trait HTMLCanvasElementImpl {
     ) -> Result<()> {
         rt::stub("HTMLCanvasElement.to_blob")
     }
+    /// OffscreenCanvas transferControlToOffscreen();
+    #[cfg(not(feature = "stubs"))]
+    fn transfer_control_to_offscreen(&self, cx: &mut Cx, this: Handle) -> Result<Handle>;
+    #[cfg(feature = "stubs")]
+    fn transfer_control_to_offscreen(&self, cx: &mut Cx, this: Handle) -> Result<Handle> {
+        rt::stub("HTMLCanvasElement.transfer_control_to_offscreen")
+    }
 }
 
 /// Getter of `[CEReactions] attribute unsigned long width;`.
@@ -336,6 +343,27 @@ pub(crate) fn op_to_blob<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
     let _ = v;
 }
 
+/// `HTMLCanvasElement.transferControlToOffscreen`: `OffscreenCanvas transferControlToOffscreen();`
+pub(crate) fn op_transfer_control_to_offscreen<D: Dom, const LO: u16, const HI: u16>(
+    call: rt::Call,
+) {
+    let _prof = call.prof("HTMLCanvasElement.transferControlToOffscreen");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { call.receiver() };
+    let argc = call.length();
+    let dom = call.state().engine::<D>();
+    let v = call.with_scope(|scope, mut rv| {
+        let r = {
+            let mut cx = Cx::new(scope);
+            <D as HTMLCanvasElementImpl>::transfer_control_to_offscreen(dom, &mut cx, this)
+        };
+        let v = rt::check(scope, r)?;
+        Some(v)
+    });
+    let Some(v) = v else { return };
+    call.return_handle(Some(v));
+}
+
 /// Fast API C functions of this file's getters, per receiver brand range.
 pub(crate) struct Fast<D, const LO: u16, const HI: u16>(std::marker::PhantomData<D>);
 
@@ -460,6 +488,18 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         );
         rt::operation(scope, &proto, "toBlob", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
+            rt::light_builder(
+                super::html_canvas_element::op_transfer_control_to_offscreen::<D, LO, HI>,
+            ),
+            "transferControlToOffscreen",
+            0,
+            Some(sig),
+        );
+        rt::operation(scope, &proto, "transferControlToOffscreen", f, false);
     }
     t
 }

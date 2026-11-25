@@ -55,6 +55,7 @@ pub(crate) mod history;
 pub(crate) mod html;
 pub(crate) mod idb;
 mod image_map;
+pub(crate) mod imagebitmap;
 pub(crate) mod img;
 mod inner_text;
 pub(crate) mod internals;
@@ -65,6 +66,7 @@ pub(crate) mod media_capabilities;
 mod node;
 mod notification;
 pub(crate) mod observer;
+pub(crate) mod offscreen;
 mod password_forms;
 pub(crate) mod platform;
 mod pointer_tilt;
@@ -390,8 +392,11 @@ pub enum Object {
     },
     MediaList(stylesheets::MediaOwner),
     Canvas2D(Box<canvas::ContextObj>),
+    OffscreenCanvas(Box<offscreen::OffscreenObj>),
+    ImageBitmap(Box<imagebitmap::BitmapObj>),
     CanvasGradient(snowlark_render::canvas::Gradient),
-    CanvasPattern(std::sync::Arc<snowlark_render::canvas::Pattern>),
+    /// A `CanvasPattern` and whether it is origin-clean (HTML §4.12.5.1.10).
+    CanvasPattern(std::sync::Arc<snowlark_render::canvas::Pattern>, bool),
     Path2D(snowlark_render::canvas::CanvasPath),
     TextMetrics {
         width: f64,
@@ -539,6 +544,14 @@ pub struct Engine {
     /// WebGL: the service, queued commands, contexts by canvas ([webgl::GlState]).
     pub(crate) gl: RefCell<webgl::GlState>,
     pub(crate) canvas_dirty: RefCell<Vec<NodeId>>,
+    /// OffscreenCanvases with a placeholder that drew since the last rendering update.
+    pub(crate) offscreen_dirty: RefCell<Vec<Handle>>,
+    /// Placeholder canvases (their control went to an OffscreenCanvas) by element.
+    pub(crate) placeholders: RefCell<rustc_hash::FxHashMap<NodeId, offscreen::PlaceholderState>>,
+    /// The OffscreenCanvases a message being serialized transfers, and those a message being
+    /// deserialized brought ([`Engine::serialize_with_transfer`]).
+    pub(crate) transfer_out: RefCell<Vec<Handle>>,
+    pub(crate) transfer_in: RefCell<Vec<Option<offscreen::Transferred>>>,
     /// The frames a rendering update asked of the canvas thread before its layout, oldest first,
     /// taken after it or, when they come later, at the next one ([`Engine::flush_canvases`]).
     pub(crate) canvas_frames_pending: RefCell<Vec<(NodeId, snowlark_render::canvas::FrameRequest)>>,
@@ -739,6 +752,10 @@ impl Engine {
             canvases: RefCell::default(),
             gl: RefCell::default(),
             canvas_dirty: RefCell::new(Vec::new()),
+            offscreen_dirty: RefCell::new(Vec::new()),
+            placeholders: RefCell::new(Default::default()),
+            transfer_out: RefCell::new(Vec::new()),
+            transfer_in: RefCell::new(Vec::new()),
             canvas_frames_pending: RefCell::new(Vec::new()),
             canvas_frames_async: Cell::new(false),
             canvas_frames_asked_at: Cell::new(None),
@@ -1251,9 +1268,14 @@ impl Engine {
             Object::CssRuleList { .. } => InterfaceId::CSSRuleList,
             Object::CssRule { rule, .. } => Engine::rule_interface(rule),
             Object::MediaList(_) => InterfaceId::MediaList,
-            Object::Canvas2D(_) => InterfaceId::CanvasRenderingContext2D,
+            Object::Canvas2D(c) => match c.owner {
+                canvas::CanvasOwner::Element(_) => InterfaceId::CanvasRenderingContext2D,
+                canvas::CanvasOwner::Offscreen(_) => InterfaceId::OffscreenCanvasRenderingContext2D,
+            },
+            Object::OffscreenCanvas(_) => InterfaceId::OffscreenCanvas,
+            Object::ImageBitmap(_) => InterfaceId::ImageBitmap,
             Object::CanvasGradient(_) => InterfaceId::CanvasGradient,
-            Object::CanvasPattern(_) => InterfaceId::CanvasPattern,
+            Object::CanvasPattern(..) => InterfaceId::CanvasPattern,
             Object::Path2D(_) => InterfaceId::Path2D,
             Object::TextMetrics { .. } => InterfaceId::TextMetrics,
             Object::ImageData(_) => InterfaceId::ImageData,

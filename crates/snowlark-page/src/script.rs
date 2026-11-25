@@ -2006,6 +2006,16 @@ impl v8::ValueSerializerImpl for CloneDelegate {
                 return Some(true);
             }
         }
+        // HTML §2.7.5 StructuredSerializeWithTransfer: an OffscreenCanvas in the transfer list is
+        // written as its index there; its data crosses beside the bytes.
+        if let Some(h) = rt::unwrap(&object, ids::OFFSCREEN_CANVAS, ids::OFFSCREEN_CANVAS_END) {
+            let st = rt::state(scope);
+            if let Some(i) = st.engine::<Engine>().transfer_index(h) {
+                value_serializer.write_uint32(HOST_TRANSFERRED);
+                value_serializer.write_uint32(i);
+                return Some(true);
+            }
+        }
         // File API §3.1 / §4.1: a Blob's serialization is its type and bytes; a File's also its name
         // and last modification date.
         if let Some(h) = rt::unwrap(&object, ids::BLOB, ids::BLOB_END) {
@@ -2067,6 +2077,8 @@ const HOST_BLOB: u32 = 2;
 const HOST_PORT: u32 = 3;
 /// The tag of a serialized ImageData: width, height, then its bytes.
 const HOST_IMAGE_DATA: u32 = 4;
+/// The tag of a transferred object: its index among those transferred beside the bytes.
+const HOST_TRANSFERRED: u32 = 5;
 
 /// A serialized Blob or File: (type, (name, last modified) for a File, bytes).
 type BlobRecord = (String, Option<(String, i64)>, Vec<u8>);
@@ -2120,6 +2132,12 @@ impl v8::ValueDeserializerImpl for CloneDelegate {
                 if received {
                     return rt::wrap(scope, h);
                 }
+            }
+        }
+        if ok && tag == HOST_TRANSFERRED && value_deserializer.read_uint32(&mut len) {
+            let st = rt::state(scope);
+            if let Some(h) = st.engine::<Engine>().receive_transferred(len) {
+                return rt::wrap(scope, h);
             }
         }
         if ok && tag == HOST_BLOB {

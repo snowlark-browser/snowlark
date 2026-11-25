@@ -162,6 +162,52 @@ pub trait WindowOrWorkerGlobalScopeImpl {
     fn queue_microtask(&self, cx: &mut Cx, this: Handle, callback: VoidFunction) -> Result<()> {
         rt::stub("WindowOrWorkerGlobalScope.queue_microtask")
     }
+    /// Promise<ImageBitmap> createImageBitmap(ImageBitmapSource image, optional ImageBitmapOptions options = {});
+    #[cfg(not(feature = "stubs"))]
+    fn create_image_bitmap_image_options(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData,
+        options: ImageBitmapOptions,
+    ) -> Result<JsPromise>;
+    #[cfg(feature = "stubs")]
+    fn create_image_bitmap_image_options(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData,
+        options: ImageBitmapOptions,
+    ) -> Result<JsPromise> {
+        rt::stub("WindowOrWorkerGlobalScope.create_image_bitmap_image_options")
+    }
+    /// Promise<ImageBitmap> createImageBitmap(ImageBitmapSource image, long sx, long sy, long sw, long sh, optional ImageBitmapOptions options = {});
+    #[cfg(not(feature = "stubs"))]
+    fn create_image_bitmap_image_sx_sy_sw_sh_options(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData,
+        sx: i32,
+        sy: i32,
+        sw: i32,
+        sh: i32,
+        options: ImageBitmapOptions,
+    ) -> Result<JsPromise>;
+    #[cfg(feature = "stubs")]
+    fn create_image_bitmap_image_sx_sy_sw_sh_options(
+        &self,
+        cx: &mut Cx,
+        this: Handle,
+        image: HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData,
+        sx: i32,
+        sy: i32,
+        sw: i32,
+        sh: i32,
+        options: ImageBitmapOptions,
+    ) -> Result<JsPromise> {
+        rt::stub("WindowOrWorkerGlobalScope.create_image_bitmap_image_sx_sy_sw_sh_options")
+    }
     /// any structuredClone(any value, optional StructuredSerializeOptions options = {});
     #[cfg(not(feature = "stubs"))]
     fn structured_clone(
@@ -906,6 +952,147 @@ pub(crate) fn op_queue_microtask<D: Dom, const LO: u16, const HI: u16>(
     let _prof = rt::prof::enter(scope, "WindowOrWorkerGlobalScope.queueMicrotask");
     if let Some(v) = op_queue_microtask_dispatch::<D, LO, HI>(scope, &args) {
         rv.set(v)
+    }
+}
+
+/// `Promise<ImageBitmap> createImageBitmap(ImageBitmapSource image, optional ImageBitmapOptions options = {});`
+fn op_create_image_bitmap_0<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    this: Handle,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::from_js(scope, v)
+    }?;
+    let a1 = {
+        let v = args.get(1);
+        if argc > 1 && !v.is_undefined() {
+            ImageBitmapOptions::from_js(scope, v)?
+        } else {
+            ImageBitmapOptions::default()
+        }
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as WindowOrWorkerGlobalScopeImpl>::create_image_bitmap_image_options(
+            dom, &mut cx, this, a0, a1,
+        )
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// `Promise<ImageBitmap> createImageBitmap(ImageBitmapSource image, long sx, long sy, long sw, long sh, optional ImageBitmapOptions options = {});`
+fn op_create_image_bitmap_1<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+    this: Handle,
+    argc: i32,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let a0 = {
+        let v = args.get(0);
+        HTMLImageElementOrSVGImageElementOrHTMLVideoElementOrHTMLCanvasElementOrImageBitmapOrOffscreenCanvasOrBlobOrImageData::from_js(scope, v)
+    }?;
+    let a1 = {
+        let v = args.get(1);
+        rt::to_long(scope, v, rt::IntMode::Wrap)
+    }?;
+    let a2 = {
+        let v = args.get(2);
+        rt::to_long(scope, v, rt::IntMode::Wrap)
+    }?;
+    let a3 = {
+        let v = args.get(3);
+        rt::to_long(scope, v, rt::IntMode::Wrap)
+    }?;
+    let a4 = {
+        let v = args.get(4);
+        rt::to_long(scope, v, rt::IntMode::Wrap)
+    }?;
+    let a5 = {
+        let v = args.get(5);
+        if argc > 5 && !v.is_undefined() {
+            ImageBitmapOptions::from_js(scope, v)?
+        } else {
+            ImageBitmapOptions::default()
+        }
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as WindowOrWorkerGlobalScopeImpl>::create_image_bitmap_image_sx_sy_sw_sh_options(
+            dom, &mut cx, this, a0, a1, a2, a3, a4, a5,
+        )
+    };
+
+    let v = rt::check(scope, r)?;
+    v.to_js(scope)
+}
+
+/// Overload resolution of `WindowOrWorkerGlobalScope.createImageBitmap` (Web IDL §3.7.6).
+fn op_create_image_bitmap_dispatch<'s, D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope<'s, '_>,
+    args: &v8::FunctionCallbackArguments,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let Some(this) = rt::unwrap(&args.this(), LO, HI) else {
+        return rt::illegal_invocation(scope);
+    };
+    if !security_check::<LO>(scope, args.this()) {
+        return None;
+    }
+    let argc = args.length();
+    match argc.min(6) {
+        0 => rt::not_enough_arguments(
+            scope,
+            "WindowOrWorkerGlobalScope.createImageBitmap",
+            1,
+            argc,
+        ),
+        1 => op_create_image_bitmap_0::<D, LO, HI>(scope, args, this, argc),
+        2 => op_create_image_bitmap_0::<D, LO, HI>(scope, args, this, argc),
+        3 => rt::not_enough_arguments(
+            scope,
+            "WindowOrWorkerGlobalScope.createImageBitmap",
+            1,
+            argc,
+        ),
+        4 => rt::not_enough_arguments(
+            scope,
+            "WindowOrWorkerGlobalScope.createImageBitmap",
+            1,
+            argc,
+        ),
+        5 => op_create_image_bitmap_1::<D, LO, HI>(scope, args, this, argc),
+        _ => op_create_image_bitmap_1::<D, LO, HI>(scope, args, this, argc),
+    }
+}
+
+/// `WindowOrWorkerGlobalScope.createImageBitmap`.
+pub(crate) fn op_create_image_bitmap<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "WindowOrWorkerGlobalScope.createImageBitmap");
+    v8::tc_scope!(let tc, scope);
+    match op_create_image_bitmap_dispatch::<D, LO, HI>(tc, &args) {
+        Some(v) => rv.set(v),
+        None => {
+            if let Some(e) = tc.exception() {
+                if let Some(r) = v8::PromiseResolver::new(tc) {
+                    r.reject(tc, e);
+                    rv.set(r.get_promise(tc).into());
+                }
+            }
+        }
     }
 }
 

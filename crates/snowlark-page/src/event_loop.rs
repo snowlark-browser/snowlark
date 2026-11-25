@@ -531,6 +531,7 @@ impl Engine {
             && !self.event_timing_pending()
             && !self.animations_need_frame()
             && self.pointer.borrow().held.is_none()
+            && !self.offscreen_frame_wanted()
         {
             return false;
         }

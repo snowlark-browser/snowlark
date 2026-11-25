@@ -8019,6 +8019,16 @@ pub(crate) fn template<'s, D: Dom>(
     {
         let f = rt::method(
             scope,
+            rt::builder(super::window_or_worker_global_scope::op_create_image_bitmap::<D, LO, HI>),
+            "createImageBitmap",
+            1,
+            None,
+        );
+        rt::operation(scope, &inst, "createImageBitmap", f, false);
+    }
+    {
+        let f = rt::method(
+            scope,
             rt::builder(super::window_or_worker_global_scope::op_structured_clone::<D, LO, HI>),
             "structuredClone",
             1,

@@ -123,7 +123,6 @@ Gamepad.touches: not shipped (a later level's proposal)
 GamepadHapticActuator.pulse: not shipped (a later level's proposal)
 HTMLCameraElement.track: interface MediaStreamTrack is not generated
 HTMLCanvasElement.captureStream(frameRequestRate): interface MediaStream is not generated
-HTMLCanvasElement.transferControlToOffscreen(): interface OffscreenCanvas is not generated
 HTMLElement.attributeStyleMap: interface StylePropertyMap is not generated
 HTMLElement.editContext: interface EditContext is not generated
 HTMLFencedFrameElement.config: interface FencedFrameConfig is not generated
@@ -188,8 +187,6 @@ WebGLRenderingContext.makeXRCompatible: WebXR is not implemented
 Window.caches: interface CacheStorage is not generated
 Window.cookieStore: interface CookieStore is not generated
 Window.crashReport: interface CrashReportContext is not generated
-Window.createImageBitmap(image, options): interface ImageBitmap is not generated
-Window.createImageBitmap(image, sx, sy, sw, sh, options): interface ImageBitmap is not generated
 Window.documentPictureInPicture: interface DocumentPictureInPicture is not generated
 Window.fence: interface Fence is not generated
 Window.fetchLater(input, init): interface FetchLaterResult is not generated
@@ -206,8 +203,6 @@ Window.showSaveFilePicker(options): interface FileSystemFileHandle is not genera
 Window.speechSynthesis: interface SpeechSynthesis is not generated
 Window.viewport: interface Viewport is not generated
 WorkerGlobalScope.caches: interface CacheStorage is not generated
-WorkerGlobalScope.createImageBitmap(image, options): interface ImageBitmap is not generated
-WorkerGlobalScope.createImageBitmap(image, sx, sy, sw, sh, options): interface ImageBitmap is not generated
 WorkerNavigator.crossOriginStorage: interface CrossOriginStorageManager is not generated
 WorkerNavigator.gpu: interface GPU is not generated
 WorkerNavigator.hid: interface HID is not generated

@@ -98,9 +98,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 - **System-font text is not byte-stable between runs.** The same frames can differ by a few bytes from one run to the
   next. The cause is not established. (ref 87)
-- **Canvas 2D.** `ctx.filter` keeps its value but is not applied. (ref 499) A canvas that drew an image from
-  another origin, not shared by CORS, still lets script read its pixels (`getImageData`, `toDataURL`): the
-  canvas's origin-clean flag is not kept. (ref 733)
+- **Canvas 2D.** `ctx.filter` keeps its value but is not applied. (ref 499) Text drawn on an `OffscreenCanvas`
+  inside a worker does not appear; `ImageBitmap` cannot be posted to another thread, and
+  `getContext('bitmaprenderer')` is not supported. (ref 735)
 - **Pixel snapping inside transforms.** Box edges inside a scale or rotate transform are not snapped to device pixels.
   (ref 34)
 - **Unpainted areas while scrolling fast.** A page whose main thread is busy can show its background where the view
@@ -144,12 +144,12 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   attribute-node paths are not implemented. Frames share the top-level document's time origin. (ref 33)
 - **XPath resolvers from another realm.** When a namespace resolver made in another frame is not callable, the
   `TypeError` is created and reported in the calling frame instead of the resolver's. (ref 661)
-- **WebGL 1 only, without extensions or video textures; no WebGL 2, `OffscreenCanvas` or WebGPU.**
-  `getContext('webgl')` gives a WebGL 1 context (`docs/webgl.md`), but `getSupportedExtensions()` is empty,
-  textures load from typed arrays, `ImageData`, images and canvases but not from video or `ImageBitmap`, and
-  `getContext('webgl2')`, `OffscreenCanvas` and `navigator.gpu` are absent. Pages that need those fall back to
-  their 2D-canvas drawing where they have one: Google Maps then zooms without its animation, the imagery grey until
-  the new level's tiles arrive. WebGL objects are freed only with the page. (ref 117, 682, 700, 732)
+- **WebGL 1 only, without extensions or video textures; no WebGL 2 or WebGPU.**
+  `getContext('webgl')` gives a WebGL 1 context (`docs/webgl.md`), also on an `OffscreenCanvas` and in a worker,
+  but `getSupportedExtensions()` is empty, textures do not load from video, and `getContext('webgl2')` and
+  `navigator.gpu` are absent. Pages that need those fall back to their 2D-canvas drawing where they have one:
+  Google Maps, whose smooth renderer needs WebGL 2, then zooms without its animation, the imagery grey until the
+  new level's tiles arrive. WebGL objects are freed only with the page. (ref 117, 682, 700, 732, 734)
 - **Service workers.** `navigator.serviceWorker` and the Cache API are not implemented. Pages that check for service
   workers print a warning. (ref 33)
 - **IndexedDB.** Names with lone surrogates are not supported, there is no storage partitioning by top-level site,
