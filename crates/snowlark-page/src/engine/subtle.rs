@@ -12,6 +12,7 @@
 //! formats raw, spki, pkcs8 and jwk (and the Modern Algorithms' "raw-secret"/"raw-public" aliases).
 //! Also the Modern Algorithms' `getPublicKey()` and `supports()`. `digest()` hashes with ring.
 
+mod aead;
 mod aes;
 mod alg;
 mod clone;
@@ -23,6 +24,7 @@ mod normalize;
 mod okp;
 mod ops;
 mod rsa;
+mod xof;
 
 use snowlark_bindings::generated::{
     ArrayBufferOrInt8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView,
@@ -366,6 +368,10 @@ impl SubtleCryptoImpl for Engine {
     ) -> Result<JsPromise> {
         let n = normalize(cx, Op::Digest, &algorithm)?;
         let data = copy_bytes(cx, &data);
+        if n.alg.is_modern_digest() {
+            let out = xof::digest(&n, &data)?;
+            return resolved_bytes(cx, out);
+        }
         let alg = match n.alg {
             Alg::Sha1 => &ring::digest::SHA1_FOR_LEGACY_USE_ONLY,
             Alg::Sha256 => &ring::digest::SHA256,
@@ -548,7 +554,7 @@ impl SubtleCryptoImpl for Engine {
         let secret = self.derive(&n, &key, length)?;
         let result = ops::import(
             &import,
-            KeyFormat::Raw,
+            KeyFormat::RawSecret,
             KeyInput::Bytes(secret),
             extractable,
             usages,

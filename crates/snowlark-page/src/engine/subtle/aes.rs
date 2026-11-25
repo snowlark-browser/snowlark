@@ -394,6 +394,7 @@ fn jwk_alg(alg: Alg, bits: usize) -> Option<String> {
         Alg::AesCbc => "CBC",
         Alg::AesGcm => "GCM",
         Alg::AesKw => "KW",
+        Alg::AesOcb => "OCB",
         _ => return None,
     };
     matches!(bits, 128 | 192 | 256).then(|| format!("A{bits}{mode}"))

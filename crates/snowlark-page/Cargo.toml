@@ -59,6 +59,13 @@ der = { version = "0.7", features = ["oid", "alloc"] }
 spki = { version = "0.7", features = ["alloc"] }
 pkcs8 = { version = "0.10", features = ["alloc"] }
 subtle = "2.6"
+# (the Modern Algorithms: OCB, ChaCha20-Poly1305, SHA-3, cSHAKE, KangarooTwelve; RustCrypto)
+ocb3 = "0.1"
+chacha20poly1305 = "0.10"
+sha3 = "0.12"
+k12 = "0.5"
+cshake = "0.2"
+turboshake = "0.7"
 rand_core = { version = "0.6", features = ["getrandom"] }
 base64 = "0.22"
 # (unwrapKey: parsing the unwrapped JWK's JSON outside any realm)

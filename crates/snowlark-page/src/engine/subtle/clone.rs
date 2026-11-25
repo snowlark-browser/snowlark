@@ -71,7 +71,7 @@ pub(crate) fn serialize(key: &KeyData) -> Vec<u8> {
     let mut w = Writer(MAGIC.to_vec());
     w.u8(index(&TYPES, &key.ty));
     w.u8(key.extractable as u8);
-    w.u8(key.usages.0);
+    w.u32(key.usages.0 as u32);
     w.u8(index(&Alg::ALL, &key.algorithm.alg()));
     match &key.algorithm {
         KeyAlg::Aes { length, .. } => w.u32(*length as u32),
@@ -121,7 +121,7 @@ pub(crate) fn deserialize(bytes: &[u8]) -> Option<KeyData> {
     }
     let ty = *TYPES.get(r.u8()? as usize)?;
     let extractable = r.u8()? != 0;
-    let usages = Usages(r.u8()?);
+    let usages = Usages(r.u32()? as u16);
     let alg = *Alg::ALL.get(r.u8()? as usize)?;
     let hash = |r: &mut Reader| HASHES.get(r.u8()? as usize).copied();
     let algorithm = match alg {

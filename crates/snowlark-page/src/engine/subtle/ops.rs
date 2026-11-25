@@ -10,11 +10,12 @@ use snowlark_bindings::generated::{KeyFormat, KeyType};
 
 use super::alg::*;
 use super::key::{Exported, Generated, KeyData, KeyInput, Material};
-use super::{aes, ec, mac, okp, rsa};
+use super::{aead, aes, ec, mac, okp, rsa, xof};
 
 pub(crate) fn encrypt(n: &Normalized, key: &KeyData, data: &[u8]) -> CryptoResult<Vec<u8>> {
     match n.alg {
         Alg::AesCtr | Alg::AesCbc | Alg::AesGcm => aes::encrypt(n, key, data),
+        Alg::AesOcb | Alg::ChaCha20Poly1305 => aead::encrypt(n, key, data),
         Alg::RsaOaep => rsa::encrypt(n, key, data),
         _ => Err(not_supported("The algorithm does not encrypt")),
     }
@@ -23,6 +24,7 @@ pub(crate) fn encrypt(n: &Normalized, key: &KeyData, data: &[u8]) -> CryptoResul
 pub(crate) fn decrypt(n: &Normalized, key: &KeyData, data: &[u8]) -> CryptoResult<Vec<u8>> {
     match n.alg {
         Alg::AesCtr | Alg::AesCbc | Alg::AesGcm => aes::decrypt(n, key, data),
+        Alg::AesOcb | Alg::ChaCha20Poly1305 => aead::decrypt(n, key, data),
         Alg::RsaOaep => rsa::decrypt(n, key, data),
         _ => Err(not_supported("The algorithm does not decrypt")),
     }
@@ -93,6 +95,7 @@ pub(crate) fn generate(
     match n.alg {
         a if a.is_aes() => aes::generate(n, extractable, usages).map(Generated::Key),
         Alg::Hmac => mac::generate(n, extractable, usages).map(Generated::Key),
+        Alg::ChaCha20Poly1305 => aead::generate(extractable, usages).map(Generated::Key),
         a if a.is_rsa() => rsa::generate(n, extractable, usages),
         a if a.is_ec() => ec::generate(n, extractable, usages),
         a if a.is_okp() => okp::generate(n, extractable, usages),
@@ -104,9 +107,19 @@ pub(crate) fn generate(
 /// algorithms, "raw-public" is "raw" for the asymmetric ones.
 fn format_for(alg: Alg, format: KeyFormat) -> KeyFormat {
     match format {
-        KeyFormat::RawSecret if alg.is_symmetric() => KeyFormat::Raw,
+        KeyFormat::RawSecret if alg.is_symmetric() && !alg.is_modern_secret() => KeyFormat::Raw,
         KeyFormat::RawPublic if !alg.is_symmetric() => KeyFormat::Raw,
         f => f,
+    }
+}
+
+/// A Modern Algorithms secret key takes "raw-secret" and no "raw": the AES code's "raw" is its
+/// "raw-secret".
+fn modern_secret_format(format: KeyFormat) -> CryptoResult<KeyFormat> {
+    match format {
+        KeyFormat::RawSecret => Ok(KeyFormat::Raw),
+        KeyFormat::Raw => Err(not_supported("The key does not use the raw format")),
+        f => Ok(f),
     }
 }
 
@@ -119,6 +132,8 @@ pub(crate) fn import(
 ) -> CryptoResult<KeyData> {
     let format = format_for(n.alg, format);
     match n.alg {
+        Alg::AesOcb => aes::import(n, modern_secret_format(format)?, input, extractable, usages),
+        Alg::ChaCha20Poly1305 => aead::import(format, input, extractable, usages),
         a if a.is_aes() => aes::import(n, format, input, extractable, usages),
         Alg::Hmac => mac::import(n, format, input, extractable, usages),
         Alg::Hkdf | Alg::Pbkdf2 => mac::import_kdf(n, format, input, extractable, usages),
@@ -133,6 +148,8 @@ pub(crate) fn import(
 pub(crate) fn export(key: &KeyData, format: KeyFormat) -> CryptoResult<Exported> {
     let format = format_for(key.algorithm.alg(), format);
     match key.algorithm.alg() {
+        Alg::AesOcb => aes::export(key, modern_secret_format(format)?),
+        Alg::ChaCha20Poly1305 => aead::export(key, format),
         a if a.is_aes() => aes::export(key, format),
         Alg::Hmac => mac::export(key, format),
         a if a.is_rsa() => rsa::export(key, format),
@@ -148,6 +165,7 @@ pub(crate) fn key_length(n: &Normalized) -> CryptoResult<Option<u32>> {
         a if a.is_aes() => aes::key_length(n),
         Alg::Hmac => mac::key_length(n),
         Alg::Hkdf | Alg::Pbkdf2 => Ok(None),
+        Alg::ChaCha20Poly1305 => Ok(Some(256)),
         _ => Err(not_supported("The algorithm has no key length")),
     }
 }
@@ -209,6 +227,14 @@ pub(crate) fn supported(
             !iv.is_empty()
                 && tag_length.is_none_or(|t| matches!(t, 32 | 64 | 96 | 104 | 112 | 120 | 128))
         }
+        (Op::Encrypt | Op::Decrypt, Params::Aead { iv, tag_length, .. }) => match n.alg {
+            Alg::AesOcb => {
+                (6..=15).contains(&iv.len())
+                    && tag_length.is_none_or(|t| matches!(t, 64 | 96 | 128))
+            }
+            _ => iv.len() == 12 && tag_length.is_none_or(|t| t == 128),
+        },
+        (Op::Digest, _) => xof::supported(n),
         (Op::DeriveBits, Params::EcdhDerive { .. }) => {
             let Some(public) = public else {
                 return false;

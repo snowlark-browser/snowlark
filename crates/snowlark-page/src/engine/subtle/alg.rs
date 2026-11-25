@@ -30,10 +30,22 @@ pub(crate) enum Alg {
     Sha512,
     Hkdf,
     Pbkdf2,
+    // The Modern Algorithms.
+    AesOcb,
+    ChaCha20Poly1305,
+    Sha3_256,
+    Sha3_384,
+    Sha3_512,
+    CShake128,
+    CShake256,
+    TurboShake128,
+    TurboShake256,
+    Kt128,
+    Kt256,
 }
 
 impl Alg {
-    pub(crate) const ALL: [Alg; 18] = [
+    pub(crate) const ALL: [Alg; 29] = [
         Alg::RsassaPkcs1,
         Alg::RsaPss,
         Alg::RsaOaep,
@@ -52,6 +64,17 @@ impl Alg {
         Alg::Sha512,
         Alg::Hkdf,
         Alg::Pbkdf2,
+        Alg::AesOcb,
+        Alg::ChaCha20Poly1305,
+        Alg::Sha3_256,
+        Alg::Sha3_384,
+        Alg::Sha3_512,
+        Alg::CShake128,
+        Alg::CShake256,
+        Alg::TurboShake128,
+        Alg::TurboShake256,
+        Alg::Kt128,
+        Alg::Kt256,
     ];
 
     /// The recognized algorithm name.
@@ -75,11 +98,48 @@ impl Alg {
             Alg::Sha512 => "SHA-512",
             Alg::Hkdf => "HKDF",
             Alg::Pbkdf2 => "PBKDF2",
+            Alg::AesOcb => "AES-OCB",
+            Alg::ChaCha20Poly1305 => "ChaCha20-Poly1305",
+            Alg::Sha3_256 => "SHA3-256",
+            Alg::Sha3_384 => "SHA3-384",
+            Alg::Sha3_512 => "SHA3-512",
+            Alg::CShake128 => "cSHAKE128",
+            Alg::CShake256 => "cSHAKE256",
+            Alg::TurboShake128 => "TurboSHAKE128",
+            Alg::TurboShake256 => "TurboSHAKE256",
+            Alg::Kt128 => "KT128",
+            Alg::Kt256 => "KT256",
         }
     }
 
     pub(crate) fn is_aes(self) -> bool {
-        matches!(self, Alg::AesCtr | Alg::AesCbc | Alg::AesGcm | Alg::AesKw)
+        matches!(
+            self,
+            Alg::AesCtr | Alg::AesCbc | Alg::AesGcm | Alg::AesKw | Alg::AesOcb
+        )
+    }
+
+    /// The Modern Algorithms' secret-key algorithms, which import and export only "raw-secret" (the
+    /// older ones also take "raw").
+    pub(crate) fn is_modern_secret(self) -> bool {
+        matches!(self, Alg::AesOcb | Alg::ChaCha20Poly1305)
+    }
+
+    /// The digest algorithms with no parameters or with output-length parameters of the Modern
+    /// Algorithms (SHA-3, cSHAKE, TurboSHAKE, KangarooTwelve).
+    pub(crate) fn is_modern_digest(self) -> bool {
+        matches!(
+            self,
+            Alg::Sha3_256
+                | Alg::Sha3_384
+                | Alg::Sha3_512
+                | Alg::CShake128
+                | Alg::CShake256
+                | Alg::TurboShake128
+                | Alg::TurboShake256
+                | Alg::Kt128
+                | Alg::Kt256
+        )
     }
 
     pub(crate) fn is_rsa(self) -> bool {
@@ -97,7 +157,11 @@ impl Alg {
 
     /// The algorithms with secret keys, for which "raw-secret" is an alias of "raw".
     pub(crate) fn is_symmetric(self) -> bool {
-        self.is_aes() || matches!(self, Alg::Hmac | Alg::Hkdf | Alg::Pbkdf2)
+        self.is_aes()
+            || matches!(
+                self,
+                Alg::Hmac | Alg::Hkdf | Alg::Pbkdf2 | Alg::ChaCha20Poly1305
+            )
     }
 }
 
@@ -159,6 +223,10 @@ pub(crate) enum DictType {
     EcdhKeyDeriveParams,
     HkdfParams,
     Pbkdf2Params,
+    AeadParams,
+    CShakeParams,
+    TurboShakeParams,
+    KangarooTwelveParams,
 }
 
 /// supportedAlgorithms\[op\]\[alg\] (§18.4.2): the dictionary type each algorithm's "Registration" table
@@ -196,6 +264,16 @@ pub(crate) fn registered(op: Op, alg: Alg) -> Option<DictType> {
         (Hkdf, DeriveBits) => D::HkdfParams,
         (Pbkdf2, DeriveBits) => D::Pbkdf2Params,
         (Hkdf | Pbkdf2, ImportKey | GetKeyLength) => D::Algorithm,
+        (AesOcb, Encrypt | Decrypt) => D::AeadParams,
+        (AesOcb, GenerateKey) => D::AesKeyGenParams,
+        (AesOcb, ImportKey | ExportKey) => D::Algorithm,
+        (AesOcb, GetKeyLength) => D::AesDerivedKeyParams,
+        (ChaCha20Poly1305, Encrypt | Decrypt) => D::AeadParams,
+        (ChaCha20Poly1305, GenerateKey | ImportKey | ExportKey | GetKeyLength) => D::Algorithm,
+        (Sha3_256 | Sha3_384 | Sha3_512, Digest) => D::Algorithm,
+        (CShake128 | CShake256, Digest) => D::CShakeParams,
+        (TurboShake128 | TurboShake256, Digest) => D::TurboShakeParams,
+        (Kt128 | Kt256, Digest) => D::KangarooTwelveParams,
         _ => return None,
     })
 }
@@ -328,6 +406,25 @@ pub(crate) enum Params {
         iterations: u32,
         hash: Hash,
     },
+    /// `AeadParams`.
+    Aead {
+        iv: Vec<u8>,
+        additional_data: Option<Vec<u8>>,
+        tag_length: Option<u8>,
+    },
+    CShake {
+        output_length: u32,
+        function_name: Vec<u8>,
+        customization: Vec<u8>,
+    },
+    TurboShake {
+        output_length: u32,
+        domain_separation: Option<u8>,
+    },
+    KangarooTwelve {
+        output_length: u32,
+        customization: Vec<u8>,
+    },
 }
 
 /// The result of "normalize an algorithm" (§18.4.4).
@@ -351,8 +448,9 @@ impl Normalized {
 
 /// A set of recognized key usages (§13.2), iterated in their listed order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Usages(pub u8);
+pub(crate) struct Usages(pub u16);
 
+#[allow(dead_code)] // the encapsulation usages are used by the KEM algorithms still to come
 impl Usages {
     pub(crate) const ENCRYPT: Usages = Usages(1);
     pub(crate) const DECRYPT: Usages = Usages(2);
@@ -362,7 +460,11 @@ impl Usages {
     pub(crate) const DERIVE_BITS: Usages = Usages(32);
     pub(crate) const WRAP_KEY: Usages = Usages(64);
     pub(crate) const UNWRAP_KEY: Usages = Usages(128);
-    pub(crate) const NAMES: [&'static str; 8] = [
+    pub(crate) const ENCAPSULATE_KEY: Usages = Usages(256);
+    pub(crate) const ENCAPSULATE_BITS: Usages = Usages(512);
+    pub(crate) const DECAPSULATE_KEY: Usages = Usages(1024);
+    pub(crate) const DECAPSULATE_BITS: Usages = Usages(2048);
+    pub(crate) const NAMES: [&'static str; 12] = [
         "encrypt",
         "decrypt",
         "sign",
@@ -371,6 +473,10 @@ impl Usages {
         "deriveBits",
         "wrapKey",
         "unwrapKey",
+        "encapsulateKey",
+        "encapsulateBits",
+        "decapsulateKey",
+        "decapsulateBits",
     ];
 
     pub(crate) const fn or(self, other: Usages) -> Usages {
@@ -390,7 +496,7 @@ impl Usages {
     }
 
     pub(crate) fn names(self) -> impl Iterator<Item = &'static str> {
-        (0..8)
+        (0..12)
             .filter(move |i| self.0 & (1 << i) != 0)
             .map(|i| Usages::NAMES[i])
     }
@@ -520,6 +626,10 @@ mod tests {
         );
         let other = Requested::new(&[KeyUsage::EncapsulateKey]);
         assert!(other.check(Usages(255)).is_err());
-        assert!(other.normalized().is_empty() && !other.empty);
+        assert!(other.check(Usages::ENCAPSULATE_KEY).is_ok());
+        assert_eq!(
+            other.normalized().names().collect::<Vec<_>>(),
+            ["encapsulateKey"]
+        );
     }
 }

@@ -282,6 +282,64 @@ pub(crate) fn normalize(cx: &mut Cx, op: Op, alg: &ObjectOrString) -> Result<Nor
                 salt: bytes(r.cx, salt),
             }
         }
+        DictType::AeadParams => {
+            let additional = match r.get("additionalData")? {
+                Some(v) => Some(r.buffer(v, "additionalData")?),
+                None => None,
+            };
+            let v = r.required("iv")?;
+            let iv = r.buffer(v, "iv")?;
+            let tag_length = match r.get("tagLength")? {
+                Some(v) => Some(r.octet(v)?),
+                None => None,
+            };
+            Params::Aead {
+                additional_data: additional.map(|a| bytes(r.cx, a)),
+                iv: bytes(r.cx, iv),
+                tag_length,
+            }
+        }
+        DictType::CShakeParams => {
+            let customization = match r.get("customization")? {
+                Some(v) => Some(r.buffer(v, "customization")?),
+                None => None,
+            };
+            let function_name = match r.get("functionName")? {
+                Some(v) => Some(r.buffer(v, "functionName")?),
+                None => None,
+            };
+            let v = r.required("outputLength")?;
+            let output_length = r.unsigned_long(v)?;
+            Params::CShake {
+                output_length,
+                function_name: function_name.map(|b| bytes(r.cx, b)).unwrap_or_default(),
+                customization: customization.map(|b| bytes(r.cx, b)).unwrap_or_default(),
+            }
+        }
+        DictType::TurboShakeParams => {
+            let domain_separation = match r.get("domainSeparation")? {
+                Some(v) => Some(r.octet(v)?),
+                None => None,
+            };
+            let v = r.required("outputLength")?;
+            let output_length = r.unsigned_long(v)?;
+            Params::TurboShake {
+                output_length,
+                domain_separation,
+            }
+        }
+        DictType::KangarooTwelveParams => {
+            let customization = match r.get("customization")? {
+                Some(v) => Some(r.buffer(v, "customization")?),
+                None => None,
+            };
+            let v = r.required("outputLength")?;
+            let output_length = r.unsigned_long(v)?;
+            Params::KangarooTwelve {
+                output_length,
+                customization: customization.map(|b| bytes(r.cx, b)).unwrap_or_default(),
+            }
+        }
     };
     Ok(Normalized { alg, params })
 }
