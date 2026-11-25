@@ -763,7 +763,7 @@ impl StyleSource for DocumentStyles<'_> {
 
     fn element_style(&self, element: NodeId) -> Option<RenderStyle> {
         let values = self.data.styles_arc(element)?;
-        if !values.get_box().clone_container_type().is_empty() {
+        if !values.get_box().container_type.is_empty() {
             self.query_containers.set(true);
         }
         let mut style = self.handle(values);
@@ -912,7 +912,7 @@ impl StyleSource for DocumentStyles<'_> {
             && self
                 .data
                 .styles(element)
-                .is_some_and(|s| s.get_box().clone_appearance() == Appearance::None)
+                .is_some_and(|s| s.get_box().appearance == Appearance::None)
     }
 
     /// HTML 15.5.14-15: the internal tree of a `progress` or `meter` element, an inner part holding

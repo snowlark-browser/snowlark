@@ -996,7 +996,7 @@ mod tests {
             rule.font_palette_values().unwrap(),
             FontPaletteValues {
                 name: "--P".into(),
-                font_family: "foo, \"Bar Baz\"".into(),
+                font_family: "foo, Bar Baz".into(),
                 base_palette: "2".into(),
                 override_colors: "3 rgb(17, 34, 51), 0 color-mix(in lch, red, blue)".into(),
             }
@@ -1023,7 +1023,7 @@ mod tests {
         assert_eq!(rule.type_code(), 14);
         assert_eq!(
             rule.font_feature_values_family().as_deref(),
-            Some("Bongo, \"Foo Bar\"")
+            Some("Bongo, Foo Bar")
         );
         assert!(rule.css_text().contains("flowing: 1;"));
         assert!(rule.set_font_feature_values_family("serif").is_none());
@@ -1032,7 +1032,7 @@ mod tests {
         assert_ne!(changed.id(), rule.id());
         assert_eq!(
             changed.font_feature_values_family().as_deref(),
-            Some("Other, \"X Y\"")
+            Some("Other, X Y")
         );
         let again = sheet.rules().get(0).unwrap();
         assert_eq!(again.id(), changed.id());
@@ -1099,7 +1099,10 @@ mod tests {
         assert!(!rule.set_font_face_descriptor("color", "red"));
         assert_eq!(rule.font_face_descriptor("color").as_deref(), Some(""));
         assert!(rule.set_font_face_css_text("font-family: B; src: local(x)"));
-        assert_eq!(rule.font_face_css_text(), "font-family: B; src: local(x);");
+        assert_eq!(
+            rule.font_face_css_text(),
+            "font-family: B; src: local(\"x\");"
+        );
         // The rule's own cssText follows.
         assert!(rule.css_text().contains("font-family: B"));
     }

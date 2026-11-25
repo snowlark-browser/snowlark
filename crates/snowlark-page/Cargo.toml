@@ -22,7 +22,7 @@ snowlark-idb = { path = "../snowlark-idb" }
 v8 = { workspace = true }
 url = "2.5"
 encoding_rs = "0.8"
-selectors = "0.41"
+selectors = "0.43"
 cssparser = "0.38"
 precomputed-hash = "0.1"
 smallvec = "1.13"

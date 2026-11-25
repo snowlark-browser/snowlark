@@ -927,6 +927,13 @@ pub(crate) fn presentational_hints(dom: &Dom, element: NodeId, quirks: bool) -> 
                     h.set("list-style-type", v);
                 }
             }
+            // §15.3.8: an `li` whose `value` parses as an integer sets its `list-item` counter.
+            if local == local_name!("li") {
+                if let Some(n) = h.attr(&local_name!("value")).and_then(parse_integer) {
+                    let n = n.clamp(i32::MIN as i64, i32::MAX as i64);
+                    h.set("counter-set", &format!("list-item {n}"));
+                }
+            }
         }
         // §15.3.3: `pre[wrap] { white-space: pre-wrap; }`.
         local_name!("pre") if h.attr(&local_name!("wrap")).is_some() => {

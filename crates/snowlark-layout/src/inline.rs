@@ -4035,9 +4035,11 @@ fn compute_vertical<S: Style>(
                         } else {
                             (f32::INFINITY, f32::NEG_INFINITY)
                         };
-                        let mut d2 = Vec::new();
+                        // (a top- or bottom-aligned child is not in this aligned subtree: CSS 2
+                        // §10.8 aligns it with the line box on its own, so it is deferred with the
+                        // line's)
                         let child = compute_vertical(
-                            text, children, m, &font, vb, quirk, counts, &mut t, &mut b, &mut d2,
+                            text, children, m, &font, vb, quirk, counts, &mut t, &mut b, deferred,
                             out,
                         );
                         if t > b {

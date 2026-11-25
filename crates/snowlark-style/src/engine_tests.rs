@@ -235,6 +235,27 @@ fn presentational_hints_are_parsed_at_the_restyle() {
     assert_eq!(p.value_of(div, "text-align"), "-webkit-right");
 }
 
+/// HTML §15.3.8: an `li` whose `value` parses by the rules for parsing integers sets its `list-item`
+/// counter (`counter-set: list-item <value>`); one that does not parse sets nothing.
+#[test]
+fn li_value_sets_the_list_item_counter() {
+    let mut p = Page::new(
+        "<ol><li id=a value=10></li><li id=b value=10e10></li><li id=c value=-3x></li>\
+         <li id=d value=xyz></li><li id=e></li></ol>",
+    );
+    p.restyle();
+    for (id, expected) in [
+        ("#a", "list-item 10"),
+        ("#b", "list-item 10"),
+        ("#c", "list-item -3"),
+        ("#d", "none"),
+        ("#e", "none"),
+    ] {
+        let li = p.q(id);
+        assert_eq!(p.value_of(li, "counter-set"), expected, "{id}");
+    }
+}
+
 /// SVG 2 §6.6: each presentation attribute is parsed alone, as a value of its property: one that
 /// leaves a function open does not take the attributes after it in, and an invalid one is ignored
 /// alone. Elements with the same presentation attributes share one block.

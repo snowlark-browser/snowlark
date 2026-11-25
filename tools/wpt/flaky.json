@@ -7906,6 +7906,9 @@
    "#2999 Run a WebAssembly test without special assertions (f32_cmp.wast:208)"
   ],
   "/wasm/core/f64.wast.js.html": [
+   "#3098 Test that WebAssembly compilation succeeds (wrapper)",
+   "#3099 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#3100 Run a WebAssembly test without special assertions (f64.wast:212)",
    "#3101 Test that WebAssembly compilation succeeds (wrapper)",
    "#3102 Test that WebAssembly instantiation succeeds (wrapper)",
    "#3103 Run a WebAssembly test without special assertions (f64.wast:213)"
@@ -8789,6 +8792,20 @@
   ],
   "/xhr/xhr-timeout-longtask.any.html": [
    "Long tasks should not trigger load timeout"
+  ],
+  "/content-security-policy/gen/top.http-rp/script-src-wildcard/worker-classic.http.html": [
+   "Content Security Policy: Expects allowed for worker-classic to same-http origin and no-redirect redirection from http context."
+  ],
+  "/content-security-policy/gen/top.http-rp/worker-src-none/sharedworker-import.http.html": [
+   "Content Security Policy: Expects blocked for sharedworker-import to same-http origin and swap-origin redirection from http context."
+  ],
+  "/fetch/metadata/generated/svg-image.sub.html": [
+   "sec-fetch-user - Not sent to non-trustworthy cross-site destination no attributes"
+  ],
+  "/wasm/core/simd/simd_i64x2_arith.wast.js.html": [
+   "#773 Test that WebAssembly compilation succeeds (wrapper)",
+   "#774 Test that WebAssembly instantiation succeeds (wrapper)",
+   "#775 Run a WebAssembly test without special assertions (simd_i64x2_arith.wast:647)"
   ]
  },
  "reftests": [

@@ -678,23 +678,10 @@ impl Engine {
             };
             // The bounding box of all fragments for the size.
             let bounds = rects.iter().fold(first, |a, b| a.union(b));
-            // (a box snaps from its block-start edge, the right one where blocks flow leftwards)
-            let flipped = dom
-                .parent(el)
-                .and_then(|p| r.element_style(p))
-                .is_some_and(|s| {
-                    matches!(
-                        s.writing_mode(),
-                        WritingMode::VerticalRl | WritingMode::SidewaysRl
-                    )
-                });
-            let w = if flipped {
-                let from_right = |x: f32| (0.5 - x).floor() as i32;
-                from_right(bounds.x) - from_right(bounds.right())
-            } else {
-                snap(bounds.right()) - snap(bounds.x)
-            };
-            let (w, h) = (w, snap(bounds.bottom()) - snap(bounds.y));
+            // The size is rounded on its own, wherever the box is: two boxes of one width have one
+            // `offsetWidth` (as engines do), where snapping both edges to pixels gave a box at a
+            // fractional position one pixel more or less.
+            let (w, h) = (snap(bounds.width), snap(bounds.height));
             let doc = dom.node_document(el);
             if dom.is_html_element_named(el, &local_name!("body"))
                 || Some(el) == dom.document_element(doc)

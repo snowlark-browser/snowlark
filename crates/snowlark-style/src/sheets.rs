@@ -695,3 +695,58 @@ pub fn font_face_descriptor(name: &str, value: &str, base_url: &Url) -> Option<S
 
 /// A handler for the `@font-face` rules of each sheet added to an engine.
 pub type FontFaceHandler = StdArc<dyn Fn(&FontFace) + Send + Sync>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use style::error_reporting::{ContextualParseError, ParseErrorReporter};
+
+    struct Collect(RefCell<Vec<String>>);
+
+    impl ParseErrorReporter for Collect {
+        fn report_error(
+            &self,
+            _url: &UrlExtraData,
+            location: SourceLocation,
+            error: ContextualParseError,
+        ) {
+            self.0
+                .borrow_mut()
+                .push(format!("line {}: {error}", location.line + 1));
+        }
+    }
+
+    /// Every rule and declaration of the user-agent sheets parses: an internal property or value
+    /// the style engine renames or drops would otherwise be skipped without a word, and the
+    /// rendering it carries (the top layer, inertness, table borders) lost with it.
+    #[test]
+    fn ua_sheets_parse_without_errors() {
+        crate::prefs::init();
+        for (name, css) in [("ua.css", UA_CSS), ("quirks.css", QUIRKS_CSS)] {
+            let errors = Collect(RefCell::new(Vec::new()));
+            let lock = SharedRwLock::new();
+            let media = Arc::new(lock.wrap(MediaList::empty()));
+            Stylesheet::from_str(
+                css,
+                UrlExtraData::from(ua_url().clone()),
+                Origin::UserAgent,
+                media,
+                lock,
+                None,
+                Some(&errors),
+                QuirksMode::NoQuirks,
+                AllowImportRules::No,
+            );
+            // HTML §15.3.4's ruby rules stay in the sheet as the spec writes them; the style engine
+            // has no ruby display types outside Gecko, so those two declarations are dropped.
+            let errors: Vec<String> = errors
+                .0
+                .into_inner()
+                .into_iter()
+                .filter(|e| !e.contains("'display: ruby;'") && !e.contains("'display: ruby-text;'"))
+                .collect();
+            assert!(errors.is_empty(), "{name}:\n{}", errors.join("\n"));
+        }
+    }
+}

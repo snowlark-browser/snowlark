@@ -25,7 +25,7 @@ use style::context::{
     StyleContext, ThreadLocalStyleContext,
 };
 use style::data::ElementStyles;
-use style::device::servo::FontMetricsProvider;
+use style::device::servo::{FontMetricsProvider, MediaData};
 use style::device::Device;
 use style::dom::{TElement, TNode};
 use style::font_metrics::FontMetrics;
@@ -223,7 +223,7 @@ fn same_font_metrics(
 fn seed_root(device: &Device, root: &Arc<ComputedValues>) {
     device.set_root_style(root);
     let zoom = root.effective_zoom;
-    let size = root.get_font().clone_font_size().computed_size();
+    let size = root.get_font().font_size.computed_size();
     device.set_root_font_size(zoom.unzoom(size.px()));
     let line_height = device
         .calc_line_height(root.get_font(), root.writing_mode, None)
@@ -238,23 +238,27 @@ fn make_device(config: &DeviceConfig, quirks_mode: QuirksMode, page: ColorScheme
     let viewport = euclid::Size2D::new(config.viewport.0, config.viewport.1);
     let screen = config.screen.unwrap_or(config.viewport);
     let mut device = Device::new(
-        media_type(config.media),
-        quirks_mode,
-        viewport,
-        euclid::Size2D::new(
-            screen.0 * config.device_pixel_ratio,
-            screen.1 * config.device_pixel_ratio,
-        ),
-        euclid::Scale::new(config.device_pixel_ratio),
+        ComputedValues::initial_values_with_font_override(Font::initial_values()),
         Box::new(Metrics {
             proportional: config.default_font_size,
             monospace: config.default_monospace_font_size,
             external: config.font_metrics.clone(),
         }),
-        ComputedValues::initial_values_with_font_override(Font::initial_values()),
-        prefers_color_scheme(config.color_scheme),
-        config.input.primary_pointer(),
-        config.input.all_pointers(),
+        // `env(-moz-submit-string)`, which only chrome style sheets can use.
+        Box::from(""),
+        MediaData {
+            media_type: media_type(config.media),
+            viewport_size: viewport,
+            device_size: euclid::Size2D::new(
+                screen.0 * config.device_pixel_ratio,
+                screen.1 * config.device_pixel_ratio,
+            ),
+            device_pixel_ratio: euclid::Scale::new(config.device_pixel_ratio),
+            quirks_mode,
+            prefers_color_scheme: prefers_color_scheme(config.color_scheme),
+            primary_pointer_capabilities: config.input.primary_pointer(),
+            all_pointer_capabilities: config.input.all_pointers(),
+        },
     );
     device.set_page_color_scheme(page);
     device.set_scripting_enabled(config.scripting);
@@ -1657,7 +1661,6 @@ impl StyleEngine {
             }
             let list = self.shadow_sheets.entry(root).or_default();
             let mut styles = ShadowStyles::new();
-            let custom_media = Default::default();
             for sheet in list
                 .tree
                 .iter()
@@ -1666,7 +1669,7 @@ impl StyleEngine {
             {
                 styles
                     .stylesheets
-                    .append_stylesheet(None, &custom_media, sheet.0.clone(), &guard);
+                    .append_stylesheet(sheet.0.clone(), &guard);
             }
             styles.flush(&mut self.stylist, &guard);
             self.shadows.insert(root, styles);
@@ -2978,10 +2981,9 @@ impl StyleEngine {
         let invalidator = RelativeSelectorInvalidator {
             element: view.element(element),
             quirks_mode: self.stylist.quirks_mode(),
-            snapshot_table: None,
+            snapshots: None,
             invalidated: relative_invalidated,
             sibling_traversal_map: SiblingTraversalMap::default(),
-            _marker: std::marker::PhantomData,
         };
         invalidator.invalidate_relative_selectors_for_dom_mutation(
             true,
@@ -3085,10 +3087,9 @@ impl StyleEngine {
             let invalidator = RelativeSelectorInvalidator {
                 element: view.element(target),
                 quirks_mode: self.stylist.quirks_mode(),
-                snapshot_table: None,
+                snapshots: None,
                 invalidated: relative_invalidated,
                 sibling_traversal_map: SiblingTraversalMap::default(),
-                _marker: std::marker::PhantomData,
             };
             invalidator.invalidate_relative_selectors_for_this(
                 &self.stylist,
@@ -3143,10 +3144,9 @@ impl StyleEngine {
         let invalidator = RelativeSelectorInvalidator {
             element,
             quirks_mode: self.stylist.quirks_mode(),
-            snapshot_table: None,
+            snapshots: None,
             invalidated: relative_invalidated,
             sibling_traversal_map: map,
-            _marker: std::marker::PhantomData,
         };
         invalidator.invalidate_relative_selectors_for_dom_mutation(
             false,
@@ -3197,7 +3197,8 @@ impl StyleEngine {
     /// restyle time, when the snapshots are complete). The relative selector invalidation map's
     /// dependencies on what changed decide which anchors are restyled.
     fn invalidate_relative_selectors_for_snapshots<'v>(&self, view: &'v TreeView<'v>) {
-        use style::invalidation::element::element_wrapper::ElementSnapshot;
+        use style::invalidation::element::element_wrapper::{ElementSnapshot, Snapshots};
+        let snapshots = Snapshots::new(&self.snapshots);
         for (node, snapshot) in self.snapshots.iter() {
             let Some(id) = node_from_opaque(*node) else {
                 continue;
@@ -3243,10 +3244,9 @@ impl StyleEngine {
             let invalidator = RelativeSelectorInvalidator {
                 element,
                 quirks_mode: self.stylist.quirks_mode(),
-                snapshot_table: Some(&self.snapshots),
+                snapshots: Some(&snapshots),
                 invalidated: relative_invalidated,
                 sibling_traversal_map: SiblingTraversalMap::default(),
-                _marker: std::marker::PhantomData,
             };
             invalidator.invalidate_relative_selectors_for_this(
                 &self.stylist,
@@ -4747,6 +4747,7 @@ impl StyleEngine {
         }
         let style = self.guards_and_view(dom, data, |shared, view| {
             let e = view.element(element);
+            let animations = style::properties::AnimationDeclarations::default();
             let mut declarations = ApplicableDeclarationList::new();
             let mut caches = SelectorCaches::default();
             let mut context = MatchingContext::<SelectorImpl>::new(
@@ -4763,7 +4764,7 @@ impl StyleEngine {
                 Some(pseudo),
                 inline.as_ref().map(|b| b.borrow_arc()),
                 None,
-                Default::default(),
+                &animations,
                 RuleInclusion::All,
                 &mut declarations,
                 &mut context,
@@ -4834,11 +4835,7 @@ impl StyleEngine {
         dom.descendants(root)
             .filter(|&n| dom.is_element(n) && data.slot(n).is_some())
             .filter(|&n| {
-                selectors::matching::matches_selector_list(
-                    selectors,
-                    &view.element(n),
-                    &mut context,
-                )
+                selectors::matching::matches_selector_list(selectors, view.element(n), &mut context)
             })
             .collect()
     }

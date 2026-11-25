@@ -16349,90 +16349,6 @@ pub(crate) fn attr_prop_dash__webkit_writing_mode_set<D: Dom, const LO: u16, con
     rt::check(scope, r);
 }
 
-/// Getter of `[CEReactions, SnowlarkCssProperty=-x-text-scale] attribute CSSOMString XTextScale;`.
-pub(crate) fn attr_prop_upper_x_text_scale_get<D: Dom, const LO: u16, const HI: u16>(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
-    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.XTextScale");
-    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
-    let this = unsafe { rt::receiver(&args.this()) };
-    let st = rt::state(scope);
-    let dom = st.engine::<D>();
-    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-x-text-scale");
-    let Some(js) = v.to_js(scope) else { return };
-    rv.set(js);
-}
-
-/// Setter of `[CEReactions, SnowlarkCssProperty=-x-text-scale] attribute CSSOMString XTextScale;`.
-pub(crate) fn attr_prop_upper_x_text_scale_set<D: Dom, const LO: u16, const HI: u16>(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
-    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.XTextScale");
-    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
-    let this = unsafe { rt::receiver(&args.this()) };
-    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
-        return;
-    };
-    let st = rt::state(scope);
-    let dom = st.engine::<D>();
-    <D as rt::Host>::push_ce_reactions(dom);
-    let r = {
-        let mut cx = Cx::new(scope);
-        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "-x-text-scale", &value)
-    };
-    {
-        let mut cx = Cx::new(scope);
-        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
-    }
-    rt::check(scope, r);
-}
-
-/// Getter of `[CEReactions, SnowlarkCssProperty=-x-text-scale] attribute CSSOMString -x-text-scale;`.
-pub(crate) fn attr_prop_dash__x_text_scale_get<D: Dom, const LO: u16, const HI: u16>(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
-    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.-x-text-scale");
-    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
-    let this = unsafe { rt::receiver(&args.this()) };
-    let st = rt::state(scope);
-    let dom = st.engine::<D>();
-    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "-x-text-scale");
-    let Some(js) = v.to_js(scope) else { return };
-    rv.set(js);
-}
-
-/// Setter of `[CEReactions, SnowlarkCssProperty=-x-text-scale] attribute CSSOMString -x-text-scale;`.
-pub(crate) fn attr_prop_dash__x_text_scale_set<D: Dom, const LO: u16, const HI: u16>(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
-    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.-x-text-scale");
-    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
-    let this = unsafe { rt::receiver(&args.this()) };
-    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
-        return;
-    };
-    let st = rt::state(scope);
-    let dom = st.engine::<D>();
-    <D as rt::Host>::push_ce_reactions(dom);
-    let r = {
-        let mut cx = Cx::new(scope);
-        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "-x-text-scale", &value)
-    };
-    {
-        let mut cx = Cx::new(scope);
-        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
-    }
-    rt::check(scope, r);
-}
-
 /// Getter of `[CEReactions, SnowlarkCssProperty=accent-color] attribute CSSOMString accentColor;`.
 pub(crate) fn attr_prop_accent_color_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -30661,6 +30577,90 @@ pub(crate) fn attr_prop_dash_counter_reset_set<D: Dom, const LO: u16, const HI: 
     rt::check(scope, r);
 }
 
+/// Getter of `[CEReactions, SnowlarkCssProperty=counter-set] attribute CSSOMString counterSet;`.
+pub(crate) fn attr_prop_counter_set_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.counterSet");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "counter-set");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=counter-set] attribute CSSOMString counterSet;`.
+pub(crate) fn attr_prop_counter_set_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.counterSet");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "counter-set", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=counter-set] attribute CSSOMString counter-set;`.
+pub(crate) fn attr_prop_dash_counter_set_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.counter-set");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "counter-set");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=counter-set] attribute CSSOMString counter-set;`.
+pub(crate) fn attr_prop_dash_counter_set_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.counter-set");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "counter-set", &value)
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
 /// Getter of `[CEReactions, SnowlarkCssProperty=cursor] attribute CSSOMString cursor;`.
 pub(crate) fn attr_prop_cursor_get<D: Dom, const LO: u16, const HI: u16>(
     scope: &mut v8::PinScope,
@@ -37493,6 +37493,48 @@ pub(crate) fn attr_prop_dash_inset_inline_start_set<D: Dom, const LO: u16, const
             "inset-inline-start",
             &value,
         )
+    };
+    {
+        let mut cx = Cx::new(scope);
+        <D as rt::Host>::pop_ce_reactions(dom, &mut cx);
+    }
+    rt::check(scope, r);
+}
+
+/// Getter of `[CEReactions, SnowlarkCssProperty=interactivity] attribute CSSOMString interactivity;`.
+pub(crate) fn attr_prop_interactivity_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get CSSStyleProperties.interactivity");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as CSSStylePropertiesImpl>::css_property(dom, this, "interactivity");
+    let Some(js) = v.to_js(scope) else { return };
+    rv.set(js);
+}
+
+/// Setter of `[CEReactions, SnowlarkCssProperty=interactivity] attribute CSSOMString interactivity;`.
+pub(crate) fn attr_prop_interactivity_set<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "set CSSStyleProperties.interactivity");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    let Some(value) = rt::to_dom_string_null_empty(scope, args.get(0)) else {
+        return;
+    };
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    <D as rt::Host>::push_ce_reactions(dom);
+    let r = {
+        let mut cx = Cx::new(scope);
+        <D as CSSStylePropertiesImpl>::set_css_property(dom, &mut cx, this, "interactivity", &value)
     };
     {
         let mut cx = Cx::new(scope);
@@ -63849,40 +63891,6 @@ pub(crate) fn template<'s, D: Dom>(
     {
         let g = rt::getter(
             scope,
-            rt::builder(super::css_style_properties::attr_prop_upper_x_text_scale_get::<D, LO, HI>),
-            "XTextScale",
-            Some(sig),
-            None,
-            options,
-        );
-        let s = Some(rt::setter(
-            scope,
-            rt::builder(super::css_style_properties::attr_prop_upper_x_text_scale_set::<D, LO, HI>),
-            "XTextScale",
-            Some(sig),
-        ));
-        rt::accessor(scope, proto, "XTextScale", g, s, false);
-    }
-    {
-        let g = rt::getter(
-            scope,
-            rt::builder(super::css_style_properties::attr_prop_dash__x_text_scale_get::<D, LO, HI>),
-            "-x-text-scale",
-            Some(sig),
-            None,
-            options,
-        );
-        let s = Some(rt::setter(
-            scope,
-            rt::builder(super::css_style_properties::attr_prop_dash__x_text_scale_set::<D, LO, HI>),
-            "-x-text-scale",
-            Some(sig),
-        ));
-        rt::accessor(scope, proto, "-x-text-scale", g, s, false);
-    }
-    {
-        let g = rt::getter(
-            scope,
             rt::builder(super::css_style_properties::attr_prop_accent_color_get::<D, LO, HI>),
             "accentColor",
             Some(sig),
@@ -69898,6 +69906,40 @@ pub(crate) fn template<'s, D: Dom>(
     {
         let g = rt::getter(
             scope,
+            rt::builder(super::css_style_properties::attr_prop_counter_set_get::<D, LO, HI>),
+            "counterSet",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_counter_set_set::<D, LO, HI>),
+            "counterSet",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "counterSet", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_counter_set_get::<D, LO, HI>),
+            "counter-set",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_dash_counter_set_set::<D, LO, HI>),
+            "counter-set",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "counter-set", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
             rt::builder(super::css_style_properties::attr_prop_cursor_get::<D, LO, HI>),
             "cursor",
             Some(sig),
@@ -72710,6 +72752,23 @@ pub(crate) fn template<'s, D: Dom>(
             Some(sig),
         ));
         rt::accessor(scope, proto, "inset-inline-start", g, s, false);
+    }
+    {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_interactivity_get::<D, LO, HI>),
+            "interactivity",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = Some(rt::setter(
+            scope,
+            rt::builder(super::css_style_properties::attr_prop_interactivity_set::<D, LO, HI>),
+            "interactivity",
+            Some(sig),
+        ));
+        rt::accessor(scope, proto, "interactivity", g, s, false);
     }
     {
         let g = rt::getter(

@@ -595,8 +595,8 @@ fn shape_commands(
 ) -> Option<()> {
     use std::fmt::Write;
     use style::values::generics::basic_shape::{
-        ArcSize, ArcSweep, AxisEndPoint, AxisPosition, CommandEndPoint, ControlPoint,
-        ControlReference, GenericShapeCommand as C,
+        ArcSize, ArcSweep, AxisEndPoint, CommandEndPoint, ControlPoint, ControlReference,
+        GenericShapeCommand as C,
     };
     let (w, h) = size;
     // (the end point of a command starting at (x, y))
@@ -617,11 +617,12 @@ fn shape_commands(
             (from.0 + lp(&r.coord.x, w), from.1 + lp(&r.coord.y, h))
         }
     };
-    let axis = |p: &AxisEndPoint<c::LengthPercentage>, at: f32, base: f32| match p {
-        AxisEndPoint::ToPosition(AxisPosition::LengthPercent(l)) => lp(l, base),
-        AxisEndPoint::ToPosition(AxisPosition::Keyword(k)) => k.as_percentage().0 * base,
-        AxisEndPoint::ByCoordinate(l) => at + lp(l, base),
-    };
+    // (an absolute position's keyword has computed to its percentage)
+    let axis =
+        |p: &AxisEndPoint<c::LengthPercentage, c::LengthPercentage>, at: f32, base: f32| match p {
+            AxisEndPoint::ToPosition(l) => lp(l, base),
+            AxisEndPoint::ByCoordinate(l) => at + lp(l, base),
+        };
     let (mut x, mut y) = (0.0f32, 0.0f32);
     let (mut sx, mut sy) = (0.0f32, 0.0f32);
     for cmd in s.commands.iter() {

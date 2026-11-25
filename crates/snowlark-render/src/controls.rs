@@ -589,7 +589,7 @@ pub fn control(
     });
     Some(Control {
         editing,
-        native: values.get_box().clone_appearance() != Appearance::None,
+        native: values.get_box().appearance != Appearance::None,
         disabled: is_disabled(dom, el),
         readonly: readonly_applies && dom.get_attribute(el, "readonly").is_some(),
         placeholder_color,

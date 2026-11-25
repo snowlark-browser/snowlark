@@ -1131,8 +1131,8 @@ impl SvgQuery<'_> {
 /// and [`PathData::to_bezpath`] reflects their control points, §9.5.2.)
 pub(crate) fn path_data_of(d: &SVGPathData) -> PathData {
     use style::values::generics::basic_shape::{
-        ArcSize, ArcSweep, AxisEndPoint, AxisPosition, CommandEndPoint, ControlPoint,
-        ControlReference, GenericShapeCommand as C,
+        ArcSize, ArcSweep, AxisEndPoint, CommandEndPoint, ControlPoint, ControlReference,
+        GenericShapeCommand as C,
     };
     use style::values::generics::Optional;
     use style::values::specified::svg_path::SVGPathPosition;
@@ -1153,10 +1153,8 @@ pub(crate) fn path_data_of(d: &SVGPathData) -> PathData {
             (base.0 + r.coord.x as f64, base.1 + r.coord.y as f64)
         }
     };
-    // (path data has no keywords: the parser makes none)
-    let axis = |a: &AxisEndPoint<f32>, cur: f64| match a {
-        AxisEndPoint::ToPosition(AxisPosition::LengthPercent(v)) => *v as f64,
-        AxisEndPoint::ToPosition(AxisPosition::Keyword(_)) => cur,
+    let axis = |a: &AxisEndPoint<f32, f32>, cur: f64| match a {
+        AxisEndPoint::ToPosition(v) => *v as f64,
         AxisEndPoint::ByCoordinate(v) => cur + *v as f64,
     };
     let mut out = PathData {

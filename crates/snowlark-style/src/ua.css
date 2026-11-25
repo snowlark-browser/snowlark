@@ -131,7 +131,7 @@ dialog:popover-open {
 /* CSS Position 4 §4.1: in the top layer, a position other than absolute or fixed computes to
    absolute (stylo's top layer adjustment, keyed on its internal -servo-top-layer). */
 dialog:modal, :popover-open {
-  -servo-top-layer: top !important;
+  -servo-top-layer: auto !important;
 }
 
 /* Fullscreen API §5 "user agent level style sheet defaults". */
@@ -149,7 +149,7 @@ dialog:modal, :popover-open {
   transform: none !important;
   /* intentionally not !important */
   object-fit: contain;
-  -servo-top-layer: top !important;
+  -servo-top-layer: auto !important;
 }
 
 iframe:fullscreen {

@@ -32,7 +32,7 @@ lto = false
 # vendor/html5ever/SNOWLARK-PATCHES.md.
 [patch.crates-io]
 html5ever = { path = "vendor/html5ever" }
-# stylo 0.22.0 with @container enabled for the servo build. See vendor/stylo/SNOWLARK-PATCHES.md.
+# stylo 0.24.0 with @container enabled for the servo build. See vendor/stylo/SNOWLARK-PATCHES.md.
 stylo = { path = "vendor/stylo" }
 # taffy 0.16.0 with flex and grid layout fixes. See vendor/taffy/SNOWLARK-PATCHES.md.
 taffy = { path = "vendor/taffy" }

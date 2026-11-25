@@ -12,11 +12,11 @@ snowlark-style = { path = "../snowlark-style" }
 snowlark-layout = { path = "../snowlark-layout" }
 snowlark-paint = { path = "../snowlark-paint" }
 snowlark-net = { path = "../snowlark-net" }
-stylo = "0.22"
-stylo_atoms = "0.22"
-servo_arc = "0.5"
+stylo = "0.24"
+stylo_atoms = "0.24"
+servo_arc = "0.6"
 cssparser = "0.38"
-stylo_traits = "0.22"
+stylo_traits = "0.24"
 euclid = "0.22"
 app_units = "0.7"
 url = "2.5"

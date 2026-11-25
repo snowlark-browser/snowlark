@@ -107,7 +107,6 @@
 -webkit-user-drag
 -webkit-user-select
 -webkit-writing-mode
--x-text-scale
 accent-color
 align-content
 align-items
@@ -268,6 +267,7 @@ corner-top-right-shape
 corner-top-shape
 counter-increment
 counter-reset
+counter-set
 cursor
 cx
 cy
@@ -352,6 +352,7 @@ inset-block-start
 inset-inline
 inset-inline-end
 inset-inline-start
+interactivity
 interpolate-size
 isolation
 justify-content

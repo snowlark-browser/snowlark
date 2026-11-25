@@ -11,7 +11,7 @@
 use std::borrow::Borrow;
 use std::fmt;
 
-use cssparser::{CowRcStr, ParseError, ToCss};
+use cssparser::{ParseError, ToCss};
 use precomputed_hash::PrecomputedHash;
 use selectors::attr::{AttrSelectorOperation, CaseSensitivity, NamespaceConstraint};
 use selectors::bloom::BloomFilter;
@@ -344,10 +344,10 @@ impl<'i> selectors::Parser<'i> for SelectorParser {
 
     fn parse_non_ts_pseudo_class(
         &self,
-        name: CowRcStr<'i>,
+        name: &str,
     ) -> Result<PseudoClass, ParseError<Self::Error>> {
         let pc = match_ignore_ascii_case(
-            &name,
+            name,
             &[
                 ("any-link", PseudoClass::AnyLink),
                 ("link", PseudoClass::Link),
@@ -387,7 +387,7 @@ impl<'i> selectors::Parser<'i> for SelectorParser {
         pc.or_else(|| {
             SCROLLBAR_PSEUDO_CLASSES
                 .iter()
-                .find(|n| n.eq_ignore_ascii_case(&name))
+                .find(|n| n.eq_ignore_ascii_case(name))
                 .map(|n| PseudoClass::Scrollbar(n))
         })
         .ok_or_else(unsupported)
@@ -395,7 +395,7 @@ impl<'i> selectors::Parser<'i> for SelectorParser {
 
     fn parse_non_ts_functional_pseudo_class(
         &self,
-        name: CowRcStr<'i>,
+        name: &str,
         parser: &mut cssparser::Parser<'i>,
         _after_part: bool,
     ) -> Result<PseudoClass, ParseError<Self::Error>> {
@@ -418,10 +418,7 @@ impl<'i> selectors::Parser<'i> for SelectorParser {
         Err(unsupported())
     }
 
-    fn parse_pseudo_element(
-        &self,
-        name: CowRcStr<'i>,
-    ) -> Result<PseudoElement, ParseError<Self::Error>> {
+    fn parse_pseudo_element(&self, name: &str) -> Result<PseudoElement, ParseError<Self::Error>> {
         const KNOWN: &[&str] = &[
             "before",
             "after",
@@ -452,7 +449,7 @@ impl<'i> selectors::Parser<'i> for SelectorParser {
 
     fn parse_functional_pseudo_element(
         &self,
-        name: CowRcStr<'i>,
+        name: &str,
         arguments: &mut cssparser::Parser<'i>,
     ) -> Result<PseudoElement, ParseError<Self::Error>> {
         let lower = name.to_ascii_lowercase();
@@ -1038,7 +1035,7 @@ impl Engine {
                 engine: self,
                 id: d,
             };
-            if matches_selector_list(list, &e, &mut cx) && !f(d) {
+            if matches_selector_list(list, e, &mut cx) && !f(d) {
                 return;
             }
         }

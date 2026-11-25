@@ -219,7 +219,7 @@ pub fn supports_condition(text: &str) -> bool {
     use style::stylesheets::supports_rule::parse_condition_or_declaration;
     crate::prefs::init();
     let url = UrlExtraData::from(Url::parse("about:blank").expect("valid URL"));
-    let context = ParserContext::new(
+    let mut context = ParserContext::new(
         Origin::Author,
         &url,
         Some(CssRuleType::Style),
@@ -232,7 +232,7 @@ pub fn supports_condition(text: &str) -> bool {
     );
     let mut parser = cssparser::Parser::new(text);
     match parser.parse_entirely(parse_condition_or_declaration) {
-        Ok(condition) => condition.eval(&context),
+        Ok(condition) => condition.eval(&mut context),
         Err(_) => false,
     }
 }
@@ -400,6 +400,21 @@ mod tests {
         assert_eq!(b.property_value("font"), "");
     }
 
+    /// CSS Fonts 4 §2.1.3: a family name spelled as a generic keyword keeps its quotes, so it
+    /// does not read back as the keyword; the keyword written unquoted serializes as itself.
+    #[test]
+    fn generic_keywords_keep_their_quotes_only_when_quoted() {
+        let family = |s: &str| {
+            DeclarationBlock::parse(&format!("font-family: {s}"), &base())
+                .property_value("font-family")
+        };
+        for k in ["math", "emoji", "fangsong", "ui-rounded"] {
+            assert_eq!(family(k), k);
+            assert_eq!(family(&format!("\"{k}\"")), format!("\"{k}\""));
+        }
+        assert_eq!(family("'Twisty Tie'"), "Twisty Tie");
+    }
+
     #[test]
     fn font_variant_caps_synthesis_and_system_fonts() {
         let parse = |s: &str| DeclarationBlock::parse(s, &base());
@@ -516,6 +531,30 @@ mod tests {
         ));
         assert!(supports_condition("display: block"));
         assert!(!supports_condition("(display: bogus)"));
+    }
+
+    /// CSS Values 5 §7.7: an `attr()` whose arguments hold no other substitution function is checked
+    /// against `<attr-name> <attr-type>?` when it is parsed; an identifier that names no unit still
+    /// matches `<attr-unit>` there.
+    #[test]
+    fn attr_arguments_are_checked_at_parse_time() {
+        assert!(supports_declaration("width", "attr(data-foo, 10px)"));
+        assert!(supports_declaration("width", "attr(data-foo px, 10px)"));
+        assert!(supports_declaration(
+            "width",
+            "attr(data-foo type(<length>), 10px)"
+        ));
+        assert!(supports_declaration("width", "attr(data-foo xx, 3px)"));
+        assert!(supports_declaration("width", "attr(var(--x), 3px)"));
+        assert!(!supports_declaration(
+            "width",
+            "attr(data-foo type(invalid |), 10px)"
+        ));
+        assert!(!supports_declaration("width", "attr(data-foo &, 3px)"));
+        assert!(!supports_declaration(
+            "font-size",
+            "attr(data-foo type(<number>) | <length>, 30px)"
+        ));
     }
 
     #[test]

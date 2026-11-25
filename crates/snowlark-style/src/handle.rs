@@ -41,7 +41,7 @@ use style::context::{QuirksMode, SharedStyleContext};
 use style::data::{ElementDataMut, ElementDataRef};
 use style::dom::{LayoutIterator, NodeInfo, OpaqueNode, TDocument, TElement, TNode, TShadowRoot};
 use style::properties::PropertyDeclarationBlock;
-use style::rule_tree::{CascadeLevel, CascadeOrigin};
+use style::rule_tree::{CascadeLevel, CascadeOrigin, StyleSourceBorrow};
 use style::selector_parser::{AttrValue, Lang, NonTSPseudoClass, PseudoElement, SelectorImpl};
 use style::shared_lock::{Locked, SharedRwLock};
 use style::stylesheets::layer_rule::LayerOrder;
@@ -330,7 +330,7 @@ pub(crate) fn opaque_node(id: NodeId) -> OpaqueNode {
 #[inline]
 pub(crate) fn opaque_element(id: NodeId) -> OpaqueElement {
     let ptr = std::ptr::without_provenance_mut::<()>(id.to_bits() as usize);
-    OpaqueElement::from_non_null_ptr(NonNull::new(ptr).expect("node ids are never zero"))
+    OpaqueElement::from_ptr(NonNull::new(ptr).expect("node ids are never zero"))
 }
 
 /// Inverse of [`opaque_node`].
@@ -1038,6 +1038,10 @@ impl<'a> TElement for StyleElement<'a> {
         self.view().animating
     }
 
+    /// Nothing to record: `may_have_animations` answers for the whole tree from whether any animation
+    /// set existed when this restyle began, and the next restyle sees the set stored now.
+    fn set_may_have_animations(&self) {}
+
     fn has_animations(&self, context: &SharedStyleContext) -> bool {
         self.view().animating && {
             let key = AnimationSetKey::new_for_non_pseudo(opaque_node(self.node_id()));
@@ -1112,16 +1116,18 @@ impl<'a> TElement for StyleElement<'a> {
         self.dom().body(self.view().document) == Some(self.node_id())
     }
 
-    fn synthesize_presentational_hints_for_legacy_attributes<V>(
+    fn synthesize_presentational_hints_for_legacy_attributes<'b, V>(
         &self,
         _visited_handling: VisitedHandlingMode,
         hints: &mut V,
     ) where
-        V: Push<ApplicableDeclarationBlock>,
+        V: Push<ApplicableDeclarationBlock<'b>>,
+        Self: 'b,
     {
-        if let Some(block) = &self.slot().attrs.hints {
+        let slot: &'b Slot = self.slot();
+        if let Some(block) = &slot.attrs.hints {
             hints.push(ApplicableDeclarationBlock::from_declarations(
-                block.clone(),
+                StyleSourceBorrow::from_declarations(block.borrow_arc()),
                 CascadeLevel::new(CascadeOrigin::PresHints),
                 LayerOrder::root(),
             ));

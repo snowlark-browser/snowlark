@@ -3024,3 +3024,23 @@ fn an_inline_button_is_not_an_inline_box() {
     );
     assert_eq!(r, "50,true,0,0");
 }
+
+/// CSSOM View §7 `offsetWidth` and `offsetHeight`: the border box's size, rounded on its own, so
+/// two boxes of one size have one offset size wherever they are (two boxes 100.3px wide side by
+/// side: the second's edges round to 108 and 209).
+#[test]
+fn offset_sizes_round_the_size_not_the_edges() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><body style='margin:8px'><div style='font-size:0'>\
+         <span id=a style='display:inline-block;width:100.3px;height:20.3px'></span>\
+         <span id=b style='display:inline-block;width:100.3px;height:20.3px;vertical-align:top;\
+         position:relative;top:0.4px'></span></div>",
+    );
+    let r = eval(
+        &mut page,
+        "[a.offsetWidth, a.offsetHeight, b.offsetWidth, b.offsetHeight, b.offsetLeft].join()",
+    );
+    assert_eq!(r, "100,20,100,20,108");
+}

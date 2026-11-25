@@ -203,7 +203,7 @@ impl RenderStyle {
     /// and paint containment.
     fn content_visibility_contains(&self) -> bool {
         use style::values::computed::ContentVisibility;
-        self.values.get_box().clone_content_visibility() != ContentVisibility::Visible
+        self.values.get_box().content_visibility != ContentVisibility::Visible
     }
 
     /// A handle without generated content.
@@ -233,7 +233,7 @@ impl RenderStyle {
     /// container (`container-type: size` both, `inline-size` the inline axis), if it is one.
     pub fn query_container_axes(&self) -> Option<(bool, bool)> {
         use style::values::computed::ContainerType;
-        let t = self.values.get_box().clone_container_type();
+        let t = self.values.get_box().container_type;
         let horizontal = self.values.writing_mode.is_horizontal();
         if t.contains(ContainerType::SIZE) {
             Some((true, true))
@@ -751,16 +751,17 @@ pub(crate) fn to_color(color: &style::color::AbsoluteColor) -> Color {
 }
 
 /// The commands of `path()` or `shape()`, which differ in how they spell positions, lengths and
-/// angles.
+/// angles. An absolute `hline`/`vline` position is a length too: `shape()`'s keywords compute to
+/// percentages.
 fn path_commands<A, P, L>(
-    commands: &[style::values::generics::basic_shape::GenericShapeCommand<A, P, L>],
+    commands: &[style::values::generics::basic_shape::GenericShapeCommand<A, L, P, L>],
     position: &dyn Fn(&P) -> (ls::LengthPercentage, ls::LengthPercentage),
     length: &dyn Fn(&L) -> ls::LengthPercentage,
     angle: &dyn Fn(&A) -> f32,
 ) -> Vec<ls::PathCommand> {
     use style::values::generics::basic_shape::{
-        ArcSize, ArcSweep, AxisEndPoint, AxisPosition, AxisPositionKeyword as K, CommandEndPoint,
-        ControlPoint, ControlReference, GenericShapeCommand as S,
+        ArcSize, ArcSweep, AxisEndPoint, CommandEndPoint, ControlPoint, ControlReference,
+        GenericShapeCommand as S,
     };
     let end = |p: &CommandEndPoint<P, L>| match p {
         CommandEndPoint::ToPosition(p) => {
@@ -796,20 +797,9 @@ fn path_commands<A, P, L>(
             },
         },
     };
-    let axis = |p: &AxisEndPoint<L>| match p {
+    let axis = |p: &AxisEndPoint<L, L>| match p {
         AxisEndPoint::ByCoordinate(v) => (length(v), true),
-        AxisEndPoint::ToPosition(AxisPosition::LengthPercent(v)) => (length(v), false),
-        AxisEndPoint::ToPosition(AxisPosition::Keyword(k)) => (
-            ls::LengthPercentage::linear(
-                0.0,
-                Some(match k {
-                    K::Center => 0.5,
-                    K::Left | K::Top | K::XStart | K::YStart => 0.0,
-                    K::Right | K::Bottom | K::XEnd | K::YEnd => 1.0,
-                }),
-            ),
-            false,
-        ),
+        AxisEndPoint::ToPosition(v) => (length(v), false),
     };
     commands
         .iter()
@@ -1637,20 +1627,13 @@ impl ls::Style for RenderStyle {
 
     fn layout_containment(&self) -> bool {
         use style::values::computed::Contain;
-        self.values
-            .get_box()
-            .clone_contain()
-            .contains(Contain::LAYOUT)
+        self.values.get_box().contain.contains(Contain::LAYOUT)
             || self.content_visibility_contains()
     }
 
     fn paint_containment(&self) -> bool {
         use style::values::computed::Contain;
-        self.values
-            .get_box()
-            .clone_contain()
-            .contains(Contain::PAINT)
-            || self.content_visibility_contains()
+        self.values.get_box().contain.contains(Contain::PAINT) || self.content_visibility_contains()
     }
 
     fn intrinsic_size_auto(&self) -> (bool, bool) {
@@ -1665,14 +1648,14 @@ impl ls::Style for RenderStyle {
 
     fn contents_skipped(&self) -> bool {
         use style::values::computed::ContentVisibility;
-        self.values.get_box().clone_content_visibility() == ContentVisibility::Hidden
+        self.values.get_box().content_visibility == ContentVisibility::Hidden
     }
 
     fn phys_size_containment(&self) -> ls::SizeContainment {
         use style::values::computed::{Contain, ContainerType};
         let b = self.values.get_box();
-        let contain = b.clone_contain();
-        let container = b.clone_container_type();
+        let contain = b.contain;
+        let container = b.container_type;
         // CSS Contain 3 §2: `container-type: size` applies size containment, `inline-size`
         // inline-size containment.
         // (CSS Contain 2 section 4: `content-visibility: hidden` also applies size containment)
@@ -2465,6 +2448,7 @@ impl ls::Style for RenderStyle {
             T::Preserve => ls::WhiteSpaceCollapse::Preserve,
             T::PreserveBreaks => ls::WhiteSpaceCollapse::PreserveBreaks,
             T::BreakSpaces => ls::WhiteSpaceCollapse::BreakSpaces,
+            T::PreserveSpaces => ls::WhiteSpaceCollapse::PreserveSpaces,
         }
     }
 
@@ -3163,14 +3147,14 @@ impl ls::Style for RenderStyle {
 
     fn native_appearance(&self) -> bool {
         use style::values::specified::box_::Appearance;
-        self.values.get_box().clone_appearance() != Appearance::None
+        self.values.get_box().appearance != Appearance::None
     }
 
     fn author_border_background(&self) -> bool {
         use style::computed_value_flags::ComputedValueFlags;
         self.values
             .flags
-            .contains(ComputedValueFlags::HAS_AUTHOR_SPECIFIED_BORDER_BACKGROUND)
+            .contains(ComputedValueFlags::HAS_AUTHOR_OR_USER_SPECIFIED_BORDER_BACKGROUND)
     }
 
     fn box_shadow_count(&self) -> usize {
@@ -3354,7 +3338,7 @@ impl ls::Style for RenderStyle {
 
     fn resize(&self) -> ls::Resize {
         use style::values::computed::Resize as R;
-        match self.values.get_box().clone_resize() {
+        match self.values.get_box().resize {
             R::None => ls::Resize::None,
             R::Both => ls::Resize::Both,
             R::Horizontal => ls::Resize::Horizontal,

@@ -904,6 +904,29 @@ fn inline_block_baseline_and_vertical_align() {
     assert_eq!(rect(&f, p).height, 30.0);
 }
 
+/// CSS 2 §10.8: a top- or bottom-aligned box inside a top-aligned one is not part of that box's
+/// aligned subtree: it is aligned with the line box on its own, and enlarges the line.
+#[test]
+fn nested_top_and_bottom_aligned_boxes_align_with_the_line_box() {
+    let mut t = T::new();
+    let r0 = t.root();
+    let p = t.doc.block(r0, |_| {});
+    t.doc.text(p, "x");
+    let top = t.doc.span(p, |s| s.vertical_align = VerticalAlign::Top);
+    let a = t.doc.text(top, "a");
+    let bottom = t.doc.span(top, |s| {
+        s.vertical_align = VerticalAlign::Bottom;
+        s.line_height = LineHeight::Length(40.0);
+    });
+    let b = t.doc.text(bottom, "b");
+    let f = t.run(200.0, 200.0);
+    // The 40px tall bottom-aligned subtree sets the line's height; its text is centred in it
+    // (half-leading 15), and the top-aligned box's text stays at the top.
+    assert_eq!(rect(&f, p).height, 40.0);
+    assert_eq!(texts(&f, b)[0].y, 15.0);
+    assert_eq!(texts(&f, a)[0].y, 0.0);
+}
+
 #[test]
 fn line_height_and_inline_box_edges() {
     let mut t = T::new();

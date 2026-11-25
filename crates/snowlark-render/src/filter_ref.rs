@@ -251,13 +251,14 @@ fn primitive_style(values: Option<&ComputedValues>) -> PrimitiveStyle {
         };
     };
     use style::properties::longhands::color_interpolation_filters::computed_value::T as Space;
-    let mut flood = crate::adapter::to_color(&v.resolve_color(&v.clone_flood_color()));
-    flood.a = (flood.a as f32 * v.clone_flood_opacity().clamp(0.0, 1.0)).round() as u8;
+    let svg = v.get_svg();
+    let mut flood = crate::adapter::to_color(&v.resolve_color(&svg.flood_color));
+    flood.a = (flood.a as f32 * svg.flood_opacity.clamp(0.0, 1.0)).round() as u8;
     PrimitiveStyle {
         flood,
-        lighting: crate::adapter::to_color(&v.resolve_color(&v.clone_lighting_color())),
+        lighting: crate::adapter::to_color(&v.resolve_color(&svg.lighting_color)),
         // (`auto` takes sRGB)
-        linear_rgb: v.clone_color_interpolation_filters() == Space::Linearrgb,
+        linear_rgb: v.get_inherited_svg().color_interpolation_filters == Space::Linearrgb,
     }
 }
 

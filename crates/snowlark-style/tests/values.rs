@@ -443,7 +443,13 @@ fn font_face_descriptors_parse_and_serialize() {
     assert_eq!(d("unicode-range", "U+0-7F").as_deref(), Some("U+0-7F"));
     assert_eq!(d("font-display", "swap").as_deref(), Some("swap"));
     assert_eq!(d("font-display", "later"), None);
-    assert_eq!(d("font-family", "'A b'").as_deref(), Some("\"A b\""));
+    assert_eq!(d("font-family", "'A b'").as_deref(), Some("A b"));
+    // A name that is not a sequence of identifiers, or is a keyword, keeps its quotes.
+    assert_eq!(
+        d("font-family", "'21st Century'").as_deref(),
+        Some("\"21st Century\"")
+    );
+    assert_eq!(d("font-family", "\"serif\"").as_deref(), Some("\"serif\""));
     let face = snowlark_style::parse_font_face(
         "font-family: Foo; src: local(Bar); font-style: italic",
         &base,
