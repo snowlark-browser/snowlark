@@ -197,7 +197,14 @@ stages: `docs/password-manager.md`.
 WebGL runs on ANGLE (OpenGL ES over Direct3D 11) behind a command protocol that can cross a process boundary, in
 four stages from a WebGL 1 context to conformance and WebGL 2: `docs/webgl.md`.
 
-Planned after the Windows build is complete: **Linux, then macOS**. Snowlark runs only on Windows today; the
-platform parts (painting and text, GPU compositing, media decoding, the window and input, the process sandbox, the OS
-calls in `snowlark-shell`) each need a Linux and a macOS counterpart behind the same interfaces, so that the engine
-crates stay platform-free. A design document that lists those parts and the order to port them comes first.
+## Linux, then macOS
+
+Snowlark runs only on Windows today. The platform parts (painting and text, GPU compositing, media decoding, the
+window and input, IPC and the process sandbox, the OS calls in `snowlark-shell`) each get a Linux and later a macOS
+half behind one interface, chosen at compile time, so that the engine crates stay platform-free.
+`docs/linux.md` maps every Windows-only part with its Linux counterpart and the Rust options, and lays out the port
+in stages: the platform-free crates check for Linux (`tools/linux/check.ps1`); next, `snowlark-paint` splits into
+a platform-free crate (geometry, the display list, the text types) and its Windows half, so that layout and render
+check too; then the headless modes on Linux, processes, the window, WebGL, media, the sandbox and packaging. The
+painting backend, the text stack, the window toolkit, the media stack and the Linux test machine are open
+decisions listed there.

@@ -102,6 +102,13 @@ Before a commit, these must be clean:
 python tools/license_headers.py
 ```
 
+The crates free of platform code also compile for Linux, checked from Windows (`rustup target add
+x86_64-unknown-linux-gnu` once; [docs/linux.md](docs/linux.md)). A change to one of them keeps this clean:
+
+```powershell
+.\tools\linux\check.ps1
+```
+
 ## Running and diagnosing
 
 `snowlark.exe [url]` opens the browser. Headless modes (use `snowlark-cli.exe`):

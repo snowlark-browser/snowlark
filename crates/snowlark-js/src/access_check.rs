@@ -35,6 +35,7 @@
 //! tokens to a global proxy is refused outright, with no cross-origin properties, and Location has no
 //! guard of its own (it cannot be reached: the Window it hangs off refuses).
 
+#[cfg(all(windows, target_arch = "x86_64"))]
 use std::ffi::c_void;
 
 /// The V8 version these declarations were checked against. An access check that silently misreads

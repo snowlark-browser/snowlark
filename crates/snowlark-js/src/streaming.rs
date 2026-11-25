@@ -129,6 +129,7 @@ impl Feed {
     /// The next chunk for V8: blocks until there is one, or `None` at the end. A chunk is at least 4
     /// bytes unless it ends the stream (V8's UTF-8 decoder handles a character split across two
     /// chunks, not three).
+    #[cfg_attr(not(all(windows, target_arch = "x86_64")), allow(dead_code))]
     fn next_chunk(&self) -> Option<Vec<u8>> {
         let mut s = self.state.lock().unwrap();
         loop {
@@ -153,6 +154,7 @@ impl Feed {
         }
     }
 
+    #[cfg_attr(not(all(windows, target_arch = "x86_64")), allow(dead_code))]
     fn set_mismatch(&self) {
         self.state.lock().unwrap().mismatch = true;
     }

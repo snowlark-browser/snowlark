@@ -17,6 +17,9 @@
 //! A sample also records the last [`SampleMarks::mark`] the thread passed, as an outermost frame
 //! `mark:<name>` in the folded stacks: what the sampled time belongs to, in a run that marks its
 //! phases (Speedometer's `performance.mark` calls: `tools/speedometer/split_scored.py`).
+//!
+//! Only Windows has the sampler: elsewhere [`NativeSampler::start`] returns `None` and frames are
+//! not named.
 
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -24,8 +27,11 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[cfg(windows)]
 use windows::core::PCSTR;
+#[cfg(windows)]
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
+#[cfg(windows)]
 use windows::Win32::System::Diagnostics::Debug::{
     GetThreadContext, RtlLookupFunctionEntry, RtlVirtualUnwind, SymAddrIncludeInlineTrace,
     SymFromAddr, SymFromInlineContext, SymGetLineFromAddr64, SymGetLineFromInlineContext,
@@ -33,16 +39,20 @@ use windows::Win32::System::Diagnostics::Debug::{
     CONTEXT_INTEGER_AMD64, IMAGEHLP_LINE64, SYMBOL_INFO, SYMOPT_DEFERRED_LOADS, SYMOPT_LOAD_LINES,
     SYMOPT_UNDNAME, UNW_FLAG_NHANDLER,
 };
+#[cfg(windows)]
 use windows::Win32::System::Memory::{
     VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_GUARD, PAGE_NOACCESS,
 };
+#[cfg(windows)]
 use windows::Win32::System::Threading::{
     GetCurrentProcess, GetCurrentThreadId, OpenThread, ResumeThread, SuspendThread,
     THREAD_GET_CONTEXT, THREAD_QUERY_INFORMATION, THREAD_SUSPEND_RESUME,
 };
 
 /// The most stack copied per sample, and frames kept per sample.
+#[cfg(windows)]
 const STACK_COPY: usize = 512 * 1024;
+#[cfg(windows)]
 const MAX_FRAMES: usize = 96;
 
 /// The bits of a sample's outermost entry when it is a mark's number, not a return address (an
@@ -80,14 +90,17 @@ impl SampleMarks {
 }
 
 /// `GetThreadContext` wants a 16-byte aligned `CONTEXT`.
+#[cfg(windows)]
 #[repr(C, align(16))]
 #[derive(Clone, Copy)]
 struct Context(CONTEXT);
 
 /// A thread handle the sampler thread may use.
+#[cfg(windows)]
 struct Thread(HANDLE);
 
 // SAFETY: a thread handle is a kernel object reference, usable from any thread of the process.
+#[cfg(windows)]
 unsafe impl Send for Thread {}
 
 /// Samples the thread that started it until stopped.
@@ -100,6 +113,14 @@ pub struct NativeSampler {
 impl NativeSampler {
     /// Starts sampling the calling thread every `interval`, each sample with the last of `marks`.
     /// `None` when the thread cannot be opened for suspension.
+    #[cfg(not(windows))]
+    pub fn start(_interval: Duration, _marks: SampleMarks) -> Option<NativeSampler> {
+        None
+    }
+
+    /// Starts sampling the calling thread every `interval`, each sample with the last of `marks`.
+    /// `None` when the thread cannot be opened for suspension.
+    #[cfg(windows)]
     pub fn start(interval: Duration, marks: SampleMarks) -> Option<NativeSampler> {
         // SAFETY: plain Win32 calls on the current thread's id; the handle is closed by the
         // sampler thread when it ends.
@@ -178,6 +199,7 @@ impl Drop for NativeSampler {
 /// not own the stack raises `STATUS_GUARD_PAGE_VIOLATION`, which nothing handles (the sampled
 /// process died of it under `SNOWLARK_PROFILE=1`). Chromium's sampler skips such samples
 /// (`base/profiler/suspendable_thread_delegate_win.cc`, `CanCopyStack`, `PointsToGuardPage`).
+#[cfg(windows)]
 fn can_copy_stack(region: &MEMORY_BASIC_INFORMATION) -> bool {
     region.State == MEM_COMMIT
         && (region.Protect & PAGE_GUARD).0 == 0
@@ -185,6 +207,7 @@ fn can_copy_stack(region: &MEMORY_BASIC_INFORMATION) -> bool {
 }
 
 /// One sample of `target`: its stack's return addresses, innermost first.
+#[cfg(windows)]
 fn sample(target: &Thread, stack: &mut [u64]) -> Option<Vec<u64>> {
     let mut ctx = Context(CONTEXT::default());
     ctx.0.ContextFlags = CONTEXT_CONTROL_AMD64 | CONTEXT_INTEGER_AMD64;
@@ -300,6 +323,7 @@ fn sample(target: &Thread, stack: &mut [u64]) -> Option<Vec<u64>> {
 }
 
 /// The value of integer register `n` (x64 encoding: 0 = rax ... 15 = r15) in `c`.
+#[cfg(windows)]
 fn register(c: &CONTEXT, n: u8) -> u64 {
     match n {
         0 => c.Rax,
@@ -336,22 +360,25 @@ pub struct NativeSummary {
 /// function. `marks` is what the sampler was given.
 pub fn summarize(samples: &[Vec<u64>], marks: &SampleMarks) -> NativeSummary {
     let mut names: HashMap<u64, String> = HashMap::new();
-    // The linker records only the PDB's file name (rustc passes /PDBALTPATH:%_PDB%): search the
-    // executable's directory, then dbghelp's defaults.
-    let mut path = std::env::current_exe()
-        .ok()
-        .and_then(|e| e.parent().map(|d| d.display().to_string()))
-        .unwrap_or_default();
-    path.push_str(";.\0");
     // SNOWLARK_PROFILE_LINES=1: the two innermost frames also name their source line (`@file:line`,
     // the innermost inlined code there), to place self time inside a function that inlines much.
     let lines = std::env::var("SNOWLARK_PROFILE_LINES").is_ok_and(|v| v == "1");
-    // SAFETY: dbghelp is initialized once for this process here and only used on this thread; the
-    // search path is NUL-terminated.
-    unsafe {
-        let load_lines = if lines { SYMOPT_LOAD_LINES } else { 0 };
-        SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | load_lines);
-        let _ = SymInitialize(GetCurrentProcess(), PCSTR(path.as_ptr()), true);
+    #[cfg(windows)]
+    {
+        // The linker records only the PDB's file name (rustc passes /PDBALTPATH:%_PDB%): search the
+        // executable's directory, then dbghelp's defaults.
+        let mut path = std::env::current_exe()
+            .ok()
+            .and_then(|e| e.parent().map(|d| d.display().to_string()))
+            .unwrap_or_default();
+        path.push_str(";.\0");
+        // SAFETY: dbghelp is initialized once for this process here and only used on this thread;
+        // the search path is NUL-terminated.
+        unsafe {
+            let load_lines = if lines { SYMOPT_LOAD_LINES } else { 0 };
+            SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | load_lines);
+            let _ = SymInitialize(GetCurrentProcess(), PCSTR(path.as_ptr()), true);
+        }
     }
     // (per address: the folded frames, innermost first, that the two innermost frames expand to)
     let mut lined: HashMap<u64, Vec<String>> = HashMap::new();
@@ -408,6 +435,22 @@ pub fn summarize(samples: &[Vec<u64>], marks: &SampleMarks) -> NativeSummary {
     }
 }
 
+#[cfg(not(windows))]
+fn symbol(_pc: u64) -> Option<String> {
+    None
+}
+
+#[cfg(not(windows))]
+fn inline_frames(_pc: u64) -> Vec<String> {
+    Vec::new()
+}
+
+#[cfg(not(windows))]
+fn source_line(_pc: u64) -> Option<String> {
+    None
+}
+
+#[cfg(windows)]
 fn symbol(pc: u64) -> Option<String> {
     #[repr(C, align(8))]
     struct Buf {
@@ -438,6 +481,7 @@ fn symbol(pc: u64) -> Option<String> {
 
 /// The functions inlined at `pc`, innermost first, each as `function@file:line` (the line inside
 /// it), from the PDB's inline sites.
+#[cfg(windows)]
 fn inline_frames(pc: u64) -> Vec<String> {
     let mut out = Vec::new();
     // SAFETY: plain dbghelp queries on this process with sized out-parameters; the symbol buffer
@@ -495,6 +539,7 @@ fn inline_frames(pc: u64) -> Vec<String> {
 }
 
 /// `file:line` of the code at `pc` (the file's name only), from the PDB's line tables.
+#[cfg(windows)]
 fn source_line(pc: u64) -> Option<String> {
     let mut line = IMAGEHLP_LINE64 {
         SizeOfStruct: std::mem::size_of::<IMAGEHLP_LINE64>() as u32,
@@ -587,6 +632,7 @@ fn short(name: &str) -> String {
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
     #[test]
     fn a_stack_pointer_in_a_guard_page_is_not_copied() {
         use windows::Win32::System::Memory::{
@@ -623,6 +669,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     #[inline(never)]
     fn spin_for(d: Duration) -> u64 {
         let t = std::time::Instant::now();
@@ -633,6 +680,7 @@ mod tests {
         x
     }
 
+    #[cfg(windows)]
     #[test]
     fn samples_and_names_the_running_thread() {
         // Under a loaded machine (the whole workspace's tests in parallel) the sampler thread and the
@@ -674,6 +722,7 @@ mod tests {
         assert!(s.report(5, Duration::from_micros(500)).contains("native"));
     }
 
+    #[cfg(windows)]
     #[test]
     fn samples_carry_the_last_mark_as_their_outermost_frame() {
         let marks = SampleMarks::default();
