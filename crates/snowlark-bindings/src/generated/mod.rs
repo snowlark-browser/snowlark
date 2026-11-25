@@ -13,6 +13,8 @@ use std::rc::Rc;
 
 pub mod types;
 pub use types::*;
+pub mod angle_instanced_arrays;
+pub use angle_instanced_arrays::ANGLE_instanced_arraysImpl;
 pub mod aria_mixin;
 pub use aria_mixin::ARIAMixinImpl;
 pub mod aria_notify_mixin;
@@ -333,6 +335,40 @@ pub mod drag_event;
 pub use drag_event::DragEventImpl;
 pub mod dynamics_compressor_node;
 pub use dynamics_compressor_node::DynamicsCompressorNodeImpl;
+pub mod ext_blend_minmax;
+pub use ext_blend_minmax::EXT_blend_minmaxImpl;
+pub mod ext_clip_control;
+pub use ext_clip_control::EXT_clip_controlImpl;
+pub mod ext_color_buffer_float;
+pub use ext_color_buffer_float::EXT_color_buffer_floatImpl;
+pub mod ext_color_buffer_half_float;
+pub use ext_color_buffer_half_float::EXT_color_buffer_half_floatImpl;
+pub mod ext_conservative_depth;
+pub use ext_conservative_depth::EXT_conservative_depthImpl;
+pub mod ext_depth_clamp;
+pub use ext_depth_clamp::EXT_depth_clampImpl;
+pub mod ext_float_blend;
+pub use ext_float_blend::EXT_float_blendImpl;
+pub mod ext_frag_depth;
+pub use ext_frag_depth::EXT_frag_depthImpl;
+pub mod ext_polygon_offset_clamp;
+pub use ext_polygon_offset_clamp::EXT_polygon_offset_clampImpl;
+pub mod ext_render_snorm;
+pub use ext_render_snorm::EXT_render_snormImpl;
+pub mod ext_s_rgb;
+pub use ext_s_rgb::EXT_sRGBImpl;
+pub mod ext_shader_texture_lod;
+pub use ext_shader_texture_lod::EXT_shader_texture_lodImpl;
+pub mod ext_texture_compression_bptc;
+pub use ext_texture_compression_bptc::EXT_texture_compression_bptcImpl;
+pub mod ext_texture_compression_rgtc;
+pub use ext_texture_compression_rgtc::EXT_texture_compression_rgtcImpl;
+pub mod ext_texture_filter_anisotropic;
+pub use ext_texture_filter_anisotropic::EXT_texture_filter_anisotropicImpl;
+pub mod ext_texture_mirror_clamp_to_edge;
+pub use ext_texture_mirror_clamp_to_edge::EXT_texture_mirror_clamp_to_edgeImpl;
+pub mod ext_texture_norm16;
+pub use ext_texture_norm16::EXT_texture_norm16Impl;
 pub mod element;
 pub use element::ElementImpl;
 pub mod element_css_inline_style;
@@ -615,6 +651,8 @@ pub mod intersection_observer;
 pub use intersection_observer::IntersectionObserverImpl;
 pub mod intersection_observer_entry;
 pub use intersection_observer_entry::IntersectionObserverEntryImpl;
+pub mod khr_parallel_shader_compile;
+pub use khr_parallel_shader_compile::KHR_parallel_shader_compileImpl;
 pub mod keyboard_event;
 pub use keyboard_event::KeyboardEventImpl;
 pub mod keyframe_effect;
@@ -717,6 +755,30 @@ pub mod non_element_parent_node;
 pub use non_element_parent_node::NonElementParentNodeImpl;
 pub mod notification;
 pub use notification::NotificationImpl;
+pub mod oes_draw_buffers_indexed;
+pub use oes_draw_buffers_indexed::OES_draw_buffers_indexedImpl;
+pub mod oes_element_index_uint;
+pub use oes_element_index_uint::OES_element_index_uintImpl;
+pub mod oes_fbo_render_mipmap;
+pub use oes_fbo_render_mipmap::OES_fbo_render_mipmapImpl;
+pub mod oes_sample_variables;
+pub use oes_sample_variables::OES_sample_variablesImpl;
+pub mod oes_shader_multisample_interpolation;
+pub use oes_shader_multisample_interpolation::OES_shader_multisample_interpolationImpl;
+pub mod oes_standard_derivatives;
+pub use oes_standard_derivatives::OES_standard_derivativesImpl;
+pub mod oes_texture_float;
+pub use oes_texture_float::OES_texture_floatImpl;
+pub mod oes_texture_float_linear;
+pub use oes_texture_float_linear::OES_texture_float_linearImpl;
+pub mod oes_texture_half_float;
+pub use oes_texture_half_float::OES_texture_half_floatImpl;
+pub mod oes_texture_half_float_linear;
+pub use oes_texture_half_float_linear::OES_texture_half_float_linearImpl;
+pub mod oes_vertex_array_object;
+pub use oes_vertex_array_object::OES_vertex_array_objectImpl;
+pub mod ovr_multiview2;
+pub use ovr_multiview2::OVR_multiview2Impl;
 pub mod offline_audio_completion_event;
 pub use offline_audio_completion_event::OfflineAudioCompletionEventImpl;
 pub mod offline_audio_context;
@@ -1157,6 +1219,38 @@ pub mod visibility_state_entry;
 pub use visibility_state_entry::VisibilityStateEntryImpl;
 pub mod visual_viewport;
 pub use visual_viewport::VisualViewportImpl;
+pub mod webgl_blend_func_extended;
+pub use webgl_blend_func_extended::WEBGL_blend_func_extendedImpl;
+pub mod webgl_clip_cull_distance;
+pub use webgl_clip_cull_distance::WEBGL_clip_cull_distanceImpl;
+pub mod webgl_color_buffer_float;
+pub use webgl_color_buffer_float::WEBGL_color_buffer_floatImpl;
+pub mod webgl_compressed_texture_astc;
+pub use webgl_compressed_texture_astc::WEBGL_compressed_texture_astcImpl;
+pub mod webgl_compressed_texture_etc;
+pub use webgl_compressed_texture_etc::WEBGL_compressed_texture_etcImpl;
+pub mod webgl_compressed_texture_etc1;
+pub use webgl_compressed_texture_etc1::WEBGL_compressed_texture_etc1Impl;
+pub mod webgl_compressed_texture_s3tc;
+pub use webgl_compressed_texture_s3tc::WEBGL_compressed_texture_s3tcImpl;
+pub mod webgl_compressed_texture_s3tc_srgb;
+pub use webgl_compressed_texture_s3tc_srgb::WEBGL_compressed_texture_s3tc_srgbImpl;
+pub mod webgl_debug_renderer_info;
+pub use webgl_debug_renderer_info::WEBGL_debug_renderer_infoImpl;
+pub mod webgl_depth_texture;
+pub use webgl_depth_texture::WEBGL_depth_textureImpl;
+pub mod webgl_draw_buffers;
+pub use webgl_draw_buffers::WEBGL_draw_buffersImpl;
+pub mod webgl_multi_draw;
+pub use webgl_multi_draw::WEBGL_multi_drawImpl;
+pub mod webgl_polygon_mode;
+pub use webgl_polygon_mode::WEBGL_polygon_modeImpl;
+pub mod webgl_provoking_vertex;
+pub use webgl_provoking_vertex::WEBGL_provoking_vertexImpl;
+pub mod webgl_render_shared_exponent;
+pub use webgl_render_shared_exponent::WEBGL_render_shared_exponentImpl;
+pub mod webgl_stencil_texturing;
+pub use webgl_stencil_texturing::WEBGL_stencil_texturingImpl;
 pub mod wave_shaper_node;
 pub use wave_shaper_node::WaveShaperNodeImpl;
 pub mod web_gl2_rendering_context;
@@ -1203,6 +1297,8 @@ pub mod web_gl_uniform_location;
 pub use web_gl_uniform_location::WebGLUniformLocationImpl;
 pub mod web_gl_vertex_array_object;
 pub use web_gl_vertex_array_object::WebGLVertexArrayObjectImpl;
+pub mod web_gl_vertex_array_object_oes;
+pub use web_gl_vertex_array_object_oes::WebGLVertexArrayObjectOESImpl;
 pub mod web_socket;
 pub use web_socket::WebSocketImpl;
 pub mod wheel_event;
@@ -1255,1633 +1351,1779 @@ pub use console::ConsoleImpl;
 /// Prototype ids: depth-first over the inheritance tree, so an interface's descendants are
 /// `ids::X..ids::X_END`.
 pub mod ids {
-    pub const ABORT_CONTROLLER: u16 = 1;
-    pub const ABORT_CONTROLLER_END: u16 = 3;
-    pub const TASK_CONTROLLER: u16 = 2;
-    pub const TASK_CONTROLLER_END: u16 = 3;
-    pub const ABSTRACT_RANGE: u16 = 3;
-    pub const ABSTRACT_RANGE_END: u16 = 6;
-    pub const RANGE: u16 = 4;
-    pub const RANGE_END: u16 = 5;
-    pub const STATIC_RANGE: u16 = 5;
-    pub const STATIC_RANGE_END: u16 = 6;
-    pub const ANIMATION_EFFECT: u16 = 6;
-    pub const ANIMATION_EFFECT_END: u16 = 8;
-    pub const KEYFRAME_EFFECT: u16 = 7;
-    pub const KEYFRAME_EFFECT_END: u16 = 8;
-    pub const ANIMATION_TIMELINE: u16 = 8;
-    pub const ANIMATION_TIMELINE_END: u16 = 10;
-    pub const DOCUMENT_TIMELINE: u16 = 9;
-    pub const DOCUMENT_TIMELINE_END: u16 = 10;
-    pub const AUDIO_BUFFER: u16 = 10;
-    pub const AUDIO_BUFFER_END: u16 = 11;
-    pub const AUDIO_LISTENER: u16 = 11;
-    pub const AUDIO_LISTENER_END: u16 = 12;
-    pub const AUDIO_PARAM: u16 = 12;
-    pub const AUDIO_PARAM_END: u16 = 13;
-    pub const AUDIO_TRACK: u16 = 13;
-    pub const AUDIO_TRACK_END: u16 = 14;
-    pub const AUTHENTICATOR_RESPONSE: u16 = 14;
-    pub const AUTHENTICATOR_RESPONSE_END: u16 = 17;
-    pub const AUTHENTICATOR_ASSERTION_RESPONSE: u16 = 15;
-    pub const AUTHENTICATOR_ASSERTION_RESPONSE_END: u16 = 16;
-    pub const AUTHENTICATOR_ATTESTATION_RESPONSE: u16 = 16;
-    pub const AUTHENTICATOR_ATTESTATION_RESPONSE_END: u16 = 17;
-    pub const BAR_PROP: u16 = 17;
-    pub const BAR_PROP_END: u16 = 18;
-    pub const BLOB: u16 = 18;
-    pub const BLOB_END: u16 = 20;
-    pub const FILE: u16 = 19;
-    pub const FILE_END: u16 = 20;
-    pub const BYTE_LENGTH_QUEUING_STRATEGY: u16 = 20;
-    pub const BYTE_LENGTH_QUEUING_STRATEGY_END: u16 = 21;
-    pub const CSS_NUMERIC_ARRAY: u16 = 21;
-    pub const CSS_NUMERIC_ARRAY_END: u16 = 22;
-    pub const CSS_RULE: u16 = 22;
-    pub const CSS_RULE_END: u16 = 39;
-    pub const CSS_FONT_FACE_RULE: u16 = 23;
-    pub const CSS_FONT_FACE_RULE_END: u16 = 24;
-    pub const CSS_FONT_FEATURE_VALUES_RULE: u16 = 24;
-    pub const CSS_FONT_FEATURE_VALUES_RULE_END: u16 = 25;
-    pub const CSS_FONT_PALETTE_VALUES_RULE: u16 = 25;
-    pub const CSS_FONT_PALETTE_VALUES_RULE_END: u16 = 26;
-    pub const CSS_GROUPING_RULE: u16 = 26;
-    pub const CSS_GROUPING_RULE_END: u16 = 33;
-    pub const CSS_CONDITION_RULE: u16 = 27;
-    pub const CSS_CONDITION_RULE_END: u16 = 31;
-    pub const CSS_CONTAINER_RULE: u16 = 28;
-    pub const CSS_CONTAINER_RULE_END: u16 = 29;
-    pub const CSS_MEDIA_RULE: u16 = 29;
-    pub const CSS_MEDIA_RULE_END: u16 = 30;
-    pub const CSS_SUPPORTS_RULE: u16 = 30;
-    pub const CSS_SUPPORTS_RULE_END: u16 = 31;
-    pub const CSS_LAYER_BLOCK_RULE: u16 = 31;
-    pub const CSS_LAYER_BLOCK_RULE_END: u16 = 32;
-    pub const CSS_STYLE_RULE: u16 = 32;
-    pub const CSS_STYLE_RULE_END: u16 = 33;
-    pub const CSS_IMPORT_RULE: u16 = 33;
-    pub const CSS_IMPORT_RULE_END: u16 = 34;
-    pub const CSS_KEYFRAME_RULE: u16 = 34;
-    pub const CSS_KEYFRAME_RULE_END: u16 = 35;
-    pub const CSS_KEYFRAMES_RULE: u16 = 35;
-    pub const CSS_KEYFRAMES_RULE_END: u16 = 36;
-    pub const CSS_LAYER_STATEMENT_RULE: u16 = 36;
-    pub const CSS_LAYER_STATEMENT_RULE_END: u16 = 37;
-    pub const CSS_NAMESPACE_RULE: u16 = 37;
-    pub const CSS_NAMESPACE_RULE_END: u16 = 38;
-    pub const CSS_PROPERTY_RULE: u16 = 38;
-    pub const CSS_PROPERTY_RULE_END: u16 = 39;
-    pub const CSS_RULE_LIST: u16 = 39;
-    pub const CSS_RULE_LIST_END: u16 = 40;
-    pub const CSS_STYLE_DECLARATION: u16 = 40;
-    pub const CSS_STYLE_DECLARATION_END: u16 = 43;
-    pub const CSS_FONT_FACE_DESCRIPTORS: u16 = 41;
-    pub const CSS_FONT_FACE_DESCRIPTORS_END: u16 = 42;
-    pub const CSS_STYLE_PROPERTIES: u16 = 42;
-    pub const CSS_STYLE_PROPERTIES_END: u16 = 43;
-    pub const CSS_STYLE_VALUE: u16 = 43;
-    pub const CSS_STYLE_VALUE_END: u16 = 58;
-    pub const CSS_IMAGE_VALUE: u16 = 44;
-    pub const CSS_IMAGE_VALUE_END: u16 = 45;
-    pub const CSS_KEYWORD_VALUE: u16 = 45;
-    pub const CSS_KEYWORD_VALUE_END: u16 = 46;
-    pub const CSS_NUMERIC_VALUE: u16 = 46;
-    pub const CSS_NUMERIC_VALUE_END: u16 = 56;
-    pub const CSS_MATH_VALUE: u16 = 47;
-    pub const CSS_MATH_VALUE_END: u16 = 55;
-    pub const CSS_MATH_CLAMP: u16 = 48;
-    pub const CSS_MATH_CLAMP_END: u16 = 49;
-    pub const CSS_MATH_INVERT: u16 = 49;
-    pub const CSS_MATH_INVERT_END: u16 = 50;
-    pub const CSS_MATH_MAX: u16 = 50;
-    pub const CSS_MATH_MAX_END: u16 = 51;
-    pub const CSS_MATH_MIN: u16 = 51;
-    pub const CSS_MATH_MIN_END: u16 = 52;
-    pub const CSS_MATH_NEGATE: u16 = 52;
-    pub const CSS_MATH_NEGATE_END: u16 = 53;
-    pub const CSS_MATH_PRODUCT: u16 = 53;
-    pub const CSS_MATH_PRODUCT_END: u16 = 54;
-    pub const CSS_MATH_SUM: u16 = 54;
-    pub const CSS_MATH_SUM_END: u16 = 55;
-    pub const CSS_UNIT_VALUE: u16 = 55;
-    pub const CSS_UNIT_VALUE_END: u16 = 56;
-    pub const CSS_TRANSFORM_VALUE: u16 = 56;
-    pub const CSS_TRANSFORM_VALUE_END: u16 = 57;
-    pub const CSS_UNPARSED_VALUE: u16 = 57;
-    pub const CSS_UNPARSED_VALUE_END: u16 = 58;
-    pub const CSS_TRANSFORM_COMPONENT: u16 = 58;
-    pub const CSS_TRANSFORM_COMPONENT_END: u16 = 67;
-    pub const CSS_MATRIX_COMPONENT: u16 = 59;
-    pub const CSS_MATRIX_COMPONENT_END: u16 = 60;
-    pub const CSS_PERSPECTIVE: u16 = 60;
-    pub const CSS_PERSPECTIVE_END: u16 = 61;
-    pub const CSS_ROTATE: u16 = 61;
-    pub const CSS_ROTATE_END: u16 = 62;
-    pub const CSS_SCALE: u16 = 62;
-    pub const CSS_SCALE_END: u16 = 63;
-    pub const CSS_SKEW: u16 = 63;
-    pub const CSS_SKEW_END: u16 = 64;
-    pub const CSS_SKEW_X: u16 = 64;
-    pub const CSS_SKEW_X_END: u16 = 65;
-    pub const CSS_SKEW_Y: u16 = 65;
-    pub const CSS_SKEW_Y_END: u16 = 66;
-    pub const CSS_TRANSLATE: u16 = 66;
-    pub const CSS_TRANSLATE_END: u16 = 67;
-    pub const CSS_VARIABLE_REFERENCE_VALUE: u16 = 67;
-    pub const CSS_VARIABLE_REFERENCE_VALUE_END: u16 = 68;
-    pub const CANVAS_GRADIENT: u16 = 68;
-    pub const CANVAS_GRADIENT_END: u16 = 69;
-    pub const CANVAS_PATTERN: u16 = 69;
-    pub const CANVAS_PATTERN_END: u16 = 70;
-    pub const CANVAS_RENDERING_CONTEXT2_D: u16 = 70;
-    pub const CANVAS_RENDERING_CONTEXT2_D_END: u16 = 71;
-    pub const CLIPBOARD_ITEM: u16 = 71;
-    pub const CLIPBOARD_ITEM_END: u16 = 72;
-    pub const COMPRESSION_STREAM: u16 = 72;
-    pub const COMPRESSION_STREAM_END: u16 = 73;
-    pub const COUNT_QUEUING_STRATEGY: u16 = 73;
-    pub const COUNT_QUEUING_STRATEGY_END: u16 = 74;
-    pub const CREDENTIAL: u16 = 74;
-    pub const CREDENTIAL_END: u16 = 79;
-    pub const FEDERATED_CREDENTIAL: u16 = 75;
-    pub const FEDERATED_CREDENTIAL_END: u16 = 76;
-    pub const IDENTITY_CREDENTIAL: u16 = 76;
-    pub const IDENTITY_CREDENTIAL_END: u16 = 77;
-    pub const PASSWORD_CREDENTIAL: u16 = 77;
-    pub const PASSWORD_CREDENTIAL_END: u16 = 78;
-    pub const PUBLIC_KEY_CREDENTIAL: u16 = 78;
-    pub const PUBLIC_KEY_CREDENTIAL_END: u16 = 79;
-    pub const CREDENTIALS_CONTAINER: u16 = 79;
-    pub const CREDENTIALS_CONTAINER_END: u16 = 80;
-    pub const CRYPTO: u16 = 80;
-    pub const CRYPTO_END: u16 = 81;
-    pub const CRYPTO_KEY: u16 = 81;
-    pub const CRYPTO_KEY_END: u16 = 82;
-    pub const CUSTOM_ELEMENT_REGISTRY: u16 = 82;
-    pub const CUSTOM_ELEMENT_REGISTRY_END: u16 = 83;
-    pub const CUSTOM_STATE_SET: u16 = 83;
-    pub const CUSTOM_STATE_SET_END: u16 = 84;
-    pub const DOM_EXCEPTION: u16 = 84;
-    pub const DOM_EXCEPTION_END: u16 = 85;
-    pub const DOM_IMPLEMENTATION: u16 = 85;
-    pub const DOM_IMPLEMENTATION_END: u16 = 86;
-    pub const DOM_MATRIX_READ_ONLY: u16 = 86;
-    pub const DOM_MATRIX_READ_ONLY_END: u16 = 88;
-    pub const DOM_MATRIX: u16 = 87;
-    pub const DOM_MATRIX_END: u16 = 88;
-    pub const DOM_PARSER: u16 = 88;
-    pub const DOM_PARSER_END: u16 = 89;
-    pub const DOM_POINT_READ_ONLY: u16 = 89;
-    pub const DOM_POINT_READ_ONLY_END: u16 = 91;
-    pub const DOM_POINT: u16 = 90;
-    pub const DOM_POINT_END: u16 = 91;
-    pub const DOM_QUAD: u16 = 91;
-    pub const DOM_QUAD_END: u16 = 92;
-    pub const DOM_RECT_LIST: u16 = 92;
-    pub const DOM_RECT_LIST_END: u16 = 93;
-    pub const DOM_RECT_READ_ONLY: u16 = 93;
-    pub const DOM_RECT_READ_ONLY_END: u16 = 95;
-    pub const DOM_RECT: u16 = 94;
-    pub const DOM_RECT_END: u16 = 95;
-    pub const DOM_STRING_LIST: u16 = 95;
-    pub const DOM_STRING_LIST_END: u16 = 96;
-    pub const DOM_STRING_MAP: u16 = 96;
-    pub const DOM_STRING_MAP_END: u16 = 97;
-    pub const DOM_TOKEN_LIST: u16 = 97;
-    pub const DOM_TOKEN_LIST_END: u16 = 98;
-    pub const DATA_TRANSFER: u16 = 98;
-    pub const DATA_TRANSFER_END: u16 = 99;
-    pub const DATA_TRANSFER_ITEM: u16 = 99;
-    pub const DATA_TRANSFER_ITEM_END: u16 = 100;
-    pub const DATA_TRANSFER_ITEM_LIST: u16 = 100;
-    pub const DATA_TRANSFER_ITEM_LIST_END: u16 = 101;
-    pub const DECOMPRESSION_STREAM: u16 = 101;
-    pub const DECOMPRESSION_STREAM_END: u16 = 102;
-    pub const ELEMENT_INTERNALS: u16 = 102;
-    pub const ELEMENT_INTERNALS_END: u16 = 103;
-    pub const EVENT: u16 = 103;
-    pub const EVENT_END: u16 = 145;
-    pub const ANIMATION_EVENT: u16 = 104;
-    pub const ANIMATION_EVENT_END: u16 = 105;
-    pub const ANIMATION_PLAYBACK_EVENT: u16 = 105;
-    pub const ANIMATION_PLAYBACK_EVENT_END: u16 = 106;
-    pub const BEFORE_UNLOAD_EVENT: u16 = 106;
-    pub const BEFORE_UNLOAD_EVENT_END: u16 = 107;
-    pub const CLIPBOARD_EVENT: u16 = 107;
-    pub const CLIPBOARD_EVENT_END: u16 = 108;
-    pub const CLOSE_EVENT: u16 = 108;
-    pub const CLOSE_EVENT_END: u16 = 109;
-    pub const COMMAND_EVENT: u16 = 109;
-    pub const COMMAND_EVENT_END: u16 = 110;
-    pub const CUSTOM_EVENT: u16 = 110;
-    pub const CUSTOM_EVENT_END: u16 = 111;
-    pub const ERROR_EVENT: u16 = 111;
-    pub const ERROR_EVENT_END: u16 = 112;
-    pub const FONT_FACE_SET_LOAD_EVENT: u16 = 112;
-    pub const FONT_FACE_SET_LOAD_EVENT_END: u16 = 113;
-    pub const FORM_DATA_EVENT: u16 = 113;
-    pub const FORM_DATA_EVENT_END: u16 = 114;
-    pub const GAMEPAD_EVENT: u16 = 114;
-    pub const GAMEPAD_EVENT_END: u16 = 115;
-    pub const HASH_CHANGE_EVENT: u16 = 115;
-    pub const HASH_CHANGE_EVENT_END: u16 = 116;
-    pub const IDB_VERSION_CHANGE_EVENT: u16 = 116;
-    pub const IDB_VERSION_CHANGE_EVENT_END: u16 = 117;
-    pub const MEDIA_ENCRYPTED_EVENT: u16 = 117;
-    pub const MEDIA_ENCRYPTED_EVENT_END: u16 = 118;
-    pub const MEDIA_KEY_MESSAGE_EVENT: u16 = 118;
-    pub const MEDIA_KEY_MESSAGE_EVENT_END: u16 = 119;
-    pub const MEDIA_QUERY_LIST_EVENT: u16 = 119;
-    pub const MEDIA_QUERY_LIST_EVENT_END: u16 = 120;
-    pub const MESSAGE_EVENT: u16 = 120;
-    pub const MESSAGE_EVENT_END: u16 = 121;
-    pub const OFFLINE_AUDIO_COMPLETION_EVENT: u16 = 121;
-    pub const OFFLINE_AUDIO_COMPLETION_EVENT_END: u16 = 122;
-    pub const PAGE_TRANSITION_EVENT: u16 = 122;
-    pub const PAGE_TRANSITION_EVENT_END: u16 = 123;
-    pub const POP_STATE_EVENT: u16 = 123;
-    pub const POP_STATE_EVENT_END: u16 = 124;
-    pub const PROGRESS_EVENT: u16 = 124;
-    pub const PROGRESS_EVENT_END: u16 = 125;
-    pub const PROMISE_REJECTION_EVENT: u16 = 125;
-    pub const PROMISE_REJECTION_EVENT_END: u16 = 126;
-    pub const SECURITY_POLICY_VIOLATION_EVENT: u16 = 126;
-    pub const SECURITY_POLICY_VIOLATION_EVENT_END: u16 = 127;
-    pub const STORAGE_EVENT: u16 = 127;
-    pub const STORAGE_EVENT_END: u16 = 128;
-    pub const SUBMIT_EVENT: u16 = 128;
-    pub const SUBMIT_EVENT_END: u16 = 129;
-    pub const TASK_PRIORITY_CHANGE_EVENT: u16 = 129;
-    pub const TASK_PRIORITY_CHANGE_EVENT_END: u16 = 130;
-    pub const TOGGLE_EVENT: u16 = 130;
-    pub const TOGGLE_EVENT_END: u16 = 131;
-    pub const TRACK_EVENT: u16 = 131;
-    pub const TRACK_EVENT_END: u16 = 132;
-    pub const TRANSITION_EVENT: u16 = 132;
-    pub const TRANSITION_EVENT_END: u16 = 133;
-    pub const UI_EVENT: u16 = 133;
-    pub const UI_EVENT_END: u16 = 144;
-    pub const COMPOSITION_EVENT: u16 = 134;
-    pub const COMPOSITION_EVENT_END: u16 = 135;
-    pub const FOCUS_EVENT: u16 = 135;
-    pub const FOCUS_EVENT_END: u16 = 136;
-    pub const INPUT_EVENT: u16 = 136;
-    pub const INPUT_EVENT_END: u16 = 137;
-    pub const KEYBOARD_EVENT: u16 = 137;
-    pub const KEYBOARD_EVENT_END: u16 = 138;
-    pub const MOUSE_EVENT: u16 = 138;
-    pub const MOUSE_EVENT_END: u16 = 142;
-    pub const DRAG_EVENT: u16 = 139;
-    pub const DRAG_EVENT_END: u16 = 140;
-    pub const POINTER_EVENT: u16 = 140;
-    pub const POINTER_EVENT_END: u16 = 141;
-    pub const WHEEL_EVENT: u16 = 141;
-    pub const WHEEL_EVENT_END: u16 = 142;
-    pub const TEXT_EVENT: u16 = 142;
-    pub const TEXT_EVENT_END: u16 = 143;
-    pub const TOUCH_EVENT: u16 = 143;
-    pub const TOUCH_EVENT_END: u16 = 144;
-    pub const WEB_GL_CONTEXT_EVENT: u16 = 144;
-    pub const WEB_GL_CONTEXT_EVENT_END: u16 = 145;
-    pub const EVENT_TARGET: u16 = 145;
-    pub const EVENT_TARGET_END: u16 = 374;
-    pub const ABORT_SIGNAL: u16 = 146;
-    pub const ABORT_SIGNAL_END: u16 = 148;
-    pub const TASK_SIGNAL: u16 = 147;
-    pub const TASK_SIGNAL_END: u16 = 148;
-    pub const ANIMATION: u16 = 148;
-    pub const ANIMATION_END: u16 = 151;
-    pub const CSS_ANIMATION: u16 = 149;
-    pub const CSS_ANIMATION_END: u16 = 150;
-    pub const CSS_TRANSITION: u16 = 150;
-    pub const CSS_TRANSITION_END: u16 = 151;
-    pub const AUDIO_NODE: u16 = 151;
-    pub const AUDIO_NODE_END: u16 = 169;
-    pub const ANALYSER_NODE: u16 = 152;
-    pub const ANALYSER_NODE_END: u16 = 153;
-    pub const AUDIO_DESTINATION_NODE: u16 = 153;
-    pub const AUDIO_DESTINATION_NODE_END: u16 = 154;
-    pub const AUDIO_SCHEDULED_SOURCE_NODE: u16 = 154;
-    pub const AUDIO_SCHEDULED_SOURCE_NODE_END: u16 = 158;
-    pub const AUDIO_BUFFER_SOURCE_NODE: u16 = 155;
-    pub const AUDIO_BUFFER_SOURCE_NODE_END: u16 = 156;
-    pub const CONSTANT_SOURCE_NODE: u16 = 156;
-    pub const CONSTANT_SOURCE_NODE_END: u16 = 157;
-    pub const OSCILLATOR_NODE: u16 = 157;
-    pub const OSCILLATOR_NODE_END: u16 = 158;
-    pub const BIQUAD_FILTER_NODE: u16 = 158;
-    pub const BIQUAD_FILTER_NODE_END: u16 = 159;
-    pub const CHANNEL_MERGER_NODE: u16 = 159;
-    pub const CHANNEL_MERGER_NODE_END: u16 = 160;
-    pub const CHANNEL_SPLITTER_NODE: u16 = 160;
-    pub const CHANNEL_SPLITTER_NODE_END: u16 = 161;
-    pub const CONVOLVER_NODE: u16 = 161;
-    pub const CONVOLVER_NODE_END: u16 = 162;
-    pub const DELAY_NODE: u16 = 162;
-    pub const DELAY_NODE_END: u16 = 163;
-    pub const DYNAMICS_COMPRESSOR_NODE: u16 = 163;
-    pub const DYNAMICS_COMPRESSOR_NODE_END: u16 = 164;
-    pub const GAIN_NODE: u16 = 164;
-    pub const GAIN_NODE_END: u16 = 165;
-    pub const IIR_FILTER_NODE: u16 = 165;
-    pub const IIR_FILTER_NODE_END: u16 = 166;
-    pub const PANNER_NODE: u16 = 166;
-    pub const PANNER_NODE_END: u16 = 167;
-    pub const STEREO_PANNER_NODE: u16 = 167;
-    pub const STEREO_PANNER_NODE_END: u16 = 168;
-    pub const WAVE_SHAPER_NODE: u16 = 168;
-    pub const WAVE_SHAPER_NODE_END: u16 = 169;
-    pub const AUDIO_TRACK_LIST: u16 = 169;
-    pub const AUDIO_TRACK_LIST_END: u16 = 170;
-    pub const BASE_AUDIO_CONTEXT: u16 = 170;
-    pub const BASE_AUDIO_CONTEXT_END: u16 = 173;
-    pub const AUDIO_CONTEXT: u16 = 171;
-    pub const AUDIO_CONTEXT_END: u16 = 172;
-    pub const OFFLINE_AUDIO_CONTEXT: u16 = 172;
-    pub const OFFLINE_AUDIO_CONTEXT_END: u16 = 173;
-    pub const BATTERY_MANAGER: u16 = 173;
-    pub const BATTERY_MANAGER_END: u16 = 174;
-    pub const BROADCAST_CHANNEL: u16 = 174;
-    pub const BROADCAST_CHANNEL_END: u16 = 175;
-    pub const CLIPBOARD: u16 = 175;
-    pub const CLIPBOARD_END: u16 = 176;
-    pub const FILE_READER: u16 = 176;
-    pub const FILE_READER_END: u16 = 177;
-    pub const FONT_FACE_SET: u16 = 177;
-    pub const FONT_FACE_SET_END: u16 = 178;
-    pub const IDB_DATABASE: u16 = 178;
-    pub const IDB_DATABASE_END: u16 = 179;
-    pub const IDB_REQUEST: u16 = 179;
-    pub const IDB_REQUEST_END: u16 = 181;
-    pub const IDB_OPEN_DB_REQUEST: u16 = 180;
-    pub const IDB_OPEN_DB_REQUEST_END: u16 = 181;
-    pub const IDB_TRANSACTION: u16 = 181;
-    pub const IDB_TRANSACTION_END: u16 = 182;
-    pub const MEDIA_DEVICES: u16 = 182;
-    pub const MEDIA_DEVICES_END: u16 = 183;
-    pub const MEDIA_KEY_SESSION: u16 = 183;
-    pub const MEDIA_KEY_SESSION_END: u16 = 184;
-    pub const MEDIA_QUERY_LIST: u16 = 184;
-    pub const MEDIA_QUERY_LIST_END: u16 = 185;
-    pub const MEDIA_SOURCE: u16 = 185;
-    pub const MEDIA_SOURCE_END: u16 = 186;
-    pub const MESSAGE_PORT: u16 = 186;
-    pub const MESSAGE_PORT_END: u16 = 187;
-    pub const NETWORK_INFORMATION: u16 = 187;
-    pub const NETWORK_INFORMATION_END: u16 = 188;
-    pub const NODE: u16 = 188;
-    pub const NODE_END: u16 = 353;
-    pub const ATTR: u16 = 189;
-    pub const ATTR_END: u16 = 190;
-    pub const CHARACTER_DATA: u16 = 190;
-    pub const CHARACTER_DATA_END: u16 = 195;
-    pub const COMMENT: u16 = 191;
-    pub const COMMENT_END: u16 = 192;
-    pub const PROCESSING_INSTRUCTION: u16 = 192;
-    pub const PROCESSING_INSTRUCTION_END: u16 = 193;
-    pub const TEXT: u16 = 193;
-    pub const TEXT_END: u16 = 195;
-    pub const CDATA_SECTION: u16 = 194;
-    pub const CDATA_SECTION_END: u16 = 195;
-    pub const DOCUMENT: u16 = 195;
-    pub const DOCUMENT_END: u16 = 198;
-    pub const HTML_DOCUMENT: u16 = 196;
-    pub const HTML_DOCUMENT_END: u16 = 197;
-    pub const XML_DOCUMENT: u16 = 197;
-    pub const XML_DOCUMENT_END: u16 = 198;
-    pub const DOCUMENT_FRAGMENT: u16 = 198;
-    pub const DOCUMENT_FRAGMENT_END: u16 = 200;
-    pub const SHADOW_ROOT: u16 = 199;
-    pub const SHADOW_ROOT_END: u16 = 200;
-    pub const DOCUMENT_TYPE: u16 = 200;
-    pub const DOCUMENT_TYPE_END: u16 = 201;
-    pub const ELEMENT: u16 = 201;
-    pub const ELEMENT_END: u16 = 353;
-    pub const HTML_ELEMENT: u16 = 202;
-    pub const HTML_ELEMENT_END: u16 = 282;
-    pub const HTML_ANCHOR_ELEMENT: u16 = 203;
-    pub const HTML_ANCHOR_ELEMENT_END: u16 = 204;
-    pub const HTML_AREA_ELEMENT: u16 = 204;
-    pub const HTML_AREA_ELEMENT_END: u16 = 205;
-    pub const HTMLBR_ELEMENT: u16 = 205;
-    pub const HTMLBR_ELEMENT_END: u16 = 206;
-    pub const HTML_BASE_ELEMENT: u16 = 206;
-    pub const HTML_BASE_ELEMENT_END: u16 = 207;
-    pub const HTML_BODY_ELEMENT: u16 = 207;
-    pub const HTML_BODY_ELEMENT_END: u16 = 208;
-    pub const HTML_BUTTON_ELEMENT: u16 = 208;
-    pub const HTML_BUTTON_ELEMENT_END: u16 = 209;
-    pub const HTML_CAMERA_ELEMENT: u16 = 209;
-    pub const HTML_CAMERA_ELEMENT_END: u16 = 210;
-    pub const HTML_CANVAS_ELEMENT: u16 = 210;
-    pub const HTML_CANVAS_ELEMENT_END: u16 = 211;
-    pub const HTMLD_LIST_ELEMENT: u16 = 211;
-    pub const HTMLD_LIST_ELEMENT_END: u16 = 212;
-    pub const HTML_DATA_ELEMENT: u16 = 212;
-    pub const HTML_DATA_ELEMENT_END: u16 = 213;
-    pub const HTML_DATA_LIST_ELEMENT: u16 = 213;
-    pub const HTML_DATA_LIST_ELEMENT_END: u16 = 214;
-    pub const HTML_DETAILS_ELEMENT: u16 = 214;
-    pub const HTML_DETAILS_ELEMENT_END: u16 = 215;
-    pub const HTML_DIALOG_ELEMENT: u16 = 215;
-    pub const HTML_DIALOG_ELEMENT_END: u16 = 216;
-    pub const HTML_DIRECTORY_ELEMENT: u16 = 216;
-    pub const HTML_DIRECTORY_ELEMENT_END: u16 = 217;
-    pub const HTML_DIV_ELEMENT: u16 = 217;
-    pub const HTML_DIV_ELEMENT_END: u16 = 218;
-    pub const HTML_EMBED_ELEMENT: u16 = 218;
-    pub const HTML_EMBED_ELEMENT_END: u16 = 219;
-    pub const HTML_FENCED_FRAME_ELEMENT: u16 = 219;
-    pub const HTML_FENCED_FRAME_ELEMENT_END: u16 = 220;
-    pub const HTML_FIELD_SET_ELEMENT: u16 = 220;
-    pub const HTML_FIELD_SET_ELEMENT_END: u16 = 221;
-    pub const HTML_FONT_ELEMENT: u16 = 221;
-    pub const HTML_FONT_ELEMENT_END: u16 = 222;
-    pub const HTML_FORM_ELEMENT: u16 = 222;
-    pub const HTML_FORM_ELEMENT_END: u16 = 223;
-    pub const HTML_FRAME_ELEMENT: u16 = 223;
-    pub const HTML_FRAME_ELEMENT_END: u16 = 224;
-    pub const HTML_FRAME_SET_ELEMENT: u16 = 224;
-    pub const HTML_FRAME_SET_ELEMENT_END: u16 = 225;
-    pub const HTML_GEOLOCATION_ELEMENT: u16 = 225;
-    pub const HTML_GEOLOCATION_ELEMENT_END: u16 = 226;
-    pub const HTMLHR_ELEMENT: u16 = 226;
-    pub const HTMLHR_ELEMENT_END: u16 = 227;
-    pub const HTML_HEAD_ELEMENT: u16 = 227;
-    pub const HTML_HEAD_ELEMENT_END: u16 = 228;
-    pub const HTML_HEADING_ELEMENT: u16 = 228;
-    pub const HTML_HEADING_ELEMENT_END: u16 = 229;
-    pub const HTML_HTML_ELEMENT: u16 = 229;
-    pub const HTML_HTML_ELEMENT_END: u16 = 230;
-    pub const HTMLI_FRAME_ELEMENT: u16 = 230;
-    pub const HTMLI_FRAME_ELEMENT_END: u16 = 231;
-    pub const HTML_IMAGE_ELEMENT: u16 = 231;
-    pub const HTML_IMAGE_ELEMENT_END: u16 = 232;
-    pub const HTML_INPUT_ELEMENT: u16 = 232;
-    pub const HTML_INPUT_ELEMENT_END: u16 = 233;
-    pub const HTML_INSTALL_ELEMENT: u16 = 233;
-    pub const HTML_INSTALL_ELEMENT_END: u16 = 234;
-    pub const HTMLLI_ELEMENT: u16 = 234;
-    pub const HTMLLI_ELEMENT_END: u16 = 235;
-    pub const HTML_LABEL_ELEMENT: u16 = 235;
-    pub const HTML_LABEL_ELEMENT_END: u16 = 236;
-    pub const HTML_LEGEND_ELEMENT: u16 = 236;
-    pub const HTML_LEGEND_ELEMENT_END: u16 = 237;
-    pub const HTML_LINK_ELEMENT: u16 = 237;
-    pub const HTML_LINK_ELEMENT_END: u16 = 238;
-    pub const HTML_MAP_ELEMENT: u16 = 238;
-    pub const HTML_MAP_ELEMENT_END: u16 = 239;
-    pub const HTML_MARQUEE_ELEMENT: u16 = 239;
-    pub const HTML_MARQUEE_ELEMENT_END: u16 = 240;
-    pub const HTML_MEDIA_ELEMENT: u16 = 240;
-    pub const HTML_MEDIA_ELEMENT_END: u16 = 243;
-    pub const HTML_AUDIO_ELEMENT: u16 = 241;
-    pub const HTML_AUDIO_ELEMENT_END: u16 = 242;
-    pub const HTML_VIDEO_ELEMENT: u16 = 242;
-    pub const HTML_VIDEO_ELEMENT_END: u16 = 243;
-    pub const HTML_MENU_ELEMENT: u16 = 243;
-    pub const HTML_MENU_ELEMENT_END: u16 = 244;
-    pub const HTML_META_ELEMENT: u16 = 244;
-    pub const HTML_META_ELEMENT_END: u16 = 245;
-    pub const HTML_METER_ELEMENT: u16 = 245;
-    pub const HTML_METER_ELEMENT_END: u16 = 246;
-    pub const HTML_MICROPHONE_ELEMENT: u16 = 246;
-    pub const HTML_MICROPHONE_ELEMENT_END: u16 = 247;
-    pub const HTML_MOD_ELEMENT: u16 = 247;
-    pub const HTML_MOD_ELEMENT_END: u16 = 248;
-    pub const HTML_MODEL_ELEMENT: u16 = 248;
-    pub const HTML_MODEL_ELEMENT_END: u16 = 249;
-    pub const HTMLO_LIST_ELEMENT: u16 = 249;
-    pub const HTMLO_LIST_ELEMENT_END: u16 = 250;
-    pub const HTML_OBJECT_ELEMENT: u16 = 250;
-    pub const HTML_OBJECT_ELEMENT_END: u16 = 251;
-    pub const HTML_OPT_GROUP_ELEMENT: u16 = 251;
-    pub const HTML_OPT_GROUP_ELEMENT_END: u16 = 252;
-    pub const HTML_OPTION_ELEMENT: u16 = 252;
-    pub const HTML_OPTION_ELEMENT_END: u16 = 253;
-    pub const HTML_OUTPUT_ELEMENT: u16 = 253;
-    pub const HTML_OUTPUT_ELEMENT_END: u16 = 254;
-    pub const HTML_PARAGRAPH_ELEMENT: u16 = 254;
-    pub const HTML_PARAGRAPH_ELEMENT_END: u16 = 255;
-    pub const HTML_PARAM_ELEMENT: u16 = 255;
-    pub const HTML_PARAM_ELEMENT_END: u16 = 256;
-    pub const HTML_PICTURE_ELEMENT: u16 = 256;
-    pub const HTML_PICTURE_ELEMENT_END: u16 = 257;
-    pub const HTML_PORTAL_ELEMENT: u16 = 257;
-    pub const HTML_PORTAL_ELEMENT_END: u16 = 258;
-    pub const HTML_PRE_ELEMENT: u16 = 258;
-    pub const HTML_PRE_ELEMENT_END: u16 = 259;
-    pub const HTML_PROGRESS_ELEMENT: u16 = 259;
-    pub const HTML_PROGRESS_ELEMENT_END: u16 = 260;
-    pub const HTML_QUOTE_ELEMENT: u16 = 260;
-    pub const HTML_QUOTE_ELEMENT_END: u16 = 261;
-    pub const HTML_SCRIPT_ELEMENT: u16 = 261;
-    pub const HTML_SCRIPT_ELEMENT_END: u16 = 262;
-    pub const HTML_SELECT_ELEMENT: u16 = 262;
-    pub const HTML_SELECT_ELEMENT_END: u16 = 263;
-    pub const HTML_SELECTED_CONTENT_ELEMENT: u16 = 263;
-    pub const HTML_SELECTED_CONTENT_ELEMENT_END: u16 = 264;
-    pub const HTML_SLOT_ELEMENT: u16 = 264;
-    pub const HTML_SLOT_ELEMENT_END: u16 = 265;
-    pub const HTML_SOURCE_ELEMENT: u16 = 265;
-    pub const HTML_SOURCE_ELEMENT_END: u16 = 266;
-    pub const HTML_SPAN_ELEMENT: u16 = 266;
-    pub const HTML_SPAN_ELEMENT_END: u16 = 267;
-    pub const HTML_STYLE_ELEMENT: u16 = 267;
-    pub const HTML_STYLE_ELEMENT_END: u16 = 268;
-    pub const HTML_TABLE_CAPTION_ELEMENT: u16 = 268;
-    pub const HTML_TABLE_CAPTION_ELEMENT_END: u16 = 269;
-    pub const HTML_TABLE_CELL_ELEMENT: u16 = 269;
-    pub const HTML_TABLE_CELL_ELEMENT_END: u16 = 270;
-    pub const HTML_TABLE_COL_ELEMENT: u16 = 270;
-    pub const HTML_TABLE_COL_ELEMENT_END: u16 = 271;
-    pub const HTML_TABLE_ELEMENT: u16 = 271;
-    pub const HTML_TABLE_ELEMENT_END: u16 = 272;
-    pub const HTML_TABLE_ROW_ELEMENT: u16 = 272;
-    pub const HTML_TABLE_ROW_ELEMENT_END: u16 = 273;
-    pub const HTML_TABLE_SECTION_ELEMENT: u16 = 273;
-    pub const HTML_TABLE_SECTION_ELEMENT_END: u16 = 274;
-    pub const HTML_TEMPLATE_ELEMENT: u16 = 274;
-    pub const HTML_TEMPLATE_ELEMENT_END: u16 = 275;
-    pub const HTML_TEXT_AREA_ELEMENT: u16 = 275;
-    pub const HTML_TEXT_AREA_ELEMENT_END: u16 = 276;
-    pub const HTML_TIME_ELEMENT: u16 = 276;
-    pub const HTML_TIME_ELEMENT_END: u16 = 277;
-    pub const HTML_TITLE_ELEMENT: u16 = 277;
-    pub const HTML_TITLE_ELEMENT_END: u16 = 278;
-    pub const HTML_TRACK_ELEMENT: u16 = 278;
-    pub const HTML_TRACK_ELEMENT_END: u16 = 279;
-    pub const HTMLU_LIST_ELEMENT: u16 = 279;
-    pub const HTMLU_LIST_ELEMENT_END: u16 = 280;
-    pub const HTML_UNKNOWN_ELEMENT: u16 = 280;
-    pub const HTML_UNKNOWN_ELEMENT_END: u16 = 281;
-    pub const HTML_USER_MEDIA_ELEMENT: u16 = 281;
-    pub const HTML_USER_MEDIA_ELEMENT_END: u16 = 282;
-    pub const SVG_ELEMENT: u16 = 282;
-    pub const SVG_ELEMENT_END: u16 = 353;
-    pub const SVG_ANIMATION_ELEMENT: u16 = 283;
-    pub const SVG_ANIMATION_ELEMENT_END: u16 = 288;
-    pub const SVG_ANIMATE_ELEMENT: u16 = 284;
-    pub const SVG_ANIMATE_ELEMENT_END: u16 = 285;
-    pub const SVG_ANIMATE_MOTION_ELEMENT: u16 = 285;
-    pub const SVG_ANIMATE_MOTION_ELEMENT_END: u16 = 286;
-    pub const SVG_ANIMATE_TRANSFORM_ELEMENT: u16 = 286;
-    pub const SVG_ANIMATE_TRANSFORM_ELEMENT_END: u16 = 287;
-    pub const SVG_SET_ELEMENT: u16 = 287;
-    pub const SVG_SET_ELEMENT_END: u16 = 288;
-    pub const SVG_CLIP_PATH_ELEMENT: u16 = 288;
-    pub const SVG_CLIP_PATH_ELEMENT_END: u16 = 289;
-    pub const SVG_COMPONENT_TRANSFER_FUNCTION_ELEMENT: u16 = 289;
-    pub const SVG_COMPONENT_TRANSFER_FUNCTION_ELEMENT_END: u16 = 294;
-    pub const SVGFE_FUNC_A_ELEMENT: u16 = 290;
-    pub const SVGFE_FUNC_A_ELEMENT_END: u16 = 291;
-    pub const SVGFE_FUNC_B_ELEMENT: u16 = 291;
-    pub const SVGFE_FUNC_B_ELEMENT_END: u16 = 292;
-    pub const SVGFE_FUNC_G_ELEMENT: u16 = 292;
-    pub const SVGFE_FUNC_G_ELEMENT_END: u16 = 293;
-    pub const SVGFE_FUNC_R_ELEMENT: u16 = 293;
-    pub const SVGFE_FUNC_R_ELEMENT_END: u16 = 294;
-    pub const SVG_DESC_ELEMENT: u16 = 294;
-    pub const SVG_DESC_ELEMENT_END: u16 = 295;
-    pub const SVGFE_BLEND_ELEMENT: u16 = 295;
-    pub const SVGFE_BLEND_ELEMENT_END: u16 = 296;
-    pub const SVGFE_COLOR_MATRIX_ELEMENT: u16 = 296;
-    pub const SVGFE_COLOR_MATRIX_ELEMENT_END: u16 = 297;
-    pub const SVGFE_COMPONENT_TRANSFER_ELEMENT: u16 = 297;
-    pub const SVGFE_COMPONENT_TRANSFER_ELEMENT_END: u16 = 298;
-    pub const SVGFE_COMPOSITE_ELEMENT: u16 = 298;
-    pub const SVGFE_COMPOSITE_ELEMENT_END: u16 = 299;
-    pub const SVGFE_CONVOLVE_MATRIX_ELEMENT: u16 = 299;
-    pub const SVGFE_CONVOLVE_MATRIX_ELEMENT_END: u16 = 300;
-    pub const SVGFE_DIFFUSE_LIGHTING_ELEMENT: u16 = 300;
-    pub const SVGFE_DIFFUSE_LIGHTING_ELEMENT_END: u16 = 301;
-    pub const SVGFE_DISPLACEMENT_MAP_ELEMENT: u16 = 301;
-    pub const SVGFE_DISPLACEMENT_MAP_ELEMENT_END: u16 = 302;
-    pub const SVGFE_DISTANT_LIGHT_ELEMENT: u16 = 302;
-    pub const SVGFE_DISTANT_LIGHT_ELEMENT_END: u16 = 303;
-    pub const SVGFE_DROP_SHADOW_ELEMENT: u16 = 303;
-    pub const SVGFE_DROP_SHADOW_ELEMENT_END: u16 = 304;
-    pub const SVGFE_FLOOD_ELEMENT: u16 = 304;
-    pub const SVGFE_FLOOD_ELEMENT_END: u16 = 305;
-    pub const SVGFE_GAUSSIAN_BLUR_ELEMENT: u16 = 305;
-    pub const SVGFE_GAUSSIAN_BLUR_ELEMENT_END: u16 = 306;
-    pub const SVGFE_IMAGE_ELEMENT: u16 = 306;
-    pub const SVGFE_IMAGE_ELEMENT_END: u16 = 307;
-    pub const SVGFE_MERGE_ELEMENT: u16 = 307;
-    pub const SVGFE_MERGE_ELEMENT_END: u16 = 308;
-    pub const SVGFE_MERGE_NODE_ELEMENT: u16 = 308;
-    pub const SVGFE_MERGE_NODE_ELEMENT_END: u16 = 309;
-    pub const SVGFE_MORPHOLOGY_ELEMENT: u16 = 309;
-    pub const SVGFE_MORPHOLOGY_ELEMENT_END: u16 = 310;
-    pub const SVGFE_OFFSET_ELEMENT: u16 = 310;
-    pub const SVGFE_OFFSET_ELEMENT_END: u16 = 311;
-    pub const SVGFE_POINT_LIGHT_ELEMENT: u16 = 311;
-    pub const SVGFE_POINT_LIGHT_ELEMENT_END: u16 = 312;
-    pub const SVGFE_SPECULAR_LIGHTING_ELEMENT: u16 = 312;
-    pub const SVGFE_SPECULAR_LIGHTING_ELEMENT_END: u16 = 313;
-    pub const SVGFE_SPOT_LIGHT_ELEMENT: u16 = 313;
-    pub const SVGFE_SPOT_LIGHT_ELEMENT_END: u16 = 314;
-    pub const SVGFE_TILE_ELEMENT: u16 = 314;
-    pub const SVGFE_TILE_ELEMENT_END: u16 = 315;
-    pub const SVGFE_TURBULENCE_ELEMENT: u16 = 315;
-    pub const SVGFE_TURBULENCE_ELEMENT_END: u16 = 316;
-    pub const SVG_FILTER_ELEMENT: u16 = 316;
-    pub const SVG_FILTER_ELEMENT_END: u16 = 317;
-    pub const SVG_GRADIENT_ELEMENT: u16 = 317;
-    pub const SVG_GRADIENT_ELEMENT_END: u16 = 320;
-    pub const SVG_LINEAR_GRADIENT_ELEMENT: u16 = 318;
-    pub const SVG_LINEAR_GRADIENT_ELEMENT_END: u16 = 319;
-    pub const SVG_RADIAL_GRADIENT_ELEMENT: u16 = 319;
-    pub const SVG_RADIAL_GRADIENT_ELEMENT_END: u16 = 320;
-    pub const SVG_GRAPHICS_ELEMENT: u16 = 320;
-    pub const SVG_GRAPHICS_ELEMENT_END: u16 = 343;
-    pub const SVGA_ELEMENT: u16 = 321;
-    pub const SVGA_ELEMENT_END: u16 = 322;
-    pub const SVG_DEFS_ELEMENT: u16 = 322;
-    pub const SVG_DEFS_ELEMENT_END: u16 = 323;
-    pub const SVG_FOREIGN_OBJECT_ELEMENT: u16 = 323;
-    pub const SVG_FOREIGN_OBJECT_ELEMENT_END: u16 = 324;
-    pub const SVGG_ELEMENT: u16 = 324;
-    pub const SVGG_ELEMENT_END: u16 = 325;
-    pub const SVG_GEOMETRY_ELEMENT: u16 = 325;
-    pub const SVG_GEOMETRY_ELEMENT_END: u16 = 333;
-    pub const SVG_CIRCLE_ELEMENT: u16 = 326;
-    pub const SVG_CIRCLE_ELEMENT_END: u16 = 327;
-    pub const SVG_ELLIPSE_ELEMENT: u16 = 327;
-    pub const SVG_ELLIPSE_ELEMENT_END: u16 = 328;
-    pub const SVG_LINE_ELEMENT: u16 = 328;
-    pub const SVG_LINE_ELEMENT_END: u16 = 329;
-    pub const SVG_PATH_ELEMENT: u16 = 329;
-    pub const SVG_PATH_ELEMENT_END: u16 = 330;
-    pub const SVG_POLYGON_ELEMENT: u16 = 330;
-    pub const SVG_POLYGON_ELEMENT_END: u16 = 331;
-    pub const SVG_POLYLINE_ELEMENT: u16 = 331;
-    pub const SVG_POLYLINE_ELEMENT_END: u16 = 332;
-    pub const SVG_RECT_ELEMENT: u16 = 332;
-    pub const SVG_RECT_ELEMENT_END: u16 = 333;
-    pub const SVG_IMAGE_ELEMENT: u16 = 333;
-    pub const SVG_IMAGE_ELEMENT_END: u16 = 334;
-    pub const SVGSVG_ELEMENT: u16 = 334;
-    pub const SVGSVG_ELEMENT_END: u16 = 335;
-    pub const SVG_SWITCH_ELEMENT: u16 = 335;
-    pub const SVG_SWITCH_ELEMENT_END: u16 = 336;
-    pub const SVG_SYMBOL_ELEMENT: u16 = 336;
-    pub const SVG_SYMBOL_ELEMENT_END: u16 = 337;
-    pub const SVG_TEXT_CONTENT_ELEMENT: u16 = 337;
-    pub const SVG_TEXT_CONTENT_ELEMENT_END: u16 = 342;
-    pub const SVG_TEXT_PATH_ELEMENT: u16 = 338;
-    pub const SVG_TEXT_PATH_ELEMENT_END: u16 = 339;
-    pub const SVG_TEXT_POSITIONING_ELEMENT: u16 = 339;
-    pub const SVG_TEXT_POSITIONING_ELEMENT_END: u16 = 342;
-    pub const SVGT_SPAN_ELEMENT: u16 = 340;
-    pub const SVGT_SPAN_ELEMENT_END: u16 = 341;
-    pub const SVG_TEXT_ELEMENT: u16 = 341;
-    pub const SVG_TEXT_ELEMENT_END: u16 = 342;
-    pub const SVG_USE_ELEMENT: u16 = 342;
-    pub const SVG_USE_ELEMENT_END: u16 = 343;
-    pub const SVGM_PATH_ELEMENT: u16 = 343;
-    pub const SVGM_PATH_ELEMENT_END: u16 = 344;
-    pub const SVG_MARKER_ELEMENT: u16 = 344;
-    pub const SVG_MARKER_ELEMENT_END: u16 = 345;
-    pub const SVG_MASK_ELEMENT: u16 = 345;
-    pub const SVG_MASK_ELEMENT_END: u16 = 346;
-    pub const SVG_METADATA_ELEMENT: u16 = 346;
-    pub const SVG_METADATA_ELEMENT_END: u16 = 347;
-    pub const SVG_PATTERN_ELEMENT: u16 = 347;
-    pub const SVG_PATTERN_ELEMENT_END: u16 = 348;
-    pub const SVG_SCRIPT_ELEMENT: u16 = 348;
-    pub const SVG_SCRIPT_ELEMENT_END: u16 = 349;
-    pub const SVG_STOP_ELEMENT: u16 = 349;
-    pub const SVG_STOP_ELEMENT_END: u16 = 350;
-    pub const SVG_STYLE_ELEMENT: u16 = 350;
-    pub const SVG_STYLE_ELEMENT_END: u16 = 351;
-    pub const SVG_TITLE_ELEMENT: u16 = 351;
-    pub const SVG_TITLE_ELEMENT_END: u16 = 352;
-    pub const SVG_VIEW_ELEMENT: u16 = 352;
-    pub const SVG_VIEW_ELEMENT_END: u16 = 353;
-    pub const NOTIFICATION: u16 = 353;
-    pub const NOTIFICATION_END: u16 = 354;
-    pub const OFFSCREEN_CANVAS: u16 = 354;
-    pub const OFFSCREEN_CANVAS_END: u16 = 355;
-    pub const PERFORMANCE: u16 = 355;
-    pub const PERFORMANCE_END: u16 = 356;
-    pub const PERMISSION_STATUS: u16 = 356;
-    pub const PERMISSION_STATUS_END: u16 = 357;
-    pub const SCREEN_ORIENTATION: u16 = 357;
-    pub const SCREEN_ORIENTATION_END: u16 = 358;
-    pub const SOURCE_BUFFER: u16 = 358;
-    pub const SOURCE_BUFFER_END: u16 = 359;
-    pub const SOURCE_BUFFER_LIST: u16 = 359;
-    pub const SOURCE_BUFFER_LIST_END: u16 = 360;
-    pub const TEXT_TRACK: u16 = 360;
-    pub const TEXT_TRACK_END: u16 = 361;
-    pub const TEXT_TRACK_CUE: u16 = 361;
-    pub const TEXT_TRACK_CUE_END: u16 = 363;
-    pub const VTT_CUE: u16 = 362;
-    pub const VTT_CUE_END: u16 = 363;
-    pub const TEXT_TRACK_LIST: u16 = 363;
-    pub const TEXT_TRACK_LIST_END: u16 = 364;
-    pub const VIDEO_TRACK_LIST: u16 = 364;
-    pub const VIDEO_TRACK_LIST_END: u16 = 365;
-    pub const VISUAL_VIEWPORT: u16 = 365;
-    pub const VISUAL_VIEWPORT_END: u16 = 366;
-    pub const WEB_SOCKET: u16 = 366;
-    pub const WEB_SOCKET_END: u16 = 367;
-    pub const WINDOW: u16 = 367;
-    pub const WINDOW_END: u16 = 368;
-    pub const WORKER: u16 = 368;
-    pub const WORKER_END: u16 = 369;
-    pub const WORKER_GLOBAL_SCOPE: u16 = 369;
-    pub const WORKER_GLOBAL_SCOPE_END: u16 = 371;
-    pub const DEDICATED_WORKER_GLOBAL_SCOPE: u16 = 370;
-    pub const DEDICATED_WORKER_GLOBAL_SCOPE_END: u16 = 371;
-    pub const XML_HTTP_REQUEST_EVENT_TARGET: u16 = 371;
-    pub const XML_HTTP_REQUEST_EVENT_TARGET_END: u16 = 374;
-    pub const XML_HTTP_REQUEST: u16 = 372;
-    pub const XML_HTTP_REQUEST_END: u16 = 373;
-    pub const XML_HTTP_REQUEST_UPLOAD: u16 = 373;
-    pub const XML_HTTP_REQUEST_UPLOAD_END: u16 = 374;
-    pub const EXTERNAL: u16 = 374;
-    pub const EXTERNAL_END: u16 = 375;
-    pub const FILE_LIST: u16 = 375;
-    pub const FILE_LIST_END: u16 = 376;
-    pub const FONT_FACE: u16 = 376;
-    pub const FONT_FACE_END: u16 = 377;
-    pub const FORM_DATA: u16 = 377;
-    pub const FORM_DATA_END: u16 = 378;
-    pub const GAMEPAD: u16 = 378;
-    pub const GAMEPAD_END: u16 = 379;
-    pub const GAMEPAD_BUTTON: u16 = 379;
-    pub const GAMEPAD_BUTTON_END: u16 = 380;
-    pub const GAMEPAD_HAPTIC_ACTUATOR: u16 = 380;
-    pub const GAMEPAD_HAPTIC_ACTUATOR_END: u16 = 381;
-    pub const HTML_ALL_COLLECTION: u16 = 381;
-    pub const HTML_ALL_COLLECTION_END: u16 = 382;
-    pub const HTML_COLLECTION: u16 = 382;
-    pub const HTML_COLLECTION_END: u16 = 385;
-    pub const HTML_FORM_CONTROLS_COLLECTION: u16 = 383;
-    pub const HTML_FORM_CONTROLS_COLLECTION_END: u16 = 384;
-    pub const HTML_OPTIONS_COLLECTION: u16 = 384;
-    pub const HTML_OPTIONS_COLLECTION_END: u16 = 385;
-    pub const HEADERS: u16 = 385;
-    pub const HEADERS_END: u16 = 386;
-    pub const HISTORY: u16 = 386;
-    pub const HISTORY_END: u16 = 387;
-    pub const IDB_CURSOR: u16 = 387;
-    pub const IDB_CURSOR_END: u16 = 389;
-    pub const IDB_CURSOR_WITH_VALUE: u16 = 388;
-    pub const IDB_CURSOR_WITH_VALUE_END: u16 = 389;
-    pub const IDB_FACTORY: u16 = 389;
-    pub const IDB_FACTORY_END: u16 = 390;
-    pub const IDB_INDEX: u16 = 390;
-    pub const IDB_INDEX_END: u16 = 391;
-    pub const IDB_KEY_RANGE: u16 = 391;
-    pub const IDB_KEY_RANGE_END: u16 = 392;
-    pub const IDB_OBJECT_STORE: u16 = 392;
-    pub const IDB_OBJECT_STORE_END: u16 = 393;
-    pub const IDB_RECORD: u16 = 393;
-    pub const IDB_RECORD_END: u16 = 394;
-    pub const IDLE_DEADLINE: u16 = 394;
-    pub const IDLE_DEADLINE_END: u16 = 395;
-    pub const IMAGE_BITMAP: u16 = 395;
-    pub const IMAGE_BITMAP_END: u16 = 396;
-    pub const IMAGE_DATA: u16 = 396;
-    pub const IMAGE_DATA_END: u16 = 397;
-    pub const INPUT_DEVICE_CAPABILITIES: u16 = 397;
-    pub const INPUT_DEVICE_CAPABILITIES_END: u16 = 398;
-    pub const INTERSECTION_OBSERVER: u16 = 398;
-    pub const INTERSECTION_OBSERVER_END: u16 = 399;
-    pub const INTERSECTION_OBSERVER_ENTRY: u16 = 399;
-    pub const INTERSECTION_OBSERVER_ENTRY_END: u16 = 400;
-    pub const LOCATION: u16 = 400;
-    pub const LOCATION_END: u16 = 401;
-    pub const MEDIA_CAPABILITIES: u16 = 401;
-    pub const MEDIA_CAPABILITIES_END: u16 = 402;
-    pub const MEDIA_DEVICE_INFO: u16 = 402;
-    pub const MEDIA_DEVICE_INFO_END: u16 = 404;
-    pub const INPUT_DEVICE_INFO: u16 = 403;
-    pub const INPUT_DEVICE_INFO_END: u16 = 404;
-    pub const MEDIA_ERROR: u16 = 404;
-    pub const MEDIA_ERROR_END: u16 = 405;
-    pub const MEDIA_KEY_STATUS_MAP: u16 = 405;
-    pub const MEDIA_KEY_STATUS_MAP_END: u16 = 406;
-    pub const MEDIA_KEY_SYSTEM_ACCESS: u16 = 406;
-    pub const MEDIA_KEY_SYSTEM_ACCESS_END: u16 = 407;
-    pub const MEDIA_KEYS: u16 = 407;
-    pub const MEDIA_KEYS_END: u16 = 408;
-    pub const MEDIA_LIST: u16 = 408;
-    pub const MEDIA_LIST_END: u16 = 409;
-    pub const MESSAGE_CHANNEL: u16 = 409;
-    pub const MESSAGE_CHANNEL_END: u16 = 410;
-    pub const MIME_TYPE: u16 = 410;
-    pub const MIME_TYPE_END: u16 = 411;
-    pub const MIME_TYPE_ARRAY: u16 = 411;
-    pub const MIME_TYPE_ARRAY_END: u16 = 412;
-    pub const MUTATION_OBSERVER: u16 = 412;
-    pub const MUTATION_OBSERVER_END: u16 = 413;
-    pub const MUTATION_RECORD: u16 = 413;
-    pub const MUTATION_RECORD_END: u16 = 414;
-    pub const NAMED_NODE_MAP: u16 = 414;
-    pub const NAMED_NODE_MAP_END: u16 = 415;
-    pub const NAVIGATOR: u16 = 415;
-    pub const NAVIGATOR_END: u16 = 416;
-    pub const NAVIGATOR_UA_DATA: u16 = 416;
-    pub const NAVIGATOR_UA_DATA_END: u16 = 417;
-    pub const NODE_ITERATOR: u16 = 417;
-    pub const NODE_ITERATOR_END: u16 = 418;
-    pub const NODE_LIST: u16 = 418;
-    pub const NODE_LIST_END: u16 = 420;
-    pub const RADIO_NODE_LIST: u16 = 419;
-    pub const RADIO_NODE_LIST_END: u16 = 420;
-    pub const OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D: u16 = 420;
-    pub const OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D_END: u16 = 421;
-    pub const PATH2_D: u16 = 421;
-    pub const PATH2_D_END: u16 = 422;
-    pub const PERFORMANCE_ENTRY: u16 = 422;
-    pub const PERFORMANCE_ENTRY_END: u16 = 430;
-    pub const PERFORMANCE_EVENT_TIMING: u16 = 423;
-    pub const PERFORMANCE_EVENT_TIMING_END: u16 = 424;
-    pub const PERFORMANCE_MARK: u16 = 424;
-    pub const PERFORMANCE_MARK_END: u16 = 425;
-    pub const PERFORMANCE_MEASURE: u16 = 425;
-    pub const PERFORMANCE_MEASURE_END: u16 = 426;
-    pub const PERFORMANCE_PAINT_TIMING: u16 = 426;
-    pub const PERFORMANCE_PAINT_TIMING_END: u16 = 427;
-    pub const PERFORMANCE_RESOURCE_TIMING: u16 = 427;
-    pub const PERFORMANCE_RESOURCE_TIMING_END: u16 = 429;
-    pub const PERFORMANCE_NAVIGATION_TIMING: u16 = 428;
-    pub const PERFORMANCE_NAVIGATION_TIMING_END: u16 = 429;
-    pub const VISIBILITY_STATE_ENTRY: u16 = 429;
-    pub const VISIBILITY_STATE_ENTRY_END: u16 = 430;
-    pub const PERFORMANCE_NAVIGATION: u16 = 430;
-    pub const PERFORMANCE_NAVIGATION_END: u16 = 431;
-    pub const PERFORMANCE_OBSERVER: u16 = 431;
-    pub const PERFORMANCE_OBSERVER_END: u16 = 432;
-    pub const PERFORMANCE_OBSERVER_ENTRY_LIST: u16 = 432;
-    pub const PERFORMANCE_OBSERVER_ENTRY_LIST_END: u16 = 433;
-    pub const PERFORMANCE_SERVER_TIMING: u16 = 433;
-    pub const PERFORMANCE_SERVER_TIMING_END: u16 = 434;
-    pub const PERFORMANCE_TIMING: u16 = 434;
-    pub const PERFORMANCE_TIMING_END: u16 = 435;
-    pub const PERIODIC_WAVE: u16 = 435;
-    pub const PERIODIC_WAVE_END: u16 = 436;
-    pub const PERMISSIONS: u16 = 436;
-    pub const PERMISSIONS_END: u16 = 437;
-    pub const PLUGIN: u16 = 437;
-    pub const PLUGIN_END: u16 = 438;
-    pub const PLUGIN_ARRAY: u16 = 438;
-    pub const PLUGIN_ARRAY_END: u16 = 439;
-    pub const READABLE_BYTE_STREAM_CONTROLLER: u16 = 439;
-    pub const READABLE_BYTE_STREAM_CONTROLLER_END: u16 = 440;
-    pub const READABLE_STREAM: u16 = 440;
-    pub const READABLE_STREAM_END: u16 = 441;
-    pub const READABLE_STREAM_BYOB_READER: u16 = 441;
-    pub const READABLE_STREAM_BYOB_READER_END: u16 = 442;
-    pub const READABLE_STREAM_BYOB_REQUEST: u16 = 442;
-    pub const READABLE_STREAM_BYOB_REQUEST_END: u16 = 443;
-    pub const READABLE_STREAM_DEFAULT_CONTROLLER: u16 = 443;
-    pub const READABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 444;
-    pub const READABLE_STREAM_DEFAULT_READER: u16 = 444;
-    pub const READABLE_STREAM_DEFAULT_READER_END: u16 = 445;
-    pub const REQUEST: u16 = 445;
-    pub const REQUEST_END: u16 = 446;
-    pub const RESIZE_OBSERVER: u16 = 446;
-    pub const RESIZE_OBSERVER_END: u16 = 447;
-    pub const RESIZE_OBSERVER_ENTRY: u16 = 447;
-    pub const RESIZE_OBSERVER_ENTRY_END: u16 = 448;
-    pub const RESIZE_OBSERVER_SIZE: u16 = 448;
-    pub const RESIZE_OBSERVER_SIZE_END: u16 = 449;
-    pub const RESPONSE: u16 = 449;
-    pub const RESPONSE_END: u16 = 450;
-    pub const SVG_ANGLE: u16 = 450;
-    pub const SVG_ANGLE_END: u16 = 451;
-    pub const SVG_ANIMATED_ANGLE: u16 = 451;
-    pub const SVG_ANIMATED_ANGLE_END: u16 = 452;
-    pub const SVG_ANIMATED_BOOLEAN: u16 = 452;
-    pub const SVG_ANIMATED_BOOLEAN_END: u16 = 453;
-    pub const SVG_ANIMATED_ENUMERATION: u16 = 453;
-    pub const SVG_ANIMATED_ENUMERATION_END: u16 = 454;
-    pub const SVG_ANIMATED_INTEGER: u16 = 454;
-    pub const SVG_ANIMATED_INTEGER_END: u16 = 455;
-    pub const SVG_ANIMATED_LENGTH: u16 = 455;
-    pub const SVG_ANIMATED_LENGTH_END: u16 = 456;
-    pub const SVG_ANIMATED_LENGTH_LIST: u16 = 456;
-    pub const SVG_ANIMATED_LENGTH_LIST_END: u16 = 457;
-    pub const SVG_ANIMATED_NUMBER: u16 = 457;
-    pub const SVG_ANIMATED_NUMBER_END: u16 = 458;
-    pub const SVG_ANIMATED_NUMBER_LIST: u16 = 458;
-    pub const SVG_ANIMATED_NUMBER_LIST_END: u16 = 459;
-    pub const SVG_ANIMATED_PRESERVE_ASPECT_RATIO: u16 = 459;
-    pub const SVG_ANIMATED_PRESERVE_ASPECT_RATIO_END: u16 = 460;
-    pub const SVG_ANIMATED_RECT: u16 = 460;
-    pub const SVG_ANIMATED_RECT_END: u16 = 461;
-    pub const SVG_ANIMATED_STRING: u16 = 461;
-    pub const SVG_ANIMATED_STRING_END: u16 = 462;
-    pub const SVG_ANIMATED_TRANSFORM_LIST: u16 = 462;
-    pub const SVG_ANIMATED_TRANSFORM_LIST_END: u16 = 463;
-    pub const SVG_LENGTH: u16 = 463;
-    pub const SVG_LENGTH_END: u16 = 464;
-    pub const SVG_LENGTH_LIST: u16 = 464;
-    pub const SVG_LENGTH_LIST_END: u16 = 465;
-    pub const SVG_NUMBER: u16 = 465;
-    pub const SVG_NUMBER_END: u16 = 466;
-    pub const SVG_NUMBER_LIST: u16 = 466;
-    pub const SVG_NUMBER_LIST_END: u16 = 467;
-    pub const SVG_POINT_LIST: u16 = 467;
-    pub const SVG_POINT_LIST_END: u16 = 468;
-    pub const SVG_PRESERVE_ASPECT_RATIO: u16 = 468;
-    pub const SVG_PRESERVE_ASPECT_RATIO_END: u16 = 469;
-    pub const SVG_STRING_LIST: u16 = 469;
-    pub const SVG_STRING_LIST_END: u16 = 470;
-    pub const SVG_TRANSFORM: u16 = 470;
-    pub const SVG_TRANSFORM_END: u16 = 471;
-    pub const SVG_TRANSFORM_LIST: u16 = 471;
-    pub const SVG_TRANSFORM_LIST_END: u16 = 472;
-    pub const SVG_UNIT_TYPES: u16 = 472;
-    pub const SVG_UNIT_TYPES_END: u16 = 473;
-    pub const SANITIZER: u16 = 473;
-    pub const SANITIZER_END: u16 = 474;
-    pub const SCHEDULER: u16 = 474;
-    pub const SCHEDULER_END: u16 = 475;
-    pub const SCHEDULING: u16 = 475;
-    pub const SCHEDULING_END: u16 = 476;
-    pub const SCREEN: u16 = 476;
-    pub const SCREEN_END: u16 = 477;
-    pub const SELECTION: u16 = 477;
-    pub const SELECTION_END: u16 = 478;
-    pub const STORAGE: u16 = 478;
-    pub const STORAGE_END: u16 = 479;
-    pub const STORAGE_MANAGER: u16 = 479;
-    pub const STORAGE_MANAGER_END: u16 = 480;
-    pub const STYLE_PROPERTY_MAP_READ_ONLY: u16 = 480;
-    pub const STYLE_PROPERTY_MAP_READ_ONLY_END: u16 = 482;
-    pub const STYLE_PROPERTY_MAP: u16 = 481;
-    pub const STYLE_PROPERTY_MAP_END: u16 = 482;
-    pub const STYLE_SHEET: u16 = 482;
-    pub const STYLE_SHEET_END: u16 = 484;
-    pub const CSS_STYLE_SHEET: u16 = 483;
-    pub const CSS_STYLE_SHEET_END: u16 = 484;
-    pub const STYLE_SHEET_LIST: u16 = 484;
-    pub const STYLE_SHEET_LIST_END: u16 = 485;
-    pub const SUBTLE_CRYPTO: u16 = 485;
-    pub const SUBTLE_CRYPTO_END: u16 = 486;
-    pub const TEXT_DECODER: u16 = 486;
-    pub const TEXT_DECODER_END: u16 = 487;
-    pub const TEXT_DECODER_STREAM: u16 = 487;
-    pub const TEXT_DECODER_STREAM_END: u16 = 488;
-    pub const TEXT_ENCODER: u16 = 488;
-    pub const TEXT_ENCODER_END: u16 = 489;
-    pub const TEXT_ENCODER_STREAM: u16 = 489;
-    pub const TEXT_ENCODER_STREAM_END: u16 = 490;
-    pub const TEXT_METRICS: u16 = 490;
-    pub const TEXT_METRICS_END: u16 = 491;
-    pub const TEXT_TRACK_CUE_LIST: u16 = 491;
-    pub const TEXT_TRACK_CUE_LIST_END: u16 = 492;
-    pub const TIME_RANGES: u16 = 492;
-    pub const TIME_RANGES_END: u16 = 493;
-    pub const TOUCH: u16 = 493;
-    pub const TOUCH_END: u16 = 494;
-    pub const TOUCH_LIST: u16 = 494;
-    pub const TOUCH_LIST_END: u16 = 495;
-    pub const TRANSFORM_STREAM: u16 = 495;
-    pub const TRANSFORM_STREAM_END: u16 = 496;
-    pub const TRANSFORM_STREAM_DEFAULT_CONTROLLER: u16 = 496;
-    pub const TRANSFORM_STREAM_DEFAULT_CONTROLLER_END: u16 = 497;
-    pub const TREE_WALKER: u16 = 497;
-    pub const TREE_WALKER_END: u16 = 498;
-    pub const TRUSTED_HTML: u16 = 498;
-    pub const TRUSTED_HTML_END: u16 = 499;
-    pub const TRUSTED_HTML_PARSER_OPTIONS: u16 = 499;
-    pub const TRUSTED_HTML_PARSER_OPTIONS_END: u16 = 500;
-    pub const TRUSTED_SCRIPT: u16 = 500;
-    pub const TRUSTED_SCRIPT_END: u16 = 501;
-    pub const TRUSTED_SCRIPT_URL: u16 = 501;
-    pub const TRUSTED_SCRIPT_URL_END: u16 = 502;
-    pub const TRUSTED_TYPE_POLICY: u16 = 502;
-    pub const TRUSTED_TYPE_POLICY_END: u16 = 503;
-    pub const TRUSTED_TYPE_POLICY_FACTORY: u16 = 503;
-    pub const TRUSTED_TYPE_POLICY_FACTORY_END: u16 = 504;
-    pub const URL: u16 = 504;
-    pub const URL_END: u16 = 505;
-    pub const URL_PATTERN: u16 = 505;
-    pub const URL_PATTERN_END: u16 = 506;
-    pub const URL_SEARCH_PARAMS: u16 = 506;
-    pub const URL_SEARCH_PARAMS_END: u16 = 507;
-    pub const USER_ACTIVATION: u16 = 507;
-    pub const USER_ACTIVATION_END: u16 = 508;
-    pub const VALIDITY_STATE: u16 = 508;
-    pub const VALIDITY_STATE_END: u16 = 509;
-    pub const VIDEO_PLAYBACK_QUALITY: u16 = 509;
-    pub const VIDEO_PLAYBACK_QUALITY_END: u16 = 510;
-    pub const VIDEO_TRACK: u16 = 510;
-    pub const VIDEO_TRACK_END: u16 = 511;
-    pub const VIEW_TRANSITION: u16 = 511;
-    pub const VIEW_TRANSITION_END: u16 = 512;
-    pub const VIEW_TRANSITION_TYPE_SET: u16 = 512;
-    pub const VIEW_TRANSITION_TYPE_SET_END: u16 = 513;
-    pub const WEB_GL2_RENDERING_CONTEXT: u16 = 513;
-    pub const WEB_GL2_RENDERING_CONTEXT_END: u16 = 514;
-    pub const WEB_GL_ACTIVE_INFO: u16 = 514;
-    pub const WEB_GL_ACTIVE_INFO_END: u16 = 515;
-    pub const WEB_GL_OBJECT: u16 = 515;
-    pub const WEB_GL_OBJECT_END: u16 = 527;
-    pub const WEB_GL_BUFFER: u16 = 516;
-    pub const WEB_GL_BUFFER_END: u16 = 517;
-    pub const WEB_GL_FRAMEBUFFER: u16 = 517;
-    pub const WEB_GL_FRAMEBUFFER_END: u16 = 518;
-    pub const WEB_GL_PROGRAM: u16 = 518;
-    pub const WEB_GL_PROGRAM_END: u16 = 519;
-    pub const WEB_GL_QUERY: u16 = 519;
-    pub const WEB_GL_QUERY_END: u16 = 520;
-    pub const WEB_GL_RENDERBUFFER: u16 = 520;
-    pub const WEB_GL_RENDERBUFFER_END: u16 = 521;
-    pub const WEB_GL_SAMPLER: u16 = 521;
-    pub const WEB_GL_SAMPLER_END: u16 = 522;
-    pub const WEB_GL_SHADER: u16 = 522;
-    pub const WEB_GL_SHADER_END: u16 = 523;
-    pub const WEB_GL_SYNC: u16 = 523;
-    pub const WEB_GL_SYNC_END: u16 = 524;
-    pub const WEB_GL_TEXTURE: u16 = 524;
-    pub const WEB_GL_TEXTURE_END: u16 = 525;
-    pub const WEB_GL_TRANSFORM_FEEDBACK: u16 = 525;
-    pub const WEB_GL_TRANSFORM_FEEDBACK_END: u16 = 526;
-    pub const WEB_GL_VERTEX_ARRAY_OBJECT: u16 = 526;
-    pub const WEB_GL_VERTEX_ARRAY_OBJECT_END: u16 = 527;
-    pub const WEB_GL_RENDERING_CONTEXT: u16 = 527;
-    pub const WEB_GL_RENDERING_CONTEXT_END: u16 = 528;
-    pub const WEB_GL_SHADER_PRECISION_FORMAT: u16 = 528;
-    pub const WEB_GL_SHADER_PRECISION_FORMAT_END: u16 = 529;
-    pub const WEB_GL_UNIFORM_LOCATION: u16 = 529;
-    pub const WEB_GL_UNIFORM_LOCATION_END: u16 = 530;
-    pub const WORKER_LOCATION: u16 = 530;
-    pub const WORKER_LOCATION_END: u16 = 531;
-    pub const WORKER_NAVIGATOR: u16 = 531;
-    pub const WORKER_NAVIGATOR_END: u16 = 532;
-    pub const WRITABLE_STREAM: u16 = 532;
-    pub const WRITABLE_STREAM_END: u16 = 533;
-    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER: u16 = 533;
-    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 534;
-    pub const WRITABLE_STREAM_DEFAULT_WRITER: u16 = 534;
-    pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 535;
-    pub const XML_SERIALIZER: u16 = 535;
-    pub const XML_SERIALIZER_END: u16 = 536;
-    pub const X_PATH_EVALUATOR: u16 = 536;
-    pub const X_PATH_EVALUATOR_END: u16 = 537;
-    pub const X_PATH_EXPRESSION: u16 = 537;
-    pub const X_PATH_EXPRESSION_END: u16 = 538;
-    pub const X_PATH_RESULT: u16 = 538;
-    pub const X_PATH_RESULT_END: u16 = 539;
+    pub const ANGLE_INSTANCED_ARRAYS: u16 = 1;
+    pub const ANGLE_INSTANCED_ARRAYS_END: u16 = 2;
+    pub const ABORT_CONTROLLER: u16 = 2;
+    pub const ABORT_CONTROLLER_END: u16 = 4;
+    pub const TASK_CONTROLLER: u16 = 3;
+    pub const TASK_CONTROLLER_END: u16 = 4;
+    pub const ABSTRACT_RANGE: u16 = 4;
+    pub const ABSTRACT_RANGE_END: u16 = 7;
+    pub const RANGE: u16 = 5;
+    pub const RANGE_END: u16 = 6;
+    pub const STATIC_RANGE: u16 = 6;
+    pub const STATIC_RANGE_END: u16 = 7;
+    pub const ANIMATION_EFFECT: u16 = 7;
+    pub const ANIMATION_EFFECT_END: u16 = 9;
+    pub const KEYFRAME_EFFECT: u16 = 8;
+    pub const KEYFRAME_EFFECT_END: u16 = 9;
+    pub const ANIMATION_TIMELINE: u16 = 9;
+    pub const ANIMATION_TIMELINE_END: u16 = 11;
+    pub const DOCUMENT_TIMELINE: u16 = 10;
+    pub const DOCUMENT_TIMELINE_END: u16 = 11;
+    pub const AUDIO_BUFFER: u16 = 11;
+    pub const AUDIO_BUFFER_END: u16 = 12;
+    pub const AUDIO_LISTENER: u16 = 12;
+    pub const AUDIO_LISTENER_END: u16 = 13;
+    pub const AUDIO_PARAM: u16 = 13;
+    pub const AUDIO_PARAM_END: u16 = 14;
+    pub const AUDIO_TRACK: u16 = 14;
+    pub const AUDIO_TRACK_END: u16 = 15;
+    pub const AUTHENTICATOR_RESPONSE: u16 = 15;
+    pub const AUTHENTICATOR_RESPONSE_END: u16 = 18;
+    pub const AUTHENTICATOR_ASSERTION_RESPONSE: u16 = 16;
+    pub const AUTHENTICATOR_ASSERTION_RESPONSE_END: u16 = 17;
+    pub const AUTHENTICATOR_ATTESTATION_RESPONSE: u16 = 17;
+    pub const AUTHENTICATOR_ATTESTATION_RESPONSE_END: u16 = 18;
+    pub const BAR_PROP: u16 = 18;
+    pub const BAR_PROP_END: u16 = 19;
+    pub const BLOB: u16 = 19;
+    pub const BLOB_END: u16 = 21;
+    pub const FILE: u16 = 20;
+    pub const FILE_END: u16 = 21;
+    pub const BYTE_LENGTH_QUEUING_STRATEGY: u16 = 21;
+    pub const BYTE_LENGTH_QUEUING_STRATEGY_END: u16 = 22;
+    pub const CSS_NUMERIC_ARRAY: u16 = 22;
+    pub const CSS_NUMERIC_ARRAY_END: u16 = 23;
+    pub const CSS_RULE: u16 = 23;
+    pub const CSS_RULE_END: u16 = 40;
+    pub const CSS_FONT_FACE_RULE: u16 = 24;
+    pub const CSS_FONT_FACE_RULE_END: u16 = 25;
+    pub const CSS_FONT_FEATURE_VALUES_RULE: u16 = 25;
+    pub const CSS_FONT_FEATURE_VALUES_RULE_END: u16 = 26;
+    pub const CSS_FONT_PALETTE_VALUES_RULE: u16 = 26;
+    pub const CSS_FONT_PALETTE_VALUES_RULE_END: u16 = 27;
+    pub const CSS_GROUPING_RULE: u16 = 27;
+    pub const CSS_GROUPING_RULE_END: u16 = 34;
+    pub const CSS_CONDITION_RULE: u16 = 28;
+    pub const CSS_CONDITION_RULE_END: u16 = 32;
+    pub const CSS_CONTAINER_RULE: u16 = 29;
+    pub const CSS_CONTAINER_RULE_END: u16 = 30;
+    pub const CSS_MEDIA_RULE: u16 = 30;
+    pub const CSS_MEDIA_RULE_END: u16 = 31;
+    pub const CSS_SUPPORTS_RULE: u16 = 31;
+    pub const CSS_SUPPORTS_RULE_END: u16 = 32;
+    pub const CSS_LAYER_BLOCK_RULE: u16 = 32;
+    pub const CSS_LAYER_BLOCK_RULE_END: u16 = 33;
+    pub const CSS_STYLE_RULE: u16 = 33;
+    pub const CSS_STYLE_RULE_END: u16 = 34;
+    pub const CSS_IMPORT_RULE: u16 = 34;
+    pub const CSS_IMPORT_RULE_END: u16 = 35;
+    pub const CSS_KEYFRAME_RULE: u16 = 35;
+    pub const CSS_KEYFRAME_RULE_END: u16 = 36;
+    pub const CSS_KEYFRAMES_RULE: u16 = 36;
+    pub const CSS_KEYFRAMES_RULE_END: u16 = 37;
+    pub const CSS_LAYER_STATEMENT_RULE: u16 = 37;
+    pub const CSS_LAYER_STATEMENT_RULE_END: u16 = 38;
+    pub const CSS_NAMESPACE_RULE: u16 = 38;
+    pub const CSS_NAMESPACE_RULE_END: u16 = 39;
+    pub const CSS_PROPERTY_RULE: u16 = 39;
+    pub const CSS_PROPERTY_RULE_END: u16 = 40;
+    pub const CSS_RULE_LIST: u16 = 40;
+    pub const CSS_RULE_LIST_END: u16 = 41;
+    pub const CSS_STYLE_DECLARATION: u16 = 41;
+    pub const CSS_STYLE_DECLARATION_END: u16 = 44;
+    pub const CSS_FONT_FACE_DESCRIPTORS: u16 = 42;
+    pub const CSS_FONT_FACE_DESCRIPTORS_END: u16 = 43;
+    pub const CSS_STYLE_PROPERTIES: u16 = 43;
+    pub const CSS_STYLE_PROPERTIES_END: u16 = 44;
+    pub const CSS_STYLE_VALUE: u16 = 44;
+    pub const CSS_STYLE_VALUE_END: u16 = 59;
+    pub const CSS_IMAGE_VALUE: u16 = 45;
+    pub const CSS_IMAGE_VALUE_END: u16 = 46;
+    pub const CSS_KEYWORD_VALUE: u16 = 46;
+    pub const CSS_KEYWORD_VALUE_END: u16 = 47;
+    pub const CSS_NUMERIC_VALUE: u16 = 47;
+    pub const CSS_NUMERIC_VALUE_END: u16 = 57;
+    pub const CSS_MATH_VALUE: u16 = 48;
+    pub const CSS_MATH_VALUE_END: u16 = 56;
+    pub const CSS_MATH_CLAMP: u16 = 49;
+    pub const CSS_MATH_CLAMP_END: u16 = 50;
+    pub const CSS_MATH_INVERT: u16 = 50;
+    pub const CSS_MATH_INVERT_END: u16 = 51;
+    pub const CSS_MATH_MAX: u16 = 51;
+    pub const CSS_MATH_MAX_END: u16 = 52;
+    pub const CSS_MATH_MIN: u16 = 52;
+    pub const CSS_MATH_MIN_END: u16 = 53;
+    pub const CSS_MATH_NEGATE: u16 = 53;
+    pub const CSS_MATH_NEGATE_END: u16 = 54;
+    pub const CSS_MATH_PRODUCT: u16 = 54;
+    pub const CSS_MATH_PRODUCT_END: u16 = 55;
+    pub const CSS_MATH_SUM: u16 = 55;
+    pub const CSS_MATH_SUM_END: u16 = 56;
+    pub const CSS_UNIT_VALUE: u16 = 56;
+    pub const CSS_UNIT_VALUE_END: u16 = 57;
+    pub const CSS_TRANSFORM_VALUE: u16 = 57;
+    pub const CSS_TRANSFORM_VALUE_END: u16 = 58;
+    pub const CSS_UNPARSED_VALUE: u16 = 58;
+    pub const CSS_UNPARSED_VALUE_END: u16 = 59;
+    pub const CSS_TRANSFORM_COMPONENT: u16 = 59;
+    pub const CSS_TRANSFORM_COMPONENT_END: u16 = 68;
+    pub const CSS_MATRIX_COMPONENT: u16 = 60;
+    pub const CSS_MATRIX_COMPONENT_END: u16 = 61;
+    pub const CSS_PERSPECTIVE: u16 = 61;
+    pub const CSS_PERSPECTIVE_END: u16 = 62;
+    pub const CSS_ROTATE: u16 = 62;
+    pub const CSS_ROTATE_END: u16 = 63;
+    pub const CSS_SCALE: u16 = 63;
+    pub const CSS_SCALE_END: u16 = 64;
+    pub const CSS_SKEW: u16 = 64;
+    pub const CSS_SKEW_END: u16 = 65;
+    pub const CSS_SKEW_X: u16 = 65;
+    pub const CSS_SKEW_X_END: u16 = 66;
+    pub const CSS_SKEW_Y: u16 = 66;
+    pub const CSS_SKEW_Y_END: u16 = 67;
+    pub const CSS_TRANSLATE: u16 = 67;
+    pub const CSS_TRANSLATE_END: u16 = 68;
+    pub const CSS_VARIABLE_REFERENCE_VALUE: u16 = 68;
+    pub const CSS_VARIABLE_REFERENCE_VALUE_END: u16 = 69;
+    pub const CANVAS_GRADIENT: u16 = 69;
+    pub const CANVAS_GRADIENT_END: u16 = 70;
+    pub const CANVAS_PATTERN: u16 = 70;
+    pub const CANVAS_PATTERN_END: u16 = 71;
+    pub const CANVAS_RENDERING_CONTEXT2_D: u16 = 71;
+    pub const CANVAS_RENDERING_CONTEXT2_D_END: u16 = 72;
+    pub const CLIPBOARD_ITEM: u16 = 72;
+    pub const CLIPBOARD_ITEM_END: u16 = 73;
+    pub const COMPRESSION_STREAM: u16 = 73;
+    pub const COMPRESSION_STREAM_END: u16 = 74;
+    pub const COUNT_QUEUING_STRATEGY: u16 = 74;
+    pub const COUNT_QUEUING_STRATEGY_END: u16 = 75;
+    pub const CREDENTIAL: u16 = 75;
+    pub const CREDENTIAL_END: u16 = 80;
+    pub const FEDERATED_CREDENTIAL: u16 = 76;
+    pub const FEDERATED_CREDENTIAL_END: u16 = 77;
+    pub const IDENTITY_CREDENTIAL: u16 = 77;
+    pub const IDENTITY_CREDENTIAL_END: u16 = 78;
+    pub const PASSWORD_CREDENTIAL: u16 = 78;
+    pub const PASSWORD_CREDENTIAL_END: u16 = 79;
+    pub const PUBLIC_KEY_CREDENTIAL: u16 = 79;
+    pub const PUBLIC_KEY_CREDENTIAL_END: u16 = 80;
+    pub const CREDENTIALS_CONTAINER: u16 = 80;
+    pub const CREDENTIALS_CONTAINER_END: u16 = 81;
+    pub const CRYPTO: u16 = 81;
+    pub const CRYPTO_END: u16 = 82;
+    pub const CRYPTO_KEY: u16 = 82;
+    pub const CRYPTO_KEY_END: u16 = 83;
+    pub const CUSTOM_ELEMENT_REGISTRY: u16 = 83;
+    pub const CUSTOM_ELEMENT_REGISTRY_END: u16 = 84;
+    pub const CUSTOM_STATE_SET: u16 = 84;
+    pub const CUSTOM_STATE_SET_END: u16 = 85;
+    pub const DOM_EXCEPTION: u16 = 85;
+    pub const DOM_EXCEPTION_END: u16 = 86;
+    pub const DOM_IMPLEMENTATION: u16 = 86;
+    pub const DOM_IMPLEMENTATION_END: u16 = 87;
+    pub const DOM_MATRIX_READ_ONLY: u16 = 87;
+    pub const DOM_MATRIX_READ_ONLY_END: u16 = 89;
+    pub const DOM_MATRIX: u16 = 88;
+    pub const DOM_MATRIX_END: u16 = 89;
+    pub const DOM_PARSER: u16 = 89;
+    pub const DOM_PARSER_END: u16 = 90;
+    pub const DOM_POINT_READ_ONLY: u16 = 90;
+    pub const DOM_POINT_READ_ONLY_END: u16 = 92;
+    pub const DOM_POINT: u16 = 91;
+    pub const DOM_POINT_END: u16 = 92;
+    pub const DOM_QUAD: u16 = 92;
+    pub const DOM_QUAD_END: u16 = 93;
+    pub const DOM_RECT_LIST: u16 = 93;
+    pub const DOM_RECT_LIST_END: u16 = 94;
+    pub const DOM_RECT_READ_ONLY: u16 = 94;
+    pub const DOM_RECT_READ_ONLY_END: u16 = 96;
+    pub const DOM_RECT: u16 = 95;
+    pub const DOM_RECT_END: u16 = 96;
+    pub const DOM_STRING_LIST: u16 = 96;
+    pub const DOM_STRING_LIST_END: u16 = 97;
+    pub const DOM_STRING_MAP: u16 = 97;
+    pub const DOM_STRING_MAP_END: u16 = 98;
+    pub const DOM_TOKEN_LIST: u16 = 98;
+    pub const DOM_TOKEN_LIST_END: u16 = 99;
+    pub const DATA_TRANSFER: u16 = 99;
+    pub const DATA_TRANSFER_END: u16 = 100;
+    pub const DATA_TRANSFER_ITEM: u16 = 100;
+    pub const DATA_TRANSFER_ITEM_END: u16 = 101;
+    pub const DATA_TRANSFER_ITEM_LIST: u16 = 101;
+    pub const DATA_TRANSFER_ITEM_LIST_END: u16 = 102;
+    pub const DECOMPRESSION_STREAM: u16 = 102;
+    pub const DECOMPRESSION_STREAM_END: u16 = 103;
+    pub const EXT_BLEND_MINMAX: u16 = 103;
+    pub const EXT_BLEND_MINMAX_END: u16 = 104;
+    pub const EXT_CLIP_CONTROL: u16 = 104;
+    pub const EXT_CLIP_CONTROL_END: u16 = 105;
+    pub const EXT_COLOR_BUFFER_FLOAT: u16 = 105;
+    pub const EXT_COLOR_BUFFER_FLOAT_END: u16 = 106;
+    pub const EXT_COLOR_BUFFER_HALF_FLOAT: u16 = 106;
+    pub const EXT_COLOR_BUFFER_HALF_FLOAT_END: u16 = 107;
+    pub const EXT_CONSERVATIVE_DEPTH: u16 = 107;
+    pub const EXT_CONSERVATIVE_DEPTH_END: u16 = 108;
+    pub const EXT_DEPTH_CLAMP: u16 = 108;
+    pub const EXT_DEPTH_CLAMP_END: u16 = 109;
+    pub const EXT_FLOAT_BLEND: u16 = 109;
+    pub const EXT_FLOAT_BLEND_END: u16 = 110;
+    pub const EXT_FRAG_DEPTH: u16 = 110;
+    pub const EXT_FRAG_DEPTH_END: u16 = 111;
+    pub const EXT_POLYGON_OFFSET_CLAMP: u16 = 111;
+    pub const EXT_POLYGON_OFFSET_CLAMP_END: u16 = 112;
+    pub const EXT_RENDER_SNORM: u16 = 112;
+    pub const EXT_RENDER_SNORM_END: u16 = 113;
+    pub const EXT_S_RGB: u16 = 113;
+    pub const EXT_S_RGB_END: u16 = 114;
+    pub const EXT_SHADER_TEXTURE_LOD: u16 = 114;
+    pub const EXT_SHADER_TEXTURE_LOD_END: u16 = 115;
+    pub const EXT_TEXTURE_COMPRESSION_BPTC: u16 = 115;
+    pub const EXT_TEXTURE_COMPRESSION_BPTC_END: u16 = 116;
+    pub const EXT_TEXTURE_COMPRESSION_RGTC: u16 = 116;
+    pub const EXT_TEXTURE_COMPRESSION_RGTC_END: u16 = 117;
+    pub const EXT_TEXTURE_FILTER_ANISOTROPIC: u16 = 117;
+    pub const EXT_TEXTURE_FILTER_ANISOTROPIC_END: u16 = 118;
+    pub const EXT_TEXTURE_MIRROR_CLAMP_TO_EDGE: u16 = 118;
+    pub const EXT_TEXTURE_MIRROR_CLAMP_TO_EDGE_END: u16 = 119;
+    pub const EXT_TEXTURE_NORM16: u16 = 119;
+    pub const EXT_TEXTURE_NORM16_END: u16 = 120;
+    pub const ELEMENT_INTERNALS: u16 = 120;
+    pub const ELEMENT_INTERNALS_END: u16 = 121;
+    pub const EVENT: u16 = 121;
+    pub const EVENT_END: u16 = 163;
+    pub const ANIMATION_EVENT: u16 = 122;
+    pub const ANIMATION_EVENT_END: u16 = 123;
+    pub const ANIMATION_PLAYBACK_EVENT: u16 = 123;
+    pub const ANIMATION_PLAYBACK_EVENT_END: u16 = 124;
+    pub const BEFORE_UNLOAD_EVENT: u16 = 124;
+    pub const BEFORE_UNLOAD_EVENT_END: u16 = 125;
+    pub const CLIPBOARD_EVENT: u16 = 125;
+    pub const CLIPBOARD_EVENT_END: u16 = 126;
+    pub const CLOSE_EVENT: u16 = 126;
+    pub const CLOSE_EVENT_END: u16 = 127;
+    pub const COMMAND_EVENT: u16 = 127;
+    pub const COMMAND_EVENT_END: u16 = 128;
+    pub const CUSTOM_EVENT: u16 = 128;
+    pub const CUSTOM_EVENT_END: u16 = 129;
+    pub const ERROR_EVENT: u16 = 129;
+    pub const ERROR_EVENT_END: u16 = 130;
+    pub const FONT_FACE_SET_LOAD_EVENT: u16 = 130;
+    pub const FONT_FACE_SET_LOAD_EVENT_END: u16 = 131;
+    pub const FORM_DATA_EVENT: u16 = 131;
+    pub const FORM_DATA_EVENT_END: u16 = 132;
+    pub const GAMEPAD_EVENT: u16 = 132;
+    pub const GAMEPAD_EVENT_END: u16 = 133;
+    pub const HASH_CHANGE_EVENT: u16 = 133;
+    pub const HASH_CHANGE_EVENT_END: u16 = 134;
+    pub const IDB_VERSION_CHANGE_EVENT: u16 = 134;
+    pub const IDB_VERSION_CHANGE_EVENT_END: u16 = 135;
+    pub const MEDIA_ENCRYPTED_EVENT: u16 = 135;
+    pub const MEDIA_ENCRYPTED_EVENT_END: u16 = 136;
+    pub const MEDIA_KEY_MESSAGE_EVENT: u16 = 136;
+    pub const MEDIA_KEY_MESSAGE_EVENT_END: u16 = 137;
+    pub const MEDIA_QUERY_LIST_EVENT: u16 = 137;
+    pub const MEDIA_QUERY_LIST_EVENT_END: u16 = 138;
+    pub const MESSAGE_EVENT: u16 = 138;
+    pub const MESSAGE_EVENT_END: u16 = 139;
+    pub const OFFLINE_AUDIO_COMPLETION_EVENT: u16 = 139;
+    pub const OFFLINE_AUDIO_COMPLETION_EVENT_END: u16 = 140;
+    pub const PAGE_TRANSITION_EVENT: u16 = 140;
+    pub const PAGE_TRANSITION_EVENT_END: u16 = 141;
+    pub const POP_STATE_EVENT: u16 = 141;
+    pub const POP_STATE_EVENT_END: u16 = 142;
+    pub const PROGRESS_EVENT: u16 = 142;
+    pub const PROGRESS_EVENT_END: u16 = 143;
+    pub const PROMISE_REJECTION_EVENT: u16 = 143;
+    pub const PROMISE_REJECTION_EVENT_END: u16 = 144;
+    pub const SECURITY_POLICY_VIOLATION_EVENT: u16 = 144;
+    pub const SECURITY_POLICY_VIOLATION_EVENT_END: u16 = 145;
+    pub const STORAGE_EVENT: u16 = 145;
+    pub const STORAGE_EVENT_END: u16 = 146;
+    pub const SUBMIT_EVENT: u16 = 146;
+    pub const SUBMIT_EVENT_END: u16 = 147;
+    pub const TASK_PRIORITY_CHANGE_EVENT: u16 = 147;
+    pub const TASK_PRIORITY_CHANGE_EVENT_END: u16 = 148;
+    pub const TOGGLE_EVENT: u16 = 148;
+    pub const TOGGLE_EVENT_END: u16 = 149;
+    pub const TRACK_EVENT: u16 = 149;
+    pub const TRACK_EVENT_END: u16 = 150;
+    pub const TRANSITION_EVENT: u16 = 150;
+    pub const TRANSITION_EVENT_END: u16 = 151;
+    pub const UI_EVENT: u16 = 151;
+    pub const UI_EVENT_END: u16 = 162;
+    pub const COMPOSITION_EVENT: u16 = 152;
+    pub const COMPOSITION_EVENT_END: u16 = 153;
+    pub const FOCUS_EVENT: u16 = 153;
+    pub const FOCUS_EVENT_END: u16 = 154;
+    pub const INPUT_EVENT: u16 = 154;
+    pub const INPUT_EVENT_END: u16 = 155;
+    pub const KEYBOARD_EVENT: u16 = 155;
+    pub const KEYBOARD_EVENT_END: u16 = 156;
+    pub const MOUSE_EVENT: u16 = 156;
+    pub const MOUSE_EVENT_END: u16 = 160;
+    pub const DRAG_EVENT: u16 = 157;
+    pub const DRAG_EVENT_END: u16 = 158;
+    pub const POINTER_EVENT: u16 = 158;
+    pub const POINTER_EVENT_END: u16 = 159;
+    pub const WHEEL_EVENT: u16 = 159;
+    pub const WHEEL_EVENT_END: u16 = 160;
+    pub const TEXT_EVENT: u16 = 160;
+    pub const TEXT_EVENT_END: u16 = 161;
+    pub const TOUCH_EVENT: u16 = 161;
+    pub const TOUCH_EVENT_END: u16 = 162;
+    pub const WEB_GL_CONTEXT_EVENT: u16 = 162;
+    pub const WEB_GL_CONTEXT_EVENT_END: u16 = 163;
+    pub const EVENT_TARGET: u16 = 163;
+    pub const EVENT_TARGET_END: u16 = 392;
+    pub const ABORT_SIGNAL: u16 = 164;
+    pub const ABORT_SIGNAL_END: u16 = 166;
+    pub const TASK_SIGNAL: u16 = 165;
+    pub const TASK_SIGNAL_END: u16 = 166;
+    pub const ANIMATION: u16 = 166;
+    pub const ANIMATION_END: u16 = 169;
+    pub const CSS_ANIMATION: u16 = 167;
+    pub const CSS_ANIMATION_END: u16 = 168;
+    pub const CSS_TRANSITION: u16 = 168;
+    pub const CSS_TRANSITION_END: u16 = 169;
+    pub const AUDIO_NODE: u16 = 169;
+    pub const AUDIO_NODE_END: u16 = 187;
+    pub const ANALYSER_NODE: u16 = 170;
+    pub const ANALYSER_NODE_END: u16 = 171;
+    pub const AUDIO_DESTINATION_NODE: u16 = 171;
+    pub const AUDIO_DESTINATION_NODE_END: u16 = 172;
+    pub const AUDIO_SCHEDULED_SOURCE_NODE: u16 = 172;
+    pub const AUDIO_SCHEDULED_SOURCE_NODE_END: u16 = 176;
+    pub const AUDIO_BUFFER_SOURCE_NODE: u16 = 173;
+    pub const AUDIO_BUFFER_SOURCE_NODE_END: u16 = 174;
+    pub const CONSTANT_SOURCE_NODE: u16 = 174;
+    pub const CONSTANT_SOURCE_NODE_END: u16 = 175;
+    pub const OSCILLATOR_NODE: u16 = 175;
+    pub const OSCILLATOR_NODE_END: u16 = 176;
+    pub const BIQUAD_FILTER_NODE: u16 = 176;
+    pub const BIQUAD_FILTER_NODE_END: u16 = 177;
+    pub const CHANNEL_MERGER_NODE: u16 = 177;
+    pub const CHANNEL_MERGER_NODE_END: u16 = 178;
+    pub const CHANNEL_SPLITTER_NODE: u16 = 178;
+    pub const CHANNEL_SPLITTER_NODE_END: u16 = 179;
+    pub const CONVOLVER_NODE: u16 = 179;
+    pub const CONVOLVER_NODE_END: u16 = 180;
+    pub const DELAY_NODE: u16 = 180;
+    pub const DELAY_NODE_END: u16 = 181;
+    pub const DYNAMICS_COMPRESSOR_NODE: u16 = 181;
+    pub const DYNAMICS_COMPRESSOR_NODE_END: u16 = 182;
+    pub const GAIN_NODE: u16 = 182;
+    pub const GAIN_NODE_END: u16 = 183;
+    pub const IIR_FILTER_NODE: u16 = 183;
+    pub const IIR_FILTER_NODE_END: u16 = 184;
+    pub const PANNER_NODE: u16 = 184;
+    pub const PANNER_NODE_END: u16 = 185;
+    pub const STEREO_PANNER_NODE: u16 = 185;
+    pub const STEREO_PANNER_NODE_END: u16 = 186;
+    pub const WAVE_SHAPER_NODE: u16 = 186;
+    pub const WAVE_SHAPER_NODE_END: u16 = 187;
+    pub const AUDIO_TRACK_LIST: u16 = 187;
+    pub const AUDIO_TRACK_LIST_END: u16 = 188;
+    pub const BASE_AUDIO_CONTEXT: u16 = 188;
+    pub const BASE_AUDIO_CONTEXT_END: u16 = 191;
+    pub const AUDIO_CONTEXT: u16 = 189;
+    pub const AUDIO_CONTEXT_END: u16 = 190;
+    pub const OFFLINE_AUDIO_CONTEXT: u16 = 190;
+    pub const OFFLINE_AUDIO_CONTEXT_END: u16 = 191;
+    pub const BATTERY_MANAGER: u16 = 191;
+    pub const BATTERY_MANAGER_END: u16 = 192;
+    pub const BROADCAST_CHANNEL: u16 = 192;
+    pub const BROADCAST_CHANNEL_END: u16 = 193;
+    pub const CLIPBOARD: u16 = 193;
+    pub const CLIPBOARD_END: u16 = 194;
+    pub const FILE_READER: u16 = 194;
+    pub const FILE_READER_END: u16 = 195;
+    pub const FONT_FACE_SET: u16 = 195;
+    pub const FONT_FACE_SET_END: u16 = 196;
+    pub const IDB_DATABASE: u16 = 196;
+    pub const IDB_DATABASE_END: u16 = 197;
+    pub const IDB_REQUEST: u16 = 197;
+    pub const IDB_REQUEST_END: u16 = 199;
+    pub const IDB_OPEN_DB_REQUEST: u16 = 198;
+    pub const IDB_OPEN_DB_REQUEST_END: u16 = 199;
+    pub const IDB_TRANSACTION: u16 = 199;
+    pub const IDB_TRANSACTION_END: u16 = 200;
+    pub const MEDIA_DEVICES: u16 = 200;
+    pub const MEDIA_DEVICES_END: u16 = 201;
+    pub const MEDIA_KEY_SESSION: u16 = 201;
+    pub const MEDIA_KEY_SESSION_END: u16 = 202;
+    pub const MEDIA_QUERY_LIST: u16 = 202;
+    pub const MEDIA_QUERY_LIST_END: u16 = 203;
+    pub const MEDIA_SOURCE: u16 = 203;
+    pub const MEDIA_SOURCE_END: u16 = 204;
+    pub const MESSAGE_PORT: u16 = 204;
+    pub const MESSAGE_PORT_END: u16 = 205;
+    pub const NETWORK_INFORMATION: u16 = 205;
+    pub const NETWORK_INFORMATION_END: u16 = 206;
+    pub const NODE: u16 = 206;
+    pub const NODE_END: u16 = 371;
+    pub const ATTR: u16 = 207;
+    pub const ATTR_END: u16 = 208;
+    pub const CHARACTER_DATA: u16 = 208;
+    pub const CHARACTER_DATA_END: u16 = 213;
+    pub const COMMENT: u16 = 209;
+    pub const COMMENT_END: u16 = 210;
+    pub const PROCESSING_INSTRUCTION: u16 = 210;
+    pub const PROCESSING_INSTRUCTION_END: u16 = 211;
+    pub const TEXT: u16 = 211;
+    pub const TEXT_END: u16 = 213;
+    pub const CDATA_SECTION: u16 = 212;
+    pub const CDATA_SECTION_END: u16 = 213;
+    pub const DOCUMENT: u16 = 213;
+    pub const DOCUMENT_END: u16 = 216;
+    pub const HTML_DOCUMENT: u16 = 214;
+    pub const HTML_DOCUMENT_END: u16 = 215;
+    pub const XML_DOCUMENT: u16 = 215;
+    pub const XML_DOCUMENT_END: u16 = 216;
+    pub const DOCUMENT_FRAGMENT: u16 = 216;
+    pub const DOCUMENT_FRAGMENT_END: u16 = 218;
+    pub const SHADOW_ROOT: u16 = 217;
+    pub const SHADOW_ROOT_END: u16 = 218;
+    pub const DOCUMENT_TYPE: u16 = 218;
+    pub const DOCUMENT_TYPE_END: u16 = 219;
+    pub const ELEMENT: u16 = 219;
+    pub const ELEMENT_END: u16 = 371;
+    pub const HTML_ELEMENT: u16 = 220;
+    pub const HTML_ELEMENT_END: u16 = 300;
+    pub const HTML_ANCHOR_ELEMENT: u16 = 221;
+    pub const HTML_ANCHOR_ELEMENT_END: u16 = 222;
+    pub const HTML_AREA_ELEMENT: u16 = 222;
+    pub const HTML_AREA_ELEMENT_END: u16 = 223;
+    pub const HTMLBR_ELEMENT: u16 = 223;
+    pub const HTMLBR_ELEMENT_END: u16 = 224;
+    pub const HTML_BASE_ELEMENT: u16 = 224;
+    pub const HTML_BASE_ELEMENT_END: u16 = 225;
+    pub const HTML_BODY_ELEMENT: u16 = 225;
+    pub const HTML_BODY_ELEMENT_END: u16 = 226;
+    pub const HTML_BUTTON_ELEMENT: u16 = 226;
+    pub const HTML_BUTTON_ELEMENT_END: u16 = 227;
+    pub const HTML_CAMERA_ELEMENT: u16 = 227;
+    pub const HTML_CAMERA_ELEMENT_END: u16 = 228;
+    pub const HTML_CANVAS_ELEMENT: u16 = 228;
+    pub const HTML_CANVAS_ELEMENT_END: u16 = 229;
+    pub const HTMLD_LIST_ELEMENT: u16 = 229;
+    pub const HTMLD_LIST_ELEMENT_END: u16 = 230;
+    pub const HTML_DATA_ELEMENT: u16 = 230;
+    pub const HTML_DATA_ELEMENT_END: u16 = 231;
+    pub const HTML_DATA_LIST_ELEMENT: u16 = 231;
+    pub const HTML_DATA_LIST_ELEMENT_END: u16 = 232;
+    pub const HTML_DETAILS_ELEMENT: u16 = 232;
+    pub const HTML_DETAILS_ELEMENT_END: u16 = 233;
+    pub const HTML_DIALOG_ELEMENT: u16 = 233;
+    pub const HTML_DIALOG_ELEMENT_END: u16 = 234;
+    pub const HTML_DIRECTORY_ELEMENT: u16 = 234;
+    pub const HTML_DIRECTORY_ELEMENT_END: u16 = 235;
+    pub const HTML_DIV_ELEMENT: u16 = 235;
+    pub const HTML_DIV_ELEMENT_END: u16 = 236;
+    pub const HTML_EMBED_ELEMENT: u16 = 236;
+    pub const HTML_EMBED_ELEMENT_END: u16 = 237;
+    pub const HTML_FENCED_FRAME_ELEMENT: u16 = 237;
+    pub const HTML_FENCED_FRAME_ELEMENT_END: u16 = 238;
+    pub const HTML_FIELD_SET_ELEMENT: u16 = 238;
+    pub const HTML_FIELD_SET_ELEMENT_END: u16 = 239;
+    pub const HTML_FONT_ELEMENT: u16 = 239;
+    pub const HTML_FONT_ELEMENT_END: u16 = 240;
+    pub const HTML_FORM_ELEMENT: u16 = 240;
+    pub const HTML_FORM_ELEMENT_END: u16 = 241;
+    pub const HTML_FRAME_ELEMENT: u16 = 241;
+    pub const HTML_FRAME_ELEMENT_END: u16 = 242;
+    pub const HTML_FRAME_SET_ELEMENT: u16 = 242;
+    pub const HTML_FRAME_SET_ELEMENT_END: u16 = 243;
+    pub const HTML_GEOLOCATION_ELEMENT: u16 = 243;
+    pub const HTML_GEOLOCATION_ELEMENT_END: u16 = 244;
+    pub const HTMLHR_ELEMENT: u16 = 244;
+    pub const HTMLHR_ELEMENT_END: u16 = 245;
+    pub const HTML_HEAD_ELEMENT: u16 = 245;
+    pub const HTML_HEAD_ELEMENT_END: u16 = 246;
+    pub const HTML_HEADING_ELEMENT: u16 = 246;
+    pub const HTML_HEADING_ELEMENT_END: u16 = 247;
+    pub const HTML_HTML_ELEMENT: u16 = 247;
+    pub const HTML_HTML_ELEMENT_END: u16 = 248;
+    pub const HTMLI_FRAME_ELEMENT: u16 = 248;
+    pub const HTMLI_FRAME_ELEMENT_END: u16 = 249;
+    pub const HTML_IMAGE_ELEMENT: u16 = 249;
+    pub const HTML_IMAGE_ELEMENT_END: u16 = 250;
+    pub const HTML_INPUT_ELEMENT: u16 = 250;
+    pub const HTML_INPUT_ELEMENT_END: u16 = 251;
+    pub const HTML_INSTALL_ELEMENT: u16 = 251;
+    pub const HTML_INSTALL_ELEMENT_END: u16 = 252;
+    pub const HTMLLI_ELEMENT: u16 = 252;
+    pub const HTMLLI_ELEMENT_END: u16 = 253;
+    pub const HTML_LABEL_ELEMENT: u16 = 253;
+    pub const HTML_LABEL_ELEMENT_END: u16 = 254;
+    pub const HTML_LEGEND_ELEMENT: u16 = 254;
+    pub const HTML_LEGEND_ELEMENT_END: u16 = 255;
+    pub const HTML_LINK_ELEMENT: u16 = 255;
+    pub const HTML_LINK_ELEMENT_END: u16 = 256;
+    pub const HTML_MAP_ELEMENT: u16 = 256;
+    pub const HTML_MAP_ELEMENT_END: u16 = 257;
+    pub const HTML_MARQUEE_ELEMENT: u16 = 257;
+    pub const HTML_MARQUEE_ELEMENT_END: u16 = 258;
+    pub const HTML_MEDIA_ELEMENT: u16 = 258;
+    pub const HTML_MEDIA_ELEMENT_END: u16 = 261;
+    pub const HTML_AUDIO_ELEMENT: u16 = 259;
+    pub const HTML_AUDIO_ELEMENT_END: u16 = 260;
+    pub const HTML_VIDEO_ELEMENT: u16 = 260;
+    pub const HTML_VIDEO_ELEMENT_END: u16 = 261;
+    pub const HTML_MENU_ELEMENT: u16 = 261;
+    pub const HTML_MENU_ELEMENT_END: u16 = 262;
+    pub const HTML_META_ELEMENT: u16 = 262;
+    pub const HTML_META_ELEMENT_END: u16 = 263;
+    pub const HTML_METER_ELEMENT: u16 = 263;
+    pub const HTML_METER_ELEMENT_END: u16 = 264;
+    pub const HTML_MICROPHONE_ELEMENT: u16 = 264;
+    pub const HTML_MICROPHONE_ELEMENT_END: u16 = 265;
+    pub const HTML_MOD_ELEMENT: u16 = 265;
+    pub const HTML_MOD_ELEMENT_END: u16 = 266;
+    pub const HTML_MODEL_ELEMENT: u16 = 266;
+    pub const HTML_MODEL_ELEMENT_END: u16 = 267;
+    pub const HTMLO_LIST_ELEMENT: u16 = 267;
+    pub const HTMLO_LIST_ELEMENT_END: u16 = 268;
+    pub const HTML_OBJECT_ELEMENT: u16 = 268;
+    pub const HTML_OBJECT_ELEMENT_END: u16 = 269;
+    pub const HTML_OPT_GROUP_ELEMENT: u16 = 269;
+    pub const HTML_OPT_GROUP_ELEMENT_END: u16 = 270;
+    pub const HTML_OPTION_ELEMENT: u16 = 270;
+    pub const HTML_OPTION_ELEMENT_END: u16 = 271;
+    pub const HTML_OUTPUT_ELEMENT: u16 = 271;
+    pub const HTML_OUTPUT_ELEMENT_END: u16 = 272;
+    pub const HTML_PARAGRAPH_ELEMENT: u16 = 272;
+    pub const HTML_PARAGRAPH_ELEMENT_END: u16 = 273;
+    pub const HTML_PARAM_ELEMENT: u16 = 273;
+    pub const HTML_PARAM_ELEMENT_END: u16 = 274;
+    pub const HTML_PICTURE_ELEMENT: u16 = 274;
+    pub const HTML_PICTURE_ELEMENT_END: u16 = 275;
+    pub const HTML_PORTAL_ELEMENT: u16 = 275;
+    pub const HTML_PORTAL_ELEMENT_END: u16 = 276;
+    pub const HTML_PRE_ELEMENT: u16 = 276;
+    pub const HTML_PRE_ELEMENT_END: u16 = 277;
+    pub const HTML_PROGRESS_ELEMENT: u16 = 277;
+    pub const HTML_PROGRESS_ELEMENT_END: u16 = 278;
+    pub const HTML_QUOTE_ELEMENT: u16 = 278;
+    pub const HTML_QUOTE_ELEMENT_END: u16 = 279;
+    pub const HTML_SCRIPT_ELEMENT: u16 = 279;
+    pub const HTML_SCRIPT_ELEMENT_END: u16 = 280;
+    pub const HTML_SELECT_ELEMENT: u16 = 280;
+    pub const HTML_SELECT_ELEMENT_END: u16 = 281;
+    pub const HTML_SELECTED_CONTENT_ELEMENT: u16 = 281;
+    pub const HTML_SELECTED_CONTENT_ELEMENT_END: u16 = 282;
+    pub const HTML_SLOT_ELEMENT: u16 = 282;
+    pub const HTML_SLOT_ELEMENT_END: u16 = 283;
+    pub const HTML_SOURCE_ELEMENT: u16 = 283;
+    pub const HTML_SOURCE_ELEMENT_END: u16 = 284;
+    pub const HTML_SPAN_ELEMENT: u16 = 284;
+    pub const HTML_SPAN_ELEMENT_END: u16 = 285;
+    pub const HTML_STYLE_ELEMENT: u16 = 285;
+    pub const HTML_STYLE_ELEMENT_END: u16 = 286;
+    pub const HTML_TABLE_CAPTION_ELEMENT: u16 = 286;
+    pub const HTML_TABLE_CAPTION_ELEMENT_END: u16 = 287;
+    pub const HTML_TABLE_CELL_ELEMENT: u16 = 287;
+    pub const HTML_TABLE_CELL_ELEMENT_END: u16 = 288;
+    pub const HTML_TABLE_COL_ELEMENT: u16 = 288;
+    pub const HTML_TABLE_COL_ELEMENT_END: u16 = 289;
+    pub const HTML_TABLE_ELEMENT: u16 = 289;
+    pub const HTML_TABLE_ELEMENT_END: u16 = 290;
+    pub const HTML_TABLE_ROW_ELEMENT: u16 = 290;
+    pub const HTML_TABLE_ROW_ELEMENT_END: u16 = 291;
+    pub const HTML_TABLE_SECTION_ELEMENT: u16 = 291;
+    pub const HTML_TABLE_SECTION_ELEMENT_END: u16 = 292;
+    pub const HTML_TEMPLATE_ELEMENT: u16 = 292;
+    pub const HTML_TEMPLATE_ELEMENT_END: u16 = 293;
+    pub const HTML_TEXT_AREA_ELEMENT: u16 = 293;
+    pub const HTML_TEXT_AREA_ELEMENT_END: u16 = 294;
+    pub const HTML_TIME_ELEMENT: u16 = 294;
+    pub const HTML_TIME_ELEMENT_END: u16 = 295;
+    pub const HTML_TITLE_ELEMENT: u16 = 295;
+    pub const HTML_TITLE_ELEMENT_END: u16 = 296;
+    pub const HTML_TRACK_ELEMENT: u16 = 296;
+    pub const HTML_TRACK_ELEMENT_END: u16 = 297;
+    pub const HTMLU_LIST_ELEMENT: u16 = 297;
+    pub const HTMLU_LIST_ELEMENT_END: u16 = 298;
+    pub const HTML_UNKNOWN_ELEMENT: u16 = 298;
+    pub const HTML_UNKNOWN_ELEMENT_END: u16 = 299;
+    pub const HTML_USER_MEDIA_ELEMENT: u16 = 299;
+    pub const HTML_USER_MEDIA_ELEMENT_END: u16 = 300;
+    pub const SVG_ELEMENT: u16 = 300;
+    pub const SVG_ELEMENT_END: u16 = 371;
+    pub const SVG_ANIMATION_ELEMENT: u16 = 301;
+    pub const SVG_ANIMATION_ELEMENT_END: u16 = 306;
+    pub const SVG_ANIMATE_ELEMENT: u16 = 302;
+    pub const SVG_ANIMATE_ELEMENT_END: u16 = 303;
+    pub const SVG_ANIMATE_MOTION_ELEMENT: u16 = 303;
+    pub const SVG_ANIMATE_MOTION_ELEMENT_END: u16 = 304;
+    pub const SVG_ANIMATE_TRANSFORM_ELEMENT: u16 = 304;
+    pub const SVG_ANIMATE_TRANSFORM_ELEMENT_END: u16 = 305;
+    pub const SVG_SET_ELEMENT: u16 = 305;
+    pub const SVG_SET_ELEMENT_END: u16 = 306;
+    pub const SVG_CLIP_PATH_ELEMENT: u16 = 306;
+    pub const SVG_CLIP_PATH_ELEMENT_END: u16 = 307;
+    pub const SVG_COMPONENT_TRANSFER_FUNCTION_ELEMENT: u16 = 307;
+    pub const SVG_COMPONENT_TRANSFER_FUNCTION_ELEMENT_END: u16 = 312;
+    pub const SVGFE_FUNC_A_ELEMENT: u16 = 308;
+    pub const SVGFE_FUNC_A_ELEMENT_END: u16 = 309;
+    pub const SVGFE_FUNC_B_ELEMENT: u16 = 309;
+    pub const SVGFE_FUNC_B_ELEMENT_END: u16 = 310;
+    pub const SVGFE_FUNC_G_ELEMENT: u16 = 310;
+    pub const SVGFE_FUNC_G_ELEMENT_END: u16 = 311;
+    pub const SVGFE_FUNC_R_ELEMENT: u16 = 311;
+    pub const SVGFE_FUNC_R_ELEMENT_END: u16 = 312;
+    pub const SVG_DESC_ELEMENT: u16 = 312;
+    pub const SVG_DESC_ELEMENT_END: u16 = 313;
+    pub const SVGFE_BLEND_ELEMENT: u16 = 313;
+    pub const SVGFE_BLEND_ELEMENT_END: u16 = 314;
+    pub const SVGFE_COLOR_MATRIX_ELEMENT: u16 = 314;
+    pub const SVGFE_COLOR_MATRIX_ELEMENT_END: u16 = 315;
+    pub const SVGFE_COMPONENT_TRANSFER_ELEMENT: u16 = 315;
+    pub const SVGFE_COMPONENT_TRANSFER_ELEMENT_END: u16 = 316;
+    pub const SVGFE_COMPOSITE_ELEMENT: u16 = 316;
+    pub const SVGFE_COMPOSITE_ELEMENT_END: u16 = 317;
+    pub const SVGFE_CONVOLVE_MATRIX_ELEMENT: u16 = 317;
+    pub const SVGFE_CONVOLVE_MATRIX_ELEMENT_END: u16 = 318;
+    pub const SVGFE_DIFFUSE_LIGHTING_ELEMENT: u16 = 318;
+    pub const SVGFE_DIFFUSE_LIGHTING_ELEMENT_END: u16 = 319;
+    pub const SVGFE_DISPLACEMENT_MAP_ELEMENT: u16 = 319;
+    pub const SVGFE_DISPLACEMENT_MAP_ELEMENT_END: u16 = 320;
+    pub const SVGFE_DISTANT_LIGHT_ELEMENT: u16 = 320;
+    pub const SVGFE_DISTANT_LIGHT_ELEMENT_END: u16 = 321;
+    pub const SVGFE_DROP_SHADOW_ELEMENT: u16 = 321;
+    pub const SVGFE_DROP_SHADOW_ELEMENT_END: u16 = 322;
+    pub const SVGFE_FLOOD_ELEMENT: u16 = 322;
+    pub const SVGFE_FLOOD_ELEMENT_END: u16 = 323;
+    pub const SVGFE_GAUSSIAN_BLUR_ELEMENT: u16 = 323;
+    pub const SVGFE_GAUSSIAN_BLUR_ELEMENT_END: u16 = 324;
+    pub const SVGFE_IMAGE_ELEMENT: u16 = 324;
+    pub const SVGFE_IMAGE_ELEMENT_END: u16 = 325;
+    pub const SVGFE_MERGE_ELEMENT: u16 = 325;
+    pub const SVGFE_MERGE_ELEMENT_END: u16 = 326;
+    pub const SVGFE_MERGE_NODE_ELEMENT: u16 = 326;
+    pub const SVGFE_MERGE_NODE_ELEMENT_END: u16 = 327;
+    pub const SVGFE_MORPHOLOGY_ELEMENT: u16 = 327;
+    pub const SVGFE_MORPHOLOGY_ELEMENT_END: u16 = 328;
+    pub const SVGFE_OFFSET_ELEMENT: u16 = 328;
+    pub const SVGFE_OFFSET_ELEMENT_END: u16 = 329;
+    pub const SVGFE_POINT_LIGHT_ELEMENT: u16 = 329;
+    pub const SVGFE_POINT_LIGHT_ELEMENT_END: u16 = 330;
+    pub const SVGFE_SPECULAR_LIGHTING_ELEMENT: u16 = 330;
+    pub const SVGFE_SPECULAR_LIGHTING_ELEMENT_END: u16 = 331;
+    pub const SVGFE_SPOT_LIGHT_ELEMENT: u16 = 331;
+    pub const SVGFE_SPOT_LIGHT_ELEMENT_END: u16 = 332;
+    pub const SVGFE_TILE_ELEMENT: u16 = 332;
+    pub const SVGFE_TILE_ELEMENT_END: u16 = 333;
+    pub const SVGFE_TURBULENCE_ELEMENT: u16 = 333;
+    pub const SVGFE_TURBULENCE_ELEMENT_END: u16 = 334;
+    pub const SVG_FILTER_ELEMENT: u16 = 334;
+    pub const SVG_FILTER_ELEMENT_END: u16 = 335;
+    pub const SVG_GRADIENT_ELEMENT: u16 = 335;
+    pub const SVG_GRADIENT_ELEMENT_END: u16 = 338;
+    pub const SVG_LINEAR_GRADIENT_ELEMENT: u16 = 336;
+    pub const SVG_LINEAR_GRADIENT_ELEMENT_END: u16 = 337;
+    pub const SVG_RADIAL_GRADIENT_ELEMENT: u16 = 337;
+    pub const SVG_RADIAL_GRADIENT_ELEMENT_END: u16 = 338;
+    pub const SVG_GRAPHICS_ELEMENT: u16 = 338;
+    pub const SVG_GRAPHICS_ELEMENT_END: u16 = 361;
+    pub const SVGA_ELEMENT: u16 = 339;
+    pub const SVGA_ELEMENT_END: u16 = 340;
+    pub const SVG_DEFS_ELEMENT: u16 = 340;
+    pub const SVG_DEFS_ELEMENT_END: u16 = 341;
+    pub const SVG_FOREIGN_OBJECT_ELEMENT: u16 = 341;
+    pub const SVG_FOREIGN_OBJECT_ELEMENT_END: u16 = 342;
+    pub const SVGG_ELEMENT: u16 = 342;
+    pub const SVGG_ELEMENT_END: u16 = 343;
+    pub const SVG_GEOMETRY_ELEMENT: u16 = 343;
+    pub const SVG_GEOMETRY_ELEMENT_END: u16 = 351;
+    pub const SVG_CIRCLE_ELEMENT: u16 = 344;
+    pub const SVG_CIRCLE_ELEMENT_END: u16 = 345;
+    pub const SVG_ELLIPSE_ELEMENT: u16 = 345;
+    pub const SVG_ELLIPSE_ELEMENT_END: u16 = 346;
+    pub const SVG_LINE_ELEMENT: u16 = 346;
+    pub const SVG_LINE_ELEMENT_END: u16 = 347;
+    pub const SVG_PATH_ELEMENT: u16 = 347;
+    pub const SVG_PATH_ELEMENT_END: u16 = 348;
+    pub const SVG_POLYGON_ELEMENT: u16 = 348;
+    pub const SVG_POLYGON_ELEMENT_END: u16 = 349;
+    pub const SVG_POLYLINE_ELEMENT: u16 = 349;
+    pub const SVG_POLYLINE_ELEMENT_END: u16 = 350;
+    pub const SVG_RECT_ELEMENT: u16 = 350;
+    pub const SVG_RECT_ELEMENT_END: u16 = 351;
+    pub const SVG_IMAGE_ELEMENT: u16 = 351;
+    pub const SVG_IMAGE_ELEMENT_END: u16 = 352;
+    pub const SVGSVG_ELEMENT: u16 = 352;
+    pub const SVGSVG_ELEMENT_END: u16 = 353;
+    pub const SVG_SWITCH_ELEMENT: u16 = 353;
+    pub const SVG_SWITCH_ELEMENT_END: u16 = 354;
+    pub const SVG_SYMBOL_ELEMENT: u16 = 354;
+    pub const SVG_SYMBOL_ELEMENT_END: u16 = 355;
+    pub const SVG_TEXT_CONTENT_ELEMENT: u16 = 355;
+    pub const SVG_TEXT_CONTENT_ELEMENT_END: u16 = 360;
+    pub const SVG_TEXT_PATH_ELEMENT: u16 = 356;
+    pub const SVG_TEXT_PATH_ELEMENT_END: u16 = 357;
+    pub const SVG_TEXT_POSITIONING_ELEMENT: u16 = 357;
+    pub const SVG_TEXT_POSITIONING_ELEMENT_END: u16 = 360;
+    pub const SVGT_SPAN_ELEMENT: u16 = 358;
+    pub const SVGT_SPAN_ELEMENT_END: u16 = 359;
+    pub const SVG_TEXT_ELEMENT: u16 = 359;
+    pub const SVG_TEXT_ELEMENT_END: u16 = 360;
+    pub const SVG_USE_ELEMENT: u16 = 360;
+    pub const SVG_USE_ELEMENT_END: u16 = 361;
+    pub const SVGM_PATH_ELEMENT: u16 = 361;
+    pub const SVGM_PATH_ELEMENT_END: u16 = 362;
+    pub const SVG_MARKER_ELEMENT: u16 = 362;
+    pub const SVG_MARKER_ELEMENT_END: u16 = 363;
+    pub const SVG_MASK_ELEMENT: u16 = 363;
+    pub const SVG_MASK_ELEMENT_END: u16 = 364;
+    pub const SVG_METADATA_ELEMENT: u16 = 364;
+    pub const SVG_METADATA_ELEMENT_END: u16 = 365;
+    pub const SVG_PATTERN_ELEMENT: u16 = 365;
+    pub const SVG_PATTERN_ELEMENT_END: u16 = 366;
+    pub const SVG_SCRIPT_ELEMENT: u16 = 366;
+    pub const SVG_SCRIPT_ELEMENT_END: u16 = 367;
+    pub const SVG_STOP_ELEMENT: u16 = 367;
+    pub const SVG_STOP_ELEMENT_END: u16 = 368;
+    pub const SVG_STYLE_ELEMENT: u16 = 368;
+    pub const SVG_STYLE_ELEMENT_END: u16 = 369;
+    pub const SVG_TITLE_ELEMENT: u16 = 369;
+    pub const SVG_TITLE_ELEMENT_END: u16 = 370;
+    pub const SVG_VIEW_ELEMENT: u16 = 370;
+    pub const SVG_VIEW_ELEMENT_END: u16 = 371;
+    pub const NOTIFICATION: u16 = 371;
+    pub const NOTIFICATION_END: u16 = 372;
+    pub const OFFSCREEN_CANVAS: u16 = 372;
+    pub const OFFSCREEN_CANVAS_END: u16 = 373;
+    pub const PERFORMANCE: u16 = 373;
+    pub const PERFORMANCE_END: u16 = 374;
+    pub const PERMISSION_STATUS: u16 = 374;
+    pub const PERMISSION_STATUS_END: u16 = 375;
+    pub const SCREEN_ORIENTATION: u16 = 375;
+    pub const SCREEN_ORIENTATION_END: u16 = 376;
+    pub const SOURCE_BUFFER: u16 = 376;
+    pub const SOURCE_BUFFER_END: u16 = 377;
+    pub const SOURCE_BUFFER_LIST: u16 = 377;
+    pub const SOURCE_BUFFER_LIST_END: u16 = 378;
+    pub const TEXT_TRACK: u16 = 378;
+    pub const TEXT_TRACK_END: u16 = 379;
+    pub const TEXT_TRACK_CUE: u16 = 379;
+    pub const TEXT_TRACK_CUE_END: u16 = 381;
+    pub const VTT_CUE: u16 = 380;
+    pub const VTT_CUE_END: u16 = 381;
+    pub const TEXT_TRACK_LIST: u16 = 381;
+    pub const TEXT_TRACK_LIST_END: u16 = 382;
+    pub const VIDEO_TRACK_LIST: u16 = 382;
+    pub const VIDEO_TRACK_LIST_END: u16 = 383;
+    pub const VISUAL_VIEWPORT: u16 = 383;
+    pub const VISUAL_VIEWPORT_END: u16 = 384;
+    pub const WEB_SOCKET: u16 = 384;
+    pub const WEB_SOCKET_END: u16 = 385;
+    pub const WINDOW: u16 = 385;
+    pub const WINDOW_END: u16 = 386;
+    pub const WORKER: u16 = 386;
+    pub const WORKER_END: u16 = 387;
+    pub const WORKER_GLOBAL_SCOPE: u16 = 387;
+    pub const WORKER_GLOBAL_SCOPE_END: u16 = 389;
+    pub const DEDICATED_WORKER_GLOBAL_SCOPE: u16 = 388;
+    pub const DEDICATED_WORKER_GLOBAL_SCOPE_END: u16 = 389;
+    pub const XML_HTTP_REQUEST_EVENT_TARGET: u16 = 389;
+    pub const XML_HTTP_REQUEST_EVENT_TARGET_END: u16 = 392;
+    pub const XML_HTTP_REQUEST: u16 = 390;
+    pub const XML_HTTP_REQUEST_END: u16 = 391;
+    pub const XML_HTTP_REQUEST_UPLOAD: u16 = 391;
+    pub const XML_HTTP_REQUEST_UPLOAD_END: u16 = 392;
+    pub const EXTERNAL: u16 = 392;
+    pub const EXTERNAL_END: u16 = 393;
+    pub const FILE_LIST: u16 = 393;
+    pub const FILE_LIST_END: u16 = 394;
+    pub const FONT_FACE: u16 = 394;
+    pub const FONT_FACE_END: u16 = 395;
+    pub const FORM_DATA: u16 = 395;
+    pub const FORM_DATA_END: u16 = 396;
+    pub const GAMEPAD: u16 = 396;
+    pub const GAMEPAD_END: u16 = 397;
+    pub const GAMEPAD_BUTTON: u16 = 397;
+    pub const GAMEPAD_BUTTON_END: u16 = 398;
+    pub const GAMEPAD_HAPTIC_ACTUATOR: u16 = 398;
+    pub const GAMEPAD_HAPTIC_ACTUATOR_END: u16 = 399;
+    pub const HTML_ALL_COLLECTION: u16 = 399;
+    pub const HTML_ALL_COLLECTION_END: u16 = 400;
+    pub const HTML_COLLECTION: u16 = 400;
+    pub const HTML_COLLECTION_END: u16 = 403;
+    pub const HTML_FORM_CONTROLS_COLLECTION: u16 = 401;
+    pub const HTML_FORM_CONTROLS_COLLECTION_END: u16 = 402;
+    pub const HTML_OPTIONS_COLLECTION: u16 = 402;
+    pub const HTML_OPTIONS_COLLECTION_END: u16 = 403;
+    pub const HEADERS: u16 = 403;
+    pub const HEADERS_END: u16 = 404;
+    pub const HISTORY: u16 = 404;
+    pub const HISTORY_END: u16 = 405;
+    pub const IDB_CURSOR: u16 = 405;
+    pub const IDB_CURSOR_END: u16 = 407;
+    pub const IDB_CURSOR_WITH_VALUE: u16 = 406;
+    pub const IDB_CURSOR_WITH_VALUE_END: u16 = 407;
+    pub const IDB_FACTORY: u16 = 407;
+    pub const IDB_FACTORY_END: u16 = 408;
+    pub const IDB_INDEX: u16 = 408;
+    pub const IDB_INDEX_END: u16 = 409;
+    pub const IDB_KEY_RANGE: u16 = 409;
+    pub const IDB_KEY_RANGE_END: u16 = 410;
+    pub const IDB_OBJECT_STORE: u16 = 410;
+    pub const IDB_OBJECT_STORE_END: u16 = 411;
+    pub const IDB_RECORD: u16 = 411;
+    pub const IDB_RECORD_END: u16 = 412;
+    pub const IDLE_DEADLINE: u16 = 412;
+    pub const IDLE_DEADLINE_END: u16 = 413;
+    pub const IMAGE_BITMAP: u16 = 413;
+    pub const IMAGE_BITMAP_END: u16 = 414;
+    pub const IMAGE_DATA: u16 = 414;
+    pub const IMAGE_DATA_END: u16 = 415;
+    pub const INPUT_DEVICE_CAPABILITIES: u16 = 415;
+    pub const INPUT_DEVICE_CAPABILITIES_END: u16 = 416;
+    pub const INTERSECTION_OBSERVER: u16 = 416;
+    pub const INTERSECTION_OBSERVER_END: u16 = 417;
+    pub const INTERSECTION_OBSERVER_ENTRY: u16 = 417;
+    pub const INTERSECTION_OBSERVER_ENTRY_END: u16 = 418;
+    pub const KHR_PARALLEL_SHADER_COMPILE: u16 = 418;
+    pub const KHR_PARALLEL_SHADER_COMPILE_END: u16 = 419;
+    pub const LOCATION: u16 = 419;
+    pub const LOCATION_END: u16 = 420;
+    pub const MEDIA_CAPABILITIES: u16 = 420;
+    pub const MEDIA_CAPABILITIES_END: u16 = 421;
+    pub const MEDIA_DEVICE_INFO: u16 = 421;
+    pub const MEDIA_DEVICE_INFO_END: u16 = 423;
+    pub const INPUT_DEVICE_INFO: u16 = 422;
+    pub const INPUT_DEVICE_INFO_END: u16 = 423;
+    pub const MEDIA_ERROR: u16 = 423;
+    pub const MEDIA_ERROR_END: u16 = 424;
+    pub const MEDIA_KEY_STATUS_MAP: u16 = 424;
+    pub const MEDIA_KEY_STATUS_MAP_END: u16 = 425;
+    pub const MEDIA_KEY_SYSTEM_ACCESS: u16 = 425;
+    pub const MEDIA_KEY_SYSTEM_ACCESS_END: u16 = 426;
+    pub const MEDIA_KEYS: u16 = 426;
+    pub const MEDIA_KEYS_END: u16 = 427;
+    pub const MEDIA_LIST: u16 = 427;
+    pub const MEDIA_LIST_END: u16 = 428;
+    pub const MESSAGE_CHANNEL: u16 = 428;
+    pub const MESSAGE_CHANNEL_END: u16 = 429;
+    pub const MIME_TYPE: u16 = 429;
+    pub const MIME_TYPE_END: u16 = 430;
+    pub const MIME_TYPE_ARRAY: u16 = 430;
+    pub const MIME_TYPE_ARRAY_END: u16 = 431;
+    pub const MUTATION_OBSERVER: u16 = 431;
+    pub const MUTATION_OBSERVER_END: u16 = 432;
+    pub const MUTATION_RECORD: u16 = 432;
+    pub const MUTATION_RECORD_END: u16 = 433;
+    pub const NAMED_NODE_MAP: u16 = 433;
+    pub const NAMED_NODE_MAP_END: u16 = 434;
+    pub const NAVIGATOR: u16 = 434;
+    pub const NAVIGATOR_END: u16 = 435;
+    pub const NAVIGATOR_UA_DATA: u16 = 435;
+    pub const NAVIGATOR_UA_DATA_END: u16 = 436;
+    pub const NODE_ITERATOR: u16 = 436;
+    pub const NODE_ITERATOR_END: u16 = 437;
+    pub const NODE_LIST: u16 = 437;
+    pub const NODE_LIST_END: u16 = 439;
+    pub const RADIO_NODE_LIST: u16 = 438;
+    pub const RADIO_NODE_LIST_END: u16 = 439;
+    pub const OES_DRAW_BUFFERS_INDEXED: u16 = 439;
+    pub const OES_DRAW_BUFFERS_INDEXED_END: u16 = 440;
+    pub const OES_ELEMENT_INDEX_UINT: u16 = 440;
+    pub const OES_ELEMENT_INDEX_UINT_END: u16 = 441;
+    pub const OES_FBO_RENDER_MIPMAP: u16 = 441;
+    pub const OES_FBO_RENDER_MIPMAP_END: u16 = 442;
+    pub const OES_SAMPLE_VARIABLES: u16 = 442;
+    pub const OES_SAMPLE_VARIABLES_END: u16 = 443;
+    pub const OES_SHADER_MULTISAMPLE_INTERPOLATION: u16 = 443;
+    pub const OES_SHADER_MULTISAMPLE_INTERPOLATION_END: u16 = 444;
+    pub const OES_STANDARD_DERIVATIVES: u16 = 444;
+    pub const OES_STANDARD_DERIVATIVES_END: u16 = 445;
+    pub const OES_TEXTURE_FLOAT: u16 = 445;
+    pub const OES_TEXTURE_FLOAT_END: u16 = 446;
+    pub const OES_TEXTURE_FLOAT_LINEAR: u16 = 446;
+    pub const OES_TEXTURE_FLOAT_LINEAR_END: u16 = 447;
+    pub const OES_TEXTURE_HALF_FLOAT: u16 = 447;
+    pub const OES_TEXTURE_HALF_FLOAT_END: u16 = 448;
+    pub const OES_TEXTURE_HALF_FLOAT_LINEAR: u16 = 448;
+    pub const OES_TEXTURE_HALF_FLOAT_LINEAR_END: u16 = 449;
+    pub const OES_VERTEX_ARRAY_OBJECT: u16 = 449;
+    pub const OES_VERTEX_ARRAY_OBJECT_END: u16 = 450;
+    pub const OVR_MULTIVIEW2: u16 = 450;
+    pub const OVR_MULTIVIEW2_END: u16 = 451;
+    pub const OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D: u16 = 451;
+    pub const OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D_END: u16 = 452;
+    pub const PATH2_D: u16 = 452;
+    pub const PATH2_D_END: u16 = 453;
+    pub const PERFORMANCE_ENTRY: u16 = 453;
+    pub const PERFORMANCE_ENTRY_END: u16 = 461;
+    pub const PERFORMANCE_EVENT_TIMING: u16 = 454;
+    pub const PERFORMANCE_EVENT_TIMING_END: u16 = 455;
+    pub const PERFORMANCE_MARK: u16 = 455;
+    pub const PERFORMANCE_MARK_END: u16 = 456;
+    pub const PERFORMANCE_MEASURE: u16 = 456;
+    pub const PERFORMANCE_MEASURE_END: u16 = 457;
+    pub const PERFORMANCE_PAINT_TIMING: u16 = 457;
+    pub const PERFORMANCE_PAINT_TIMING_END: u16 = 458;
+    pub const PERFORMANCE_RESOURCE_TIMING: u16 = 458;
+    pub const PERFORMANCE_RESOURCE_TIMING_END: u16 = 460;
+    pub const PERFORMANCE_NAVIGATION_TIMING: u16 = 459;
+    pub const PERFORMANCE_NAVIGATION_TIMING_END: u16 = 460;
+    pub const VISIBILITY_STATE_ENTRY: u16 = 460;
+    pub const VISIBILITY_STATE_ENTRY_END: u16 = 461;
+    pub const PERFORMANCE_NAVIGATION: u16 = 461;
+    pub const PERFORMANCE_NAVIGATION_END: u16 = 462;
+    pub const PERFORMANCE_OBSERVER: u16 = 462;
+    pub const PERFORMANCE_OBSERVER_END: u16 = 463;
+    pub const PERFORMANCE_OBSERVER_ENTRY_LIST: u16 = 463;
+    pub const PERFORMANCE_OBSERVER_ENTRY_LIST_END: u16 = 464;
+    pub const PERFORMANCE_SERVER_TIMING: u16 = 464;
+    pub const PERFORMANCE_SERVER_TIMING_END: u16 = 465;
+    pub const PERFORMANCE_TIMING: u16 = 465;
+    pub const PERFORMANCE_TIMING_END: u16 = 466;
+    pub const PERIODIC_WAVE: u16 = 466;
+    pub const PERIODIC_WAVE_END: u16 = 467;
+    pub const PERMISSIONS: u16 = 467;
+    pub const PERMISSIONS_END: u16 = 468;
+    pub const PLUGIN: u16 = 468;
+    pub const PLUGIN_END: u16 = 469;
+    pub const PLUGIN_ARRAY: u16 = 469;
+    pub const PLUGIN_ARRAY_END: u16 = 470;
+    pub const READABLE_BYTE_STREAM_CONTROLLER: u16 = 470;
+    pub const READABLE_BYTE_STREAM_CONTROLLER_END: u16 = 471;
+    pub const READABLE_STREAM: u16 = 471;
+    pub const READABLE_STREAM_END: u16 = 472;
+    pub const READABLE_STREAM_BYOB_READER: u16 = 472;
+    pub const READABLE_STREAM_BYOB_READER_END: u16 = 473;
+    pub const READABLE_STREAM_BYOB_REQUEST: u16 = 473;
+    pub const READABLE_STREAM_BYOB_REQUEST_END: u16 = 474;
+    pub const READABLE_STREAM_DEFAULT_CONTROLLER: u16 = 474;
+    pub const READABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 475;
+    pub const READABLE_STREAM_DEFAULT_READER: u16 = 475;
+    pub const READABLE_STREAM_DEFAULT_READER_END: u16 = 476;
+    pub const REQUEST: u16 = 476;
+    pub const REQUEST_END: u16 = 477;
+    pub const RESIZE_OBSERVER: u16 = 477;
+    pub const RESIZE_OBSERVER_END: u16 = 478;
+    pub const RESIZE_OBSERVER_ENTRY: u16 = 478;
+    pub const RESIZE_OBSERVER_ENTRY_END: u16 = 479;
+    pub const RESIZE_OBSERVER_SIZE: u16 = 479;
+    pub const RESIZE_OBSERVER_SIZE_END: u16 = 480;
+    pub const RESPONSE: u16 = 480;
+    pub const RESPONSE_END: u16 = 481;
+    pub const SVG_ANGLE: u16 = 481;
+    pub const SVG_ANGLE_END: u16 = 482;
+    pub const SVG_ANIMATED_ANGLE: u16 = 482;
+    pub const SVG_ANIMATED_ANGLE_END: u16 = 483;
+    pub const SVG_ANIMATED_BOOLEAN: u16 = 483;
+    pub const SVG_ANIMATED_BOOLEAN_END: u16 = 484;
+    pub const SVG_ANIMATED_ENUMERATION: u16 = 484;
+    pub const SVG_ANIMATED_ENUMERATION_END: u16 = 485;
+    pub const SVG_ANIMATED_INTEGER: u16 = 485;
+    pub const SVG_ANIMATED_INTEGER_END: u16 = 486;
+    pub const SVG_ANIMATED_LENGTH: u16 = 486;
+    pub const SVG_ANIMATED_LENGTH_END: u16 = 487;
+    pub const SVG_ANIMATED_LENGTH_LIST: u16 = 487;
+    pub const SVG_ANIMATED_LENGTH_LIST_END: u16 = 488;
+    pub const SVG_ANIMATED_NUMBER: u16 = 488;
+    pub const SVG_ANIMATED_NUMBER_END: u16 = 489;
+    pub const SVG_ANIMATED_NUMBER_LIST: u16 = 489;
+    pub const SVG_ANIMATED_NUMBER_LIST_END: u16 = 490;
+    pub const SVG_ANIMATED_PRESERVE_ASPECT_RATIO: u16 = 490;
+    pub const SVG_ANIMATED_PRESERVE_ASPECT_RATIO_END: u16 = 491;
+    pub const SVG_ANIMATED_RECT: u16 = 491;
+    pub const SVG_ANIMATED_RECT_END: u16 = 492;
+    pub const SVG_ANIMATED_STRING: u16 = 492;
+    pub const SVG_ANIMATED_STRING_END: u16 = 493;
+    pub const SVG_ANIMATED_TRANSFORM_LIST: u16 = 493;
+    pub const SVG_ANIMATED_TRANSFORM_LIST_END: u16 = 494;
+    pub const SVG_LENGTH: u16 = 494;
+    pub const SVG_LENGTH_END: u16 = 495;
+    pub const SVG_LENGTH_LIST: u16 = 495;
+    pub const SVG_LENGTH_LIST_END: u16 = 496;
+    pub const SVG_NUMBER: u16 = 496;
+    pub const SVG_NUMBER_END: u16 = 497;
+    pub const SVG_NUMBER_LIST: u16 = 497;
+    pub const SVG_NUMBER_LIST_END: u16 = 498;
+    pub const SVG_POINT_LIST: u16 = 498;
+    pub const SVG_POINT_LIST_END: u16 = 499;
+    pub const SVG_PRESERVE_ASPECT_RATIO: u16 = 499;
+    pub const SVG_PRESERVE_ASPECT_RATIO_END: u16 = 500;
+    pub const SVG_STRING_LIST: u16 = 500;
+    pub const SVG_STRING_LIST_END: u16 = 501;
+    pub const SVG_TRANSFORM: u16 = 501;
+    pub const SVG_TRANSFORM_END: u16 = 502;
+    pub const SVG_TRANSFORM_LIST: u16 = 502;
+    pub const SVG_TRANSFORM_LIST_END: u16 = 503;
+    pub const SVG_UNIT_TYPES: u16 = 503;
+    pub const SVG_UNIT_TYPES_END: u16 = 504;
+    pub const SANITIZER: u16 = 504;
+    pub const SANITIZER_END: u16 = 505;
+    pub const SCHEDULER: u16 = 505;
+    pub const SCHEDULER_END: u16 = 506;
+    pub const SCHEDULING: u16 = 506;
+    pub const SCHEDULING_END: u16 = 507;
+    pub const SCREEN: u16 = 507;
+    pub const SCREEN_END: u16 = 508;
+    pub const SELECTION: u16 = 508;
+    pub const SELECTION_END: u16 = 509;
+    pub const STORAGE: u16 = 509;
+    pub const STORAGE_END: u16 = 510;
+    pub const STORAGE_MANAGER: u16 = 510;
+    pub const STORAGE_MANAGER_END: u16 = 511;
+    pub const STYLE_PROPERTY_MAP_READ_ONLY: u16 = 511;
+    pub const STYLE_PROPERTY_MAP_READ_ONLY_END: u16 = 513;
+    pub const STYLE_PROPERTY_MAP: u16 = 512;
+    pub const STYLE_PROPERTY_MAP_END: u16 = 513;
+    pub const STYLE_SHEET: u16 = 513;
+    pub const STYLE_SHEET_END: u16 = 515;
+    pub const CSS_STYLE_SHEET: u16 = 514;
+    pub const CSS_STYLE_SHEET_END: u16 = 515;
+    pub const STYLE_SHEET_LIST: u16 = 515;
+    pub const STYLE_SHEET_LIST_END: u16 = 516;
+    pub const SUBTLE_CRYPTO: u16 = 516;
+    pub const SUBTLE_CRYPTO_END: u16 = 517;
+    pub const TEXT_DECODER: u16 = 517;
+    pub const TEXT_DECODER_END: u16 = 518;
+    pub const TEXT_DECODER_STREAM: u16 = 518;
+    pub const TEXT_DECODER_STREAM_END: u16 = 519;
+    pub const TEXT_ENCODER: u16 = 519;
+    pub const TEXT_ENCODER_END: u16 = 520;
+    pub const TEXT_ENCODER_STREAM: u16 = 520;
+    pub const TEXT_ENCODER_STREAM_END: u16 = 521;
+    pub const TEXT_METRICS: u16 = 521;
+    pub const TEXT_METRICS_END: u16 = 522;
+    pub const TEXT_TRACK_CUE_LIST: u16 = 522;
+    pub const TEXT_TRACK_CUE_LIST_END: u16 = 523;
+    pub const TIME_RANGES: u16 = 523;
+    pub const TIME_RANGES_END: u16 = 524;
+    pub const TOUCH: u16 = 524;
+    pub const TOUCH_END: u16 = 525;
+    pub const TOUCH_LIST: u16 = 525;
+    pub const TOUCH_LIST_END: u16 = 526;
+    pub const TRANSFORM_STREAM: u16 = 526;
+    pub const TRANSFORM_STREAM_END: u16 = 527;
+    pub const TRANSFORM_STREAM_DEFAULT_CONTROLLER: u16 = 527;
+    pub const TRANSFORM_STREAM_DEFAULT_CONTROLLER_END: u16 = 528;
+    pub const TREE_WALKER: u16 = 528;
+    pub const TREE_WALKER_END: u16 = 529;
+    pub const TRUSTED_HTML: u16 = 529;
+    pub const TRUSTED_HTML_END: u16 = 530;
+    pub const TRUSTED_HTML_PARSER_OPTIONS: u16 = 530;
+    pub const TRUSTED_HTML_PARSER_OPTIONS_END: u16 = 531;
+    pub const TRUSTED_SCRIPT: u16 = 531;
+    pub const TRUSTED_SCRIPT_END: u16 = 532;
+    pub const TRUSTED_SCRIPT_URL: u16 = 532;
+    pub const TRUSTED_SCRIPT_URL_END: u16 = 533;
+    pub const TRUSTED_TYPE_POLICY: u16 = 533;
+    pub const TRUSTED_TYPE_POLICY_END: u16 = 534;
+    pub const TRUSTED_TYPE_POLICY_FACTORY: u16 = 534;
+    pub const TRUSTED_TYPE_POLICY_FACTORY_END: u16 = 535;
+    pub const URL: u16 = 535;
+    pub const URL_END: u16 = 536;
+    pub const URL_PATTERN: u16 = 536;
+    pub const URL_PATTERN_END: u16 = 537;
+    pub const URL_SEARCH_PARAMS: u16 = 537;
+    pub const URL_SEARCH_PARAMS_END: u16 = 538;
+    pub const USER_ACTIVATION: u16 = 538;
+    pub const USER_ACTIVATION_END: u16 = 539;
+    pub const VALIDITY_STATE: u16 = 539;
+    pub const VALIDITY_STATE_END: u16 = 540;
+    pub const VIDEO_PLAYBACK_QUALITY: u16 = 540;
+    pub const VIDEO_PLAYBACK_QUALITY_END: u16 = 541;
+    pub const VIDEO_TRACK: u16 = 541;
+    pub const VIDEO_TRACK_END: u16 = 542;
+    pub const VIEW_TRANSITION: u16 = 542;
+    pub const VIEW_TRANSITION_END: u16 = 543;
+    pub const VIEW_TRANSITION_TYPE_SET: u16 = 543;
+    pub const VIEW_TRANSITION_TYPE_SET_END: u16 = 544;
+    pub const WEBGL_BLEND_FUNC_EXTENDED: u16 = 544;
+    pub const WEBGL_BLEND_FUNC_EXTENDED_END: u16 = 545;
+    pub const WEBGL_CLIP_CULL_DISTANCE: u16 = 545;
+    pub const WEBGL_CLIP_CULL_DISTANCE_END: u16 = 546;
+    pub const WEBGL_COLOR_BUFFER_FLOAT: u16 = 546;
+    pub const WEBGL_COLOR_BUFFER_FLOAT_END: u16 = 547;
+    pub const WEBGL_COMPRESSED_TEXTURE_ASTC: u16 = 547;
+    pub const WEBGL_COMPRESSED_TEXTURE_ASTC_END: u16 = 548;
+    pub const WEBGL_COMPRESSED_TEXTURE_ETC: u16 = 548;
+    pub const WEBGL_COMPRESSED_TEXTURE_ETC_END: u16 = 549;
+    pub const WEBGL_COMPRESSED_TEXTURE_ETC1: u16 = 549;
+    pub const WEBGL_COMPRESSED_TEXTURE_ETC1_END: u16 = 550;
+    pub const WEBGL_COMPRESSED_TEXTURE_S3TC: u16 = 550;
+    pub const WEBGL_COMPRESSED_TEXTURE_S3TC_END: u16 = 551;
+    pub const WEBGL_COMPRESSED_TEXTURE_S3TC_SRGB: u16 = 551;
+    pub const WEBGL_COMPRESSED_TEXTURE_S3TC_SRGB_END: u16 = 552;
+    pub const WEBGL_DEBUG_RENDERER_INFO: u16 = 552;
+    pub const WEBGL_DEBUG_RENDERER_INFO_END: u16 = 553;
+    pub const WEBGL_DEPTH_TEXTURE: u16 = 553;
+    pub const WEBGL_DEPTH_TEXTURE_END: u16 = 554;
+    pub const WEBGL_DRAW_BUFFERS: u16 = 554;
+    pub const WEBGL_DRAW_BUFFERS_END: u16 = 555;
+    pub const WEBGL_MULTI_DRAW: u16 = 555;
+    pub const WEBGL_MULTI_DRAW_END: u16 = 556;
+    pub const WEBGL_POLYGON_MODE: u16 = 556;
+    pub const WEBGL_POLYGON_MODE_END: u16 = 557;
+    pub const WEBGL_PROVOKING_VERTEX: u16 = 557;
+    pub const WEBGL_PROVOKING_VERTEX_END: u16 = 558;
+    pub const WEBGL_RENDER_SHARED_EXPONENT: u16 = 558;
+    pub const WEBGL_RENDER_SHARED_EXPONENT_END: u16 = 559;
+    pub const WEBGL_STENCIL_TEXTURING: u16 = 559;
+    pub const WEBGL_STENCIL_TEXTURING_END: u16 = 560;
+    pub const WEB_GL2_RENDERING_CONTEXT: u16 = 560;
+    pub const WEB_GL2_RENDERING_CONTEXT_END: u16 = 561;
+    pub const WEB_GL_ACTIVE_INFO: u16 = 561;
+    pub const WEB_GL_ACTIVE_INFO_END: u16 = 562;
+    pub const WEB_GL_OBJECT: u16 = 562;
+    pub const WEB_GL_OBJECT_END: u16 = 575;
+    pub const WEB_GL_BUFFER: u16 = 563;
+    pub const WEB_GL_BUFFER_END: u16 = 564;
+    pub const WEB_GL_FRAMEBUFFER: u16 = 564;
+    pub const WEB_GL_FRAMEBUFFER_END: u16 = 565;
+    pub const WEB_GL_PROGRAM: u16 = 565;
+    pub const WEB_GL_PROGRAM_END: u16 = 566;
+    pub const WEB_GL_QUERY: u16 = 566;
+    pub const WEB_GL_QUERY_END: u16 = 567;
+    pub const WEB_GL_RENDERBUFFER: u16 = 567;
+    pub const WEB_GL_RENDERBUFFER_END: u16 = 568;
+    pub const WEB_GL_SAMPLER: u16 = 568;
+    pub const WEB_GL_SAMPLER_END: u16 = 569;
+    pub const WEB_GL_SHADER: u16 = 569;
+    pub const WEB_GL_SHADER_END: u16 = 570;
+    pub const WEB_GL_SYNC: u16 = 570;
+    pub const WEB_GL_SYNC_END: u16 = 571;
+    pub const WEB_GL_TEXTURE: u16 = 571;
+    pub const WEB_GL_TEXTURE_END: u16 = 572;
+    pub const WEB_GL_TRANSFORM_FEEDBACK: u16 = 572;
+    pub const WEB_GL_TRANSFORM_FEEDBACK_END: u16 = 573;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT: u16 = 573;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT_END: u16 = 574;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT_OES: u16 = 574;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT_OES_END: u16 = 575;
+    pub const WEB_GL_RENDERING_CONTEXT: u16 = 575;
+    pub const WEB_GL_RENDERING_CONTEXT_END: u16 = 576;
+    pub const WEB_GL_SHADER_PRECISION_FORMAT: u16 = 576;
+    pub const WEB_GL_SHADER_PRECISION_FORMAT_END: u16 = 577;
+    pub const WEB_GL_UNIFORM_LOCATION: u16 = 577;
+    pub const WEB_GL_UNIFORM_LOCATION_END: u16 = 578;
+    pub const WORKER_LOCATION: u16 = 578;
+    pub const WORKER_LOCATION_END: u16 = 579;
+    pub const WORKER_NAVIGATOR: u16 = 579;
+    pub const WORKER_NAVIGATOR_END: u16 = 580;
+    pub const WRITABLE_STREAM: u16 = 580;
+    pub const WRITABLE_STREAM_END: u16 = 581;
+    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER: u16 = 581;
+    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 582;
+    pub const WRITABLE_STREAM_DEFAULT_WRITER: u16 = 582;
+    pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 583;
+    pub const XML_SERIALIZER: u16 = 583;
+    pub const XML_SERIALIZER_END: u16 = 584;
+    pub const X_PATH_EVALUATOR: u16 = 584;
+    pub const X_PATH_EVALUATOR_END: u16 = 585;
+    pub const X_PATH_EXPRESSION: u16 = 585;
+    pub const X_PATH_EXPRESSION_END: u16 = 586;
+    pub const X_PATH_RESULT: u16 = 586;
+    pub const X_PATH_RESULT_END: u16 = 587;
     /// The number of generated interfaces.
-    pub const COUNT: usize = 538;
+    pub const COUNT: usize = 586;
 }
 
 /// The generated interfaces; the engine names an object's most derived one in `Host::interface_of`.
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[allow(non_camel_case_types)] // (WebGL extensions: `EXT_sRGB`)
 pub enum InterfaceId {
-    AbortController = 1,
-    TaskController = 2,
-    AbstractRange = 3,
-    Range = 4,
-    StaticRange = 5,
-    AnimationEffect = 6,
-    KeyframeEffect = 7,
-    AnimationTimeline = 8,
-    DocumentTimeline = 9,
-    AudioBuffer = 10,
-    AudioListener = 11,
-    AudioParam = 12,
-    AudioTrack = 13,
-    AuthenticatorResponse = 14,
-    AuthenticatorAssertionResponse = 15,
-    AuthenticatorAttestationResponse = 16,
-    BarProp = 17,
-    Blob = 18,
-    File = 19,
-    ByteLengthQueuingStrategy = 20,
-    CSSNumericArray = 21,
-    CSSRule = 22,
-    CSSFontFaceRule = 23,
-    CSSFontFeatureValuesRule = 24,
-    CSSFontPaletteValuesRule = 25,
-    CSSGroupingRule = 26,
-    CSSConditionRule = 27,
-    CSSContainerRule = 28,
-    CSSMediaRule = 29,
-    CSSSupportsRule = 30,
-    CSSLayerBlockRule = 31,
-    CSSStyleRule = 32,
-    CSSImportRule = 33,
-    CSSKeyframeRule = 34,
-    CSSKeyframesRule = 35,
-    CSSLayerStatementRule = 36,
-    CSSNamespaceRule = 37,
-    CSSPropertyRule = 38,
-    CSSRuleList = 39,
-    CSSStyleDeclaration = 40,
-    CSSFontFaceDescriptors = 41,
-    CSSStyleProperties = 42,
-    CSSStyleValue = 43,
-    CSSImageValue = 44,
-    CSSKeywordValue = 45,
-    CSSNumericValue = 46,
-    CSSMathValue = 47,
-    CSSMathClamp = 48,
-    CSSMathInvert = 49,
-    CSSMathMax = 50,
-    CSSMathMin = 51,
-    CSSMathNegate = 52,
-    CSSMathProduct = 53,
-    CSSMathSum = 54,
-    CSSUnitValue = 55,
-    CSSTransformValue = 56,
-    CSSUnparsedValue = 57,
-    CSSTransformComponent = 58,
-    CSSMatrixComponent = 59,
-    CSSPerspective = 60,
-    CSSRotate = 61,
-    CSSScale = 62,
-    CSSSkew = 63,
-    CSSSkewX = 64,
-    CSSSkewY = 65,
-    CSSTranslate = 66,
-    CSSVariableReferenceValue = 67,
-    CanvasGradient = 68,
-    CanvasPattern = 69,
-    CanvasRenderingContext2D = 70,
-    ClipboardItem = 71,
-    CompressionStream = 72,
-    CountQueuingStrategy = 73,
-    Credential = 74,
-    FederatedCredential = 75,
-    IdentityCredential = 76,
-    PasswordCredential = 77,
-    PublicKeyCredential = 78,
-    CredentialsContainer = 79,
-    Crypto = 80,
-    CryptoKey = 81,
-    CustomElementRegistry = 82,
-    CustomStateSet = 83,
-    DOMException = 84,
-    DOMImplementation = 85,
-    DOMMatrixReadOnly = 86,
-    DOMMatrix = 87,
-    DOMParser = 88,
-    DOMPointReadOnly = 89,
-    DOMPoint = 90,
-    DOMQuad = 91,
-    DOMRectList = 92,
-    DOMRectReadOnly = 93,
-    DOMRect = 94,
-    DOMStringList = 95,
-    DOMStringMap = 96,
-    DOMTokenList = 97,
-    DataTransfer = 98,
-    DataTransferItem = 99,
-    DataTransferItemList = 100,
-    DecompressionStream = 101,
-    ElementInternals = 102,
-    Event = 103,
-    AnimationEvent = 104,
-    AnimationPlaybackEvent = 105,
-    BeforeUnloadEvent = 106,
-    ClipboardEvent = 107,
-    CloseEvent = 108,
-    CommandEvent = 109,
-    CustomEvent = 110,
-    ErrorEvent = 111,
-    FontFaceSetLoadEvent = 112,
-    FormDataEvent = 113,
-    GamepadEvent = 114,
-    HashChangeEvent = 115,
-    IDBVersionChangeEvent = 116,
-    MediaEncryptedEvent = 117,
-    MediaKeyMessageEvent = 118,
-    MediaQueryListEvent = 119,
-    MessageEvent = 120,
-    OfflineAudioCompletionEvent = 121,
-    PageTransitionEvent = 122,
-    PopStateEvent = 123,
-    ProgressEvent = 124,
-    PromiseRejectionEvent = 125,
-    SecurityPolicyViolationEvent = 126,
-    StorageEvent = 127,
-    SubmitEvent = 128,
-    TaskPriorityChangeEvent = 129,
-    ToggleEvent = 130,
-    TrackEvent = 131,
-    TransitionEvent = 132,
-    UIEvent = 133,
-    CompositionEvent = 134,
-    FocusEvent = 135,
-    InputEvent = 136,
-    KeyboardEvent = 137,
-    MouseEvent = 138,
-    DragEvent = 139,
-    PointerEvent = 140,
-    WheelEvent = 141,
-    TextEvent = 142,
-    TouchEvent = 143,
-    WebGLContextEvent = 144,
-    EventTarget = 145,
-    AbortSignal = 146,
-    TaskSignal = 147,
-    Animation = 148,
-    CSSAnimation = 149,
-    CSSTransition = 150,
-    AudioNode = 151,
-    AnalyserNode = 152,
-    AudioDestinationNode = 153,
-    AudioScheduledSourceNode = 154,
-    AudioBufferSourceNode = 155,
-    ConstantSourceNode = 156,
-    OscillatorNode = 157,
-    BiquadFilterNode = 158,
-    ChannelMergerNode = 159,
-    ChannelSplitterNode = 160,
-    ConvolverNode = 161,
-    DelayNode = 162,
-    DynamicsCompressorNode = 163,
-    GainNode = 164,
-    IIRFilterNode = 165,
-    PannerNode = 166,
-    StereoPannerNode = 167,
-    WaveShaperNode = 168,
-    AudioTrackList = 169,
-    BaseAudioContext = 170,
-    AudioContext = 171,
-    OfflineAudioContext = 172,
-    BatteryManager = 173,
-    BroadcastChannel = 174,
-    Clipboard = 175,
-    FileReader = 176,
-    FontFaceSet = 177,
-    IDBDatabase = 178,
-    IDBRequest = 179,
-    IDBOpenDBRequest = 180,
-    IDBTransaction = 181,
-    MediaDevices = 182,
-    MediaKeySession = 183,
-    MediaQueryList = 184,
-    MediaSource = 185,
-    MessagePort = 186,
-    NetworkInformation = 187,
-    Node = 188,
-    Attr = 189,
-    CharacterData = 190,
-    Comment = 191,
-    ProcessingInstruction = 192,
-    Text = 193,
-    CDATASection = 194,
-    Document = 195,
-    HTMLDocument = 196,
-    XMLDocument = 197,
-    DocumentFragment = 198,
-    ShadowRoot = 199,
-    DocumentType = 200,
-    Element = 201,
-    HTMLElement = 202,
-    HTMLAnchorElement = 203,
-    HTMLAreaElement = 204,
-    HTMLBRElement = 205,
-    HTMLBaseElement = 206,
-    HTMLBodyElement = 207,
-    HTMLButtonElement = 208,
-    HTMLCameraElement = 209,
-    HTMLCanvasElement = 210,
-    HTMLDListElement = 211,
-    HTMLDataElement = 212,
-    HTMLDataListElement = 213,
-    HTMLDetailsElement = 214,
-    HTMLDialogElement = 215,
-    HTMLDirectoryElement = 216,
-    HTMLDivElement = 217,
-    HTMLEmbedElement = 218,
-    HTMLFencedFrameElement = 219,
-    HTMLFieldSetElement = 220,
-    HTMLFontElement = 221,
-    HTMLFormElement = 222,
-    HTMLFrameElement = 223,
-    HTMLFrameSetElement = 224,
-    HTMLGeolocationElement = 225,
-    HTMLHRElement = 226,
-    HTMLHeadElement = 227,
-    HTMLHeadingElement = 228,
-    HTMLHtmlElement = 229,
-    HTMLIFrameElement = 230,
-    HTMLImageElement = 231,
-    HTMLInputElement = 232,
-    HTMLInstallElement = 233,
-    HTMLLIElement = 234,
-    HTMLLabelElement = 235,
-    HTMLLegendElement = 236,
-    HTMLLinkElement = 237,
-    HTMLMapElement = 238,
-    HTMLMarqueeElement = 239,
-    HTMLMediaElement = 240,
-    HTMLAudioElement = 241,
-    HTMLVideoElement = 242,
-    HTMLMenuElement = 243,
-    HTMLMetaElement = 244,
-    HTMLMeterElement = 245,
-    HTMLMicrophoneElement = 246,
-    HTMLModElement = 247,
-    HTMLModelElement = 248,
-    HTMLOListElement = 249,
-    HTMLObjectElement = 250,
-    HTMLOptGroupElement = 251,
-    HTMLOptionElement = 252,
-    HTMLOutputElement = 253,
-    HTMLParagraphElement = 254,
-    HTMLParamElement = 255,
-    HTMLPictureElement = 256,
-    HTMLPortalElement = 257,
-    HTMLPreElement = 258,
-    HTMLProgressElement = 259,
-    HTMLQuoteElement = 260,
-    HTMLScriptElement = 261,
-    HTMLSelectElement = 262,
-    HTMLSelectedContentElement = 263,
-    HTMLSlotElement = 264,
-    HTMLSourceElement = 265,
-    HTMLSpanElement = 266,
-    HTMLStyleElement = 267,
-    HTMLTableCaptionElement = 268,
-    HTMLTableCellElement = 269,
-    HTMLTableColElement = 270,
-    HTMLTableElement = 271,
-    HTMLTableRowElement = 272,
-    HTMLTableSectionElement = 273,
-    HTMLTemplateElement = 274,
-    HTMLTextAreaElement = 275,
-    HTMLTimeElement = 276,
-    HTMLTitleElement = 277,
-    HTMLTrackElement = 278,
-    HTMLUListElement = 279,
-    HTMLUnknownElement = 280,
-    HTMLUserMediaElement = 281,
-    SVGElement = 282,
-    SVGAnimationElement = 283,
-    SVGAnimateElement = 284,
-    SVGAnimateMotionElement = 285,
-    SVGAnimateTransformElement = 286,
-    SVGSetElement = 287,
-    SVGClipPathElement = 288,
-    SVGComponentTransferFunctionElement = 289,
-    SVGFEFuncAElement = 290,
-    SVGFEFuncBElement = 291,
-    SVGFEFuncGElement = 292,
-    SVGFEFuncRElement = 293,
-    SVGDescElement = 294,
-    SVGFEBlendElement = 295,
-    SVGFEColorMatrixElement = 296,
-    SVGFEComponentTransferElement = 297,
-    SVGFECompositeElement = 298,
-    SVGFEConvolveMatrixElement = 299,
-    SVGFEDiffuseLightingElement = 300,
-    SVGFEDisplacementMapElement = 301,
-    SVGFEDistantLightElement = 302,
-    SVGFEDropShadowElement = 303,
-    SVGFEFloodElement = 304,
-    SVGFEGaussianBlurElement = 305,
-    SVGFEImageElement = 306,
-    SVGFEMergeElement = 307,
-    SVGFEMergeNodeElement = 308,
-    SVGFEMorphologyElement = 309,
-    SVGFEOffsetElement = 310,
-    SVGFEPointLightElement = 311,
-    SVGFESpecularLightingElement = 312,
-    SVGFESpotLightElement = 313,
-    SVGFETileElement = 314,
-    SVGFETurbulenceElement = 315,
-    SVGFilterElement = 316,
-    SVGGradientElement = 317,
-    SVGLinearGradientElement = 318,
-    SVGRadialGradientElement = 319,
-    SVGGraphicsElement = 320,
-    SVGAElement = 321,
-    SVGDefsElement = 322,
-    SVGForeignObjectElement = 323,
-    SVGGElement = 324,
-    SVGGeometryElement = 325,
-    SVGCircleElement = 326,
-    SVGEllipseElement = 327,
-    SVGLineElement = 328,
-    SVGPathElement = 329,
-    SVGPolygonElement = 330,
-    SVGPolylineElement = 331,
-    SVGRectElement = 332,
-    SVGImageElement = 333,
-    SVGSVGElement = 334,
-    SVGSwitchElement = 335,
-    SVGSymbolElement = 336,
-    SVGTextContentElement = 337,
-    SVGTextPathElement = 338,
-    SVGTextPositioningElement = 339,
-    SVGTSpanElement = 340,
-    SVGTextElement = 341,
-    SVGUseElement = 342,
-    SVGMPathElement = 343,
-    SVGMarkerElement = 344,
-    SVGMaskElement = 345,
-    SVGMetadataElement = 346,
-    SVGPatternElement = 347,
-    SVGScriptElement = 348,
-    SVGStopElement = 349,
-    SVGStyleElement = 350,
-    SVGTitleElement = 351,
-    SVGViewElement = 352,
-    Notification = 353,
-    OffscreenCanvas = 354,
-    Performance = 355,
-    PermissionStatus = 356,
-    ScreenOrientation = 357,
-    SourceBuffer = 358,
-    SourceBufferList = 359,
-    TextTrack = 360,
-    TextTrackCue = 361,
-    VTTCue = 362,
-    TextTrackList = 363,
-    VideoTrackList = 364,
-    VisualViewport = 365,
-    WebSocket = 366,
-    Window = 367,
-    Worker = 368,
-    WorkerGlobalScope = 369,
-    DedicatedWorkerGlobalScope = 370,
-    XMLHttpRequestEventTarget = 371,
-    XMLHttpRequest = 372,
-    XMLHttpRequestUpload = 373,
-    External = 374,
-    FileList = 375,
-    FontFace = 376,
-    FormData = 377,
-    Gamepad = 378,
-    GamepadButton = 379,
-    GamepadHapticActuator = 380,
-    HTMLAllCollection = 381,
-    HTMLCollection = 382,
-    HTMLFormControlsCollection = 383,
-    HTMLOptionsCollection = 384,
-    Headers = 385,
-    History = 386,
-    IDBCursor = 387,
-    IDBCursorWithValue = 388,
-    IDBFactory = 389,
-    IDBIndex = 390,
-    IDBKeyRange = 391,
-    IDBObjectStore = 392,
-    IDBRecord = 393,
-    IdleDeadline = 394,
-    ImageBitmap = 395,
-    ImageData = 396,
-    InputDeviceCapabilities = 397,
-    IntersectionObserver = 398,
-    IntersectionObserverEntry = 399,
-    Location = 400,
-    MediaCapabilities = 401,
-    MediaDeviceInfo = 402,
-    InputDeviceInfo = 403,
-    MediaError = 404,
-    MediaKeyStatusMap = 405,
-    MediaKeySystemAccess = 406,
-    MediaKeys = 407,
-    MediaList = 408,
-    MessageChannel = 409,
-    MimeType = 410,
-    MimeTypeArray = 411,
-    MutationObserver = 412,
-    MutationRecord = 413,
-    NamedNodeMap = 414,
-    Navigator = 415,
-    NavigatorUAData = 416,
-    NodeIterator = 417,
-    NodeList = 418,
-    RadioNodeList = 419,
-    OffscreenCanvasRenderingContext2D = 420,
-    Path2D = 421,
-    PerformanceEntry = 422,
-    PerformanceEventTiming = 423,
-    PerformanceMark = 424,
-    PerformanceMeasure = 425,
-    PerformancePaintTiming = 426,
-    PerformanceResourceTiming = 427,
-    PerformanceNavigationTiming = 428,
-    VisibilityStateEntry = 429,
-    PerformanceNavigation = 430,
-    PerformanceObserver = 431,
-    PerformanceObserverEntryList = 432,
-    PerformanceServerTiming = 433,
-    PerformanceTiming = 434,
-    PeriodicWave = 435,
-    Permissions = 436,
-    Plugin = 437,
-    PluginArray = 438,
-    ReadableByteStreamController = 439,
-    ReadableStream = 440,
-    ReadableStreamBYOBReader = 441,
-    ReadableStreamBYOBRequest = 442,
-    ReadableStreamDefaultController = 443,
-    ReadableStreamDefaultReader = 444,
-    Request = 445,
-    ResizeObserver = 446,
-    ResizeObserverEntry = 447,
-    ResizeObserverSize = 448,
-    Response = 449,
-    SVGAngle = 450,
-    SVGAnimatedAngle = 451,
-    SVGAnimatedBoolean = 452,
-    SVGAnimatedEnumeration = 453,
-    SVGAnimatedInteger = 454,
-    SVGAnimatedLength = 455,
-    SVGAnimatedLengthList = 456,
-    SVGAnimatedNumber = 457,
-    SVGAnimatedNumberList = 458,
-    SVGAnimatedPreserveAspectRatio = 459,
-    SVGAnimatedRect = 460,
-    SVGAnimatedString = 461,
-    SVGAnimatedTransformList = 462,
-    SVGLength = 463,
-    SVGLengthList = 464,
-    SVGNumber = 465,
-    SVGNumberList = 466,
-    SVGPointList = 467,
-    SVGPreserveAspectRatio = 468,
-    SVGStringList = 469,
-    SVGTransform = 470,
-    SVGTransformList = 471,
-    SVGUnitTypes = 472,
-    Sanitizer = 473,
-    Scheduler = 474,
-    Scheduling = 475,
-    Screen = 476,
-    Selection = 477,
-    Storage = 478,
-    StorageManager = 479,
-    StylePropertyMapReadOnly = 480,
-    StylePropertyMap = 481,
-    StyleSheet = 482,
-    CSSStyleSheet = 483,
-    StyleSheetList = 484,
-    SubtleCrypto = 485,
-    TextDecoder = 486,
-    TextDecoderStream = 487,
-    TextEncoder = 488,
-    TextEncoderStream = 489,
-    TextMetrics = 490,
-    TextTrackCueList = 491,
-    TimeRanges = 492,
-    Touch = 493,
-    TouchList = 494,
-    TransformStream = 495,
-    TransformStreamDefaultController = 496,
-    TreeWalker = 497,
-    TrustedHTML = 498,
-    TrustedHTMLParserOptions = 499,
-    TrustedScript = 500,
-    TrustedScriptURL = 501,
-    TrustedTypePolicy = 502,
-    TrustedTypePolicyFactory = 503,
-    URL = 504,
-    URLPattern = 505,
-    URLSearchParams = 506,
-    UserActivation = 507,
-    ValidityState = 508,
-    VideoPlaybackQuality = 509,
-    VideoTrack = 510,
-    ViewTransition = 511,
-    ViewTransitionTypeSet = 512,
-    WebGL2RenderingContext = 513,
-    WebGLActiveInfo = 514,
-    WebGLObject = 515,
-    WebGLBuffer = 516,
-    WebGLFramebuffer = 517,
-    WebGLProgram = 518,
-    WebGLQuery = 519,
-    WebGLRenderbuffer = 520,
-    WebGLSampler = 521,
-    WebGLShader = 522,
-    WebGLSync = 523,
-    WebGLTexture = 524,
-    WebGLTransformFeedback = 525,
-    WebGLVertexArrayObject = 526,
-    WebGLRenderingContext = 527,
-    WebGLShaderPrecisionFormat = 528,
-    WebGLUniformLocation = 529,
-    WorkerLocation = 530,
-    WorkerNavigator = 531,
-    WritableStream = 532,
-    WritableStreamDefaultController = 533,
-    WritableStreamDefaultWriter = 534,
-    XMLSerializer = 535,
-    XPathEvaluator = 536,
-    XPathExpression = 537,
-    XPathResult = 538,
+    ANGLE_instanced_arrays = 1,
+    AbortController = 2,
+    TaskController = 3,
+    AbstractRange = 4,
+    Range = 5,
+    StaticRange = 6,
+    AnimationEffect = 7,
+    KeyframeEffect = 8,
+    AnimationTimeline = 9,
+    DocumentTimeline = 10,
+    AudioBuffer = 11,
+    AudioListener = 12,
+    AudioParam = 13,
+    AudioTrack = 14,
+    AuthenticatorResponse = 15,
+    AuthenticatorAssertionResponse = 16,
+    AuthenticatorAttestationResponse = 17,
+    BarProp = 18,
+    Blob = 19,
+    File = 20,
+    ByteLengthQueuingStrategy = 21,
+    CSSNumericArray = 22,
+    CSSRule = 23,
+    CSSFontFaceRule = 24,
+    CSSFontFeatureValuesRule = 25,
+    CSSFontPaletteValuesRule = 26,
+    CSSGroupingRule = 27,
+    CSSConditionRule = 28,
+    CSSContainerRule = 29,
+    CSSMediaRule = 30,
+    CSSSupportsRule = 31,
+    CSSLayerBlockRule = 32,
+    CSSStyleRule = 33,
+    CSSImportRule = 34,
+    CSSKeyframeRule = 35,
+    CSSKeyframesRule = 36,
+    CSSLayerStatementRule = 37,
+    CSSNamespaceRule = 38,
+    CSSPropertyRule = 39,
+    CSSRuleList = 40,
+    CSSStyleDeclaration = 41,
+    CSSFontFaceDescriptors = 42,
+    CSSStyleProperties = 43,
+    CSSStyleValue = 44,
+    CSSImageValue = 45,
+    CSSKeywordValue = 46,
+    CSSNumericValue = 47,
+    CSSMathValue = 48,
+    CSSMathClamp = 49,
+    CSSMathInvert = 50,
+    CSSMathMax = 51,
+    CSSMathMin = 52,
+    CSSMathNegate = 53,
+    CSSMathProduct = 54,
+    CSSMathSum = 55,
+    CSSUnitValue = 56,
+    CSSTransformValue = 57,
+    CSSUnparsedValue = 58,
+    CSSTransformComponent = 59,
+    CSSMatrixComponent = 60,
+    CSSPerspective = 61,
+    CSSRotate = 62,
+    CSSScale = 63,
+    CSSSkew = 64,
+    CSSSkewX = 65,
+    CSSSkewY = 66,
+    CSSTranslate = 67,
+    CSSVariableReferenceValue = 68,
+    CanvasGradient = 69,
+    CanvasPattern = 70,
+    CanvasRenderingContext2D = 71,
+    ClipboardItem = 72,
+    CompressionStream = 73,
+    CountQueuingStrategy = 74,
+    Credential = 75,
+    FederatedCredential = 76,
+    IdentityCredential = 77,
+    PasswordCredential = 78,
+    PublicKeyCredential = 79,
+    CredentialsContainer = 80,
+    Crypto = 81,
+    CryptoKey = 82,
+    CustomElementRegistry = 83,
+    CustomStateSet = 84,
+    DOMException = 85,
+    DOMImplementation = 86,
+    DOMMatrixReadOnly = 87,
+    DOMMatrix = 88,
+    DOMParser = 89,
+    DOMPointReadOnly = 90,
+    DOMPoint = 91,
+    DOMQuad = 92,
+    DOMRectList = 93,
+    DOMRectReadOnly = 94,
+    DOMRect = 95,
+    DOMStringList = 96,
+    DOMStringMap = 97,
+    DOMTokenList = 98,
+    DataTransfer = 99,
+    DataTransferItem = 100,
+    DataTransferItemList = 101,
+    DecompressionStream = 102,
+    EXT_blend_minmax = 103,
+    EXT_clip_control = 104,
+    EXT_color_buffer_float = 105,
+    EXT_color_buffer_half_float = 106,
+    EXT_conservative_depth = 107,
+    EXT_depth_clamp = 108,
+    EXT_float_blend = 109,
+    EXT_frag_depth = 110,
+    EXT_polygon_offset_clamp = 111,
+    EXT_render_snorm = 112,
+    EXT_sRGB = 113,
+    EXT_shader_texture_lod = 114,
+    EXT_texture_compression_bptc = 115,
+    EXT_texture_compression_rgtc = 116,
+    EXT_texture_filter_anisotropic = 117,
+    EXT_texture_mirror_clamp_to_edge = 118,
+    EXT_texture_norm16 = 119,
+    ElementInternals = 120,
+    Event = 121,
+    AnimationEvent = 122,
+    AnimationPlaybackEvent = 123,
+    BeforeUnloadEvent = 124,
+    ClipboardEvent = 125,
+    CloseEvent = 126,
+    CommandEvent = 127,
+    CustomEvent = 128,
+    ErrorEvent = 129,
+    FontFaceSetLoadEvent = 130,
+    FormDataEvent = 131,
+    GamepadEvent = 132,
+    HashChangeEvent = 133,
+    IDBVersionChangeEvent = 134,
+    MediaEncryptedEvent = 135,
+    MediaKeyMessageEvent = 136,
+    MediaQueryListEvent = 137,
+    MessageEvent = 138,
+    OfflineAudioCompletionEvent = 139,
+    PageTransitionEvent = 140,
+    PopStateEvent = 141,
+    ProgressEvent = 142,
+    PromiseRejectionEvent = 143,
+    SecurityPolicyViolationEvent = 144,
+    StorageEvent = 145,
+    SubmitEvent = 146,
+    TaskPriorityChangeEvent = 147,
+    ToggleEvent = 148,
+    TrackEvent = 149,
+    TransitionEvent = 150,
+    UIEvent = 151,
+    CompositionEvent = 152,
+    FocusEvent = 153,
+    InputEvent = 154,
+    KeyboardEvent = 155,
+    MouseEvent = 156,
+    DragEvent = 157,
+    PointerEvent = 158,
+    WheelEvent = 159,
+    TextEvent = 160,
+    TouchEvent = 161,
+    WebGLContextEvent = 162,
+    EventTarget = 163,
+    AbortSignal = 164,
+    TaskSignal = 165,
+    Animation = 166,
+    CSSAnimation = 167,
+    CSSTransition = 168,
+    AudioNode = 169,
+    AnalyserNode = 170,
+    AudioDestinationNode = 171,
+    AudioScheduledSourceNode = 172,
+    AudioBufferSourceNode = 173,
+    ConstantSourceNode = 174,
+    OscillatorNode = 175,
+    BiquadFilterNode = 176,
+    ChannelMergerNode = 177,
+    ChannelSplitterNode = 178,
+    ConvolverNode = 179,
+    DelayNode = 180,
+    DynamicsCompressorNode = 181,
+    GainNode = 182,
+    IIRFilterNode = 183,
+    PannerNode = 184,
+    StereoPannerNode = 185,
+    WaveShaperNode = 186,
+    AudioTrackList = 187,
+    BaseAudioContext = 188,
+    AudioContext = 189,
+    OfflineAudioContext = 190,
+    BatteryManager = 191,
+    BroadcastChannel = 192,
+    Clipboard = 193,
+    FileReader = 194,
+    FontFaceSet = 195,
+    IDBDatabase = 196,
+    IDBRequest = 197,
+    IDBOpenDBRequest = 198,
+    IDBTransaction = 199,
+    MediaDevices = 200,
+    MediaKeySession = 201,
+    MediaQueryList = 202,
+    MediaSource = 203,
+    MessagePort = 204,
+    NetworkInformation = 205,
+    Node = 206,
+    Attr = 207,
+    CharacterData = 208,
+    Comment = 209,
+    ProcessingInstruction = 210,
+    Text = 211,
+    CDATASection = 212,
+    Document = 213,
+    HTMLDocument = 214,
+    XMLDocument = 215,
+    DocumentFragment = 216,
+    ShadowRoot = 217,
+    DocumentType = 218,
+    Element = 219,
+    HTMLElement = 220,
+    HTMLAnchorElement = 221,
+    HTMLAreaElement = 222,
+    HTMLBRElement = 223,
+    HTMLBaseElement = 224,
+    HTMLBodyElement = 225,
+    HTMLButtonElement = 226,
+    HTMLCameraElement = 227,
+    HTMLCanvasElement = 228,
+    HTMLDListElement = 229,
+    HTMLDataElement = 230,
+    HTMLDataListElement = 231,
+    HTMLDetailsElement = 232,
+    HTMLDialogElement = 233,
+    HTMLDirectoryElement = 234,
+    HTMLDivElement = 235,
+    HTMLEmbedElement = 236,
+    HTMLFencedFrameElement = 237,
+    HTMLFieldSetElement = 238,
+    HTMLFontElement = 239,
+    HTMLFormElement = 240,
+    HTMLFrameElement = 241,
+    HTMLFrameSetElement = 242,
+    HTMLGeolocationElement = 243,
+    HTMLHRElement = 244,
+    HTMLHeadElement = 245,
+    HTMLHeadingElement = 246,
+    HTMLHtmlElement = 247,
+    HTMLIFrameElement = 248,
+    HTMLImageElement = 249,
+    HTMLInputElement = 250,
+    HTMLInstallElement = 251,
+    HTMLLIElement = 252,
+    HTMLLabelElement = 253,
+    HTMLLegendElement = 254,
+    HTMLLinkElement = 255,
+    HTMLMapElement = 256,
+    HTMLMarqueeElement = 257,
+    HTMLMediaElement = 258,
+    HTMLAudioElement = 259,
+    HTMLVideoElement = 260,
+    HTMLMenuElement = 261,
+    HTMLMetaElement = 262,
+    HTMLMeterElement = 263,
+    HTMLMicrophoneElement = 264,
+    HTMLModElement = 265,
+    HTMLModelElement = 266,
+    HTMLOListElement = 267,
+    HTMLObjectElement = 268,
+    HTMLOptGroupElement = 269,
+    HTMLOptionElement = 270,
+    HTMLOutputElement = 271,
+    HTMLParagraphElement = 272,
+    HTMLParamElement = 273,
+    HTMLPictureElement = 274,
+    HTMLPortalElement = 275,
+    HTMLPreElement = 276,
+    HTMLProgressElement = 277,
+    HTMLQuoteElement = 278,
+    HTMLScriptElement = 279,
+    HTMLSelectElement = 280,
+    HTMLSelectedContentElement = 281,
+    HTMLSlotElement = 282,
+    HTMLSourceElement = 283,
+    HTMLSpanElement = 284,
+    HTMLStyleElement = 285,
+    HTMLTableCaptionElement = 286,
+    HTMLTableCellElement = 287,
+    HTMLTableColElement = 288,
+    HTMLTableElement = 289,
+    HTMLTableRowElement = 290,
+    HTMLTableSectionElement = 291,
+    HTMLTemplateElement = 292,
+    HTMLTextAreaElement = 293,
+    HTMLTimeElement = 294,
+    HTMLTitleElement = 295,
+    HTMLTrackElement = 296,
+    HTMLUListElement = 297,
+    HTMLUnknownElement = 298,
+    HTMLUserMediaElement = 299,
+    SVGElement = 300,
+    SVGAnimationElement = 301,
+    SVGAnimateElement = 302,
+    SVGAnimateMotionElement = 303,
+    SVGAnimateTransformElement = 304,
+    SVGSetElement = 305,
+    SVGClipPathElement = 306,
+    SVGComponentTransferFunctionElement = 307,
+    SVGFEFuncAElement = 308,
+    SVGFEFuncBElement = 309,
+    SVGFEFuncGElement = 310,
+    SVGFEFuncRElement = 311,
+    SVGDescElement = 312,
+    SVGFEBlendElement = 313,
+    SVGFEColorMatrixElement = 314,
+    SVGFEComponentTransferElement = 315,
+    SVGFECompositeElement = 316,
+    SVGFEConvolveMatrixElement = 317,
+    SVGFEDiffuseLightingElement = 318,
+    SVGFEDisplacementMapElement = 319,
+    SVGFEDistantLightElement = 320,
+    SVGFEDropShadowElement = 321,
+    SVGFEFloodElement = 322,
+    SVGFEGaussianBlurElement = 323,
+    SVGFEImageElement = 324,
+    SVGFEMergeElement = 325,
+    SVGFEMergeNodeElement = 326,
+    SVGFEMorphologyElement = 327,
+    SVGFEOffsetElement = 328,
+    SVGFEPointLightElement = 329,
+    SVGFESpecularLightingElement = 330,
+    SVGFESpotLightElement = 331,
+    SVGFETileElement = 332,
+    SVGFETurbulenceElement = 333,
+    SVGFilterElement = 334,
+    SVGGradientElement = 335,
+    SVGLinearGradientElement = 336,
+    SVGRadialGradientElement = 337,
+    SVGGraphicsElement = 338,
+    SVGAElement = 339,
+    SVGDefsElement = 340,
+    SVGForeignObjectElement = 341,
+    SVGGElement = 342,
+    SVGGeometryElement = 343,
+    SVGCircleElement = 344,
+    SVGEllipseElement = 345,
+    SVGLineElement = 346,
+    SVGPathElement = 347,
+    SVGPolygonElement = 348,
+    SVGPolylineElement = 349,
+    SVGRectElement = 350,
+    SVGImageElement = 351,
+    SVGSVGElement = 352,
+    SVGSwitchElement = 353,
+    SVGSymbolElement = 354,
+    SVGTextContentElement = 355,
+    SVGTextPathElement = 356,
+    SVGTextPositioningElement = 357,
+    SVGTSpanElement = 358,
+    SVGTextElement = 359,
+    SVGUseElement = 360,
+    SVGMPathElement = 361,
+    SVGMarkerElement = 362,
+    SVGMaskElement = 363,
+    SVGMetadataElement = 364,
+    SVGPatternElement = 365,
+    SVGScriptElement = 366,
+    SVGStopElement = 367,
+    SVGStyleElement = 368,
+    SVGTitleElement = 369,
+    SVGViewElement = 370,
+    Notification = 371,
+    OffscreenCanvas = 372,
+    Performance = 373,
+    PermissionStatus = 374,
+    ScreenOrientation = 375,
+    SourceBuffer = 376,
+    SourceBufferList = 377,
+    TextTrack = 378,
+    TextTrackCue = 379,
+    VTTCue = 380,
+    TextTrackList = 381,
+    VideoTrackList = 382,
+    VisualViewport = 383,
+    WebSocket = 384,
+    Window = 385,
+    Worker = 386,
+    WorkerGlobalScope = 387,
+    DedicatedWorkerGlobalScope = 388,
+    XMLHttpRequestEventTarget = 389,
+    XMLHttpRequest = 390,
+    XMLHttpRequestUpload = 391,
+    External = 392,
+    FileList = 393,
+    FontFace = 394,
+    FormData = 395,
+    Gamepad = 396,
+    GamepadButton = 397,
+    GamepadHapticActuator = 398,
+    HTMLAllCollection = 399,
+    HTMLCollection = 400,
+    HTMLFormControlsCollection = 401,
+    HTMLOptionsCollection = 402,
+    Headers = 403,
+    History = 404,
+    IDBCursor = 405,
+    IDBCursorWithValue = 406,
+    IDBFactory = 407,
+    IDBIndex = 408,
+    IDBKeyRange = 409,
+    IDBObjectStore = 410,
+    IDBRecord = 411,
+    IdleDeadline = 412,
+    ImageBitmap = 413,
+    ImageData = 414,
+    InputDeviceCapabilities = 415,
+    IntersectionObserver = 416,
+    IntersectionObserverEntry = 417,
+    KHR_parallel_shader_compile = 418,
+    Location = 419,
+    MediaCapabilities = 420,
+    MediaDeviceInfo = 421,
+    InputDeviceInfo = 422,
+    MediaError = 423,
+    MediaKeyStatusMap = 424,
+    MediaKeySystemAccess = 425,
+    MediaKeys = 426,
+    MediaList = 427,
+    MessageChannel = 428,
+    MimeType = 429,
+    MimeTypeArray = 430,
+    MutationObserver = 431,
+    MutationRecord = 432,
+    NamedNodeMap = 433,
+    Navigator = 434,
+    NavigatorUAData = 435,
+    NodeIterator = 436,
+    NodeList = 437,
+    RadioNodeList = 438,
+    OES_draw_buffers_indexed = 439,
+    OES_element_index_uint = 440,
+    OES_fbo_render_mipmap = 441,
+    OES_sample_variables = 442,
+    OES_shader_multisample_interpolation = 443,
+    OES_standard_derivatives = 444,
+    OES_texture_float = 445,
+    OES_texture_float_linear = 446,
+    OES_texture_half_float = 447,
+    OES_texture_half_float_linear = 448,
+    OES_vertex_array_object = 449,
+    OVR_multiview2 = 450,
+    OffscreenCanvasRenderingContext2D = 451,
+    Path2D = 452,
+    PerformanceEntry = 453,
+    PerformanceEventTiming = 454,
+    PerformanceMark = 455,
+    PerformanceMeasure = 456,
+    PerformancePaintTiming = 457,
+    PerformanceResourceTiming = 458,
+    PerformanceNavigationTiming = 459,
+    VisibilityStateEntry = 460,
+    PerformanceNavigation = 461,
+    PerformanceObserver = 462,
+    PerformanceObserverEntryList = 463,
+    PerformanceServerTiming = 464,
+    PerformanceTiming = 465,
+    PeriodicWave = 466,
+    Permissions = 467,
+    Plugin = 468,
+    PluginArray = 469,
+    ReadableByteStreamController = 470,
+    ReadableStream = 471,
+    ReadableStreamBYOBReader = 472,
+    ReadableStreamBYOBRequest = 473,
+    ReadableStreamDefaultController = 474,
+    ReadableStreamDefaultReader = 475,
+    Request = 476,
+    ResizeObserver = 477,
+    ResizeObserverEntry = 478,
+    ResizeObserverSize = 479,
+    Response = 480,
+    SVGAngle = 481,
+    SVGAnimatedAngle = 482,
+    SVGAnimatedBoolean = 483,
+    SVGAnimatedEnumeration = 484,
+    SVGAnimatedInteger = 485,
+    SVGAnimatedLength = 486,
+    SVGAnimatedLengthList = 487,
+    SVGAnimatedNumber = 488,
+    SVGAnimatedNumberList = 489,
+    SVGAnimatedPreserveAspectRatio = 490,
+    SVGAnimatedRect = 491,
+    SVGAnimatedString = 492,
+    SVGAnimatedTransformList = 493,
+    SVGLength = 494,
+    SVGLengthList = 495,
+    SVGNumber = 496,
+    SVGNumberList = 497,
+    SVGPointList = 498,
+    SVGPreserveAspectRatio = 499,
+    SVGStringList = 500,
+    SVGTransform = 501,
+    SVGTransformList = 502,
+    SVGUnitTypes = 503,
+    Sanitizer = 504,
+    Scheduler = 505,
+    Scheduling = 506,
+    Screen = 507,
+    Selection = 508,
+    Storage = 509,
+    StorageManager = 510,
+    StylePropertyMapReadOnly = 511,
+    StylePropertyMap = 512,
+    StyleSheet = 513,
+    CSSStyleSheet = 514,
+    StyleSheetList = 515,
+    SubtleCrypto = 516,
+    TextDecoder = 517,
+    TextDecoderStream = 518,
+    TextEncoder = 519,
+    TextEncoderStream = 520,
+    TextMetrics = 521,
+    TextTrackCueList = 522,
+    TimeRanges = 523,
+    Touch = 524,
+    TouchList = 525,
+    TransformStream = 526,
+    TransformStreamDefaultController = 527,
+    TreeWalker = 528,
+    TrustedHTML = 529,
+    TrustedHTMLParserOptions = 530,
+    TrustedScript = 531,
+    TrustedScriptURL = 532,
+    TrustedTypePolicy = 533,
+    TrustedTypePolicyFactory = 534,
+    URL = 535,
+    URLPattern = 536,
+    URLSearchParams = 537,
+    UserActivation = 538,
+    ValidityState = 539,
+    VideoPlaybackQuality = 540,
+    VideoTrack = 541,
+    ViewTransition = 542,
+    ViewTransitionTypeSet = 543,
+    WEBGL_blend_func_extended = 544,
+    WEBGL_clip_cull_distance = 545,
+    WEBGL_color_buffer_float = 546,
+    WEBGL_compressed_texture_astc = 547,
+    WEBGL_compressed_texture_etc = 548,
+    WEBGL_compressed_texture_etc1 = 549,
+    WEBGL_compressed_texture_s3tc = 550,
+    WEBGL_compressed_texture_s3tc_srgb = 551,
+    WEBGL_debug_renderer_info = 552,
+    WEBGL_depth_texture = 553,
+    WEBGL_draw_buffers = 554,
+    WEBGL_multi_draw = 555,
+    WEBGL_polygon_mode = 556,
+    WEBGL_provoking_vertex = 557,
+    WEBGL_render_shared_exponent = 558,
+    WEBGL_stencil_texturing = 559,
+    WebGL2RenderingContext = 560,
+    WebGLActiveInfo = 561,
+    WebGLObject = 562,
+    WebGLBuffer = 563,
+    WebGLFramebuffer = 564,
+    WebGLProgram = 565,
+    WebGLQuery = 566,
+    WebGLRenderbuffer = 567,
+    WebGLSampler = 568,
+    WebGLShader = 569,
+    WebGLSync = 570,
+    WebGLTexture = 571,
+    WebGLTransformFeedback = 572,
+    WebGLVertexArrayObject = 573,
+    WebGLVertexArrayObjectOES = 574,
+    WebGLRenderingContext = 575,
+    WebGLShaderPrecisionFormat = 576,
+    WebGLUniformLocation = 577,
+    WorkerLocation = 578,
+    WorkerNavigator = 579,
+    WritableStream = 580,
+    WritableStreamDefaultController = 581,
+    WritableStreamDefaultWriter = 582,
+    XMLSerializer = 583,
+    XPathEvaluator = 584,
+    XPathExpression = 585,
+    XPathResult = 586,
 }
 
 impl InterfaceId {
     pub fn name(self) -> &'static str {
         match self {
+            InterfaceId::ANGLE_instanced_arrays => "ANGLE_instanced_arrays",
             InterfaceId::AbortController => "AbortController",
             InterfaceId::TaskController => "TaskController",
             InterfaceId::AbstractRange => "AbstractRange",
@@ -2983,6 +3225,23 @@ impl InterfaceId {
             InterfaceId::DataTransferItem => "DataTransferItem",
             InterfaceId::DataTransferItemList => "DataTransferItemList",
             InterfaceId::DecompressionStream => "DecompressionStream",
+            InterfaceId::EXT_blend_minmax => "EXT_blend_minmax",
+            InterfaceId::EXT_clip_control => "EXT_clip_control",
+            InterfaceId::EXT_color_buffer_float => "EXT_color_buffer_float",
+            InterfaceId::EXT_color_buffer_half_float => "EXT_color_buffer_half_float",
+            InterfaceId::EXT_conservative_depth => "EXT_conservative_depth",
+            InterfaceId::EXT_depth_clamp => "EXT_depth_clamp",
+            InterfaceId::EXT_float_blend => "EXT_float_blend",
+            InterfaceId::EXT_frag_depth => "EXT_frag_depth",
+            InterfaceId::EXT_polygon_offset_clamp => "EXT_polygon_offset_clamp",
+            InterfaceId::EXT_render_snorm => "EXT_render_snorm",
+            InterfaceId::EXT_sRGB => "EXT_sRGB",
+            InterfaceId::EXT_shader_texture_lod => "EXT_shader_texture_lod",
+            InterfaceId::EXT_texture_compression_bptc => "EXT_texture_compression_bptc",
+            InterfaceId::EXT_texture_compression_rgtc => "EXT_texture_compression_rgtc",
+            InterfaceId::EXT_texture_filter_anisotropic => "EXT_texture_filter_anisotropic",
+            InterfaceId::EXT_texture_mirror_clamp_to_edge => "EXT_texture_mirror_clamp_to_edge",
+            InterfaceId::EXT_texture_norm16 => "EXT_texture_norm16",
             InterfaceId::ElementInternals => "ElementInternals",
             InterfaceId::Event => "Event",
             InterfaceId::AnimationEvent => "AnimationEvent",
@@ -3283,6 +3542,7 @@ impl InterfaceId {
             InterfaceId::InputDeviceCapabilities => "InputDeviceCapabilities",
             InterfaceId::IntersectionObserver => "IntersectionObserver",
             InterfaceId::IntersectionObserverEntry => "IntersectionObserverEntry",
+            InterfaceId::KHR_parallel_shader_compile => "KHR_parallel_shader_compile",
             InterfaceId::Location => "Location",
             InterfaceId::MediaCapabilities => "MediaCapabilities",
             InterfaceId::MediaDeviceInfo => "MediaDeviceInfo",
@@ -3303,6 +3563,20 @@ impl InterfaceId {
             InterfaceId::NodeIterator => "NodeIterator",
             InterfaceId::NodeList => "NodeList",
             InterfaceId::RadioNodeList => "RadioNodeList",
+            InterfaceId::OES_draw_buffers_indexed => "OES_draw_buffers_indexed",
+            InterfaceId::OES_element_index_uint => "OES_element_index_uint",
+            InterfaceId::OES_fbo_render_mipmap => "OES_fbo_render_mipmap",
+            InterfaceId::OES_sample_variables => "OES_sample_variables",
+            InterfaceId::OES_shader_multisample_interpolation => {
+                "OES_shader_multisample_interpolation"
+            }
+            InterfaceId::OES_standard_derivatives => "OES_standard_derivatives",
+            InterfaceId::OES_texture_float => "OES_texture_float",
+            InterfaceId::OES_texture_float_linear => "OES_texture_float_linear",
+            InterfaceId::OES_texture_half_float => "OES_texture_half_float",
+            InterfaceId::OES_texture_half_float_linear => "OES_texture_half_float_linear",
+            InterfaceId::OES_vertex_array_object => "OES_vertex_array_object",
+            InterfaceId::OVR_multiview2 => "OVR_multiview2",
             InterfaceId::OffscreenCanvasRenderingContext2D => "OffscreenCanvasRenderingContext2D",
             InterfaceId::Path2D => "Path2D",
             InterfaceId::PerformanceEntry => "PerformanceEntry",
@@ -3396,6 +3670,22 @@ impl InterfaceId {
             InterfaceId::VideoTrack => "VideoTrack",
             InterfaceId::ViewTransition => "ViewTransition",
             InterfaceId::ViewTransitionTypeSet => "ViewTransitionTypeSet",
+            InterfaceId::WEBGL_blend_func_extended => "WEBGL_blend_func_extended",
+            InterfaceId::WEBGL_clip_cull_distance => "WEBGL_clip_cull_distance",
+            InterfaceId::WEBGL_color_buffer_float => "WEBGL_color_buffer_float",
+            InterfaceId::WEBGL_compressed_texture_astc => "WEBGL_compressed_texture_astc",
+            InterfaceId::WEBGL_compressed_texture_etc => "WEBGL_compressed_texture_etc",
+            InterfaceId::WEBGL_compressed_texture_etc1 => "WEBGL_compressed_texture_etc1",
+            InterfaceId::WEBGL_compressed_texture_s3tc => "WEBGL_compressed_texture_s3tc",
+            InterfaceId::WEBGL_compressed_texture_s3tc_srgb => "WEBGL_compressed_texture_s3tc_srgb",
+            InterfaceId::WEBGL_debug_renderer_info => "WEBGL_debug_renderer_info",
+            InterfaceId::WEBGL_depth_texture => "WEBGL_depth_texture",
+            InterfaceId::WEBGL_draw_buffers => "WEBGL_draw_buffers",
+            InterfaceId::WEBGL_multi_draw => "WEBGL_multi_draw",
+            InterfaceId::WEBGL_polygon_mode => "WEBGL_polygon_mode",
+            InterfaceId::WEBGL_provoking_vertex => "WEBGL_provoking_vertex",
+            InterfaceId::WEBGL_render_shared_exponent => "WEBGL_render_shared_exponent",
+            InterfaceId::WEBGL_stencil_texturing => "WEBGL_stencil_texturing",
             InterfaceId::WebGL2RenderingContext => "WebGL2RenderingContext",
             InterfaceId::WebGLActiveInfo => "WebGLActiveInfo",
             InterfaceId::WebGLObject => "WebGLObject",
@@ -3410,6 +3700,7 @@ impl InterfaceId {
             InterfaceId::WebGLTexture => "WebGLTexture",
             InterfaceId::WebGLTransformFeedback => "WebGLTransformFeedback",
             InterfaceId::WebGLVertexArrayObject => "WebGLVertexArrayObject",
+            InterfaceId::WebGLVertexArrayObjectOES => "WebGLVertexArrayObjectOES",
             InterfaceId::WebGLRenderingContext => "WebGLRenderingContext",
             InterfaceId::WebGLShaderPrecisionFormat => "WebGLShaderPrecisionFormat",
             InterfaceId::WebGLUniformLocation => "WebGLUniformLocation",
@@ -3433,6 +3724,7 @@ pub trait Dom:
     + rt::Host
     + rt::Reflect
     + rt::EventHandlers
+    + ANGLE_instanced_arraysImpl
     + ARIAMixinImpl
     + ARIANotifyMixinImpl
     + AbortControllerImpl
@@ -3593,6 +3885,23 @@ pub trait Dom:
     + DocumentTypeImpl
     + DragEventImpl
     + DynamicsCompressorNodeImpl
+    + EXT_blend_minmaxImpl
+    + EXT_clip_controlImpl
+    + EXT_color_buffer_floatImpl
+    + EXT_color_buffer_half_floatImpl
+    + EXT_conservative_depthImpl
+    + EXT_depth_clampImpl
+    + EXT_float_blendImpl
+    + EXT_frag_depthImpl
+    + EXT_polygon_offset_clampImpl
+    + EXT_render_snormImpl
+    + EXT_sRGBImpl
+    + EXT_shader_texture_lodImpl
+    + EXT_texture_compression_bptcImpl
+    + EXT_texture_compression_rgtcImpl
+    + EXT_texture_filter_anisotropicImpl
+    + EXT_texture_mirror_clamp_to_edgeImpl
+    + EXT_texture_norm16Impl
     + ElementImpl
     + ElementCSSInlineStyleImpl
     + ElementContentEditableImpl
@@ -3734,6 +4043,7 @@ pub trait Dom:
     + InputEventImpl
     + IntersectionObserverImpl
     + IntersectionObserverEntryImpl
+    + KHR_parallel_shader_compileImpl
     + KeyboardEventImpl
     + KeyframeEffectImpl
     + LinkStyleImpl
@@ -3785,6 +4095,18 @@ pub trait Dom:
     + NonDocumentTypeChildNodeImpl
     + NonElementParentNodeImpl
     + NotificationImpl
+    + OES_draw_buffers_indexedImpl
+    + OES_element_index_uintImpl
+    + OES_fbo_render_mipmapImpl
+    + OES_sample_variablesImpl
+    + OES_shader_multisample_interpolationImpl
+    + OES_standard_derivativesImpl
+    + OES_texture_floatImpl
+    + OES_texture_float_linearImpl
+    + OES_texture_half_floatImpl
+    + OES_texture_half_float_linearImpl
+    + OES_vertex_array_objectImpl
+    + OVR_multiview2Impl
     + OfflineAudioCompletionEventImpl
     + OfflineAudioContextImpl
     + OffscreenCanvasImpl
@@ -4005,6 +4327,22 @@ pub trait Dom:
     + ViewTransitionTypeSetImpl
     + VisibilityStateEntryImpl
     + VisualViewportImpl
+    + WEBGL_blend_func_extendedImpl
+    + WEBGL_clip_cull_distanceImpl
+    + WEBGL_color_buffer_floatImpl
+    + WEBGL_compressed_texture_astcImpl
+    + WEBGL_compressed_texture_etcImpl
+    + WEBGL_compressed_texture_etc1Impl
+    + WEBGL_compressed_texture_s3tcImpl
+    + WEBGL_compressed_texture_s3tc_srgbImpl
+    + WEBGL_debug_renderer_infoImpl
+    + WEBGL_depth_textureImpl
+    + WEBGL_draw_buffersImpl
+    + WEBGL_multi_drawImpl
+    + WEBGL_polygon_modeImpl
+    + WEBGL_provoking_vertexImpl
+    + WEBGL_render_shared_exponentImpl
+    + WEBGL_stencil_texturingImpl
     + WaveShaperNodeImpl
     + WebGL2RenderingContextImpl
     + WebGL2RenderingContextBaseImpl
@@ -4028,6 +4366,7 @@ pub trait Dom:
     + WebGLTransformFeedbackImpl
     + WebGLUniformLocationImpl
     + WebGLVertexArrayObjectImpl
+    + WebGLVertexArrayObjectOESImpl
     + WebSocketImpl
     + WheelEventImpl
     + WindowImpl
@@ -4060,6 +4399,7 @@ impl<T> Dom for T where
         + rt::Host
         + rt::Reflect
         + rt::EventHandlers
+        + ANGLE_instanced_arraysImpl
         + ARIAMixinImpl
         + ARIANotifyMixinImpl
         + AbortControllerImpl
@@ -4220,6 +4560,23 @@ impl<T> Dom for T where
         + DocumentTypeImpl
         + DragEventImpl
         + DynamicsCompressorNodeImpl
+        + EXT_blend_minmaxImpl
+        + EXT_clip_controlImpl
+        + EXT_color_buffer_floatImpl
+        + EXT_color_buffer_half_floatImpl
+        + EXT_conservative_depthImpl
+        + EXT_depth_clampImpl
+        + EXT_float_blendImpl
+        + EXT_frag_depthImpl
+        + EXT_polygon_offset_clampImpl
+        + EXT_render_snormImpl
+        + EXT_sRGBImpl
+        + EXT_shader_texture_lodImpl
+        + EXT_texture_compression_bptcImpl
+        + EXT_texture_compression_rgtcImpl
+        + EXT_texture_filter_anisotropicImpl
+        + EXT_texture_mirror_clamp_to_edgeImpl
+        + EXT_texture_norm16Impl
         + ElementImpl
         + ElementCSSInlineStyleImpl
         + ElementContentEditableImpl
@@ -4361,6 +4718,7 @@ impl<T> Dom for T where
         + InputEventImpl
         + IntersectionObserverImpl
         + IntersectionObserverEntryImpl
+        + KHR_parallel_shader_compileImpl
         + KeyboardEventImpl
         + KeyframeEffectImpl
         + LinkStyleImpl
@@ -4412,6 +4770,18 @@ impl<T> Dom for T where
         + NonDocumentTypeChildNodeImpl
         + NonElementParentNodeImpl
         + NotificationImpl
+        + OES_draw_buffers_indexedImpl
+        + OES_element_index_uintImpl
+        + OES_fbo_render_mipmapImpl
+        + OES_sample_variablesImpl
+        + OES_shader_multisample_interpolationImpl
+        + OES_standard_derivativesImpl
+        + OES_texture_floatImpl
+        + OES_texture_float_linearImpl
+        + OES_texture_half_floatImpl
+        + OES_texture_half_float_linearImpl
+        + OES_vertex_array_objectImpl
+        + OVR_multiview2Impl
         + OfflineAudioCompletionEventImpl
         + OfflineAudioContextImpl
         + OffscreenCanvasImpl
@@ -4632,6 +5002,22 @@ impl<T> Dom for T where
         + ViewTransitionTypeSetImpl
         + VisibilityStateEntryImpl
         + VisualViewportImpl
+        + WEBGL_blend_func_extendedImpl
+        + WEBGL_clip_cull_distanceImpl
+        + WEBGL_color_buffer_floatImpl
+        + WEBGL_compressed_texture_astcImpl
+        + WEBGL_compressed_texture_etcImpl
+        + WEBGL_compressed_texture_etc1Impl
+        + WEBGL_compressed_texture_s3tcImpl
+        + WEBGL_compressed_texture_s3tc_srgbImpl
+        + WEBGL_debug_renderer_infoImpl
+        + WEBGL_depth_textureImpl
+        + WEBGL_draw_buffersImpl
+        + WEBGL_multi_drawImpl
+        + WEBGL_polygon_modeImpl
+        + WEBGL_provoking_vertexImpl
+        + WEBGL_render_shared_exponentImpl
+        + WEBGL_stencil_texturingImpl
         + WaveShaperNodeImpl
         + WebGL2RenderingContextImpl
         + WebGL2RenderingContextBaseImpl
@@ -4655,6 +5041,7 @@ impl<T> Dom for T where
         + WebGLTransformFeedbackImpl
         + WebGLUniformLocationImpl
         + WebGLVertexArrayObjectImpl
+        + WebGLVertexArrayObjectOESImpl
         + WebSocketImpl
         + WheelEventImpl
         + WindowImpl
@@ -4686,6 +5073,7 @@ impl<T> Dom for T where
 #[macro_export]
 macro_rules! for_each_trait {
     ($m:ident) => {
+        $m!(ANGLE_instanced_arraysImpl);
         $m!(ARIAMixinImpl);
         $m!(ARIANotifyMixinImpl);
         $m!(AbortControllerImpl);
@@ -4846,6 +5234,23 @@ macro_rules! for_each_trait {
         $m!(DocumentTypeImpl);
         $m!(DragEventImpl);
         $m!(DynamicsCompressorNodeImpl);
+        $m!(EXT_blend_minmaxImpl);
+        $m!(EXT_clip_controlImpl);
+        $m!(EXT_color_buffer_floatImpl);
+        $m!(EXT_color_buffer_half_floatImpl);
+        $m!(EXT_conservative_depthImpl);
+        $m!(EXT_depth_clampImpl);
+        $m!(EXT_float_blendImpl);
+        $m!(EXT_frag_depthImpl);
+        $m!(EXT_polygon_offset_clampImpl);
+        $m!(EXT_render_snormImpl);
+        $m!(EXT_sRGBImpl);
+        $m!(EXT_shader_texture_lodImpl);
+        $m!(EXT_texture_compression_bptcImpl);
+        $m!(EXT_texture_compression_rgtcImpl);
+        $m!(EXT_texture_filter_anisotropicImpl);
+        $m!(EXT_texture_mirror_clamp_to_edgeImpl);
+        $m!(EXT_texture_norm16Impl);
         $m!(ElementImpl);
         $m!(ElementCSSInlineStyleImpl);
         $m!(ElementContentEditableImpl);
@@ -4987,6 +5392,7 @@ macro_rules! for_each_trait {
         $m!(InputEventImpl);
         $m!(IntersectionObserverImpl);
         $m!(IntersectionObserverEntryImpl);
+        $m!(KHR_parallel_shader_compileImpl);
         $m!(KeyboardEventImpl);
         $m!(KeyframeEffectImpl);
         $m!(LinkStyleImpl);
@@ -5038,6 +5444,18 @@ macro_rules! for_each_trait {
         $m!(NonDocumentTypeChildNodeImpl);
         $m!(NonElementParentNodeImpl);
         $m!(NotificationImpl);
+        $m!(OES_draw_buffers_indexedImpl);
+        $m!(OES_element_index_uintImpl);
+        $m!(OES_fbo_render_mipmapImpl);
+        $m!(OES_sample_variablesImpl);
+        $m!(OES_shader_multisample_interpolationImpl);
+        $m!(OES_standard_derivativesImpl);
+        $m!(OES_texture_floatImpl);
+        $m!(OES_texture_float_linearImpl);
+        $m!(OES_texture_half_floatImpl);
+        $m!(OES_texture_half_float_linearImpl);
+        $m!(OES_vertex_array_objectImpl);
+        $m!(OVR_multiview2Impl);
         $m!(OfflineAudioCompletionEventImpl);
         $m!(OfflineAudioContextImpl);
         $m!(OffscreenCanvasImpl);
@@ -5258,6 +5676,22 @@ macro_rules! for_each_trait {
         $m!(ViewTransitionTypeSetImpl);
         $m!(VisibilityStateEntryImpl);
         $m!(VisualViewportImpl);
+        $m!(WEBGL_blend_func_extendedImpl);
+        $m!(WEBGL_clip_cull_distanceImpl);
+        $m!(WEBGL_color_buffer_floatImpl);
+        $m!(WEBGL_compressed_texture_astcImpl);
+        $m!(WEBGL_compressed_texture_etcImpl);
+        $m!(WEBGL_compressed_texture_etc1Impl);
+        $m!(WEBGL_compressed_texture_s3tcImpl);
+        $m!(WEBGL_compressed_texture_s3tc_srgbImpl);
+        $m!(WEBGL_debug_renderer_infoImpl);
+        $m!(WEBGL_depth_textureImpl);
+        $m!(WEBGL_draw_buffersImpl);
+        $m!(WEBGL_multi_drawImpl);
+        $m!(WEBGL_polygon_modeImpl);
+        $m!(WEBGL_provoking_vertexImpl);
+        $m!(WEBGL_render_shared_exponentImpl);
+        $m!(WEBGL_stencil_texturingImpl);
         $m!(WaveShaperNodeImpl);
         $m!(WebGL2RenderingContextImpl);
         $m!(WebGL2RenderingContextBaseImpl);
@@ -5281,6 +5715,7 @@ macro_rules! for_each_trait {
         $m!(WebGLTransformFeedbackImpl);
         $m!(WebGLUniformLocationImpl);
         $m!(WebGLVertexArrayObjectImpl);
+        $m!(WebGLVertexArrayObjectOESImpl);
         $m!(WebSocketImpl);
         $m!(WheelEventImpl);
         $m!(WindowImpl);
@@ -5346,6 +5781,8 @@ pub fn init_isolate<D: Dom>(
             options,
         ),
     );
+    let t_angle_instanced_arrays = angle_instanced_arrays::template::<D>(scope, None, &options);
+    st.set_template(ids::ANGLE_INSTANCED_ARRAYS, scope, t_angle_instanced_arrays);
     let t_abort_controller = abort_controller::template::<D>(scope, None, &options);
     st.set_template(ids::ABORT_CONTROLLER, scope, t_abort_controller);
     let t_task_controller =
@@ -5636,6 +6073,69 @@ pub fn init_isolate<D: Dom>(
     );
     let t_decompression_stream = decompression_stream::template::<D>(scope, None, &options);
     st.set_template(ids::DECOMPRESSION_STREAM, scope, t_decompression_stream);
+    let t_ext_blend_minmax = ext_blend_minmax::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_BLEND_MINMAX, scope, t_ext_blend_minmax);
+    let t_ext_clip_control = ext_clip_control::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_CLIP_CONTROL, scope, t_ext_clip_control);
+    let t_ext_color_buffer_float = ext_color_buffer_float::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_COLOR_BUFFER_FLOAT, scope, t_ext_color_buffer_float);
+    let t_ext_color_buffer_half_float =
+        ext_color_buffer_half_float::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::EXT_COLOR_BUFFER_HALF_FLOAT,
+        scope,
+        t_ext_color_buffer_half_float,
+    );
+    let t_ext_conservative_depth = ext_conservative_depth::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_CONSERVATIVE_DEPTH, scope, t_ext_conservative_depth);
+    let t_ext_depth_clamp = ext_depth_clamp::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_DEPTH_CLAMP, scope, t_ext_depth_clamp);
+    let t_ext_float_blend = ext_float_blend::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_FLOAT_BLEND, scope, t_ext_float_blend);
+    let t_ext_frag_depth = ext_frag_depth::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_FRAG_DEPTH, scope, t_ext_frag_depth);
+    let t_ext_polygon_offset_clamp = ext_polygon_offset_clamp::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::EXT_POLYGON_OFFSET_CLAMP,
+        scope,
+        t_ext_polygon_offset_clamp,
+    );
+    let t_ext_render_snorm = ext_render_snorm::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_RENDER_SNORM, scope, t_ext_render_snorm);
+    let t_ext_s_rgb = ext_s_rgb::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_S_RGB, scope, t_ext_s_rgb);
+    let t_ext_shader_texture_lod = ext_shader_texture_lod::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_SHADER_TEXTURE_LOD, scope, t_ext_shader_texture_lod);
+    let t_ext_texture_compression_bptc =
+        ext_texture_compression_bptc::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::EXT_TEXTURE_COMPRESSION_BPTC,
+        scope,
+        t_ext_texture_compression_bptc,
+    );
+    let t_ext_texture_compression_rgtc =
+        ext_texture_compression_rgtc::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::EXT_TEXTURE_COMPRESSION_RGTC,
+        scope,
+        t_ext_texture_compression_rgtc,
+    );
+    let t_ext_texture_filter_anisotropic =
+        ext_texture_filter_anisotropic::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::EXT_TEXTURE_FILTER_ANISOTROPIC,
+        scope,
+        t_ext_texture_filter_anisotropic,
+    );
+    let t_ext_texture_mirror_clamp_to_edge =
+        ext_texture_mirror_clamp_to_edge::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::EXT_TEXTURE_MIRROR_CLAMP_TO_EDGE,
+        scope,
+        t_ext_texture_mirror_clamp_to_edge,
+    );
+    let t_ext_texture_norm16 = ext_texture_norm16::template::<D>(scope, None, &options);
+    st.set_template(ids::EXT_TEXTURE_NORM16, scope, t_ext_texture_norm16);
     let t_element_internals = element_internals::template::<D>(scope, None, &options);
     st.set_template(ids::ELEMENT_INTERNALS, scope, t_element_internals);
     let t_event = event::template::<D>(scope, None, &options);
@@ -6638,6 +7138,13 @@ pub fn init_isolate<D: Dom>(
         scope,
         t_intersection_observer_entry,
     );
+    let t_khr_parallel_shader_compile =
+        khr_parallel_shader_compile::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::KHR_PARALLEL_SHADER_COMPILE,
+        scope,
+        t_khr_parallel_shader_compile,
+    );
     let t_location = location::template::<D>(scope, None, &options);
     st.set_template(ids::LOCATION, scope, t_location);
     let t_media_capabilities = media_capabilities::template::<D>(scope, None, &options);
@@ -6683,6 +7190,56 @@ pub fn init_isolate<D: Dom>(
     st.set_template(ids::NODE_LIST, scope, t_node_list);
     let t_radio_node_list = radio_node_list::template::<D>(scope, Some(t_node_list), &options);
     st.set_template(ids::RADIO_NODE_LIST, scope, t_radio_node_list);
+    let t_oes_draw_buffers_indexed = oes_draw_buffers_indexed::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::OES_DRAW_BUFFERS_INDEXED,
+        scope,
+        t_oes_draw_buffers_indexed,
+    );
+    let t_oes_element_index_uint = oes_element_index_uint::template::<D>(scope, None, &options);
+    st.set_template(ids::OES_ELEMENT_INDEX_UINT, scope, t_oes_element_index_uint);
+    let t_oes_fbo_render_mipmap = oes_fbo_render_mipmap::template::<D>(scope, None, &options);
+    st.set_template(ids::OES_FBO_RENDER_MIPMAP, scope, t_oes_fbo_render_mipmap);
+    let t_oes_sample_variables = oes_sample_variables::template::<D>(scope, None, &options);
+    st.set_template(ids::OES_SAMPLE_VARIABLES, scope, t_oes_sample_variables);
+    let t_oes_shader_multisample_interpolation =
+        oes_shader_multisample_interpolation::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::OES_SHADER_MULTISAMPLE_INTERPOLATION,
+        scope,
+        t_oes_shader_multisample_interpolation,
+    );
+    let t_oes_standard_derivatives = oes_standard_derivatives::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::OES_STANDARD_DERIVATIVES,
+        scope,
+        t_oes_standard_derivatives,
+    );
+    let t_oes_texture_float = oes_texture_float::template::<D>(scope, None, &options);
+    st.set_template(ids::OES_TEXTURE_FLOAT, scope, t_oes_texture_float);
+    let t_oes_texture_float_linear = oes_texture_float_linear::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::OES_TEXTURE_FLOAT_LINEAR,
+        scope,
+        t_oes_texture_float_linear,
+    );
+    let t_oes_texture_half_float = oes_texture_half_float::template::<D>(scope, None, &options);
+    st.set_template(ids::OES_TEXTURE_HALF_FLOAT, scope, t_oes_texture_half_float);
+    let t_oes_texture_half_float_linear =
+        oes_texture_half_float_linear::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::OES_TEXTURE_HALF_FLOAT_LINEAR,
+        scope,
+        t_oes_texture_half_float_linear,
+    );
+    let t_oes_vertex_array_object = oes_vertex_array_object::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::OES_VERTEX_ARRAY_OBJECT,
+        scope,
+        t_oes_vertex_array_object,
+    );
+    let t_ovr_multiview2 = ovr_multiview2::template::<D>(scope, None, &options);
+    st.set_template(ids::OVR_MULTIVIEW2, scope, t_ovr_multiview2);
     let t_offscreen_canvas_rendering_context2_d =
         offscreen_canvas_rendering_context2_d::template::<D>(scope, None, &options);
     st.set_template(
@@ -6987,6 +7544,90 @@ pub fn init_isolate<D: Dom>(
         scope,
         t_view_transition_type_set,
     );
+    let t_webgl_blend_func_extended =
+        webgl_blend_func_extended::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_BLEND_FUNC_EXTENDED,
+        scope,
+        t_webgl_blend_func_extended,
+    );
+    let t_webgl_clip_cull_distance = webgl_clip_cull_distance::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_CLIP_CULL_DISTANCE,
+        scope,
+        t_webgl_clip_cull_distance,
+    );
+    let t_webgl_color_buffer_float = webgl_color_buffer_float::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_COLOR_BUFFER_FLOAT,
+        scope,
+        t_webgl_color_buffer_float,
+    );
+    let t_webgl_compressed_texture_astc =
+        webgl_compressed_texture_astc::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_COMPRESSED_TEXTURE_ASTC,
+        scope,
+        t_webgl_compressed_texture_astc,
+    );
+    let t_webgl_compressed_texture_etc =
+        webgl_compressed_texture_etc::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_COMPRESSED_TEXTURE_ETC,
+        scope,
+        t_webgl_compressed_texture_etc,
+    );
+    let t_webgl_compressed_texture_etc1 =
+        webgl_compressed_texture_etc1::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_COMPRESSED_TEXTURE_ETC1,
+        scope,
+        t_webgl_compressed_texture_etc1,
+    );
+    let t_webgl_compressed_texture_s3tc =
+        webgl_compressed_texture_s3tc::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_COMPRESSED_TEXTURE_S3TC,
+        scope,
+        t_webgl_compressed_texture_s3tc,
+    );
+    let t_webgl_compressed_texture_s3tc_srgb =
+        webgl_compressed_texture_s3tc_srgb::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_COMPRESSED_TEXTURE_S3TC_SRGB,
+        scope,
+        t_webgl_compressed_texture_s3tc_srgb,
+    );
+    let t_webgl_debug_renderer_info =
+        webgl_debug_renderer_info::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_DEBUG_RENDERER_INFO,
+        scope,
+        t_webgl_debug_renderer_info,
+    );
+    let t_webgl_depth_texture = webgl_depth_texture::template::<D>(scope, None, &options);
+    st.set_template(ids::WEBGL_DEPTH_TEXTURE, scope, t_webgl_depth_texture);
+    let t_webgl_draw_buffers = webgl_draw_buffers::template::<D>(scope, None, &options);
+    st.set_template(ids::WEBGL_DRAW_BUFFERS, scope, t_webgl_draw_buffers);
+    let t_webgl_multi_draw = webgl_multi_draw::template::<D>(scope, None, &options);
+    st.set_template(ids::WEBGL_MULTI_DRAW, scope, t_webgl_multi_draw);
+    let t_webgl_polygon_mode = webgl_polygon_mode::template::<D>(scope, None, &options);
+    st.set_template(ids::WEBGL_POLYGON_MODE, scope, t_webgl_polygon_mode);
+    let t_webgl_provoking_vertex = webgl_provoking_vertex::template::<D>(scope, None, &options);
+    st.set_template(ids::WEBGL_PROVOKING_VERTEX, scope, t_webgl_provoking_vertex);
+    let t_webgl_render_shared_exponent =
+        webgl_render_shared_exponent::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_RENDER_SHARED_EXPONENT,
+        scope,
+        t_webgl_render_shared_exponent,
+    );
+    let t_webgl_stencil_texturing = webgl_stencil_texturing::template::<D>(scope, None, &options);
+    st.set_template(
+        ids::WEBGL_STENCIL_TEXTURING,
+        scope,
+        t_webgl_stencil_texturing,
+    );
     let t_web_gl2_rendering_context =
         web_gl2_rendering_context::template::<D>(scope, None, &options);
     st.set_template(
@@ -7031,6 +7672,13 @@ pub fn init_isolate<D: Dom>(
         ids::WEB_GL_VERTEX_ARRAY_OBJECT,
         scope,
         t_web_gl_vertex_array_object,
+    );
+    let t_web_gl_vertex_array_object_oes =
+        web_gl_vertex_array_object_oes::template::<D>(scope, Some(t_web_gl_object), &options);
+    st.set_template(
+        ids::WEB_GL_VERTEX_ARRAY_OBJECT_OES,
+        scope,
+        t_web_gl_vertex_array_object_oes,
     );
     let t_web_gl_rendering_context = web_gl_rendering_context::template::<D>(scope, None, &options);
     st.set_template(
@@ -7185,6 +7833,15 @@ pub fn install_context_for<D: Dom>(
     }
     if let (Some(h), Some(ids::WINDOW)) = (global_handle, global_interface_id(kind)) {
         rt::install_named_properties_object(scope, ids::WINDOW, global, h)?;
+    }
+    let f_angle_instanced_arrays = st
+        .template(scope, ids::ANGLE_INSTANCED_ARRAYS)?
+        .get_function(scope)?;
+    if let Some(p) = f_angle_instanced_arrays
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
     }
     let f_abort_controller = st
         .template(scope, ids::ABORT_CONTROLLER)?
@@ -7882,6 +8539,157 @@ pub fn install_context_for<D: Dom>(
         .get_function(scope)?;
     if kind.exposes(&["*"]) {
         rt::expose(scope, global, "DecompressionStream", f_decompression_stream)?;
+    }
+    let f_ext_blend_minmax = st
+        .template(scope, ids::EXT_BLEND_MINMAX)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_blend_minmax
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_clip_control = st
+        .template(scope, ids::EXT_CLIP_CONTROL)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_clip_control
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_color_buffer_float = st
+        .template(scope, ids::EXT_COLOR_BUFFER_FLOAT)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_color_buffer_float
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_color_buffer_half_float = st
+        .template(scope, ids::EXT_COLOR_BUFFER_HALF_FLOAT)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_color_buffer_half_float
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_conservative_depth = st
+        .template(scope, ids::EXT_CONSERVATIVE_DEPTH)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_conservative_depth
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_depth_clamp = st
+        .template(scope, ids::EXT_DEPTH_CLAMP)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_depth_clamp
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_float_blend = st
+        .template(scope, ids::EXT_FLOAT_BLEND)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_float_blend
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_frag_depth = st
+        .template(scope, ids::EXT_FRAG_DEPTH)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_frag_depth
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_polygon_offset_clamp = st
+        .template(scope, ids::EXT_POLYGON_OFFSET_CLAMP)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_polygon_offset_clamp
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_render_snorm = st
+        .template(scope, ids::EXT_RENDER_SNORM)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_render_snorm
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_s_rgb = st.template(scope, ids::EXT_S_RGB)?.get_function(scope)?;
+    if let Some(p) = f_ext_s_rgb
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_shader_texture_lod = st
+        .template(scope, ids::EXT_SHADER_TEXTURE_LOD)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_shader_texture_lod
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_texture_compression_bptc = st
+        .template(scope, ids::EXT_TEXTURE_COMPRESSION_BPTC)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_texture_compression_bptc
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_texture_compression_rgtc = st
+        .template(scope, ids::EXT_TEXTURE_COMPRESSION_RGTC)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_texture_compression_rgtc
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_texture_filter_anisotropic = st
+        .template(scope, ids::EXT_TEXTURE_FILTER_ANISOTROPIC)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_texture_filter_anisotropic
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_texture_mirror_clamp_to_edge = st
+        .template(scope, ids::EXT_TEXTURE_MIRROR_CLAMP_TO_EDGE)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_texture_mirror_clamp_to_edge
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ext_texture_norm16 = st
+        .template(scope, ids::EXT_TEXTURE_NORM16)?
+        .get_function(scope)?;
+    if let Some(p) = f_ext_texture_norm16
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
     }
     let f_element_internals = st
         .template(scope, ids::ELEMENT_INTERNALS)?
@@ -10266,6 +11074,15 @@ pub fn install_context_for<D: Dom>(
             f_intersection_observer_entry,
         )?;
     }
+    let f_khr_parallel_shader_compile = st
+        .template(scope, ids::KHR_PARALLEL_SHADER_COMPILE)?
+        .get_function(scope)?;
+    if let Some(p) = f_khr_parallel_shader_compile
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
     let f_location = st.template(scope, ids::LOCATION)?.get_function(scope)?;
     if kind.exposes(&["Window"]) {
         rt::expose(scope, global, "Location", f_location)?;
@@ -10380,6 +11197,114 @@ pub fn install_context_for<D: Dom>(
         rt::expose(scope, global, "RadioNodeList", f_radio_node_list)?;
     }
     f_radio_node_list.set_prototype(scope, f_node_list.into())?;
+    let f_oes_draw_buffers_indexed = st
+        .template(scope, ids::OES_DRAW_BUFFERS_INDEXED)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_draw_buffers_indexed
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_oes_element_index_uint = st
+        .template(scope, ids::OES_ELEMENT_INDEX_UINT)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_element_index_uint
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_oes_fbo_render_mipmap = st
+        .template(scope, ids::OES_FBO_RENDER_MIPMAP)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_fbo_render_mipmap
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_oes_sample_variables = st
+        .template(scope, ids::OES_SAMPLE_VARIABLES)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_sample_variables
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_oes_shader_multisample_interpolation = st
+        .template(scope, ids::OES_SHADER_MULTISAMPLE_INTERPOLATION)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_shader_multisample_interpolation
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_oes_standard_derivatives = st
+        .template(scope, ids::OES_STANDARD_DERIVATIVES)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_standard_derivatives
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_oes_texture_float = st
+        .template(scope, ids::OES_TEXTURE_FLOAT)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_texture_float
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_oes_texture_float_linear = st
+        .template(scope, ids::OES_TEXTURE_FLOAT_LINEAR)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_texture_float_linear
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_oes_texture_half_float = st
+        .template(scope, ids::OES_TEXTURE_HALF_FLOAT)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_texture_half_float
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_oes_texture_half_float_linear = st
+        .template(scope, ids::OES_TEXTURE_HALF_FLOAT_LINEAR)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_texture_half_float_linear
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_oes_vertex_array_object = st
+        .template(scope, ids::OES_VERTEX_ARRAY_OBJECT)?
+        .get_function(scope)?;
+    if let Some(p) = f_oes_vertex_array_object
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_ovr_multiview2 = st
+        .template(scope, ids::OVR_MULTIVIEW2)?
+        .get_function(scope)?;
+    if let Some(p) = f_ovr_multiview2
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
     let f_offscreen_canvas_rendering_context2_d = st
         .template(scope, ids::OFFSCREEN_CANVAS_RENDERING_CONTEXT2_D)?
         .get_function(scope)?;
@@ -11041,6 +11966,150 @@ pub fn install_context_for<D: Dom>(
         f_view_transition_type_set,
         "values",
     )?;
+    let f_webgl_blend_func_extended = st
+        .template(scope, ids::WEBGL_BLEND_FUNC_EXTENDED)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_blend_func_extended
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_clip_cull_distance = st
+        .template(scope, ids::WEBGL_CLIP_CULL_DISTANCE)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_clip_cull_distance
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_color_buffer_float = st
+        .template(scope, ids::WEBGL_COLOR_BUFFER_FLOAT)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_color_buffer_float
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_compressed_texture_astc = st
+        .template(scope, ids::WEBGL_COMPRESSED_TEXTURE_ASTC)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_compressed_texture_astc
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_compressed_texture_etc = st
+        .template(scope, ids::WEBGL_COMPRESSED_TEXTURE_ETC)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_compressed_texture_etc
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_compressed_texture_etc1 = st
+        .template(scope, ids::WEBGL_COMPRESSED_TEXTURE_ETC1)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_compressed_texture_etc1
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_compressed_texture_s3tc = st
+        .template(scope, ids::WEBGL_COMPRESSED_TEXTURE_S3TC)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_compressed_texture_s3tc
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_compressed_texture_s3tc_srgb = st
+        .template(scope, ids::WEBGL_COMPRESSED_TEXTURE_S3TC_SRGB)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_compressed_texture_s3tc_srgb
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_debug_renderer_info = st
+        .template(scope, ids::WEBGL_DEBUG_RENDERER_INFO)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_debug_renderer_info
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_depth_texture = st
+        .template(scope, ids::WEBGL_DEPTH_TEXTURE)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_depth_texture
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_draw_buffers = st
+        .template(scope, ids::WEBGL_DRAW_BUFFERS)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_draw_buffers
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_multi_draw = st
+        .template(scope, ids::WEBGL_MULTI_DRAW)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_multi_draw
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_polygon_mode = st
+        .template(scope, ids::WEBGL_POLYGON_MODE)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_polygon_mode
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_provoking_vertex = st
+        .template(scope, ids::WEBGL_PROVOKING_VERTEX)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_provoking_vertex
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_render_shared_exponent = st
+        .template(scope, ids::WEBGL_RENDER_SHARED_EXPONENT)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_render_shared_exponent
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_stencil_texturing = st
+        .template(scope, ids::WEBGL_STENCIL_TEXTURING)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_stencil_texturing
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
     let f_web_gl2_rendering_context = st
         .template(scope, ids::WEB_GL2_RENDERING_CONTEXT)?
         .get_function(scope)?;
@@ -11147,6 +12216,16 @@ pub fn install_context_for<D: Dom>(
         )?;
     }
     f_web_gl_vertex_array_object.set_prototype(scope, f_web_gl_object.into())?;
+    let f_web_gl_vertex_array_object_oes = st
+        .template(scope, ids::WEB_GL_VERTEX_ARRAY_OBJECT_OES)?
+        .get_function(scope)?;
+    if let Some(p) = f_web_gl_vertex_array_object_oes
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    f_web_gl_vertex_array_object_oes.set_prototype(scope, f_web_gl_object.into())?;
     let f_web_gl_rendering_context = st
         .template(scope, ids::WEB_GL_RENDERING_CONTEXT)?
         .get_function(scope)?;

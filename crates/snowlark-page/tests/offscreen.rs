@@ -253,6 +253,41 @@ fn worker(script: &str) -> String {
     )
 }
 
+/// HTML StructuredSerializeWithTransfer through `Worker.postMessage` and the worker's own
+/// `postMessage`: an ArrayBuffer in the transfer list is detached on the sending side and arrives
+/// with its bytes; one listed twice, or already detached, is a DataCloneError.
+#[test]
+fn an_array_buffer_transferred_to_and_from_a_worker_is_detached() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = page(&net, "<!doctype html>");
+    let w = worker(
+        "onmessage = e => {
+             const b = e.data;
+             const back = new Uint8Array(b).map(x => x * 2).buffer;
+             postMessage(back, [back]);
+             postMessage([new Uint8Array(b).join(' '), back.byteLength].join());
+         };",
+    );
+    let r = eval(
+        &mut page,
+        &format!(
+            "window.got = [];
+            const w = {w};
+            w.onmessage = e => window.got.push(e.data instanceof ArrayBuffer ? new Uint8Array(e.data).join(' ') : e.data);
+            const b = new Uint8Array([1, 2, 3]).buffer;
+            w.postMessage(b, [b]);
+            const errors = [];
+            const c = new ArrayBuffer(1);
+            try {{ w.postMessage(c, [c, c]); }} catch (e) {{ errors.push(e.name); }}
+            try {{ w.postMessage(b, [b]); }} catch (e) {{ errors.push(e.name); }}
+            [b.byteLength, b.detached, c.byteLength, errors.join(' ')].join()"
+        ),
+    );
+    assert_eq!(r, "0,true,1,DataCloneError DataCloneError");
+    let got = wait_for(&mut page, "window.got.join('|')", "2 4 6|1 2 3,0");
+    assert_eq!(got, "2 4 6|1 2 3,0");
+}
+
 #[test]
 fn a_transferred_offscreen_canvas_draws_from_a_worker() {
     let net = NetThread::start(NetConfig::default()).unwrap();

@@ -31,6 +31,10 @@ use super::{Engine, InterfaceId, Object};
 mod webgl2;
 use webgl2::Gl2State;
 
+#[path = "webgl_ext.rs"]
+mod webgl_ext;
+use webgl_ext::ExtState;
+
 /// The OpenGL ES 2.0 and WebGL enums this file uses.
 mod c {
     pub const NO_ERROR: u32 = 0;
@@ -117,6 +121,8 @@ pub struct ContextObj {
     textures: Vec<[Option<Handle>; 4]>,
     /// WebGL 2.0's bindings (empty in a WebGL 1.0 context).
     gl2: Gl2State,
+    /// The extensions offered and asked for.
+    ext: ExtState,
     attrib_buffers: Vec<Option<Handle>>,
     pack_alignment: i32,
     unpack_alignment: i32,
@@ -171,6 +177,11 @@ pub enum WebGlObject {
         name: String,
     },
     Precision([i32; 3]),
+    /// The object of a WebGL extension (an index in [`webgl_ext::EXTENSIONS`]).
+    Extension {
+        context: Handle,
+        index: usize,
+    },
 }
 
 impl WebGlObject {
@@ -189,11 +200,15 @@ impl WebGlObject {
                 Kind::Sampler => InterfaceId::WebGLSampler,
                 Kind::Sync => InterfaceId::WebGLSync,
                 Kind::TransformFeedback => InterfaceId::WebGLTransformFeedback,
+                Kind::VertexArray if o.shader_type == webgl_ext::OES_VERTEX_ARRAY => {
+                    InterfaceId::WebGLVertexArrayObjectOES
+                }
                 Kind::VertexArray => InterfaceId::WebGLVertexArrayObject,
             },
             WebGlObject::UniformLocation { .. } => InterfaceId::WebGLUniformLocation,
             WebGlObject::ActiveInfo { .. } => InterfaceId::WebGLActiveInfo,
             WebGlObject::Precision(_) => InterfaceId::WebGLShaderPrecisionFormat,
+            WebGlObject::Extension { index, .. } => webgl_ext::EXTENSIONS[*index].iface,
         }
     }
 
@@ -219,6 +234,7 @@ impl WebGlObject {
                 objects.extend(c.textures.iter().flatten().flatten());
                 objects.extend(c.attrib_buffers.iter().flatten());
                 c.gl2.gc_refs(objects);
+                objects.extend(c.ext.objects.iter().map(|(_, h)| *h));
             }
             WebGlObject::Object(o) => {
                 objects.push(o.context);
@@ -232,6 +248,7 @@ impl WebGlObject {
             WebGlObject::UniformLocation {
                 context, program, ..
             } => objects.extend([*context, *program]),
+            WebGlObject::Extension { context, .. } => objects.push(*context),
             WebGlObject::ActiveInfo { .. } | WebGlObject::Precision(_) => {}
         }
     }
@@ -901,6 +918,7 @@ impl Engine {
                 active_unit: 0,
                 textures: vec![[None; 4]; units],
                 gl2: Gl2State::new(&created.limits, units),
+                ext: ExtState::new(created.extensions, created.requestable),
                 attrib_buffers: vec![None; attribs],
                 pack_alignment: 4,
                 unpack_alignment: 4,
@@ -1191,16 +1209,10 @@ impl WebGLRenderingContextBaseImpl for Engine {
         _cx: &mut Cx,
         this: Handle,
     ) -> rt::Result<Option<Vec<String>>> {
-        // (extensions are a later stage)
-        Ok((!self.gl_lost(this)).then(Vec::new))
+        Ok((!self.gl_lost(this)).then(|| self.gl_supported_extensions(this)))
     }
-    fn get_extension(
-        &self,
-        _cx: &mut Cx,
-        _this: Handle,
-        _name: &str,
-    ) -> rt::Result<Option<JsObject>> {
-        Ok(None)
+    fn get_extension(&self, cx: &mut Cx, this: Handle, name: &str) -> rt::Result<Option<JsObject>> {
+        self.gl_get_extension(cx, this, name)
     }
     fn active_texture(&self, _cx: &mut Cx, this: Handle, texture: u32) -> rt::Result<()> {
         let units = self.gl_ctx(this, |c| c.textures.len() as u32);
@@ -1864,6 +1876,22 @@ impl WebGLRenderingContextBaseImpl for Engine {
             c::SHADING_LANGUAGE_VERSION => {
                 js(cx, "WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Snowlark)")
             }
+            webgl_ext::UNMASKED_VENDOR_WEBGL | webgl_ext::UNMASKED_RENDERER_WEBGL
+                if self.gl_ext_enabled(this, "WEBGL_debug_renderer_info") =>
+            {
+                let s = self.gl_unmasked(this, pname).unwrap_or_default();
+                js(cx, s.as_str())
+            }
+            webgl_ext::VERTEX_ARRAY_BINDING_OES
+                if self.gl_ext_enabled(this, "OES_vertex_array_object") =>
+            {
+                object(self.gl_vertex_array(this), cx)
+            }
+            // MAX_TEXTURE_MAX_ANISOTROPY_EXT is a float.
+            0x84FF => match self.gl_query(this, Query::Floats(pname, 1)) {
+                Some(Reply::Floats(v)) if !v.is_empty() => js(cx, &(v[0] as f64)),
+                _ => null(cx),
+            },
             // ALIASED_LINE_WIDTH_RANGE, ALIASED_POINT_SIZE_RANGE, DEPTH_RANGE
             0x846E | 0x846D | 0x0B70 => floats(2, cx),
             // BLEND_COLOR, COLOR_CLEAR_VALUE
@@ -1984,6 +2012,12 @@ impl WebGLRenderingContextBaseImpl for Engine {
             c::ATTACHED_SHADERS | c::ACTIVE_ATTRIBUTES | c::ACTIVE_UNIFORMS => {
                 Ok(self.int_param(this, Query::Program(p, pname), cx))
             }
+            webgl_ext::COMPLETION_STATUS_KHR
+                if self.gl_ext_enabled(this, "KHR_parallel_shader_compile") =>
+            {
+                let v = self.gl_query(this, Query::Program(p, pname));
+                Ok(js(cx, &(v.map_or(1, |r| r.int()) != 0)))
+            }
             // WebGL 2.0: TRANSFORM_FEEDBACK_BUFFER_MODE, TRANSFORM_FEEDBACK_VARYINGS,
             // ACTIVE_UNIFORM_BLOCKS
             0x8C7F | 0x8C83 | 0x8A36 if self.webgl_version_2(this) => {
@@ -2045,6 +2079,12 @@ impl WebGLRenderingContextBaseImpl for Engine {
                     Some(v) => js(cx, &(v != 0)),
                     None => null(cx),
                 })
+            }
+            webgl_ext::COMPLETION_STATUS_KHR
+                if self.gl_ext_enabled(this, "KHR_parallel_shader_compile") =>
+            {
+                let v = self.gl_query(this, Query::Shader(s, pname));
+                Ok(js(cx, &(v.map_or(1, |r| r.int()) != 0)))
             }
             _ => {
                 self.gl_error(this, c::INVALID_ENUM);

@@ -300,6 +300,20 @@ impl Device {
             .collect()
     }
 
+    /// The names in an extension string (`GL_EXTENSIONS` or ANGLE's requestable ones) of the
+    /// current context.
+    fn extension_list(&self, pname: u32) -> Vec<String> {
+        // SAFETY: the context is current; the string ANGLE returns lives as long as the context
+        // and is read before any other call.
+        let s = unsafe { (self.angle.gl.glGetString)(pname) };
+        if s.is_null() {
+            return Vec::new();
+        }
+        // SAFETY: a NUL-terminated string from ANGLE.
+        let s = unsafe { std::ffi::CStr::from_ptr(s.cast()) }.to_string_lossy();
+        s.split_ascii_whitespace().map(str::to_owned).collect()
+    }
+
     fn limits(&self, es3: bool) -> Limits {
         let one = |p| self.get_ints(p, 1).first().copied().unwrap_or(0);
         let three = |p| if es3 { one(p) } else { 0 };
@@ -327,6 +341,7 @@ impl Device {
         let gl = &self.angle.gl;
         let n = |kind, client| self.name(id, kind, client);
         let b = |v: bool| v as u8;
+        let es2 = self.contexts.get(&id).is_some_and(|c| !c.attributes.webgl2);
         // SAFETY (every call below): the context is current; enums and integers are passed
         // through for ANGLE to validate; object names come from this context's table (unknown ids
         // become 0); pointers are to memory this function owns for the call, with its size
@@ -345,6 +360,7 @@ impl Device {
                         Kind::Query => (gl.glGenQueries)(1, &mut name),
                         Kind::Sampler => (gl.glGenSamplers)(1, &mut name),
                         Kind::TransformFeedback => (gl.glGenTransformFeedbacks)(1, &mut name),
+                        Kind::VertexArray if es2 => (gl.glGenVertexArraysOES)(1, &mut name),
                         Kind::VertexArray => (gl.glGenVertexArrays)(1, &mut name),
                         Kind::Shader | Kind::Sync => {}
                     }
@@ -389,6 +405,7 @@ impl Device {
                         Kind::Query => (gl.glDeleteQueries)(1, &name),
                         Kind::Sampler => (gl.glDeleteSamplers)(1, &name),
                         Kind::TransformFeedback => (gl.glDeleteTransformFeedbacks)(1, &name),
+                        Kind::VertexArray if es2 => (gl.glDeleteVertexArraysOES)(1, &name),
                         Kind::VertexArray => (gl.glDeleteVertexArrays)(1, &name),
                         Kind::Sync => {}
                     }
@@ -584,6 +601,7 @@ impl Device {
                 C::BindTransformFeedback(t, tf) => {
                     (gl.glBindTransformFeedback)(*t, n(Kind::TransformFeedback, *tf))
                 }
+                C::BindVertexArray(v) if es2 => (gl.glBindVertexArrayOES)(n(Kind::VertexArray, *v)),
                 C::BindVertexArray(v) => (gl.glBindVertexArray)(n(Kind::VertexArray, *v)),
                 C::BlitFramebuffer(r, mask, filter) => (gl.glBlitFramebuffer)(
                     r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], *mask, *filter,
@@ -624,10 +642,24 @@ impl Device {
                 C::CopyTexSubImage3D(t, level, xo, yo, zo, x, y, w, h) => {
                     (gl.glCopyTexSubImage3D)(*t, *level, *xo, *yo, *zo, *x, *y, *w, *h)
                 }
+                // In an OpenGL ES 2.0 context (WebGL 1.0) these come from extensions, whose entry
+                // points ANGLE keeps apart from ES 3.0's.
+                C::DrawArraysInstanced(m, first, count, inst) if es2 => {
+                    (gl.glDrawArraysInstancedANGLE)(*m, *first, *count, *inst)
+                }
                 C::DrawArraysInstanced(m, first, count, inst) => {
                     (gl.glDrawArraysInstanced)(*m, *first, *count, *inst)
                 }
+                C::DrawBuffers(v) if es2 => (gl.glDrawBuffersEXT)(v.len() as i32, v.as_ptr()),
                 C::DrawBuffers(v) => (gl.glDrawBuffers)(v.len() as i32, v.as_ptr()),
+                C::DrawElementsInstanced(m, count, ty, offset, inst) if es2 => (gl
+                    .glDrawElementsInstancedANGLE)(
+                    *m,
+                    *count,
+                    *ty,
+                    *offset as usize as *const c_void,
+                    *inst,
+                ),
                 C::DrawElementsInstanced(m, count, ty, offset, inst) => (gl
                     .glDrawElementsInstanced)(
                     *m,
@@ -786,6 +818,7 @@ impl Device {
                     }
                     f(*loc, (v.len() / per) as i32, b(*transpose), v.as_ptr())
                 }
+                C::VertexAttribDivisor(i, d) if es2 => (gl.glVertexAttribDivisorANGLE)(*i, *d),
                 C::VertexAttribDivisor(i, d) => (gl.glVertexAttribDivisor)(*i, *d),
                 C::VertexAttribI(i, v) => (gl.glVertexAttribI4iv)(*i, v.as_ptr()),
                 C::VertexAttribIu(i, v) => (gl.glVertexAttribI4uiv)(*i, v.as_ptr()),
@@ -804,6 +837,77 @@ impl Device {
                         (gl.glWaitSync)(*s as *const c_void, 0, u64::MAX)
                     }
                 }
+                C::RequestExtension(name) => {
+                    if let Ok(name) = std::ffi::CString::new(name.as_str()) {
+                        (gl.glRequestExtensionANGLE)(name.as_ptr())
+                    }
+                }
+                C::MultiDrawArrays(m, firsts, counts, inst) => {
+                    let len = firsts.len().min(counts.len());
+                    match inst {
+                        Some(i) => (gl.glMultiDrawArraysInstancedANGLE)(
+                            *m,
+                            firsts.as_ptr(),
+                            counts.as_ptr(),
+                            i.as_ptr(),
+                            len.min(i.len()) as i32,
+                        ),
+                        None => (gl.glMultiDrawArraysANGLE)(
+                            *m,
+                            firsts.as_ptr(),
+                            counts.as_ptr(),
+                            len as i32,
+                        ),
+                    }
+                }
+                C::MultiDrawElements(m, counts, ty, offsets, inst) => {
+                    let ptrs: Vec<*const c_void> = offsets
+                        .iter()
+                        .map(|o| *o as usize as *const c_void)
+                        .collect();
+                    let len = counts.len().min(ptrs.len());
+                    match inst {
+                        Some(i) => (gl.glMultiDrawElementsInstancedANGLE)(
+                            *m,
+                            counts.as_ptr(),
+                            *ty,
+                            ptrs.as_ptr(),
+                            i.as_ptr(),
+                            len.min(i.len()) as i32,
+                        ),
+                        None => (gl.glMultiDrawElementsANGLE)(
+                            *m,
+                            counts.as_ptr(),
+                            *ty,
+                            ptrs.as_ptr(),
+                            len as i32,
+                        ),
+                    }
+                }
+                C::ClipControl(o, d) => (gl.glClipControlEXT)(*o, *d),
+                C::PolygonMode(f, m) => (gl.glPolygonModeANGLE)(*f, *m),
+                C::ProvokingVertex(m) => (gl.glProvokingVertexANGLE)(*m),
+                C::PolygonOffsetClamp(f, u, c) => (gl.glPolygonOffsetClampEXT)(*f, *u, *c),
+                C::EnableIndexed(t, i, true) => (gl.glEnableiOES)(*t, *i),
+                C::EnableIndexed(t, i, false) => (gl.glDisableiOES)(*t, *i),
+                C::BlendEquationIndexed(buf, rgb, a) => {
+                    (gl.glBlendEquationSeparateiOES)(*buf, *rgb, *a)
+                }
+                C::BlendFuncIndexed(buf, f) => {
+                    (gl.glBlendFuncSeparateiOES)(*buf, f[0], f[1], f[2], f[3])
+                }
+                C::ColorMaskIndexed(buf, m) => {
+                    (gl.glColorMaskiOES)(*buf, b(m[0]), b(m[1]), b(m[2]), b(m[3]))
+                }
+                C::FramebufferTextureMultiview(t, a, tex, level, base, views) => (gl
+                    .glFramebufferTextureMultiviewOVR)(
+                    *t,
+                    *a,
+                    n(Kind::Texture, *tex),
+                    *level,
+                    *base,
+                    *views,
+                ),
             }
         }
     }
@@ -1526,6 +1630,9 @@ impl Backend for Device {
         Ok(Created {
             attributes: granted,
             limits: self.limits(a.webgl2),
+            extensions: self.extension_list(0x1F03),
+            // GL_REQUESTABLE_EXTENSIONS_ANGLE
+            requestable: self.extension_list(0x93A8),
         })
     }
 

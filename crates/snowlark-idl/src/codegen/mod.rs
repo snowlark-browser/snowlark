@@ -116,7 +116,7 @@ impl Plan<'_> {
         )
         .unwrap();
 
-        o.push_str("/// The generated interfaces; the engine names an object's most derived one in `Host::interface_of`.\n#[repr(u16)]\n#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]\npub enum InterfaceId {\n");
+        o.push_str("/// The generated interfaces; the engine names an object's most derived one in `Host::interface_of`.\n#[repr(u16)]\n#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]\n#[allow(non_camel_case_types)] // (WebGL extensions: `EXT_sRGB`)\npub enum InterfaceId {\n");
         for ip in &self.ifaces {
             writeln!(o, "    {} = {},", ip.name, ip.lo).unwrap();
         }
@@ -225,6 +225,25 @@ impl Plan<'_> {
         for ip in &self.ifaces {
             let f = &self.traits[&ip.name].file;
             let names: Vec<String> = ip.exposure.iter().map(|n| lit(n)).collect();
+            if ip.no_interface_object {
+                // [LegacyNoInterfaceObject] (Web IDL §3.7.3): the prototype object exists for its
+                // objects, but there is no interface object and no `constructor` property.
+                writeln!(
+                    o,
+                    "    let f_{f} = st.template(scope, ids::{})?.get_function(scope)?;\n    if let Some(p) = f_{f}.get(scope, rt::name(scope, \"prototype\").into()).and_then(|p| v8::Local::<v8::Object>::try_from(p).ok()) {{\n        p.delete(scope, rt::name(scope, \"constructor\").into())?;\n    }}",
+                    upper(&ip.name)
+                )
+                .unwrap();
+                if let Some(p) = &ip.parent {
+                    writeln!(
+                        o,
+                        "    f_{f}.set_prototype(scope, f_{}.into())?;",
+                        self.traits[p].file
+                    )
+                    .unwrap();
+                }
+                continue;
+            }
             writeln!(
                 o,
                 "    let f_{f} = st.template(scope, ids::{})?.get_function(scope)?;\n    if kind.exposes(&[{}]) {{\n        rt::expose(scope, global, {}, f_{f})?;\n    }}",

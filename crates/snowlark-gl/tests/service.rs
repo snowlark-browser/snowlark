@@ -230,3 +230,31 @@ fn attributes_are_granted() {
     ]);
     assert_eq!(pixel(&s.present(1).unwrap(), 0, 0)[3], 255);
 }
+
+#[test]
+fn a_context_lists_the_extensions_it_can_turn_on() {
+    let mut s = service();
+    let created = s.create_context(1, &plain(), 2, 2).unwrap();
+    if std::env::var_os("SNOWLARK_PRINT_GL_EXTENSIONS").is_some() {
+        eprintln!(
+            "on: {}\nrequestable: {}",
+            created.extensions.join(" "),
+            created.requestable.join(" ")
+        );
+    }
+    // ANGLE's WebGL mode starts with the extensions off; the page's getExtension turns them on.
+    assert!(created
+        .requestable
+        .iter()
+        .any(|e| e == "GL_ANGLE_instanced_arrays"));
+    s.submit(vec![(
+        1,
+        C::RequestExtension("GL_ANGLE_instanced_arrays".into()),
+    )]);
+    assert_eq!(s.query(1, &Q::Error), Reply::Int(0));
+    let on = s.query(1, &Q::String(0x1F03));
+    let Reply::String(Some(on)) = on else {
+        panic!("GL_EXTENSIONS: {on:?}")
+    };
+    assert!(on.split(' ').any(|e| e == "GL_ANGLE_instanced_arrays"));
+}

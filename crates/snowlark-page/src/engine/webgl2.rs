@@ -302,6 +302,11 @@ impl Engine {
         self.gl_ctx(h, |c| c.attributes.webgl2)
     }
 
+    /// The bound vertex array object (WebGL 2.0, or OES_vertex_array_object in WebGL 1.0).
+    pub(super) fn gl_vertex_array(&self, h: Handle) -> Option<Handle> {
+        self.gl_ctx(h, |c| c.gl2.vertex_array)
+    }
+
     /// The buffer bound to a WebGL 2.0 target.
     fn gl2_bound(&self, this: Handle, target: u32) -> Option<Handle> {
         let slot = buffer_slot(target)?;

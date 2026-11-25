@@ -289,6 +289,29 @@ entry_points!(Gles {
     glGetVertexAttribIuivRobustANGLE: fn(u32, u32, i32, *mut i32, *mut u32);
     glTexImage3DRobustANGLE: fn(u32, i32, i32, i32, i32, i32, i32, u32, u32, i32, *const c_void);
     glTexSubImage3DRobustANGLE: fn(u32, i32, i32, i32, i32, i32, i32, i32, u32, u32, i32, *const c_void);
+    // Extensions (WebGL's extension registry, as ANGLE offers them in its WebGL mode):
+    glRequestExtensionANGLE: fn(*const i8);
+    glGenVertexArraysOES: fn(i32, *mut u32);
+    glDeleteVertexArraysOES: fn(i32, *const u32);
+    glBindVertexArrayOES: fn(u32);
+    glDrawArraysInstancedANGLE: fn(u32, i32, i32, i32);
+    glDrawElementsInstancedANGLE: fn(u32, i32, u32, *const c_void, i32);
+    glVertexAttribDivisorANGLE: fn(u32, u32);
+    glDrawBuffersEXT: fn(i32, *const u32);
+    glMultiDrawArraysANGLE: fn(u32, *const i32, *const i32, i32);
+    glMultiDrawElementsANGLE: fn(u32, *const i32, u32, *const *const c_void, i32);
+    glMultiDrawArraysInstancedANGLE: fn(u32, *const i32, *const i32, *const i32, i32);
+    glMultiDrawElementsInstancedANGLE: fn(u32, *const i32, u32, *const *const c_void, *const i32, i32);
+    glClipControlEXT: fn(u32, u32);
+    glPolygonModeANGLE: fn(u32, u32);
+    glProvokingVertexANGLE: fn(u32);
+    glPolygonOffsetClampEXT: fn(f32, f32, f32);
+    glEnableiOES: fn(u32, u32);
+    glDisableiOES: fn(u32, u32);
+    glBlendEquationSeparateiOES: fn(u32, u32, u32);
+    glBlendFuncSeparateiOES: fn(u32, u32, u32, u32, u32);
+    glColorMaskiOES: fn(u32, u8, u8, u8, u8);
+    glFramebufferTextureMultiviewOVR: fn(u32, u32, u32, i32, i32, i32);
 });
 
 /// The loaded libraries. They stay loaded for the life of the process.

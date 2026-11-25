@@ -25,6 +25,38 @@ use super::canvas::{CanvasOwner, ContextObj};
 use super::{exception, Engine, Object};
 use crate::event_loop::Waker;
 
+/// The ArrayBuffers among a message's transfer list (HTML §2.7.5 StructuredSerializeWithTransfer
+/// steps 1-4 for them): each once, not shared, not detached and detachable, else a
+/// DataCloneError.
+fn transfer_buffers(
+    cx: &mut Cx,
+    transfer: &[JsObject],
+) -> rt::Result<Vec<v8::Global<v8::ArrayBuffer>>> {
+    let scope = cx.scope();
+    let mut buffers: Vec<v8::Global<v8::ArrayBuffer>> = Vec::new();
+    for t in transfer {
+        let o = v8::Local::new(scope, t.global());
+        if o.is_shared_array_buffer() {
+            return Err(exception(
+                ExceptionName::DataCloneError,
+                "A SharedArrayBuffer cannot be transferred",
+            ));
+        }
+        let Ok(ab) = v8::Local::<v8::ArrayBuffer>::try_from(o) else {
+            continue;
+        };
+        let dup = buffers.iter().any(|b| v8::Local::new(scope, b) == ab);
+        if dup || ab.was_detached() || !ab.is_detachable() {
+            return Err(exception(
+                ExceptionName::DataCloneError,
+                "An ArrayBuffer in the transfer list cannot be transferred",
+            ));
+        }
+        buffers.push(v8::Global::new(scope, ab));
+    }
+    Ok(buffers)
+}
+
 /// The largest bitmap side an OffscreenCanvas gets (a larger one has no bitmap: its context draws
 /// nothing), as for a canvas element's attributes.
 const MAX_SIDE: u64 = 1 << 15;
@@ -320,11 +352,20 @@ impl Engine {
         value: &JsValue,
         transfer: &[JsObject],
     ) -> rt::Result<(Vec<u8>, Vec<Transferred>)> {
+        let buffers = transfer_buffers(cx, transfer)?;
         let list = self.offscreen_transfer_list(cx, transfer)?;
         let prev = self.transfer_out.replace(list.clone());
         let bytes = self.serialize_value(cx, value);
         self.transfer_out.replace(prev);
         let bytes = bytes?;
+        // The ArrayBuffers' contents went with the message (serialized by value); the transfer
+        // steps detach them here.
+        {
+            let scope = cx.scope();
+            for b in &buffers {
+                v8::Local::new(scope, b).detach(None);
+            }
+        }
         let mut out = Vec::with_capacity(list.len());
         for h in list {
             // HTML §4.12.5.3 transfer steps: the data holder gets the bitmap's size and the

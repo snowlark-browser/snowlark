@@ -438,9 +438,15 @@ impl Plan<'_> {
             t.owner
         )
         .unwrap();
+        // (WebGL extension interfaces are named in the registry's style, `EXT_sRGB`)
+        let camel = if t.trait_name.contains('_') {
+            ", non_camel_case_types"
+        } else {
+            ""
+        };
         writeln!(
             o,
-            "#[allow(clippy::too_many_arguments)]\npub trait {} {{",
+            "#[allow(clippy::too_many_arguments{camel})]\npub trait {} {{",
             t.trait_name
         )
         .unwrap();

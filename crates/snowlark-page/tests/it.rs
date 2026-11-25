@@ -114,6 +114,7 @@ mod web_audio;
 mod web_storage;
 mod webgl;
 mod webgl2;
+mod webgl_ext;
 mod wheel_legacy;
 mod xpath;
 

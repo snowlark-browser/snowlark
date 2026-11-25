@@ -56,6 +56,10 @@ pub struct Created {
     pub attributes: Attributes,
     /// `MAX_TEXTURE_SIZE` and friends, read once.
     pub limits: Limits,
+    /// The OpenGL ES extensions on in the new context (`GL_EXTENSIONS`).
+    pub extensions: Vec<String>,
+    /// The ones it can turn on ([`Command::RequestExtension`]; ANGLE's requestable extensions).
+    pub requestable: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
@@ -260,6 +264,26 @@ pub enum Command {
     VertexAttribIPointer(u32, i32, u32, i32, i64),
     /// A fence the server waits for (no flags, GL's TIMEOUT_IGNORED).
     WaitSync(u32),
+    // Extensions (a WebGL extension's object turns its OpenGL ES extensions on first):
+    /// Turns on one of [`Created::requestable`].
+    RequestExtension(String),
+    /// mode, firsts, counts, instance counts (none: not instanced); the lists have one length
+    MultiDrawArrays(u32, Vec<i32>, Vec<i32>, Option<Vec<i32>>),
+    /// mode, counts, type, byte offsets into the element array buffer, instance counts
+    MultiDrawElements(u32, Vec<i32>, u32, Vec<i64>, Option<Vec<i32>>),
+    ClipControl(u32, u32),
+    PolygonMode(u32, u32),
+    ProvokingVertex(u32),
+    PolygonOffsetClamp(f32, f32, f32),
+    /// target, index, enabled
+    EnableIndexed(u32, u32, bool),
+    /// draw buffer, RGB mode, alpha mode
+    BlendEquationIndexed(u32, u32, u32),
+    /// draw buffer, source RGB, destination RGB, source alpha, destination alpha
+    BlendFuncIndexed(u32, [u32; 4]),
+    ColorMaskIndexed(u32, [bool; 4]),
+    /// target, attachment, texture, level, base view index, number of views
+    FramebufferTextureMultiview(u32, u32, u32, i32, i32, i32),
 }
 
 /// A command that answers.

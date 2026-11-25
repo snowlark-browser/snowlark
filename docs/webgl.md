@@ -146,8 +146,23 @@ share, and the placeholder's rendering update shows it. The readback per frame i
   are bounded by the size the message states and capped at 1 GiB.
 - **Shaders** never reach the driver as the page wrote them: ANGLE's translator parses, validates and rewrites them.
 - **Limits** are read from ANGLE when a context is made (`Created::limits`) and are the ones `getParameter` reports.
-- **Identifying strings.** `VENDOR` and `RENDERER` are fixed strings; the graphics card's name is not exposed
-  (`WEBGL_debug_renderer_info` is a later decision).
+- **Identifying strings.** `VENDOR` and `RENDERER` are fixed strings. `WEBGL_debug_renderer_info`'s
+  `UNMASKED_VENDOR_WEBGL` and `UNMASKED_RENDERER_WEBGL` give the graphics card's maker and model only: ANGLE's
+  device id, Direct3D version, shader models and driver details are cut from its renderer string
+  (`webgl_ext.rs` `trim_renderer`).
+
+## Extensions
+
+`getSupportedExtensions()` lists the registry's extensions (`webgl_ext.rs` `EXTENSIONS`) whose OpenGL ES
+extensions the context has on or can turn on: ANGLE's WebGL mode starts a context with them off and lists the
+ones it can turn on (`GL_REQUESTABLE_EXTENSIONS_ANGLE`, read into `Created::requestable`). `getExtension(name)`
+(names compared ASCII case-insensitively) makes the extension's object once per context, sends
+`Command::RequestExtension` for each OpenGL ES extension it is built on, and returns that object on every later
+call, so a page that never asks sees WebGL without it. The objects come from the registry's IDL
+(`[LegacyNoInterfaceObject]`: no interface object on the global). In a WebGL 1.0 context the service calls the
+extension entry points ANGLE keeps apart from ES 3.0's (`glDrawArraysInstancedANGLE`,
+`glBindVertexArrayOES`, `glDrawBuffersEXT`). Not offered yet: the timer queries, `WEBGL_lose_context`,
+`WEBGL_debug_shaders`, the draft extensions and `WEBGL_shader_pixel_local_storage`.
 - **Context loss.** After every presentation the service is asked for the reset status; a reset marks the context
   lost: every call does nothing, `isContextLost()` is true, `getError()` returns `CONTEXT_LOST_WEBGL` once. The
   `webglcontextlost` and `webglcontextrestored` events, `WEBGL_lose_context` and restoring the context are stage
