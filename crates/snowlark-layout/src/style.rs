@@ -217,6 +217,28 @@ pub struct ClipPath {
     pub zoom: f32,
 }
 
+/// `shape-outside` of the kinds layout resolves (CSS Shapes 1 §3.1).
+#[derive(Clone, Debug, PartialEq)]
+pub enum ShapeOutside {
+    /// A basic shape (never [`ClipShape::Reference`] nor [`ClipShape::Box`]) in its reference box.
+    Shape(ClipShape, ClipBox),
+    /// A box value: the reference box's edge, with its rounded corners (§4).
+    Box(ClipBox),
+    /// An image (§3.2), as the alpha of its pixels at its natural size.
+    Image(Arc<ShapeImage>),
+    /// A gradient (§3.2), drawn the size of the reference box.
+    Gradient(Image),
+}
+
+/// The pixels of a `shape-outside` image, as decoded by whoever reads the document, at the size it
+/// is drawn: row by row from the top, one alpha byte per pixel.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ShapeImage {
+    pub width: u32,
+    pub height: u32,
+    pub alpha: Vec<u8>,
+}
+
 /// A linear `length + percent × basis` term (a bound of a non-linear `calc()`).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Linear {
@@ -2760,6 +2782,23 @@ pub trait Style: Clone {
     /// `backdrop-filter`'s functions in order (Filter Effects 2 §3), as [`Style::filter_ops`].
     fn backdrop_filter_ops(&self, _reference_box: Rect) -> Vec<FilterOp> {
         Vec::new()
+    }
+    /// `shape-outside` (CSS Shapes 1 §3.1); `None` for `none`, and for an image that is not
+    /// loaded or not of the document's origin (§3.2: then no shape).
+    fn shape_outside(&self) -> Option<ShapeOutside> {
+        None
+    }
+    /// Whether [`Style::shape_outside`] is other than `none` (without building it).
+    fn has_shape_outside(&self) -> bool {
+        self.shape_outside().is_some()
+    }
+    /// `shape-margin` (§5.3), its percentages of the containing block's inline size.
+    fn shape_margin(&self) -> LengthPercentage {
+        LengthPercentage::ZERO
+    }
+    /// `shape-image-threshold` (§5.2), from 0 to 1.
+    fn shape_image_threshold(&self) -> f32 {
+        0.0
     }
     /// Whether [`Style::clip_path`] is `Some` (without building it).
     fn has_clip_path(&self) -> bool {

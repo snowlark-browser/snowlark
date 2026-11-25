@@ -756,6 +756,11 @@ impl SvgImages {
     }
 
     /// Whether image `id` has its markup ([`SvgImage::without_markup`]); `false` for no image.
+    /// The SVG image registered as `id`.
+    pub(crate) fn image(&self, id: ImageId) -> Option<Arc<SvgImage>> {
+        self.entries.get(&id).map(|e| e.image.clone())
+    }
+
     pub(crate) fn has_markup(&self, id: ImageId) -> bool {
         self.entries.get(&id).is_some_and(|e| e.image.has_markup())
     }

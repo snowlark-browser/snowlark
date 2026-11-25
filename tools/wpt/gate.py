@@ -333,6 +333,68 @@ def learn_flaky(verdicts, run_label, path=FLAKY):
     return new
 
 
+class LoadWatch:
+    """Whether other heavy work ran beside a gate: every `every` seconds it counts the machine-wide slots
+    (run.py's lock files, the ones dev.ps1 takes for builds and test runs) held by others. A re-check under
+    such load proves little: a subtest that times out beside a build and passes alone is a load effect, and
+    learning it as flaky would hide a later real loss of it. So the gate learns flakes only from a quiet
+    re-check. `held(kind)` counts the held slots of a kind (run.slots_held); the gate's own WPT slot is
+    `own_wpt`."""
+
+    KINDS = ('build', 'test', 'wpt')
+
+    def __init__(self, own_wpt=1, every=30, held=None):
+        self.own_wpt, self.every = own_wpt, every
+        self._held = held
+        self.samples, self.busy = 0, 0
+        self.seen = collections.Counter()
+        self._stop = None
+        self._thread = None
+
+    def held(self, kind):
+        if self._held is None:
+            sys.path.insert(0, HERE)
+            import run as runner
+            self._held = runner.slots_held
+        return self._held(kind)
+
+    def sample(self):
+        others = {k: self.held(k) - (self.own_wpt if k == 'wpt' else 0) for k in self.KINDS}
+        others = {k: n for k, n in others.items() if n > 0}
+        self.samples += 1
+        if others:
+            self.busy += 1
+            self.seen.update(others.keys())
+
+    def start(self):
+        import threading
+        self.sample()
+        self._stop = threading.Event()
+
+        def loop():
+            while not self._stop.wait(self.every):
+                self.sample()
+        self._thread = threading.Thread(target=loop, daemon=True)
+        self._thread.start()
+        return self
+
+    def stop(self):
+        if self._stop is not None:
+            self._stop.set()
+            self._thread.join()
+            self._stop = None
+        self.sample()
+        return self
+
+    @property
+    def quiet(self):
+        return self.samples > 0 and self.busy == 0
+
+    def describe(self):
+        return (f'other {"/".join(sorted(self.seen))} work held slots in {self.busy} of {self.samples} samples'
+                if self.busy else f'quiet in all {self.samples} samples')
+
+
 def build_flaky(paths, out=FLAKY, merge=True):
     flaky = flaky_from_runs([load(p) for p in paths])
     data = write_flaky(flaky, [os.path.basename(p) for p in paths], out, merge)
@@ -502,8 +564,9 @@ def show(items, P, limit, verdicts=None):
 
 
 def run_compare(baseline, run, flaky_path=FLAKY, recheck_n=0, exe=None, base_exe=None, allow_set_diff=False, limit=60,
-                have_slot=False, learn=True):
-    """The whole compare step; returns the exit status."""
+                have_slot=False, learn=True, watch=None):
+    """The whole compare step; returns the exit status. `watch` is a started LoadWatch covering the run (the
+    re-check gets one of its own when none is given): flakes are learned only when it saw no other work."""
     base_path, meta = resolve_baseline(baseline)
     run_path = resolve_run(run)
     try:
@@ -535,13 +598,25 @@ def run_compare(baseline, run, flaky_path=FLAKY, recheck_n=0, exe=None, base_exe
             print(f'gate: re-running {len({p for p, _ in result["real"]})} files with losses alone, {recheck_n}x'
                   + (f' (baseline binary {base_exe})' if base_exe else ' (the baseline binary is not available)'),
                   flush=True)
+            if watch is None:
+                watch = LoadWatch(own_wpt=1 if have_slot else 0).start()
             verdicts = recheck(result['real'], exe, base_exe, recheck_n, have_slot=have_slot)
     real, unresolved = print_report(result, label, os.path.basename(run_path), verdicts, limit)
-    if verdicts and learn:
-        added = learn_flaky(verdicts, os.path.basename(run_path), flaky_path)
-        if added:
-            print(f'\nflake list: {added} new flaky subtests/reftests from this re-check added to '
-                  f'{os.path.basename(flaky_path)} (commit it with the merge)')
+    if watch is not None:
+        watch.stop()
+    if verdicts and learn and flaky_path:
+        found = flaky_from_verdicts(verdicts)
+        n = sum(len(v) for v in found['subtests'].values()) + len(found['reftests'])
+        if not n:
+            pass
+        elif watch is not None and not watch.quiet:
+            print(f'\nflake list: not learned, the machine was busy ({watch.describe()}): {n} subtests/reftests '
+                  f'the re-check called flaky stay off {os.path.basename(flaky_path)}')
+        else:
+            added = learn_flaky(verdicts, os.path.basename(run_path), flaky_path)
+            if added:
+                print(f'\nflake list: {added} new flaky subtests/reftests from this quiet re-check added to '
+                      f'{os.path.basename(flaky_path)} (commit it with the merge)')
     status = 1 if real or unresolved else 0
     differ = result['only_base'] or result['only_run']
     if skipped:

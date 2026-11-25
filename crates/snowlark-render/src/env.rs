@@ -132,12 +132,74 @@ impl LoadedImage {
 }
 
 /// Images by absolute URL.
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct ImageTable {
     map: RwLock<HashMap<String, LoadedImage>>,
+    /// Where the images' decoded pixels are, for what layout reads of them (`shape-outside`).
+    store: std::sync::OnceLock<Arc<snowlark_paint::ImageStore>>,
+    /// The SVG images among them (the store has a placeholder for each until it is painted at a
+    /// size), and their rasters at their natural sizes once read.
+    svgs: RwLock<HashMap<ImageId, Arc<crate::svg::SvgImage>>>,
+    svg_rasters: RwLock<HashMap<ImageId, Arc<snowlark_paint::DecodedImage>>>,
+}
+
+impl std::fmt::Debug for ImageTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ImageTable")
+            .field("map", &self.map)
+            .finish()
+    }
 }
 
 impl ImageTable {
+    /// An image table whose images' pixels are in `store`.
+    pub fn with_store(store: Arc<snowlark_paint::ImageStore>) -> ImageTable {
+        let table = ImageTable::default();
+        let _ = table.store.set(store);
+        table
+    }
+
+    /// Records that image `id` is the SVG image `image`.
+    pub(crate) fn add_svg(&self, id: ImageId, image: Arc<crate::svg::SvgImage>) {
+        self.svgs.write().unwrap().insert(id, image);
+    }
+
+    /// The pixels of `image`, decoded (an SVG image drawn at its natural size, rounded): its first
+    /// frame has four bytes a pixel, alpha last. `None` when the table has no store or the store
+    /// no such image.
+    pub fn pixels(&self, image: &LoadedImage) -> Option<Arc<snowlark_paint::DecodedImage>> {
+        let id = image.id;
+        let svg = self.svgs.read().unwrap().get(&id).cloned();
+        let Some(svg) = svg else {
+            return self.store.get()?.get(id);
+        };
+        if let Some(r) = self.svg_rasters.read().unwrap().get(&id) {
+            return Some(r.clone());
+        }
+        let (w, h) = (
+            image
+                .natural
+                .width
+                .unwrap_or(300.0)
+                .round()
+                .clamp(1.0, 4096.0),
+            image
+                .natural
+                .height
+                .unwrap_or(150.0)
+                .round()
+                .clamp(1.0, 4096.0),
+        );
+        let raster = Arc::new(svg.rasterize(
+            (w, h),
+            (w as u32, h as u32),
+            snowlark_paint::ImageRendering::Smooth,
+            None,
+        )?);
+        self.svg_rasters.write().unwrap().insert(id, raster.clone());
+        Some(raster)
+    }
+
     pub fn get(&self, url: &str) -> Option<LoadedImage> {
         self.map.read().unwrap().get(url).copied()
     }

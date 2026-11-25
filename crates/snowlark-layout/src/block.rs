@@ -323,6 +323,18 @@ pub(crate) fn layout_float<S: Style>(
         left,
         right,
     );
+    // CSS Shapes 1 §3: lines beside the float wrap around its float area, in its containing
+    // block's writing mode (the float's own may differ).
+    if style.has_shape_outside() {
+        use crate::logical::Flip;
+        let frame = cx.tree.b(id).parent().map_or(Flip::IDENTITY, |p| {
+            Flip::of(cx.tree.b(p).style.writing_mode())
+        });
+        if let Some(shape) = crate::shapes::float_shape(&style.with_view(frame), size, m, cb_width)
+        {
+            bfc.set_last_shape(shape);
+        }
+    }
     // A relatively positioned float is shifted after it is placed (CSS Position 3 §3.1: the
     // offset does not affect the flow, the floats' exclusions included).
     let rel = cx.relative_offset(&style, cb_width, cb_height);
@@ -749,7 +761,7 @@ pub(crate) fn layout_block_container_box<S: Style>(
     let mut escaped = Vec::new();
     if !independent {
         for f in &bfc.floats[floats_before..] {
-            let mut f = *f;
+            let mut f = f.clone();
             f.rect = f.rect.translate(-at.x, -at.y);
             escaped.push(f);
         }

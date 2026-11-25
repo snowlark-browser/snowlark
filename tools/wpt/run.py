@@ -1130,6 +1130,8 @@ def main():
     slot = acquire_slot()  # held until the process ends
     jobs = auto_jobs(slot) if args.jobs == 'auto' else args.jobs
     exe = find_browser(args.snowlark)
+    # (a gate learns flakes only when no other build, test run or WPT run held a slot during its run and re-check)
+    watch = gate.LoadWatch(own_wpt=1 if slot else 0).start() if baseline is not None and not args.no_compare else None
     names = [name] if args.repeat == 1 else [f'{name}-r{i}' for i in range(1, args.repeat + 1)]
     paths = []
     for n in names:
@@ -1150,7 +1152,7 @@ def main():
     if baseline is not None and not args.no_compare:
         status = gate.run_compare(baseline[0], paths[-1], recheck_n=args.recheck, exe=exe, base_exe=args.base_exe,
                                   allow_set_diff=args.allow_set_diff, have_slot=True,
-                                  learn=not args.no_learn_flaky)
+                                  learn=not args.no_learn_flaky, watch=watch)
         sys.exit(status)
 
 

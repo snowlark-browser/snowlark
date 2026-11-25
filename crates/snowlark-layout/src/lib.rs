@@ -44,6 +44,7 @@ mod paint;
 mod positioned;
 mod replaced;
 pub mod scroll_snap;
+mod shapes;
 mod sizing;
 pub mod style;
 pub mod svg;

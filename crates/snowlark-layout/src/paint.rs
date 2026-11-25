@@ -4128,6 +4128,75 @@ fn color_at(stops: &[GradientStop], t: f32) -> Color {
     last.color
 }
 
+/// The alpha of a gradient drawn `w` × `h`, row by row, one byte per pixel sampled at its center
+/// (CSS Shapes 1 §3.2 reads a gradient's pixels as an image's); `None` for other images.
+pub(crate) fn gradient_alpha(image: &Image, w: u32, h: u32) -> Option<Vec<u8>> {
+    // (where a point is along the gradient: 0 at its start, 1 at its end)
+    type Along = Box<dyn Fn(f32, f32) -> f32>;
+    let tile = Rect::new(0.0, 0.0, w as f32, h as f32);
+    let (stops, repeating, t_at): (Vec<GradientStop>, bool, Along) = match image {
+        Image::LinearGradient(g) => {
+            let angle = match g.corner {
+                Some((right, bottom)) => corner_angle(right, bottom, tile.width, tile.height),
+                None => g.angle,
+            };
+            let (a, b) = gradient_line(angle, tile);
+            let (dx, dy) = (b.x - a.x, b.y - a.y);
+            let len2 = dx * dx + dy * dy;
+            let stops = interpolated_stops(&resolve_stops(&g.stops, len2.sqrt()), &g.ramps);
+            let t = move |x: f32, y: f32| {
+                if len2 > 0.0 {
+                    ((x - a.x) * dx + (y - a.y) * dy) / len2
+                } else {
+                    0.0
+                }
+            };
+            (stops, g.repeating, Box::new(t))
+        }
+        Image::RadialGradient(g) => {
+            let cx = finite_length(g.center.0.resolve(tile.width));
+            let cy = finite_length(g.center.1.resolve(tile.height));
+            let (rx, ry) = radial_size(g, tile, cx, cy);
+            let (rx, ry) = (finite_length(rx), finite_length(ry));
+            let stops = interpolated_stops(&resolve_stops(&g.stops, rx), &g.ramps);
+            let t = move |x: f32, y: f32| {
+                if rx > 0.0 && ry > 0.0 {
+                    ((x - cx) / rx).hypot((y - cy) / ry)
+                } else {
+                    f32::INFINITY
+                }
+            };
+            (stops, g.repeating, Box::new(t))
+        }
+        Image::ConicGradient(g) => {
+            let cx = finite_length(g.center.0.resolve(tile.width));
+            let cy = finite_length(g.center.1.resolve(tile.height));
+            let stops = interpolated_stops(&resolve_stops(&g.stops, 1.0), &g.ramps);
+            let start = if g.angle.is_finite() { g.angle } else { 0.0 };
+            // (angles clockwise from up, CSS Images 4 §3.3)
+            let t = move |x: f32, y: f32| {
+                let deg = (x - cx).atan2(cy - y).to_degrees();
+                ((deg - start) / 360.0).rem_euclid(1.0)
+            };
+            (stops, g.repeating, Box::new(t))
+        }
+        _ => return None,
+    };
+    let (first, last) = (stops.first()?.offset, stops.last()?.offset);
+    let period = last - first;
+    let mut out = Vec::with_capacity((w * h) as usize);
+    for y in 0..h {
+        for x in 0..w {
+            let mut t = t_at(x as f32 + 0.5, y as f32 + 0.5);
+            if repeating && period > 1e-6 && t.is_finite() {
+                t = first + (t - first).rem_euclid(period);
+            }
+            out.push(color_at(&stops, t).a);
+        }
+    }
+    Some(out)
+}
+
 /// Fits resolved stops to the 0..1 range a rasterizer's gradient brush covers: the returned
 /// `(from, scale, stops)` say that the brush's 0..1 is `from..from + scale` of the original
 /// gradient line (or ray). A clamped linear gradient's line is extended to its outermost stops;

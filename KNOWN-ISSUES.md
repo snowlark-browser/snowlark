@@ -48,8 +48,11 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## CSS and style
 
+- **CSS Shapes.** Lines wrap around `shape-outside` shapes, images and gradients, but an animated `inset()` or
+  `polygon()` reads back in a longer form than other browsers give (all four `inset()` sides, a zero `round`),
+  and text beside a rounded shape can end at a fraction of a pixel and leave a hairline gap. (ref 760)
 - **CSS Typed OM, the rest.** The style property maps and `CSSStyleValue` objects work, but properties the style
-  system does not have yet (`shape-outside`, `text-emphasis-color`, `counter-set`, `page` and a few more) are not
+  system does not have yet (`text-emphasis-color`, `counter-set`, `page` and a few more) are not
   in the maps, a percentage `opacity` reads back as a number, `step-start` as `steps(1, start)`, and a
   computed `column-rule-width` as a length instead of a `CSSStyleValue`. (ref 754)
 - **Anchor positioning and scrolling.** A box positioned with `anchor()` or `position-area` is placed against its

@@ -287,6 +287,51 @@ impl RenderStyle {
         used_color_scheme(&self.values) == ls::ColorScheme::Dark
     }
 
+    /// A `shape-outside` image (CSS Shapes 1 §3.2): a bitmap's alpha at its natural size, or a
+    /// gradient for layout to draw. `None`, which is no shape, for an image that is not loaded
+    /// or whose pixels the document may not read (§3.2: it must be CORS-same-origin).
+    fn shape_outside_image(&self, image: &c::Image) -> Option<ls::ShapeOutside> {
+        if let c::Image::Url(url) = image {
+            let loaded = self.env.images.get(url.url()?.as_str())?;
+            if loaded.access == crate::env::PixelAccess::None {
+                return None;
+            }
+            let decoded = self.env.images.pixels(&loaded)?;
+            let frame = decoded.frames.first()?;
+            let (pw, ph) = (frame.width, frame.height);
+            let size = |v: Option<f32>, pixels: u32| {
+                v.map_or(pixels, |v| v.round().clamp(0.0, 16384.0) as u32)
+            };
+            let (w, h) = (
+                size(loaded.natural.width, pw),
+                size(loaded.natural.height, ph),
+            );
+            if pw == 0 || ph == 0 || frame.pixels.len() < (pw * ph * 4) as usize {
+                return None;
+            }
+            // (nearest pixel when the natural size is not the pixel size)
+            let mut alpha = Vec::with_capacity((w * h) as usize);
+            for y in 0..h {
+                let sy = (u64::from(y) * u64::from(ph) / u64::from(h.max(1))) as u32;
+                for x in 0..w {
+                    let sx = (u64::from(x) * u64::from(pw) / u64::from(w.max(1))) as u32;
+                    alpha.push(frame.pixels[((sy * pw + sx) * 4 + 3) as usize]);
+                }
+            }
+            return Some(ls::ShapeOutside::Image(Arc::new(ls::ShapeImage {
+                width: w,
+                height: h,
+                alpha,
+            })));
+        }
+        match self.image(image) {
+            g @ (ls::Image::LinearGradient(_)
+            | ls::Image::RadialGradient(_)
+            | ls::Image::ConicGradient(_)) => Some(ls::ShapeOutside::Gradient(g)),
+            _ => None,
+        }
+    }
+
     /// A computed `<image>` as layout paints it (`None` for one that is not available).
     pub(crate) fn image(&self, image: &c::Image) -> ls::Image {
         match image {
@@ -2762,30 +2807,14 @@ impl ls::Style for RenderStyle {
 
     fn clip_path(&self) -> Option<ls::ClipPath> {
         use style::values::generics::basic_shape::{
-            FillRule, GenericBasicShape as B, GenericClipPath as C, GenericShapeRadius as R,
-            ShapeBox, ShapeGeometryBox as G,
+            GenericClipPath as C, ShapeBox, ShapeGeometryBox as G,
         };
-        use style::values::generics::position::GenericPositionOrAuto as P;
         // (CSS Masking 1 §5.1: for a CSS box `fill-box` is the content box, `stroke-box` and
         // `view-box` the border box)
         let reference = |b: &G| match b {
-            G::ShapeBox(ShapeBox::MarginBox) => ls::ClipBox::Margin,
-            G::ShapeBox(ShapeBox::PaddingBox) => ls::ClipBox::Padding,
-            G::ShapeBox(ShapeBox::ContentBox) | G::FillBox => ls::ClipBox::Content,
-            G::ShapeBox(ShapeBox::BorderBox) | G::StrokeBox | G::ViewBox | G::ElementDependent => {
-                ls::ClipBox::Border
-            }
-        };
-        let radius = |r: &c::basic_shape::ShapeRadius| match r {
-            R::Length(l) => ls::ShapeRadius::Length(lp(&l.0)),
-            R::ClosestSide => ls::ShapeRadius::ClosestSide,
-            R::FarthestSide => ls::ShapeRadius::FarthestSide,
-            R::ClosestCorner => ls::ShapeRadius::ClosestCorner,
-            R::FarthestCorner => ls::ShapeRadius::FarthestCorner,
-        };
-        let center = |p: &P<c::Position>| match p {
-            P::Position(p) => Some((lp(&p.horizontal), lp(&p.vertical))),
-            P::Auto => None,
+            G::ShapeBox(b) => shape_box(b),
+            G::FillBox => shape_box(&ShapeBox::ContentBox),
+            G::StrokeBox | G::ViewBox | G::ElementDependent => ls::ClipBox::Border,
         };
         let zoom = self.values.effective_zoom.value();
         match &self.values.get_svg().clip_path {
@@ -2800,77 +2829,39 @@ impl ls::Style for RenderStyle {
                 reference: reference(b),
                 zoom,
             }),
-            C::Shape(shape, b) => {
-                let shape = match &**shape {
-                    B::Rect(i) => {
-                        let corner = |r: &style::values::computed::BorderCornerRadius| {
-                            (lp(&r.0.width.0), lp(&r.0.height.0))
-                        };
-                        ls::ClipShape::Inset {
-                            sides: Box::new([
-                                lp(&i.rect.0),
-                                lp(&i.rect.1),
-                                lp(&i.rect.2),
-                                lp(&i.rect.3),
-                            ]),
-                            radii: Box::new([
-                                corner(&i.round.top_left),
-                                corner(&i.round.top_right),
-                                corner(&i.round.bottom_right),
-                                corner(&i.round.bottom_left),
-                            ]),
-                        }
-                    }
-                    B::Circle(s) => ls::ClipShape::Circle {
-                        center: center(&s.position),
-                        radius: radius(&s.radius),
-                    },
-                    B::Ellipse(s) => ls::ClipShape::Ellipse {
-                        center: center(&s.position),
-                        radii: (radius(&s.semiaxis_x), radius(&s.semiaxis_y)),
-                    },
-                    B::Polygon(s) => ls::ClipShape::Polygon {
-                        even_odd: s.fill == FillRule::Evenodd,
-                        points: s.coordinates.iter().map(|p| (lp(&p.0), lp(&p.1))).collect(),
-                    },
-                    B::PathOrShape(s) => {
-                        use style::values::generics::basic_shape::GenericPathOrShapeFunction as F;
-                        match s {
-                            // (`path()` is plain numbers: CSS pixels before zoom, unlike the
-                            // computed lengths of `shape()`)
-                            F::Path(p) => ls::ClipShape::Path {
-                                even_odd: p.fill == FillRule::Evenodd,
-                                commands: path_commands(
-                                    p.path.commands(),
-                                    &|p| {
-                                        (
-                                            ls::LengthPercentage::px(p.horizontal * zoom),
-                                            ls::LengthPercentage::px(p.vertical * zoom),
-                                        )
-                                    },
-                                    &|l| ls::LengthPercentage::px(*l * zoom),
-                                    &|a| a.to_radians(),
-                                ),
-                            },
-                            F::Shape(s) => ls::ClipShape::Path {
-                                even_odd: s.fill == FillRule::Evenodd,
-                                commands: path_commands(
-                                    &s.commands,
-                                    &|p| (lp(&p.horizontal), lp(&p.vertical)),
-                                    &lp,
-                                    &|a| a.radians(),
-                                ),
-                            },
-                        }
-                    }
-                };
-                Some(ls::ClipPath {
-                    shape,
-                    reference: reference(b),
-                    zoom,
-                })
-            }
+            C::Shape(shape, b) => Some(ls::ClipPath {
+                shape: basic_shape(shape, zoom),
+                reference: reference(b),
+                zoom,
+            }),
         }
+    }
+
+    fn shape_outside(&self) -> Option<ls::ShapeOutside> {
+        use style::values::generics::basic_shape::GenericShapeOutside as O;
+        let zoom = self.values.effective_zoom.value();
+        match &self.values.get_box().shape_outside {
+            O::None => None,
+            O::Shape(shape, b) => Some(ls::ShapeOutside::Shape(
+                basic_shape(shape, zoom),
+                shape_box(b),
+            )),
+            O::Box(b) => Some(ls::ShapeOutside::Box(shape_box(b))),
+            O::Image(image) => self.shape_outside_image(image),
+        }
+    }
+
+    fn has_shape_outside(&self) -> bool {
+        use style::values::generics::basic_shape::GenericShapeOutside as O;
+        !matches!(self.values.get_box().shape_outside, O::None)
+    }
+
+    fn shape_margin(&self) -> ls::LengthPercentage {
+        lp(&self.values.get_box().shape_margin.0)
+    }
+
+    fn shape_image_threshold(&self) -> f32 {
+        self.values.get_box().shape_image_threshold
     }
 
     fn has_filter(&self) -> bool {
@@ -3590,4 +3581,93 @@ pub fn resolve_color(style: &ComputedValues, color: &c::Color) -> Color {
 fn _assert_send_sync() {
     fn check<T: Send + Sync>() {}
     check::<RenderStyle>();
+}
+
+/// A `<shape-box>` of `clip-path` or `shape-outside` (CSS Shapes 1 §4).
+fn shape_box(b: &style::values::generics::basic_shape::ShapeBox) -> ls::ClipBox {
+    use style::values::generics::basic_shape::ShapeBox;
+    match b {
+        ShapeBox::MarginBox => ls::ClipBox::Margin,
+        ShapeBox::BorderBox => ls::ClipBox::Border,
+        ShapeBox::PaddingBox => ls::ClipBox::Padding,
+        ShapeBox::ContentBox => ls::ClipBox::Content,
+    }
+}
+
+/// A `<basic-shape>` (CSS Shapes 1 §3.1) of `clip-path` or `shape-outside`, its lengths relative to
+/// the reference box; `zoom` scales `path()`'s plain numbers.
+fn basic_shape(shape: &c::basic_shape::BasicShape, zoom: f32) -> ls::ClipShape {
+    use style::values::generics::basic_shape::{
+        FillRule, GenericBasicShape as B, GenericShapeRadius as R,
+    };
+    use style::values::generics::position::GenericPositionOrAuto as P;
+    let radius = |r: &c::basic_shape::ShapeRadius| match r {
+        R::Length(l) => ls::ShapeRadius::Length(lp(&l.0)),
+        R::ClosestSide => ls::ShapeRadius::ClosestSide,
+        R::FarthestSide => ls::ShapeRadius::FarthestSide,
+        R::ClosestCorner => ls::ShapeRadius::ClosestCorner,
+        R::FarthestCorner => ls::ShapeRadius::FarthestCorner,
+    };
+    let center = |p: &P<c::Position>| match p {
+        P::Position(p) => Some((lp(&p.horizontal), lp(&p.vertical))),
+        P::Auto => None,
+    };
+    match shape {
+        B::Rect(i) => {
+            let corner = |r: &style::values::computed::BorderCornerRadius| {
+                (lp(&r.0.width.0), lp(&r.0.height.0))
+            };
+            ls::ClipShape::Inset {
+                sides: Box::new([lp(&i.rect.0), lp(&i.rect.1), lp(&i.rect.2), lp(&i.rect.3)]),
+                radii: Box::new([
+                    corner(&i.round.top_left),
+                    corner(&i.round.top_right),
+                    corner(&i.round.bottom_right),
+                    corner(&i.round.bottom_left),
+                ]),
+            }
+        }
+        B::Circle(s) => ls::ClipShape::Circle {
+            center: center(&s.position),
+            radius: radius(&s.radius),
+        },
+        B::Ellipse(s) => ls::ClipShape::Ellipse {
+            center: center(&s.position),
+            radii: (radius(&s.semiaxis_x), radius(&s.semiaxis_y)),
+        },
+        B::Polygon(s) => ls::ClipShape::Polygon {
+            even_odd: s.fill == FillRule::Evenodd,
+            points: s.coordinates.iter().map(|p| (lp(&p.0), lp(&p.1))).collect(),
+        },
+        B::PathOrShape(s) => {
+            use style::values::generics::basic_shape::GenericPathOrShapeFunction as F;
+            match s {
+                // (`path()` is plain numbers: CSS pixels before zoom, unlike the computed
+                // lengths of `shape()`)
+                F::Path(p) => ls::ClipShape::Path {
+                    even_odd: p.fill == FillRule::Evenodd,
+                    commands: path_commands(
+                        p.path.commands(),
+                        &|p| {
+                            (
+                                ls::LengthPercentage::px(p.horizontal * zoom),
+                                ls::LengthPercentage::px(p.vertical * zoom),
+                            )
+                        },
+                        &|l| ls::LengthPercentage::px(*l * zoom),
+                        &|a| a.to_radians(),
+                    ),
+                },
+                F::Shape(s) => ls::ClipShape::Path {
+                    even_odd: s.fill == FillRule::Evenodd,
+                    commands: path_commands(
+                        &s.commands,
+                        &|p| (lp(&p.horizontal), lp(&p.vertical)),
+                        &lp,
+                        &|a| a.radians(),
+                    ),
+                },
+            }
+        }
+    }
 }

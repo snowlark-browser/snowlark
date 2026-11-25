@@ -2169,6 +2169,21 @@ fn layout_lines<S: Style>(
         });
     };
 
+    // The space beside floats for a line at `y`. Beside floats with shapes (CSS Shapes 1 §3) it
+    // depends on the line's height: a line is first fitted as if it had none, then again at the
+    // height it turned out to have (`fit_height`) while that changes its width, allowing only
+    // narrower widths once two heights alternate (`prev_fit`).
+    let line_space = |bfc: &Exclusions, y: f32, fit_height: f32| {
+        if bfc.has_shapes() {
+            bfc.line_band(origin.y + y, fit_height, left_edge, right_edge)
+        } else {
+            bfc.band(origin.y + y, strut_height, left_edge, right_edge)
+        }
+    };
+    let mut fit_height = 0.0f32;
+    let mut prev_fit: Option<f32> = None;
+    let mut refits = 0u32;
+
     // An empty IFC with an outside marker still makes one line for the marker.
     let mut marker_pending = marker_result.is_some();
     while pos.item < n || marker_pending {
@@ -2188,7 +2203,7 @@ fn layout_lines<S: Style>(
         for f in std::mem::take(&mut deferred_floats) {
             place_float(cx, bfc, &mut out, f, y);
         }
-        let mut band = bfc.band(origin.y + y, strut_height, left_edge, right_edge);
+        let mut band = line_space(bfc, y, fit_height);
         let mut left = band.left - origin.x;
         let mut avail = band.width();
         if indented {
@@ -2263,7 +2278,7 @@ fn layout_lines<S: Style>(
                     let fw = r.fragment.size.width + r.margin.left + r.margin.right;
                     if room + fw <= avail + 0.01 || empty {
                         place_float(cx, bfc, &mut out, item, y);
-                        band = bfc.band(origin.y + y, strut_height, left_edge, right_edge);
+                        band = line_space(bfc, y, fit_height);
                         left = band.left - origin.x + if indented && !rtl { indent } else { 0.0 };
                         LineAnswer::Avail(band.width() - if indented { indent } else { 0.0 })
                     } else {
@@ -2275,10 +2290,17 @@ fn layout_lines<S: Style>(
                 LineEvent::NoFit if band.width() < content_width => {
                     // (the new position must be strictly lower, despite rounding between
                     // coordinate systems)
-                    let below = bfc
+                    let next = bfc
                         .next_edge_below(origin.y + y)
-                        .map(|next| next - origin.y)
-                        .filter(|ny| *ny > y + 0.001);
+                        .map(|next| next - origin.y);
+                    // Beside a shape the space changes all along it: the line tries each
+                    // pixel down (CSS Shapes 1 §3).
+                    let next = if bfc.beside_shapes(origin.y + y) {
+                        next.map(|n| n.min(y + 1.0))
+                    } else {
+                        next
+                    };
+                    let below = next.filter(|ny| *ny > y + 0.001);
                     match below {
                         Some(ny) => {
                             y = ny;
@@ -2292,6 +2314,7 @@ fn layout_lines<S: Style>(
         );
         if decided.moved_down {
             // Retry the line lower down.
+            (fit_height, prev_fit, refits) = (0.0, None, 0);
             continue;
         }
         let LineEnd {
@@ -2354,6 +2377,9 @@ fn layout_lines<S: Style>(
         } else {
             line_trim
         };
+        let before = bfc
+            .has_shapes()
+            .then(|| (open_stack.clone(), out.oof.len()));
         let built = build_line(
             cx,
             &style,
@@ -2369,6 +2395,26 @@ fn layout_lines<S: Style>(
             y,
             &mut out.oof,
         );
+        if let Some((stack, oof)) = before.filter(|_| real && refits < 8) {
+            // Beside a shape: fit the line again at its own height when that gives it another
+            // width (the line breaks no later for it, as it can only get shorter).
+            let (old, new) = (band.width(), line_space(bfc, y, built.height).width());
+            let refit = if prev_fit == Some(built.height) {
+                new < old
+            } else {
+                new != old
+            };
+            if refit {
+                prev_fit = Some(fit_height);
+                fit_height = built.height;
+                refits += 1;
+                open_stack = stack;
+                out.oof.truncate(oof);
+                marker_pending = line_marker.is_some();
+                continue;
+            }
+        }
+        (fit_height, prev_fit, refits) = (0.0, None, 0);
         if real {
             let line_top = y;
             if first_line {

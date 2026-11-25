@@ -324,7 +324,7 @@ fn ellipse_points(center: Point, rx: f32, ry: f32) -> Vec<Point> {
 
 /// The contours of `path()` or `shape()` against the reference box `area` (CSS Shapes 1 §3.1, the
 /// path data rules of SVG 2 §9.3), curves as line segments.
-fn flatten_path(commands: &[PathCommand], area: Rect) -> Vec<Vec<Point>> {
+pub(crate) fn flatten_path(commands: &[PathCommand], area: Rect) -> Vec<Vec<Point>> {
     let (w, h) = (area.width, area.height);
     let mut out: Vec<Vec<Point>> = Vec::new();
     let mut contour: Vec<Point> = Vec::new();

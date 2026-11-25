@@ -501,6 +501,9 @@ scroll-snap-type
 scrollbar-color
 scrollbar-gutter
 scrollbar-width
+shape-image-threshold
+shape-margin
+shape-outside
 shape-rendering
 stop-color
 stop-opacity

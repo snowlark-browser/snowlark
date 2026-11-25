@@ -459,7 +459,7 @@ impl<'a, S: Style> Cx<'a, S> {
                     self.stats.reused += 1;
                     if let Some(ex) = bfc {
                         for f in &result.floats {
-                            let mut f = *f;
+                            let mut f = f.clone();
                             f.rect = f.rect.translate(at.x, at.y);
                             ex.push(f);
                         }

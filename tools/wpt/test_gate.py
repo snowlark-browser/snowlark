@@ -46,6 +46,11 @@ def write(directory, name, lines):
     return path
 
 
+def quiet_watch():
+    """A LoadWatch that sees no other work on the machine (the real one reads this machine's slots)."""
+    return gate.LoadWatch(own_wpt=1, held=lambda kind: 1 if kind == 'wpt' else 0).start()
+
+
 def recs(lines):
     out = {}
     for line in lines:
@@ -319,8 +324,29 @@ class Rechecks(unittest.TestCase):
         run = write(self.dir, 'run.jsonl', [th('/dom/a.html', failed=['x'])])
         path = os.path.join(self.dir, 'flaky.json')
         with mock.patch.object(gate, 'recheck', lambda *a, **k: {('/dom/a.html', 'x'): 'unresolved'}):
-            self.assertEqual(gate.run_compare(base, run, flaky_path=path, recheck_n=1, exe='b.exe', base_exe='a.exe'), 1)
+            self.assertEqual(gate.run_compare(base, run, flaky_path=path, recheck_n=1, exe='b.exe', base_exe='a.exe',
+                                              watch=quiet_watch()), 1)
         self.assertEqual(gate.run_compare(base, run, flaky_path=path), 0)
+
+    def test_a_recheck_beside_other_work_learns_nothing(self):
+        base = write(self.dir, 'base.jsonl', [th('/dom/a.html', passed=['x'])])
+        run = write(self.dir, 'run.jsonl', [th('/dom/a.html', failed=['x'])])
+        path = os.path.join(self.dir, 'flaky.json')
+        busy = gate.LoadWatch(own_wpt=1, held=lambda kind: {'build': 1, 'wpt': 1}.get(kind, 0)).start()
+        with mock.patch.object(gate, 'recheck', lambda *a, **k: {('/dom/a.html', 'x'): 'recovered'}):
+            status = gate.run_compare(base, run, flaky_path=path, recheck_n=1, exe='b.exe', base_exe='a.exe', watch=busy)
+        self.assertEqual(status, 0)  # (a recovered loss still passes the gate)
+        self.assertFalse(os.path.exists(path))
+        self.assertIn('build', busy.seen)
+
+    def test_the_load_watch_counts_only_other_work(self):
+        own = gate.LoadWatch(own_wpt=1, held=lambda kind: 1 if kind == 'wpt' else 0).start().stop()
+        self.assertTrue(own.quiet)
+        other = gate.LoadWatch(own_wpt=1, held=lambda kind: 2 if kind == 'wpt' else 0).start().stop()
+        self.assertFalse(other.quiet)
+        self.assertEqual(set(other.seen), {'wpt'})
+        test_run = gate.LoadWatch(own_wpt=0, held=lambda kind: 1 if kind == 'test' else 0).start().stop()
+        self.assertFalse(test_run.quiet)
 
     def test_learning_can_be_turned_off(self):
         base = write(self.dir, 'base.jsonl', [th('/dom/a.html', passed=['x'])])

@@ -1320,7 +1320,7 @@ impl Renderer {
         let mut fetcher = Fetcher::new(self.net.clone(), &url);
         fetcher.set_notify(self.notify.clone());
         *self.fonts.write().unwrap() = FontAliases::default();
-        self.image_table = Arc::new(ImageTable::default());
+        self.image_table = Arc::new(ImageTable::with_store(self.images.clone()));
         self.free_images();
         let env = Arc::new(StyleEnv {
             fonts: FontAliases::default(),
@@ -1824,6 +1824,9 @@ impl Renderer {
                                 let document = crate::svg::SvgDocument::parse(&body, &a.url, now);
                                 let dark = crate::svg::SvgDocument::parse(&body, &a.url, now);
                                 let id = self.svg.add_with_document(&self.images, image, document);
+                                if let Some(image) = self.svg.image(id) {
+                                    self.image_table.add_svg(id, image);
+                                }
                                 let mut loaded = LoadedImage::new(id, natural);
                                 loaded.dark = dark
                                     .and_then(|d| self.svg.add_dark_variant(&self.images, id, d));
@@ -6337,6 +6340,12 @@ fn collect_style_urls(values: &ServoArc<ComputedValues>, out: &mut Vec<(String, 
     }
     image_urls(&values.get_border().border_image_source, dark, &mut urls);
     out.extend(urls.drain(..).map(|u| (u, false)));
+    // (a float's shape wraps lines around it: CSS Shapes 1 §3.2)
+    if let style::values::generics::basic_shape::GenericShapeOutside::Image(i) =
+        &values.get_box().shape_outside
+    {
+        image_urls(i, dark, &mut urls);
+    }
     if values.get_box().display.is_list_item() {
         image_urls(&values.get_list().list_style_image, dark, &mut urls);
     }

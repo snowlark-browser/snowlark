@@ -398,6 +398,43 @@ fn text_flows_around_a_float() {
 }
 
 #[test]
+fn text_wraps_around_a_floats_shape() {
+    // CSS Shapes 1 §3: a triangle `polygon(0 0, 100% 0, 0 100%)` on a 100px float: each 10px
+    // line starts where the triangle's edge is at the line's bottom (the line is fitted again at
+    // its own height), and the margin box does not count.
+    let text = "aaa bbb ccc ddd eee fff ggg hhh iii jjj kkk lll mmm nnn ooo ppp";
+    let run = |shape: Option<ShapeOutside>| {
+        let mut t = T::new();
+        let r0 = t.root();
+        let p = t.doc.block(r0, |s| s.width = SizeValue::px(200.0));
+        t.doc.block(p, |s| {
+            s.float = Float::Left;
+            s.width = SizeValue::px(100.0);
+            s.height = SizeValue::px(100.0);
+            s.shape_outside = shape.clone();
+        });
+        t.doc.text(p, text);
+        let f = t.run(300.0, 300.0);
+        lines(&f, p).iter().map(|l| l.x).collect::<Vec<f32>>()
+    };
+    let pct = LengthPercentage::percent;
+    let triangle = ShapeOutside::Shape(
+        ClipShape::Polygon {
+            even_odd: false,
+            points: vec![
+                (pct(0.0), pct(0.0)),
+                (pct(100.0), pct(0.0)),
+                (pct(0.0), pct(100.0)),
+            ],
+        },
+        ClipBox::Margin,
+    );
+    assert_eq!(run(Some(triangle))[..3], [100.0, 90.0, 80.0]);
+    // with no shape, every line beside the float starts at its margin box
+    assert_eq!(run(None)[..3], [100.0, 100.0, 100.0]);
+}
+
+#[test]
 fn clearance_and_right_floats() {
     let mut t = T::new();
     let r0 = t.root();

@@ -129,6 +129,9 @@ pub struct TestStyle {
     pub background_layers: Vec<BackgroundLayer>,
     pub mask_layers: Vec<MaskLayer>,
     pub clip_path: Option<ClipPath>,
+    /// `shape-outside` and `shape-margin`.
+    pub shape_outside: Option<ShapeOutside>,
+    pub shape_margin: LengthPercentage,
     /// `filter`'s functions.
     pub filters: Vec<FilterOp>,
     /// `backdrop-filter`'s functions.
@@ -284,6 +287,8 @@ impl Default for TestStyle {
             background_layers: Vec::new(),
             mask_layers: Vec::new(),
             clip_path: None,
+            shape_outside: None,
+            shape_margin: LengthPercentage::ZERO,
             filters: Vec::new(),
             backdrop_filters: Vec::new(),
             box_shadows: Vec::new(),
@@ -817,6 +822,12 @@ impl Style for Arc<TestStyle> {
     }
     fn clip_path(&self) -> Option<ClipPath> {
         self.clip_path.clone()
+    }
+    fn shape_outside(&self) -> Option<ShapeOutside> {
+        self.shape_outside.clone()
+    }
+    fn shape_margin(&self) -> LengthPercentage {
+        self.shape_margin
     }
     fn filter_ops(&self, _reference_box: Rect) -> Vec<FilterOp> {
         self.filters.clone()

@@ -126,7 +126,10 @@ python tools/wpt/run.py --all --snowlark <main snowlark.exe> --jobs auto --save-
   not fail the check; the other subtests of that file still count. The gate also grows the list as it goes: a loss
   its re-check proves to be a flake (the branch passes it when re-run alone, or the baseline binary fails it too)
   is added to `flaky.json`, so the next gate reports it apart; commit the file with the merge
-  (`--no-learn-flaky` turns this off).
+  (`--no-learn-flaky` turns this off). It learns only from a quiet machine: while the gate runs and re-checks, it
+  samples the machine-wide slots every 30 s, and when another build, test run or WPT run held one, it prints what
+  the re-check called flaky and leaves the list alone (a subtest that times out beside a build and passes alone
+  says nothing about the subtest, and on the list it would hide a later real loss).
 - **`--jobs auto`** is 16 when no other run holds a WPT slot and 8 when one does. A gate is mostly waiting on timers
   and timeouts (80% of its test-time is in 4% of its files), so 16 processes cost the fast files about 7% and halve
   the wall time.
