@@ -165,16 +165,16 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   EXT_disjoint_timer_query, WEBGL_lose_context or WEBGL_debug_shaders; textures do not load from video, and
   `navigator.gpu` is absent. WebGL 2 does not yet upload compressed textures from a pixel unpack buffer, an
   image source into more than one layer of a 3D texture, or a sub-rectangle of an image source
-  (`UNPACK_ROW_LENGTH`, `UNPACK_SKIP_*`). Google Maps' satellite layer shows black. WebGL objects are freed
-  only with the page. (ref 117, 682, 700, 732, 734, 768)
+  (`UNPACK_ROW_LENGTH`, `UNPACK_SKIP_*`). WebGL objects are freed only with the page. (ref 117, 682, 700,
+  732, 734)
 - **Service workers.** `navigator.serviceWorker` and the Cache API are not implemented. Pages that check for service
   workers print a warning. (ref 33)
 - **IndexedDB.** Names with lone surrogates are not supported, there is no storage partitioning by top-level site,
   no quota and no `close` event, a database's contents are read into memory on first use, and transactions,
   connections and cursors are not garbage collected. (ref 49)
-- **WebAssembly modules cannot be posted.** `postMessage` of a `WebAssembly.Module` to a window or worker of the
-  same agent cluster throws instead of sharing the module, and `postMessage` with a `WebAssembly.Memory` in the
-  transfer list does not throw a `DataCloneError`. (ref 752)
+- **WebAssembly modules through message ports.** A `WebAssembly.Module` crosses to a worker or a same-site window
+  with `postMessage`, but not through a `MessagePort` or a `BroadcastChannel` (a `DataCloneError`), and a
+  `WebAssembly.Memory` or `Module` in a transfer list does not throw a `DataCloneError`. (ref 752)
 - **Web Audio output device change.** An `AudioContext` stops with an `error` event when the default output device
   changes or is removed, instead of moving to the new device. (ref 125)
 

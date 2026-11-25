@@ -104,6 +104,10 @@ pub enum Transferred {
         height: u64,
         placeholder: Option<Arc<Placeholder>>,
     },
+    /// A `WebAssembly.Module` (serialized, not transferred): its compiled module, which the
+    /// receiving side makes a Module of without compiling again (WebAssembly JS API, Module's
+    /// serialization steps: its bytes, within its agent cluster).
+    WasmModule(v8::CompiledWasmModule),
 }
 
 impl Engine {
@@ -355,7 +359,9 @@ impl Engine {
         let buffers = transfer_buffers(cx, transfer)?;
         let list = self.offscreen_transfer_list(cx, transfer)?;
         let prev = self.transfer_out.replace(list.clone());
-        let bytes = self.serialize_value(cx, value);
+        // (a dedicated worker is in its owner's agent cluster: WebAssembly modules go along)
+        let (bytes, modules) =
+            self.sharing_wasm_modules(list.len() as u32, || self.serialize_value(cx, value));
         self.transfer_out.replace(prev);
         let bytes = bytes?;
         // The ArrayBuffers' contents went with the message (serialized by value); the transfer
@@ -381,7 +387,47 @@ impl Engine {
             });
             out.extend(data);
         }
+        out.extend(modules.into_iter().map(Transferred::WasmModule));
         Ok((bytes, out))
+    }
+
+    /// Runs `f`, a serialization for a realm of this agent cluster, with WebAssembly modules
+    /// shared: each Module it meets is listed beside the bytes, from index `base` on
+    /// ([`Engine::share_wasm_module`]); the list comes back with `f`'s result. A serialization
+    /// outside this (for storage, or to another agent cluster) throws a DataCloneError at a Module.
+    pub(crate) fn sharing_wasm_modules<R>(
+        &self,
+        base: u32,
+        f: impl FnOnce() -> R,
+    ) -> (R, Vec<v8::CompiledWasmModule>) {
+        let prev = self.wasm_out.replace(Some((base, Vec::new())));
+        let r = f();
+        let shared = self.wasm_out.replace(prev);
+        (r, shared.map(|(_, list)| list).unwrap_or_default())
+    }
+
+    /// WebAssembly JS API, Module's serialization steps: the index beside the bytes of the
+    /// compiled module `m`, or `None` when this serialization cannot share one
+    /// ([`Engine::sharing_wasm_modules`]).
+    pub(crate) fn share_wasm_module(&self, m: v8::CompiledWasmModule) -> Option<u32> {
+        let mut out = self.wasm_out.borrow_mut();
+        let (base, list) = out.as_mut()?;
+        list.push(m);
+        Some(*base + list.len() as u32 - 1)
+    }
+
+    /// The compiled module of the WebAssembly Module serialized at `index` beside the bytes being
+    /// deserialized.
+    pub(crate) fn receive_wasm_module(&self, index: u32) -> Option<v8::CompiledWasmModule> {
+        let mut t = self.transfer_in.borrow_mut();
+        let slot = t.get_mut(index as usize)?;
+        if !matches!(slot, Some(Transferred::WasmModule(_))) {
+            return None;
+        }
+        match slot.take() {
+            Some(Transferred::WasmModule(m)) => Some(m),
+            _ => None,
+        }
     }
 
     /// The index in the transfer list being serialized of the object `h`, if it is in it.
@@ -410,17 +456,21 @@ impl Engine {
 
     /// The transfer-receiving steps of the transferred object at `index`: a new object here.
     pub(crate) fn receive_transferred(&self, index: u32) -> Option<Handle> {
-        let t = self
-            .transfer_in
-            .borrow_mut()
-            .get_mut(index as usize)?
-            .take()?;
+        let t = {
+            let mut t = self.transfer_in.borrow_mut();
+            let slot = t.get_mut(index as usize)?;
+            if !matches!(slot, Some(Transferred::OffscreenCanvas { .. })) {
+                return None;
+            }
+            slot.take()?
+        };
         match t {
             Transferred::OffscreenCanvas {
                 width,
                 height,
                 placeholder,
             } => Some(self.new_offscreen(width, height, placeholder)),
+            Transferred::WasmModule(_) => None,
         }
     }
 

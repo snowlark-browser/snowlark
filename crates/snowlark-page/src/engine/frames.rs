@@ -1142,6 +1142,25 @@ impl Engine {
             .is_some_and(|o| o.identity == origin)
     }
 
+    /// HTML §8.1.2 agent clusters: whether the Windows `a` and `b` are in one, which is keyed by
+    /// site ("obtain a similar-origin window agent": an opaque origin is a site of its own).
+    pub(crate) fn same_agent_cluster(&self, a: Handle, b: Handle) -> bool {
+        let f = self.frames.borrow();
+        let (Some(x), Some(y)) = (f.origins.get(&a), f.origins.get(&b)) else {
+            return false;
+        };
+        if x.identity == y.identity {
+            return true;
+        }
+        if x.scheme.is_none() || y.scheme.is_none() {
+            return false;
+        }
+        match (url::Url::parse(&x.identity), url::Url::parse(&y.identity)) {
+            (Ok(u), Ok(v)) => snowlark_net::origin::same_site(&u.origin(), &v.origin()),
+            _ => false,
+        }
+    }
+
     /// The identity of a Window's origin.
     pub(crate) fn window_origin(&self, window: Handle) -> Option<String> {
         let f = self.frames.borrow();

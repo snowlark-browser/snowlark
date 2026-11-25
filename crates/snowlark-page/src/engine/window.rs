@@ -1445,8 +1445,11 @@ impl Engine {
                 }
             }
         };
-        // 6.
-        let (bytes, ports) = self.serialize_with_ports(cx, &message, transfer)?;
+        // 6. (WebAssembly modules go beside the bytes; the target's realm takes them only within
+        // their agent cluster)
+        let (serialized, modules) =
+            self.sharing_wasm_modules(0, || self.serialize_with_ports(cx, &message, transfer));
+        let (bytes, ports) = serialized?;
         let posted = PostedMessage {
             target: this,
             target_origin: target,
@@ -1454,6 +1457,7 @@ impl Engine {
             source,
             bytes,
             ports,
+            modules,
         };
         // 7.
         self.queue_task(
@@ -1472,6 +1476,7 @@ impl Engine {
             source,
             bytes,
             ports,
+            modules,
         } = posted;
         // (a Window whose document is gone runs no more tasks)
         if self.context_discarded(target) {
@@ -1496,7 +1501,17 @@ impl Engine {
             for &p in &ports {
                 self.receive_port(cx, p);
             }
-            match self.deserialize_value(cx, &bytes) {
+            // (WebAssembly JS API, Module's deserialization steps: a Module from another agent
+            // cluster is a DataCloneError, so a `messageerror`)
+            let modules = if self.same_agent_cluster(source, target) {
+                modules
+            } else {
+                Vec::new()
+            };
+            let prev = self.receive_modules(modules);
+            let data = self.deserialize_value(cx, &bytes);
+            self.transfer_in.replace(prev);
+            match data {
                 Ok(data) => self.fire_message_event(cx, target, data, &origin, source, ports),
                 Err(()) => {
                     let ev = self.trusted_event(
@@ -1562,6 +1577,8 @@ struct PostedMessage {
     source: Handle,
     bytes: Vec<u8>,
     ports: Vec<Handle>,
+    /// The WebAssembly modules serialized beside the bytes.
+    modules: Vec<v8::CompiledWasmModule>,
 }
 
 impl LocationImpl for Engine {

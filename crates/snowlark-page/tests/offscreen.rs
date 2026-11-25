@@ -330,6 +330,51 @@ fn a_transferred_offscreen_canvas_draws_from_a_worker() {
     );
 }
 
+/// A module exporting `f`, which returns 42.
+const WASM_42: &str = "new Uint8Array([0,97,115,109,1,0,0,0, 1,5,1,96,0,1,127, 3,2,1,0, \
+                       7,5,1,1,102,0,0, 10,6,1,4,0,65,42,11])";
+
+/// WebAssembly JS API, Module's serialization steps: a `WebAssembly.Module` crosses to a dedicated
+/// worker (its owner's agent cluster) and back as a Module of the same code, and `structuredClone`
+/// copies one in the same realm.
+#[test]
+fn a_webassembly_module_crosses_to_a_worker_and_back() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = page(&net, "<!doctype html>");
+    let w = worker(
+        "onmessage = e => {
+             const m = e.data.module;
+             const i = new WebAssembly.Instance(m);
+             postMessage({ text: [m instanceof WebAssembly.Module, i.exports.f()].join(), module: m });
+         };",
+    );
+    let r = eval(
+        &mut page,
+        &format!(
+            "window.got = '';
+            const m = new WebAssembly.Module({WASM_42});
+            const c = structuredClone(m);
+            const w = {w};
+            w.onmessage = e => window.got = e.data.text + '|' + new WebAssembly.Instance(e.data.module).exports.f();
+            w.postMessage({{ module: m }});
+            [c instanceof WebAssembly.Module, c !== m, new WebAssembly.Instance(c).exports.f()].join()"
+        ),
+    );
+    assert_eq!(r, "true,true,42");
+    assert_eq!(
+        wait_for(&mut page, "window.got", "true,42|42"),
+        "true,42|42"
+    );
+    // to a window of the same agent cluster (this one), as a new Module
+    eval(
+        &mut page,
+        "window.posted = '';
+        onmessage = e => window.posted = [e.data !== m, new WebAssembly.Instance(e.data).exports.f()].join();
+        postMessage(m, '*'); 0",
+    );
+    assert_eq!(wait_for(&mut page, "window.posted", "true,42"), "true,42");
+}
+
 #[test]
 fn webgl_draws_from_a_worker_to_a_placeholder() {
     let net = NetThread::start(NetConfig::default()).unwrap();

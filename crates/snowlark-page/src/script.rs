@@ -1785,16 +1785,37 @@ impl Engine {
         let v = v8::Local::new(scope, value.global());
         let ser = v8::ValueSerializer::new(scope, Box::new(CloneDelegate));
         ser.write_header();
-        if ser.write_value(context, v) != Some(true) {
+        // (the same realm: WebAssembly modules are shared)
+        let (written, modules) = self.sharing_wasm_modules(0, || ser.write_value(context, v));
+        if written != Some(true) {
             return Err(rt::Error::Pending);
         }
         let bytes = ser.release();
+        let prev = self.receive_modules(modules);
         let de = v8::ValueDeserializer::new(scope, Box::new(CloneDelegate), &bytes);
-        if de.read_header(context) != Some(true) {
-            return Err(rt::Error::Pending);
-        }
-        let out = de.read_value(context).ok_or(rt::Error::Pending)?;
+        let out = if de.read_header(context) == Some(true) {
+            de.read_value(context)
+        } else {
+            None
+        };
+        self.transfer_in.replace(prev);
+        let out = out.ok_or(rt::Error::Pending)?;
         Ok(JsValue::new(scope, out))
+    }
+
+    /// Puts `modules` beside the bytes about to be deserialized (from index 0); what was there
+    /// before, to put back after.
+    pub(crate) fn receive_modules(
+        &self,
+        modules: Vec<v8::CompiledWasmModule>,
+    ) -> Vec<Option<crate::engine::offscreen::Transferred>> {
+        use crate::engine::offscreen::Transferred;
+        self.transfer_in.replace(
+            modules
+                .into_iter()
+                .map(|m| Some(Transferred::WasmModule(m)))
+                .collect(),
+        )
     }
 
     /// StructuredClone with what it throws (a DataCloneError) caught: `Err` holds the exception.
@@ -1810,12 +1831,15 @@ impl Engine {
         let ser = v8::ValueSerializer::new(tc, Box::new(CloneDelegate));
         ser.write_header();
         let mut out = None;
-        if ser.write_value(context, v) == Some(true) {
+        let (written, modules) = self.sharing_wasm_modules(0, || ser.write_value(context, v));
+        if written == Some(true) {
             let bytes = ser.release();
+            let prev = self.receive_modules(modules);
             let de = v8::ValueDeserializer::new(tc, Box::new(CloneDelegate), &bytes);
             if de.read_header(context) == Some(true) {
                 out = de.read_value(context);
             }
+            self.transfer_in.replace(prev);
         }
         if let Some(v) = out {
             return Ok(JsValue::new(tc, v));
@@ -2069,6 +2093,31 @@ impl v8::ValueSerializerImpl for CloneDelegate {
         );
         None
     }
+
+    /// WebAssembly JS API, Module's serialization steps: within the agent cluster, the module
+    /// goes beside the bytes ([`Engine::sharing_wasm_modules`]); for storage, or where nothing
+    /// takes it, "throw a DataCloneError".
+    fn get_wasm_module_transfer_id(
+        &self,
+        scope: &mut v8::PinScope<'_, '_>,
+        module: v8::Local<v8::WasmModuleObject>,
+    ) -> Option<u32> {
+        let st = rt::state(scope);
+        if let Some(id) = st
+            .engine::<Engine>()
+            .share_wasm_module(module.get_compiled_module())
+        {
+            return Some(id);
+        }
+        rt::throw(
+            scope,
+            rt::Error::Dom(
+                ExceptionName::DataCloneError,
+                "A WebAssembly.Module cannot be serialized here".into(),
+            ),
+        );
+        None
+    }
 }
 
 /// The tag of a serialized CryptoKey (Web Cryptography §13.5) in a host object's data.
@@ -2187,6 +2236,29 @@ impl v8::ValueDeserializerImpl for CloneDelegate {
             rt::Error::Dom(
                 ExceptionName::DataCloneError,
                 "A serialized platform object could not be read".into(),
+            ),
+        );
+        None
+    }
+
+    /// WebAssembly JS API, Module's deserialization steps: a Module of the compiled module that
+    /// came beside the bytes (shared, not compiled again).
+    fn get_wasm_module_from_id<'s>(
+        &self,
+        scope: &mut v8::PinScope<'s, '_>,
+        clone_id: u32,
+    ) -> Option<v8::Local<'s, v8::WasmModuleObject>> {
+        let st = rt::state(scope);
+        let module = st.engine::<Engine>().receive_wasm_module(clone_id);
+        if let Some(m) = module.and_then(|m| v8::WasmModuleObject::from_compiled_module(scope, &m))
+        {
+            return Some(m);
+        }
+        rt::throw(
+            scope,
+            rt::Error::Dom(
+                ExceptionName::DataCloneError,
+                "A serialized WebAssembly.Module could not be read".into(),
             ),
         );
         None

@@ -557,6 +557,9 @@ pub struct Engine {
     /// deserialized brought ([`Engine::serialize_with_transfer`]).
     pub(crate) transfer_out: RefCell<Vec<Handle>>,
     pub(crate) transfer_in: RefCell<Vec<Option<offscreen::Transferred>>>,
+    /// While a serialization may share WebAssembly modules ([`Engine::sharing_wasm_modules`]): the
+    /// index the first one gets beside the bytes, and the compiled modules met so far.
+    pub(crate) wasm_out: RefCell<Option<(u32, Vec<v8::CompiledWasmModule>)>>,
     /// The frames a rendering update asked of the canvas thread before its layout, oldest first,
     /// taken after it or, when they come later, at the next one ([`Engine::flush_canvases`]).
     pub(crate) canvas_frames_pending: RefCell<Vec<(NodeId, snowlark_render::canvas::FrameRequest)>>,
@@ -761,6 +764,7 @@ impl Engine {
             placeholders: RefCell::new(Default::default()),
             transfer_out: RefCell::new(Vec::new()),
             transfer_in: RefCell::new(Vec::new()),
+            wasm_out: RefCell::new(None),
             canvas_frames_pending: RefCell::new(Vec::new()),
             canvas_frames_async: Cell::new(false),
             canvas_frames_asked_at: Cell::new(None),
