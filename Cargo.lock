@@ -3288,6 +3288,7 @@ dependencies = [
  "subtle",
  "turboshake",
  "url",
+ "urlpattern",
  "v8",
  "x25519-dalek",
 ]
@@ -4163,6 +4164,16 @@ dependencies = [
  "percent-encoding",
  "serde",
  "serde_derive",
+]
+
+[[package]]
+name = "urlpattern"
+version = "0.6.0"
+dependencies = [
+ "icu_properties",
+ "regex",
+ "serde",
+ "url",
 ]
 
 [[package]]

@@ -106,6 +106,7 @@ mod timeline;
 mod touch_events;
 mod trusted_types;
 mod typed_om;
+mod urlpattern;
 mod user_agent;
 mod wasm_streaming;
 mod wasm_tasks;

@@ -30,6 +30,8 @@ kurbo = "0.13"
 rustc-hash = "2"
 getrandom = "0.3"
 regex = "1"
+# (URLPattern: the URL Pattern parser and matcher, with V8's RegExp as its regular expression engine)
+urlpattern = "0.6"
 # (Compression Streams: deflate and gzip; brotli, which snowlark-net also decodes)
 flate2 = "1"
 brotli = "8"

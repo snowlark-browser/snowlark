@@ -94,6 +94,7 @@ mod traversal;
 pub(crate) mod trusted_types;
 pub(crate) mod typed_om;
 pub(crate) mod url;
+pub(crate) mod urlpattern;
 pub(crate) mod view;
 pub(crate) mod view_transition;
 pub(crate) mod webgl;
@@ -328,6 +329,7 @@ pub enum Object {
     TextDecoder(encoding::DecoderData),
     Url(url::UrlData),
     UrlSearchParams(url::ParamsData),
+    UrlPattern(Box<urlpattern::Pattern>),
     DomRect(geometry::Rect),
     DomRectList(Vec<Handle>),
     Touch(Box<touch::TouchData>),
@@ -1195,6 +1197,7 @@ impl Engine {
             Object::TextDecoder(_) => InterfaceId::TextDecoder,
             Object::Url(_) => InterfaceId::URL,
             Object::UrlSearchParams(_) => InterfaceId::URLSearchParams,
+            Object::UrlPattern(_) => InterfaceId::URLPattern,
             Object::DomRect(r) => {
                 // (a viewBox's animVal is a read-only DOMRect: SVGRect, as engines expose it)
                 if r.read_only && r.svg.is_none() {

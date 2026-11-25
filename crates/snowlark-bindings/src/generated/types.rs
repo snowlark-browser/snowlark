@@ -51426,6 +51426,762 @@ impl ToJs for ULongRange {
     }
 }
 
+/// `dictionary URLPatternComponentResult` (urlpattern.idl).
+#[derive(Clone)]
+pub struct URLPatternComponentResult {
+    /// `record<USVString, (USVString or undefined)> groups`
+    pub groups: Option<Record<StringOrUndefined>>,
+    /// `USVString input`
+    pub input: Option<String>,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for URLPatternComponentResult {
+    fn default() -> Self {
+        URLPatternComponentResult {
+            groups: None,
+            input: None,
+        }
+    }
+}
+
+impl URLPatternComponentResult {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "URLPatternComponentResult")?;
+        let m_groups = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("groups");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(
+                        rt::record_entries(scope, v, rt::to_usv_string, |scope, item| {
+                            StringOrUndefined::from_js(scope, item)
+                        })
+                        .map(rt::Record)?,
+                    )
+                }
+            }
+            None => None,
+        };
+        let m_input = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("input");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        Some(URLPatternComponentResult {
+            groups: m_groups,
+            input: m_input,
+        })
+    }
+}
+
+impl ToJs for URLPatternComponentResult {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        if let Some(x) = &self.groups {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("groups");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.input {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("input");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary URLPatternInit` (urlpattern.idl).
+#[derive(Clone)]
+pub struct URLPatternInit {
+    /// `USVString baseURL`
+    pub base_url: Option<String>,
+    /// `USVString hash`
+    pub hash: Option<String>,
+    /// `USVString hostname`
+    pub hostname: Option<String>,
+    /// `USVString password`
+    pub password: Option<String>,
+    /// `USVString pathname`
+    pub pathname: Option<String>,
+    /// `USVString port`
+    pub port: Option<String>,
+    /// `USVString protocol`
+    pub protocol: Option<String>,
+    /// `USVString search`
+    pub search: Option<String>,
+    /// `USVString username`
+    pub username: Option<String>,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for URLPatternInit {
+    fn default() -> Self {
+        URLPatternInit {
+            base_url: None,
+            hash: None,
+            hostname: None,
+            password: None,
+            pathname: None,
+            port: None,
+            protocol: None,
+            search: None,
+            username: None,
+        }
+    }
+}
+
+impl URLPatternInit {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "URLPatternInit")?;
+        let m_base_url = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("baseURL");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_hash = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("hash");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_hostname = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("hostname");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_password = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("password");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_pathname = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("pathname");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_port = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("port");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_protocol = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("protocol");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_search = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("search");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_username = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("username");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        Some(URLPatternInit {
+            base_url: m_base_url,
+            hash: m_hash,
+            hostname: m_hostname,
+            password: m_password,
+            pathname: m_pathname,
+            port: m_port,
+            protocol: m_protocol,
+            search: m_search,
+            username: m_username,
+        })
+    }
+}
+
+impl ToJs for URLPatternInit {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        if let Some(x) = &self.base_url {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("baseURL");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.hash {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("hash");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.hostname {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("hostname");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.password {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("password");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.pathname {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("pathname");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.port {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("port");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.protocol {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("protocol");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.search {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("search");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.username {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("username");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary URLPatternOptions` (urlpattern.idl).
+#[derive(Clone)]
+pub struct URLPatternOptions {
+    /// `boolean ignoreCase = false`
+    pub ignore_case: bool,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for URLPatternOptions {
+    fn default() -> Self {
+        URLPatternOptions { ignore_case: false }
+    }
+}
+
+impl URLPatternOptions {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "URLPatternOptions")?;
+        let m_ignore_case = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("ignoreCase");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        Some(URLPatternOptions {
+            ignore_case: m_ignore_case,
+        })
+    }
+}
+
+impl ToJs for URLPatternOptions {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.ignore_case.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("ignoreCase");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary URLPatternResult` (urlpattern.idl).
+#[derive(Clone)]
+pub struct URLPatternResult {
+    /// `URLPatternComponentResult hash`
+    pub hash: Option<URLPatternComponentResult>,
+    /// `URLPatternComponentResult hostname`
+    pub hostname: Option<URLPatternComponentResult>,
+    /// `sequence<(USVString or URLPatternInit)> inputs`
+    pub inputs: Option<Vec<StringOrURLPatternInit>>,
+    /// `URLPatternComponentResult password`
+    pub password: Option<URLPatternComponentResult>,
+    /// `URLPatternComponentResult pathname`
+    pub pathname: Option<URLPatternComponentResult>,
+    /// `URLPatternComponentResult port`
+    pub port: Option<URLPatternComponentResult>,
+    /// `URLPatternComponentResult protocol`
+    pub protocol: Option<URLPatternComponentResult>,
+    /// `URLPatternComponentResult search`
+    pub search: Option<URLPatternComponentResult>,
+    /// `URLPatternComponentResult username`
+    pub username: Option<URLPatternComponentResult>,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for URLPatternResult {
+    fn default() -> Self {
+        URLPatternResult {
+            hash: None,
+            hostname: None,
+            inputs: None,
+            password: None,
+            pathname: None,
+            port: None,
+            protocol: None,
+            search: None,
+            username: None,
+        }
+    }
+}
+
+impl URLPatternResult {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "URLPatternResult")?;
+        let m_hash = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("hash");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(URLPatternComponentResult::from_js(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_hostname = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("hostname");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(URLPatternComponentResult::from_js(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_inputs = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("inputs");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some({
+                        let mut out = Vec::new();
+                        rt::iterate(scope, v, |scope, item| {
+                            out.push(StringOrURLPatternInit::from_js(scope, item)?);
+                            Some(())
+                        })
+                        .map(|_| out)
+                    }?)
+                }
+            }
+            None => None,
+        };
+        let m_password = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("password");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(URLPatternComponentResult::from_js(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_pathname = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("pathname");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(URLPatternComponentResult::from_js(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_port = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("port");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(URLPatternComponentResult::from_js(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_protocol = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("protocol");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(URLPatternComponentResult::from_js(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_search = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("search");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(URLPatternComponentResult::from_js(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_username = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("username");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(URLPatternComponentResult::from_js(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        Some(URLPatternResult {
+            hash: m_hash,
+            hostname: m_hostname,
+            inputs: m_inputs,
+            password: m_password,
+            pathname: m_pathname,
+            port: m_port,
+            protocol: m_protocol,
+            search: m_search,
+            username: m_username,
+        })
+    }
+}
+
+impl ToJs for URLPatternResult {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        if let Some(x) = &self.hash {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("hash");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.hostname {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("hostname");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.inputs {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("inputs");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.password {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("password");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.pathname {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("pathname");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.port {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("port");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.protocol {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("protocol");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.search {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("search");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.username {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("username");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
 /// `dictionary UnknownCredentialOptions` (webauthn.idl).
 #[derive(Clone)]
 pub struct UnknownCredentialOptions {
@@ -57751,6 +58507,58 @@ impl ToJs for StringOrTrustedScriptURL {
         match self {
             StringOrTrustedScriptURL::String(x) => x.to_js(scope),
             StringOrTrustedScriptURL::TrustedScriptURL(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(USVString or URLPatternInit)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum StringOrURLPatternInit {
+    String(String),
+    URLPatternInit(URLPatternInit),
+}
+
+impl StringOrURLPatternInit {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if v.is_null_or_undefined() {
+            return (URLPatternInit::from_js(scope, v)).map(StringOrURLPatternInit::URLPatternInit);
+        }
+        if v.is_object() {
+            return (URLPatternInit::from_js(scope, v)).map(StringOrURLPatternInit::URLPatternInit);
+        }
+        (rt::to_usv_string(scope, v)).map(StringOrURLPatternInit::String)
+    }
+}
+
+impl ToJs for StringOrURLPatternInit {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            StringOrURLPatternInit::String(x) => x.to_js(scope),
+            StringOrURLPatternInit::URLPatternInit(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(USVString or undefined)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum StringOrUndefined {
+    String(String),
+    Undefined(()),
+}
+
+impl StringOrUndefined {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        (rt::to_usv_string(scope, v)).map(StringOrUndefined::String)
+    }
+}
+
+impl ToJs for StringOrUndefined {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            StringOrUndefined::String(x) => x.to_js(scope),
+            StringOrUndefined::Undefined(x) => x.to_js(scope),
         }
     }
 }

@@ -13,6 +13,7 @@ pub mod code_cache;
 pub mod cpu_profile;
 #[cfg(all(windows, target_env = "msvc", target_feature = "crt-static"))]
 pub mod crt_heap;
+pub mod ecma_regexp;
 pub mod guard;
 pub mod hooks;
 pub mod internal_field;

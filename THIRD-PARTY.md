@@ -16,6 +16,7 @@ Patched copies, taken through `[patch.crates-io]` in `Cargo.toml`. Each keeps it
 | `vendor/stylo` | [servo/stylo](https://github.com/servo/stylo) 0.22.0 | MPL-2.0 |
 | `vendor/taffy` | [DioxusLabs/taffy](https://github.com/DioxusLabs/taffy) 0.15.1 | MIT |
 | `vendor/url` | [servo/rust-url](https://github.com/servo/rust-url) 2.5.8 | MIT or Apache-2.0 |
+| `vendor/urlpattern` | [denoland/rust-urlpattern](https://github.com/denoland/rust-urlpattern) 0.6.0 | MIT |
 | `vendor/v8` | [denoland/rusty_v8](https://github.com/denoland/rusty_v8), its roll to V8 15.8 | MIT |
 | `vendor/dav1d-sys` | [webmproject/CrabbyAvif](https://github.com/webmproject/CrabbyAvif)'s `sys/dav1d-sys`, taken through `[patch."https://github.com/webmproject/CrabbyAvif"]` | Apache-2.0 |
 

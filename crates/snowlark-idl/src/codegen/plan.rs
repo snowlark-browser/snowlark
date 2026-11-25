@@ -287,6 +287,7 @@ pub const SCOPE: &[&str] = &[
     "TextDecoder",
     "URL",
     "URLSearchParams",
+    "URLPattern",
     "Headers",
     "Request",
     "Response",

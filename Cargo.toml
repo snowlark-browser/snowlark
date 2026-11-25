@@ -39,6 +39,9 @@ taffy = { path = "vendor/taffy" }
 # url 2.5.8 whose parser and API setters are the URL Standard's basic URL parser as written. See
 # vendor/url/SNOWLARK-PATCHES.md.
 url = { path = "vendor/url" }
+# urlpattern 0.6.0 whose matcher compares a literal prefix and suffix with `ignoreCase` as the standard does. See
+# vendor/urlpattern/SNOWLARK-PATCHES.md.
+urlpattern = { path = "vendor/urlpattern" }
 # v8 158.0.0 (V8 15.8), the crate's own roll, not on crates.io yet. See vendor/v8/SNOWLARK-PATCHES.md.
 v8 = { path = "vendor/v8" }
 

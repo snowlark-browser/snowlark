@@ -1133,6 +1133,8 @@ pub mod ui_event;
 pub use ui_event::UIEventImpl;
 pub mod url;
 pub use url::URLImpl;
+pub mod url_pattern;
+pub use url_pattern::URLPatternImpl;
 pub mod url_search_params;
 pub use url_search_params::URLSearchParamsImpl;
 pub mod user_activation;
@@ -2261,74 +2263,76 @@ pub mod ids {
     pub const TRUSTED_TYPE_POLICY_FACTORY_END: u16 = 504;
     pub const URL: u16 = 504;
     pub const URL_END: u16 = 505;
-    pub const URL_SEARCH_PARAMS: u16 = 505;
-    pub const URL_SEARCH_PARAMS_END: u16 = 506;
-    pub const USER_ACTIVATION: u16 = 506;
-    pub const USER_ACTIVATION_END: u16 = 507;
-    pub const VALIDITY_STATE: u16 = 507;
-    pub const VALIDITY_STATE_END: u16 = 508;
-    pub const VIDEO_PLAYBACK_QUALITY: u16 = 508;
-    pub const VIDEO_PLAYBACK_QUALITY_END: u16 = 509;
-    pub const VIDEO_TRACK: u16 = 509;
-    pub const VIDEO_TRACK_END: u16 = 510;
-    pub const VIEW_TRANSITION: u16 = 510;
-    pub const VIEW_TRANSITION_END: u16 = 511;
-    pub const VIEW_TRANSITION_TYPE_SET: u16 = 511;
-    pub const VIEW_TRANSITION_TYPE_SET_END: u16 = 512;
-    pub const WEB_GL2_RENDERING_CONTEXT: u16 = 512;
-    pub const WEB_GL2_RENDERING_CONTEXT_END: u16 = 513;
-    pub const WEB_GL_ACTIVE_INFO: u16 = 513;
-    pub const WEB_GL_ACTIVE_INFO_END: u16 = 514;
-    pub const WEB_GL_OBJECT: u16 = 514;
-    pub const WEB_GL_OBJECT_END: u16 = 526;
-    pub const WEB_GL_BUFFER: u16 = 515;
-    pub const WEB_GL_BUFFER_END: u16 = 516;
-    pub const WEB_GL_FRAMEBUFFER: u16 = 516;
-    pub const WEB_GL_FRAMEBUFFER_END: u16 = 517;
-    pub const WEB_GL_PROGRAM: u16 = 517;
-    pub const WEB_GL_PROGRAM_END: u16 = 518;
-    pub const WEB_GL_QUERY: u16 = 518;
-    pub const WEB_GL_QUERY_END: u16 = 519;
-    pub const WEB_GL_RENDERBUFFER: u16 = 519;
-    pub const WEB_GL_RENDERBUFFER_END: u16 = 520;
-    pub const WEB_GL_SAMPLER: u16 = 520;
-    pub const WEB_GL_SAMPLER_END: u16 = 521;
-    pub const WEB_GL_SHADER: u16 = 521;
-    pub const WEB_GL_SHADER_END: u16 = 522;
-    pub const WEB_GL_SYNC: u16 = 522;
-    pub const WEB_GL_SYNC_END: u16 = 523;
-    pub const WEB_GL_TEXTURE: u16 = 523;
-    pub const WEB_GL_TEXTURE_END: u16 = 524;
-    pub const WEB_GL_TRANSFORM_FEEDBACK: u16 = 524;
-    pub const WEB_GL_TRANSFORM_FEEDBACK_END: u16 = 525;
-    pub const WEB_GL_VERTEX_ARRAY_OBJECT: u16 = 525;
-    pub const WEB_GL_VERTEX_ARRAY_OBJECT_END: u16 = 526;
-    pub const WEB_GL_RENDERING_CONTEXT: u16 = 526;
-    pub const WEB_GL_RENDERING_CONTEXT_END: u16 = 527;
-    pub const WEB_GL_SHADER_PRECISION_FORMAT: u16 = 527;
-    pub const WEB_GL_SHADER_PRECISION_FORMAT_END: u16 = 528;
-    pub const WEB_GL_UNIFORM_LOCATION: u16 = 528;
-    pub const WEB_GL_UNIFORM_LOCATION_END: u16 = 529;
-    pub const WORKER_LOCATION: u16 = 529;
-    pub const WORKER_LOCATION_END: u16 = 530;
-    pub const WORKER_NAVIGATOR: u16 = 530;
-    pub const WORKER_NAVIGATOR_END: u16 = 531;
-    pub const WRITABLE_STREAM: u16 = 531;
-    pub const WRITABLE_STREAM_END: u16 = 532;
-    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER: u16 = 532;
-    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 533;
-    pub const WRITABLE_STREAM_DEFAULT_WRITER: u16 = 533;
-    pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 534;
-    pub const XML_SERIALIZER: u16 = 534;
-    pub const XML_SERIALIZER_END: u16 = 535;
-    pub const X_PATH_EVALUATOR: u16 = 535;
-    pub const X_PATH_EVALUATOR_END: u16 = 536;
-    pub const X_PATH_EXPRESSION: u16 = 536;
-    pub const X_PATH_EXPRESSION_END: u16 = 537;
-    pub const X_PATH_RESULT: u16 = 537;
-    pub const X_PATH_RESULT_END: u16 = 538;
+    pub const URL_PATTERN: u16 = 505;
+    pub const URL_PATTERN_END: u16 = 506;
+    pub const URL_SEARCH_PARAMS: u16 = 506;
+    pub const URL_SEARCH_PARAMS_END: u16 = 507;
+    pub const USER_ACTIVATION: u16 = 507;
+    pub const USER_ACTIVATION_END: u16 = 508;
+    pub const VALIDITY_STATE: u16 = 508;
+    pub const VALIDITY_STATE_END: u16 = 509;
+    pub const VIDEO_PLAYBACK_QUALITY: u16 = 509;
+    pub const VIDEO_PLAYBACK_QUALITY_END: u16 = 510;
+    pub const VIDEO_TRACK: u16 = 510;
+    pub const VIDEO_TRACK_END: u16 = 511;
+    pub const VIEW_TRANSITION: u16 = 511;
+    pub const VIEW_TRANSITION_END: u16 = 512;
+    pub const VIEW_TRANSITION_TYPE_SET: u16 = 512;
+    pub const VIEW_TRANSITION_TYPE_SET_END: u16 = 513;
+    pub const WEB_GL2_RENDERING_CONTEXT: u16 = 513;
+    pub const WEB_GL2_RENDERING_CONTEXT_END: u16 = 514;
+    pub const WEB_GL_ACTIVE_INFO: u16 = 514;
+    pub const WEB_GL_ACTIVE_INFO_END: u16 = 515;
+    pub const WEB_GL_OBJECT: u16 = 515;
+    pub const WEB_GL_OBJECT_END: u16 = 527;
+    pub const WEB_GL_BUFFER: u16 = 516;
+    pub const WEB_GL_BUFFER_END: u16 = 517;
+    pub const WEB_GL_FRAMEBUFFER: u16 = 517;
+    pub const WEB_GL_FRAMEBUFFER_END: u16 = 518;
+    pub const WEB_GL_PROGRAM: u16 = 518;
+    pub const WEB_GL_PROGRAM_END: u16 = 519;
+    pub const WEB_GL_QUERY: u16 = 519;
+    pub const WEB_GL_QUERY_END: u16 = 520;
+    pub const WEB_GL_RENDERBUFFER: u16 = 520;
+    pub const WEB_GL_RENDERBUFFER_END: u16 = 521;
+    pub const WEB_GL_SAMPLER: u16 = 521;
+    pub const WEB_GL_SAMPLER_END: u16 = 522;
+    pub const WEB_GL_SHADER: u16 = 522;
+    pub const WEB_GL_SHADER_END: u16 = 523;
+    pub const WEB_GL_SYNC: u16 = 523;
+    pub const WEB_GL_SYNC_END: u16 = 524;
+    pub const WEB_GL_TEXTURE: u16 = 524;
+    pub const WEB_GL_TEXTURE_END: u16 = 525;
+    pub const WEB_GL_TRANSFORM_FEEDBACK: u16 = 525;
+    pub const WEB_GL_TRANSFORM_FEEDBACK_END: u16 = 526;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT: u16 = 526;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT_END: u16 = 527;
+    pub const WEB_GL_RENDERING_CONTEXT: u16 = 527;
+    pub const WEB_GL_RENDERING_CONTEXT_END: u16 = 528;
+    pub const WEB_GL_SHADER_PRECISION_FORMAT: u16 = 528;
+    pub const WEB_GL_SHADER_PRECISION_FORMAT_END: u16 = 529;
+    pub const WEB_GL_UNIFORM_LOCATION: u16 = 529;
+    pub const WEB_GL_UNIFORM_LOCATION_END: u16 = 530;
+    pub const WORKER_LOCATION: u16 = 530;
+    pub const WORKER_LOCATION_END: u16 = 531;
+    pub const WORKER_NAVIGATOR: u16 = 531;
+    pub const WORKER_NAVIGATOR_END: u16 = 532;
+    pub const WRITABLE_STREAM: u16 = 532;
+    pub const WRITABLE_STREAM_END: u16 = 533;
+    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER: u16 = 533;
+    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 534;
+    pub const WRITABLE_STREAM_DEFAULT_WRITER: u16 = 534;
+    pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 535;
+    pub const XML_SERIALIZER: u16 = 535;
+    pub const XML_SERIALIZER_END: u16 = 536;
+    pub const X_PATH_EVALUATOR: u16 = 536;
+    pub const X_PATH_EVALUATOR_END: u16 = 537;
+    pub const X_PATH_EXPRESSION: u16 = 537;
+    pub const X_PATH_EXPRESSION_END: u16 = 538;
+    pub const X_PATH_RESULT: u16 = 538;
+    pub const X_PATH_RESULT_END: u16 = 539;
     /// The number of generated interfaces.
-    pub const COUNT: usize = 537;
+    pub const COUNT: usize = 538;
 }
 
 /// The generated interfaces; the engine names an object's most derived one in `Host::interface_of`.
@@ -2839,39 +2843,40 @@ pub enum InterfaceId {
     TrustedTypePolicy = 502,
     TrustedTypePolicyFactory = 503,
     URL = 504,
-    URLSearchParams = 505,
-    UserActivation = 506,
-    ValidityState = 507,
-    VideoPlaybackQuality = 508,
-    VideoTrack = 509,
-    ViewTransition = 510,
-    ViewTransitionTypeSet = 511,
-    WebGL2RenderingContext = 512,
-    WebGLActiveInfo = 513,
-    WebGLObject = 514,
-    WebGLBuffer = 515,
-    WebGLFramebuffer = 516,
-    WebGLProgram = 517,
-    WebGLQuery = 518,
-    WebGLRenderbuffer = 519,
-    WebGLSampler = 520,
-    WebGLShader = 521,
-    WebGLSync = 522,
-    WebGLTexture = 523,
-    WebGLTransformFeedback = 524,
-    WebGLVertexArrayObject = 525,
-    WebGLRenderingContext = 526,
-    WebGLShaderPrecisionFormat = 527,
-    WebGLUniformLocation = 528,
-    WorkerLocation = 529,
-    WorkerNavigator = 530,
-    WritableStream = 531,
-    WritableStreamDefaultController = 532,
-    WritableStreamDefaultWriter = 533,
-    XMLSerializer = 534,
-    XPathEvaluator = 535,
-    XPathExpression = 536,
-    XPathResult = 537,
+    URLPattern = 505,
+    URLSearchParams = 506,
+    UserActivation = 507,
+    ValidityState = 508,
+    VideoPlaybackQuality = 509,
+    VideoTrack = 510,
+    ViewTransition = 511,
+    ViewTransitionTypeSet = 512,
+    WebGL2RenderingContext = 513,
+    WebGLActiveInfo = 514,
+    WebGLObject = 515,
+    WebGLBuffer = 516,
+    WebGLFramebuffer = 517,
+    WebGLProgram = 518,
+    WebGLQuery = 519,
+    WebGLRenderbuffer = 520,
+    WebGLSampler = 521,
+    WebGLShader = 522,
+    WebGLSync = 523,
+    WebGLTexture = 524,
+    WebGLTransformFeedback = 525,
+    WebGLVertexArrayObject = 526,
+    WebGLRenderingContext = 527,
+    WebGLShaderPrecisionFormat = 528,
+    WebGLUniformLocation = 529,
+    WorkerLocation = 530,
+    WorkerNavigator = 531,
+    WritableStream = 532,
+    WritableStreamDefaultController = 533,
+    WritableStreamDefaultWriter = 534,
+    XMLSerializer = 535,
+    XPathEvaluator = 536,
+    XPathExpression = 537,
+    XPathResult = 538,
 }
 
 impl InterfaceId {
@@ -3383,6 +3388,7 @@ impl InterfaceId {
             InterfaceId::TrustedTypePolicy => "TrustedTypePolicy",
             InterfaceId::TrustedTypePolicyFactory => "TrustedTypePolicyFactory",
             InterfaceId::URL => "URL",
+            InterfaceId::URLPattern => "URLPattern",
             InterfaceId::URLSearchParams => "URLSearchParams",
             InterfaceId::UserActivation => "UserActivation",
             InterfaceId::ValidityState => "ValidityState",
@@ -3987,6 +3993,7 @@ pub trait Dom:
     + TrustedTypePolicyFactoryImpl
     + UIEventImpl
     + URLImpl
+    + URLPatternImpl
     + URLSearchParamsImpl
     + UserActivationImpl
     + VTTCueImpl
@@ -4613,6 +4620,7 @@ impl<T> Dom for T where
         + TrustedTypePolicyFactoryImpl
         + UIEventImpl
         + URLImpl
+        + URLPatternImpl
         + URLSearchParamsImpl
         + UserActivationImpl
         + VTTCueImpl
@@ -5238,6 +5246,7 @@ macro_rules! for_each_trait {
         $m!(TrustedTypePolicyFactoryImpl);
         $m!(UIEventImpl);
         $m!(URLImpl);
+        $m!(URLPatternImpl);
         $m!(URLSearchParamsImpl);
         $m!(UserActivationImpl);
         $m!(VTTCueImpl);
@@ -6958,6 +6967,8 @@ pub fn init_isolate<D: Dom>(
     );
     let t_url = url::template::<D>(scope, None, &options);
     st.set_template(ids::URL, scope, t_url);
+    let t_url_pattern = url_pattern::template::<D>(scope, None, &options);
+    st.set_template(ids::URL_PATTERN, scope, t_url_pattern);
     let t_url_search_params = url_search_params::template::<D>(scope, None, &options);
     st.set_template(ids::URL_SEARCH_PARAMS, scope, t_url_search_params);
     let t_user_activation = user_activation::template::<D>(scope, None, &options);
@@ -10968,6 +10979,10 @@ pub fn install_context_for<D: Dom>(
     let f_url = st.template(scope, ids::URL)?.get_function(scope)?;
     if kind.exposes(&["*"]) {
         rt::expose(scope, global, "URL", f_url)?;
+    }
+    let f_url_pattern = st.template(scope, ids::URL_PATTERN)?.get_function(scope)?;
+    if kind.exposes(&["Window", "Worker"]) {
+        rt::expose(scope, global, "URLPattern", f_url_pattern)?;
     }
     let f_url_search_params = st
         .template(scope, ids::URL_SEARCH_PARAMS)?
