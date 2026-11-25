@@ -20,6 +20,7 @@ pub mod module_graph;
 pub mod native_profile;
 pub mod object_clone;
 pub mod object_field;
+pub mod platform;
 pub mod raw_callback;
 pub mod rust_heap;
 pub mod script_check;
@@ -50,7 +51,8 @@ pub fn init() {
         if let Ok(flags) = std::env::var("SNOWLARK_V8_FLAGS") {
             v8::V8::set_flags_from_string(&flags);
         }
-        let platform = v8::new_default_platform(0, false).make_shared();
+        // (each isolate's foreground tasks go to its event loop's queue: platform)
+        let platform = platform::new_platform().make_shared();
         v8::V8::initialize_platform(platform);
         v8::V8::initialize();
     });

@@ -92,9 +92,10 @@ pub struct Page {
     /// V8's sampling profiler and the native one, when profiling (`SNOWLARK_PROFILE=1`).
     cpu: Option<snowlark_js::cpu_profile::CpuProfiler>,
     native: Option<snowlark_js::native_profile::NativeSampler>,
-    /// V8's platform, whose foreground tasks for this isolate (its garbage collector's jobs, an
-    /// asynchronous WebAssembly compilation finishing) the loop runs ([`Page::run_v8_tasks`]).
-    platform: v8::SharedRef<v8::Platform>,
+    /// V8's foreground tasks for this isolate (its garbage collector's jobs, an asynchronous
+    /// WebAssembly compilation finishing), which the loop runs ([`Page::run_v8_tasks`]). A task's
+    /// arrival wakes the loop.
+    v8_tasks: std::sync::Arc<snowlark_js::platform::TaskQueue>,
     /// When the loop last ran V8's foreground tasks.
     v8_tasks_ran_at: Instant,
 }
@@ -155,7 +156,18 @@ impl Drop for Page {
             eprint!("{js}{native}{bindings}");
         }
         rt::release_all(&mut self.isolate);
+        // (V8's tasks still waiting are destroyed while the isolate lives)
+        self.v8_tasks.close(&self.isolate);
     }
+}
+
+/// Gives `isolate`'s foreground tasks to a queue that the page's loop runs, woken by each task.
+fn v8_task_queue(
+    engine: &Engine,
+    isolate: &v8::Isolate,
+) -> std::sync::Arc<snowlark_js::platform::TaskQueue> {
+    let waker = engine.waker();
+    snowlark_js::platform::TaskQueue::register(isolate, move || waker.wake())
 }
 
 /// The browser family a chosen user agent claims, which decides whether `navigator.userAgentData`
@@ -223,6 +235,7 @@ impl Page {
             None => v8::CreateParams::default(),
         };
         let mut isolate = v8::Isolate::new(params);
+        let v8_tasks = v8_task_queue(&engine, &isolate);
         let heap_near_limit = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         snowlark_js::hooks::watch_heap_limit(&mut isolate, heap_near_limit.clone());
         snowlark_js::hooks::count_gcs(&mut isolate);
@@ -233,6 +246,10 @@ impl Page {
         snowlark_js::hooks::set_dynamic_import_hook(&mut isolate, crate::script::dynamic_import);
         snowlark_js::hooks::set_codegen_hook(&mut isolate, crate::csp::codegen_hook);
         snowlark_js::hooks::set_wasm_codegen_hook(&mut isolate, crate::csp::wasm_hook);
+        snowlark_js::hooks::set_wasm_streaming_hook(
+            &mut isolate,
+            crate::engine::fetch::wasm_streaming_hook,
+        );
         // Profiling counts every binding call, so getters take the slow path (Fast API calls
         // bypass the generated callbacks).
         let options = rt::InstallOptions {
@@ -282,7 +299,7 @@ impl Page {
             heap_near_limit,
             cpu,
             native,
-            platform: v8::V8::get_current_platform(),
+            v8_tasks,
             v8_tasks_ran_at: Instant::now(),
         }
     }
@@ -377,6 +394,8 @@ impl Page {
             held: init.module.map(|_| Vec::new()),
         });
         let mut isolate = v8::Isolate::new(v8::CreateParams::default());
+        // (after the worker's own waker is in place)
+        let v8_tasks = v8_task_queue(&engine, &isolate);
         isolate.set_microtasks_policy(v8::MicrotasksPolicy::Explicit);
         snowlark_js::hooks::set_resolve_hook(&mut isolate, crate::script::resolve_hook);
         snowlark_js::hooks::set_import_meta_hook(&mut isolate, crate::script::import_meta_hook);
@@ -384,6 +403,10 @@ impl Page {
         snowlark_js::hooks::set_dynamic_import_hook(&mut isolate, crate::script::dynamic_import);
         snowlark_js::hooks::set_codegen_hook(&mut isolate, crate::csp::codegen_hook);
         snowlark_js::hooks::set_wasm_codegen_hook(&mut isolate, crate::csp::wasm_hook);
+        snowlark_js::hooks::set_wasm_streaming_hook(
+            &mut isolate,
+            crate::engine::fetch::wasm_streaming_hook,
+        );
         {
             v8::scope!(let scope, &mut isolate);
             let bootstrap = v8::Context::new(scope, Default::default());
@@ -415,7 +438,7 @@ impl Page {
             heap_near_limit: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             cpu: None,
             native: None,
-            platform: v8::V8::get_current_platform(),
+            v8_tasks,
             v8_tasks_ran_at: Instant::now(),
         }
     }
@@ -578,10 +601,8 @@ impl Page {
 
     /// Runs V8's foreground tasks for this isolate until none is left. Returns whether any ran.
     fn run_v8_tasks(&mut self) -> bool {
-        let mut ran = false;
-        while v8::Platform::pump_message_loop(&self.platform, &self.isolate, false) {
-            ran = true;
-        }
+        // (in a loop nested in script, the tasks V8 posted as non-nestable wait)
+        let ran = self.v8_tasks.run(self.engine.script_running());
         self.v8_tasks_ran_at = Instant::now();
         ran
     }

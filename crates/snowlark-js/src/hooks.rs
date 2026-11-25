@@ -72,6 +72,34 @@ struct Hooks {
     dynamic_import: Option<DynamicImportHook>,
     codegen: Option<CodegenHook>,
     wasm: Option<WasmCodegenHook>,
+    wasm_streaming: Option<WasmStreamingHook>,
+}
+
+/// Feeds `WebAssembly.compileStreaming(source)` and `instantiateStreaming(source)` (the
+/// WebAssembly Web API's "compile a potential WebAssembly response"): `source` as script passed
+/// it, and V8's compilation, which takes the response's bytes.
+pub type WasmStreamingHook =
+    for<'s, 'i> fn(&mut v8::PinScope<'s, 'i>, v8::Local<'s, v8::Value>, v8::WasmStreaming<false>);
+
+/// Installs the streaming compilation hook; with it V8 provides `WebAssembly.compileStreaming`
+/// and `WebAssembly.instantiateStreaming`.
+pub fn set_wasm_streaming_hook(isolate: &mut v8::Isolate, hook: WasmStreamingHook) {
+    let mut h = isolate.get_slot::<Hooks>().copied().unwrap_or_default();
+    h.wasm_streaming = Some(hook);
+    isolate.set_slot(h);
+    isolate.set_wasm_streaming_callback(wasm_streaming_callback);
+}
+
+fn wasm_streaming_callback<'s>(
+    scope: &mut v8::PinScope<'s, '_>,
+    source: v8::Local<'s, v8::Value>,
+    streaming: v8::WasmStreaming<false>,
+) {
+    let Some(hook) = scope.get_slot::<Hooks>().and_then(|h| h.wasm_streaming) else {
+        return;
+    };
+    // (a panic aborts the compilation without settling its promise rather than crossing into V8)
+    let _ = crate::guard::catch(|| hook(scope, source, streaming));
 }
 
 /// Installs the string compilation hook. Contexts that allow code generation from strings (the

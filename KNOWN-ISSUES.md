@@ -155,6 +155,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **IndexedDB.** Names with lone surrogates are not supported, there is no storage partitioning by top-level site,
   no quota and no `close` event, a database's contents are read into memory on first use, and transactions,
   connections and cursors are not garbage collected. (ref 49)
+- **WebAssembly modules cannot be posted.** `postMessage` of a `WebAssembly.Module` to a window or worker of the
+  same agent cluster throws instead of sharing the module, and `postMessage` with a `WebAssembly.Memory` in the
+  transfer list does not throw a `DataCloneError`. (ref 752)
 - **Web Audio output device change.** An `AudioContext` stops with an `error` event when the default output device
   changes or is removed, instead of moving to the new device. (ref 125)
 

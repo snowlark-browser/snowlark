@@ -13,6 +13,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
+use snowlark_bindings::generated::ids;
 use snowlark_bindings::generated::{
     BodyImpl, FileOrString, FormDataImpl, HeadersImpl, IPAddressSpace,
     ReadableStreamOrBlobOrArrayBufferOrInt8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataViewOrFormDataOrURLSearchParamsOrString as BodyInit,
@@ -1691,6 +1692,144 @@ impl Engine {
             _ => {}
         }
         Some(s)
+    }
+}
+
+/// V8's streaming compilation of one `compileStreaming` or `instantiateStreaming` call, until it is
+/// given the response's bytes or aborted.
+type WasmStreaming = Rc<std::cell::RefCell<Option<v8::WasmStreaming<false>>>>;
+
+/// Rejects the compilation's promise with `reason` (V8's "abort").
+fn abort_wasm(cx: &mut Cx, streaming: &WasmStreaming, reason: &JsValue) {
+    if let Some(s) = streaming.borrow_mut().take() {
+        let scope = cx.scope();
+        let reason = v8::Local::new(scope, reason.global());
+        s.abort(Some(reason));
+    }
+}
+
+/// Rejects the compilation's promise with a TypeError.
+fn abort_wasm_type_error(cx: &mut Cx, streaming: &WasmStreaming, message: &str) {
+    let scope = cx.scope();
+    let Some(message) = v8::String::new(scope, message) else {
+        return;
+    };
+    let error = v8::Exception::type_error(scope, message);
+    let error = JsValue::new(scope, error);
+    abort_wasm(cx, streaming, &error);
+}
+
+/// `WebAssembly.compileStreaming(source)` and `instantiateStreaming(source)`: the WebAssembly Web
+/// API's "compile a potential WebAssembly response" (§3), with V8 compiling the bytes.
+pub fn wasm_streaming_hook<'s>(
+    scope: &mut v8::PinScope<'s, '_>,
+    source: v8::Local<'s, v8::Value>,
+    streaming: v8::WasmStreaming<false>,
+) {
+    let st = rt::state(scope);
+    let engine = st.engine::<Engine>();
+    let mut cx = Cx::new(scope);
+    let source = JsValue::new(cx.scope(), source);
+    let streaming: WasmStreaming = Rc::new(std::cell::RefCell::new(Some(streaming)));
+    // "Upon fulfillment of source with value unwrappedSource" (a Response or a promise of one);
+    // upon its rejection, the compilation is rejected with the reason.
+    engine.upon(
+        &mut cx,
+        &source,
+        Box::new(move |e, cx, r| match r {
+            Ok(value) => e.compile_wasm_response(cx, &value, streaming),
+            Err(reason) => abort_wasm(cx, &streaming, &reason),
+        }),
+    );
+}
+
+impl Engine {
+    /// The steps of "compile a potential WebAssembly response" once the source is a value.
+    fn compile_wasm_response(&self, cx: &mut Cx, value: &JsValue, streaming: WasmStreaming) {
+        let v = v8::Local::new(cx.scope(), value.global());
+        let Some(h) = rt::unwrap_value(v, ids::RESPONSE, ids::RESPONSE_END) else {
+            abort_wasm_type_error(
+                cx,
+                &streaming,
+                "WebAssembly: the argument is not a Response or a promise of one",
+            );
+            return;
+        };
+        let (type_, status, url, headers) = {
+            let r = self.response(h);
+            (r.type_, r.status, r.url_list.last().cloned(), r.headers)
+        };
+        // "Let mimeType be the result of getting `Content-Type` from response's header list";
+        // without HTTP tab or space bytes at its ends, it must be `application/wasm` exactly
+        // (ASCII case-insensitively: no parameters).
+        let mime = self.headers_of(headers).get("content-type").ok().flatten();
+        let wasm = mime.as_deref().is_some_and(|m| {
+            m.trim_matches(|c| c == ' ' || c == '\t')
+                .eq_ignore_ascii_case("application/wasm")
+        });
+        if !wasm {
+            let message = match &mime {
+                Some(m) => format!(
+                    "WebAssembly: the response's MIME type is '{m}', not 'application/wasm'"
+                ),
+                None => "WebAssembly: the response has no MIME type, not 'application/wasm'".into(),
+            };
+            abort_wasm_type_error(cx, &streaming, &message);
+            return;
+        }
+        // (CORS-same-origin: a basic, cors or default response)
+        if !matches!(
+            type_,
+            ResponseType::Basic | ResponseType::Cors | ResponseType::Default
+        ) {
+            abort_wasm_type_error(
+                cx,
+                &streaming,
+                "WebAssembly: the response is not CORS-same-origin",
+            );
+            return;
+        }
+        if !(200..=299).contains(&status) {
+            abort_wasm_type_error(
+                cx,
+                &streaming,
+                &format!("WebAssembly: the response's status is {status}, not an ok status"),
+            );
+            return;
+        }
+        // (the module's URL, for its functions' stack frames)
+        if let Some(url) = url {
+            if let Some(s) = streaming.borrow_mut().as_mut() {
+                s.set_url(url.as_str());
+            }
+        }
+        // "Consume response's body as an ArrayBuffer": its bytes go to the compilation; a body
+        // already used, or failing as it arrives, rejects it.
+        let fed = streaming.clone();
+        let consumed = self.consume(cx, h, move |_, cx, bytes, _, p| {
+            if let Some(mut s) = fed.borrow_mut().take() {
+                s.on_bytes_received(&bytes);
+                s.finish();
+            }
+            let u = super::streams::undefined(cx);
+            p.resolve(cx, u);
+            Ok(())
+        });
+        match consumed {
+            Ok(p) => {
+                let p = p.promise(cx);
+                self.upon(
+                    cx,
+                    &p,
+                    Box::new(move |_, cx, r| {
+                        if let Err(reason) = r {
+                            abort_wasm(cx, &streaming, &reason);
+                        }
+                    }),
+                );
+            }
+            Err(_) => abort_wasm_type_error(cx, &streaming, "WebAssembly: the body cannot be read"),
+        }
     }
 }
 

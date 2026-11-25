@@ -215,6 +215,29 @@ fn members_are_exposed_by_global() {
     );
 }
 
+/// A worker's isolate has V8 foreground tasks of its own, which its loop runs: an asynchronous
+/// `WebAssembly.compile` there resolves.
+#[test]
+fn a_workers_async_wasm_compile_resolves() {
+    let base = serve(vec![
+        ("/index.html", "text/html", "<!doctype html>"),
+        (
+            "/w.js",
+            "text/javascript",
+            "WebAssembly.compile(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0]))
+               .then(m => postMessage(m instanceof WebAssembly.Module ? 'module' : 'other'),
+                     e => postMessage('rejected ' + e));",
+        ),
+    ]);
+    let (mut page, _net) = page_at(&base, "/index.html");
+    eval(
+        &mut page,
+        "var log = []; new Worker('/w.js').onmessage = e => log.push(e.data); 'ok'",
+    );
+    wait_for(&mut page, "log.length >= 1");
+    assert_eq!(eval(&mut page, "log[0]"), "module");
+}
+
 /// A WebSocket echo server for one connection (RFC 6455, server side): echoes text and binary
 /// messages; answers a Close frame with the same code and closes. Returns its port.
 fn ws_echo_server() -> u16 {

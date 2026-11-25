@@ -105,6 +105,8 @@ mod timeline;
 mod touch_events;
 mod trusted_types;
 mod user_agent;
+mod wasm_streaming;
+mod wasm_tasks;
 mod web_audio;
 mod web_storage;
 mod webgl;
