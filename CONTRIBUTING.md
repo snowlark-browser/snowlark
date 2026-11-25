@@ -12,7 +12,7 @@ This file is how to build, test and measure, and the rules the code follows. Tak
 - Rust stable for `x86_64-pc-windows-msvc`, installed with [rustup](https://rustup.rs).
 - Git, and Python 3.10 or newer for the tools under `tools/`.
 - For web-platform-tests: a checkout of [web-platform-tests/wpt](https://github.com/web-platform-tests/wpt).
-- For comparisons with another engine (`tools/layout-diff`, `tools/census`, `tools/vs-chrome`, the micro
+- For comparisons with another engine (`tools/layout-diff`, `tools/visdiff`, `tools/census`, `tools/vs-chrome`, the micro
   benchmarks' `--chrome`): Google Chrome in its default place, or `--chrome <exe>`.
 
 ## Building
@@ -153,6 +153,9 @@ More tools locate conformance problems:
 
 - `tools/layout-diff/` renders a URL in headless Chrome and in Snowlark and reports the first element whose box
   or computed style differs: the locator for "this page looks wrong".
+- `tools/visdiff/` loads each page of a corpus in both engines, lets it settle (animations ended, content
+  revealed on scroll), and reports the content Chrome shows and Snowlark leaves invisible, empty, unloaded or
+  out, ranked by area and grouped by cause: the locator for "this page is blank or half there".
 - `tools/census/` diffs the web-exposed API surface against Chrome's, weighted by how many sites of a corpus use
   each missing member, and records uncaught exceptions and blank renders per site.
 - `tools/sweep/` ranks whole features by how many sites of the corpus they break: CSS Chrome accepts and Snowlark

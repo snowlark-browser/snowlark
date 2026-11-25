@@ -79,7 +79,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   (ref 640)
 - **Filters.** `filter` functions and `backdrop-filter` work. Not done: `filter: url()` pointing to an external SVG
   document, `linearRGB` interpolation in SVG filters, `filter` on the root element, `will-change: filter` as a
-  compositing reason, and running filter animations on the compositor. (ref 40)
+  compositing reason, and running filter animations on the compositor. (ref 40) Rendering airbnb.com's home page
+  into a tall image can use many gigabytes: a blur that falls back from the GPU to the CPU keeps growing.
+  (ref 774)
 - **Backgrounds and borders.** Open: `background-clip: border-area`, `text` layers drawn above the box's other
   layers whatever their order and not on the root's canvas, border images from SVGs without a natural
   size, box-shadow and background slicing across fragments, backgrounds on `::first-line`/`::first-letter`, and
