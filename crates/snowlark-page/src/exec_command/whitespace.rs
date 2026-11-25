@@ -13,48 +13,32 @@ use crate::engine::Engine;
 
 const NBSP: char = '\u{a0}';
 
-/// "The canonical space sequence" of length `n`.
+/// "The canonical space sequence" of length `n`, as browsers write it: a run of two or more
+/// starts with a no-break space and then alternates; the first is a no-break space at a
+/// non-breaking start and the last one at a non-breaking end. (The spec's sequence starts a run
+/// that may break with a space instead.)
 pub(super) fn canonical_space_sequence(
-    mut n: u32,
+    n: u32,
     non_breaking_start: bool,
     non_breaking_end: bool,
 ) -> Vec<char> {
-    if n == 0 {
-        return Vec::new();
-    }
-    if n == 1 {
-        return vec![if !non_breaking_start && !non_breaking_end {
-            ' '
-        } else {
+    let mut out = Vec::with_capacity(n as usize);
+    let mut previous = None;
+    for i in 0..n {
+        let c = if (i == 0 && non_breaking_start) || (i + 1 == n && non_breaking_end) {
             NBSP
-        }];
+        } else {
+            match previous {
+                Some(' ') => NBSP,
+                Some(_) => ' ',
+                None if i + 1 < n => NBSP,
+                None => ' ',
+            }
+        };
+        out.push(c);
+        previous = Some(c);
     }
-    let mut buffer = Vec::new();
-    let pair = if non_breaking_start {
-        [NBSP, ' ']
-    } else {
-        [' ', NBSP]
-    };
-    while n > 3 {
-        buffer.extend_from_slice(&pair);
-        n -= 2;
-    }
-    let tail: &[char] = if n == 3 {
-        match (non_breaking_start, non_breaking_end) {
-            (false, false) => &[' ', NBSP, ' '],
-            (true, false) => &[NBSP, NBSP, ' '],
-            (false, true) => &[' ', NBSP, NBSP],
-            (true, true) => &[NBSP, ' ', NBSP],
-        }
-    } else {
-        match (non_breaking_start, non_breaking_end) {
-            (false, false) | (true, false) => &[NBSP, ' '],
-            (false, true) => &[' ', NBSP],
-            (true, true) => &[NBSP, NBSP],
-        }
-    };
-    buffer.extend_from_slice(tail);
-    buffer
+    out
 }
 
 impl Engine {

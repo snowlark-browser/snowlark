@@ -5407,6 +5407,18 @@ impl Renderer {
         Some(snowlark_style::computed::computed_property(&values, &id))
     }
 
+    /// Whether an author or user declaration gives `node` its own value for the property `name`
+    /// (see [`snowlark_style::author_declares`]); `false` when it has no style.
+    pub fn author_declares(&self, node: NodeId, name: &str) -> bool {
+        let Some(doc) = self.doc.as_deref() else {
+            return false;
+        };
+        let dom = doc.dom.borrow();
+        doc.engine
+            .computed_style(&dom, &doc.data, node)
+            .is_some_and(|values| snowlark_style::author_declares(&doc.data, &values, name))
+    }
+
     /// CSS Typed OM §3.1: the computed value (not the resolved value) of `name` for `node`, reified.
     /// `None` when the element has no style or the property is not one.
     pub fn typed_computed_property(

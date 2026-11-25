@@ -31,26 +31,26 @@ impl Engine {
         if !self.ec_editable_or_host(r.start.0) {
             return true;
         }
-        // An editing host that is inline or cannot hold a paragraph gets a line break instead: a
-        // line feed where its white space keeps line feeds, else a `br`.
+        // An editing host that is inline (with no block inside it around the selection) or
+        // cannot hold a paragraph gets a line break instead (a line feed where its white space
+        // keeps line feeds).
         if let Some(host) = self.ec_host_of(r.start.0) {
             let tag = self.ec_default_single_line_container(doc);
-            if self.ec_inline(host) || !self.ec_allowed_child(Item::Name(tag), Item::Node(host)) {
-                let el = if self.dom().is_element(r.start.0) {
-                    Some(r.start.0)
-                } else {
-                    self.dom().parent_element(r.start.0)
-                };
-                let keeps_lf = el.is_some_and(|e| {
-                    matches!(
-                        self.ec_white_space(e).as_str(),
-                        "pre" | "pre-wrap" | "pre-line" | "break-spaces"
-                    )
-                });
-                if keeps_lf {
-                    self.ec_insert_linefeed(cx, doc);
-                    return true;
+            let block_inside = {
+                let mut a = Some(r.start.0);
+                let mut found = false;
+                while let Some(n) = a.filter(|&n| n != host) {
+                    if self.dom().is_element(n) && self.ec_block(n) {
+                        found = true;
+                        break;
+                    }
+                    a = self.ec_parent(n);
                 }
+                found
+            };
+            if (self.ec_inline(host) && !block_inside)
+                || !self.ec_allowed_child(Item::Name(tag), Item::Node(host))
+            {
                 return self.ec_insert_line_break(cx, doc);
             }
         }
@@ -229,6 +229,11 @@ impl Engine {
             }
         }
         self.ec_append(cx, new_container, frag);
+        // (the white space at the split is rebalanced on both sides, as browsers do: the end of
+        // the first part and the start of the second are line ends now)
+        let left_end = self.ec_len(container);
+        self.ec_canonicalize_whitespace(cx, container, left_end, false);
+        self.ec_canonicalize_whitespace(cx, new_container, 0, false);
         while self.ec_prohibited_paragraph_child(self.dom().last_child(container)) {
             container = self.dom().last_child(container).unwrap();
         }
@@ -243,23 +248,6 @@ impl Engine {
         }
         self.ec_collapse(doc, (new_container, 0));
         true
-    }
-
-    /// Inserts a line feed at the active range's start (in a Text node there or a new one) and
-    /// collapses the selection after it.
-    fn ec_insert_linefeed(&self, cx: &mut Cx, doc: NodeId) {
-        let Some(r) = self.ec_active(doc) else {
-            return;
-        };
-        let (node, offset) = r.start;
-        if self.dom().is_text(node) {
-            self.ec_insert_data(cx, node, offset, "\n");
-            self.ec_collapse(doc, (node, offset + 1));
-        } else {
-            let text = self.dom_mut().create_text_node(doc, "\n");
-            self.ec_insert_node(cx, doc, text);
-            self.ec_collapse(doc, (text, 1));
-        }
     }
 
     /// The `insertLineBreak` command's action.
@@ -299,20 +287,62 @@ impl Engine {
                 }
             }
         }
+        // (where the white space keeps line feeds, a line feed is the line break, as browsers
+        // insert, except in a `pre`, which gets `br`s as in other browsers: each `br` below
+        // becomes a Text node "\n" once placed)
+        let keeps_lf = {
+            let (n, _) = self.ec_active(doc).map_or(r.start, |r| r.start);
+            let el = if self.dom().is_element(n) {
+                Some(n)
+            } else {
+                self.ec_parent(n)
+            };
+            let in_pre = {
+                let dom = self.dom();
+                dom.inclusive_ancestors(n).any(|a| {
+                    dom.is_element(a)
+                        && dom.namespace(a) == &snowlark_dom::ns!(html)
+                        && &**dom.local_name(a) == "pre"
+                })
+            };
+            !in_pre && el.is_some_and(|e| self.ec_keeps_line_feeds(e))
+        };
         let br = self.ec_create(doc, "br");
         self.ec_insert_node(cx, doc, br);
         let Some(p) = self.ec_parent(br) else {
             return true;
         };
         self.ec_collapse(doc, (p, 1 + self.ec_index(br)));
+        let mut extra = None;
         if self.ec_collapsed_line_break(br) || self.ec_ends_inline_host(br) {
-            let extra = self.ec_create(doc, "br");
-            self.ec_insert_node(cx, doc, extra);
+            let e = self.ec_create(doc, "br");
+            self.ec_insert_node(cx, doc, e);
+            extra = Some(e);
             if let Some(p) = self.ec_parent(br) {
                 self.ec_collapse(doc, (p, 1 + self.ec_index(br)));
             }
         }
+        if keeps_lf {
+            for b in std::iter::once(br).chain(extra) {
+                self.ec_replace_with_linefeed(cx, doc, b);
+            }
+        }
         true
+    }
+
+    /// Replaces the `br` with a Text node "\n" at the same place (the selection, kept around it,
+    /// stays where it was).
+    fn ec_replace_with_linefeed(&self, cx: &mut Cx, doc: NodeId, br: NodeId) {
+        let Some(p) = self.ec_parent(br) else {
+            return;
+        };
+        let text = self.dom_mut().create_text_node(doc, "\n");
+        let sel = self.ec_active(doc);
+        self.ec_insert(cx, p, text, Some(br));
+        self.ec_remove(cx, br);
+        if let Some(r) = sel {
+            self.ec_select(doc, r.start, r.end);
+        }
     }
 
     /// Whether `br` is the last visible node of an inline editing host: the line after it would be

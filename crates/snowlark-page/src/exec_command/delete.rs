@@ -42,6 +42,207 @@ fn is_combining_mark(u: u16) -> bool {
 }
 
 impl Engine {
+    /// Whether the line that starts in (or before) the subtree `n` ends inside it: `n` is or holds
+    /// a `br`, a block or a line feed its `white-space` keeps.
+    fn ec_line_ends_in(&self, n: NodeId) -> bool {
+        if self.dom().is_text(n) {
+            return self.ec_preserves_line_feeds(n)
+                && self
+                    .dom()
+                    .character_data(n)
+                    .is_some_and(|d| d.contains('\n'));
+        }
+        if self.ec_is(n, &["br"]) || self.ec_block(n) {
+            return true;
+        }
+        self.ec_children(n)
+            .into_iter()
+            .any(|c| self.ec_line_ends_in(c))
+    }
+
+    /// Takes the first line of the inline content that starts at `first` and runs through its
+    /// following siblings: what comes before the first `br`, kept line feed or block. The `br` or
+    /// line feed that ends the line is removed (a `br` that `first` is stays: it is the line); a
+    /// Text node is split at the line feed, and an
+    /// inline element the line ends in is split, the part on the line going to a shallow clone of
+    /// it inserted before it. Returns the line's nodes, consecutive siblings (none for an empty
+    /// line).
+    fn ec_take_first_line(&self, cx: &mut Cx, first: NodeId) -> Vec<NodeId> {
+        let mut line = Vec::new();
+        let mut cur = Some(first);
+        while let Some(n) = cur {
+            let next = self.dom().next_sibling(n);
+            if self.ec_block(n) {
+                break;
+            }
+            if self.ec_is(n, &["br"]) {
+                // (a `br` that is the whole line is the line: it moves)
+                if line.is_empty() && n == first {
+                    line.push(n);
+                } else {
+                    self.ec_remove(cx, n);
+                }
+                break;
+            }
+            if self.dom().is_text(n) {
+                let feed = self.ec_preserves_line_feeds(n).then(|| {
+                    let dom = self.dom();
+                    let data = dom.character_data(n).unwrap_or("");
+                    data.find('\n')
+                        .map(|i| data[..i].encode_utf16().count() as u32)
+                });
+                if let Some(Some(i)) = feed {
+                    let rest = if i > 0 {
+                        line.push(n);
+                        let rest = self.dom_mut().split_text(n, i as usize);
+                        self.after_mutation(cx);
+                        rest.ok()
+                    } else {
+                        Some(n)
+                    };
+                    if let Some(rest) = rest {
+                        self.ec_delete_data(cx, rest, 0, 1);
+                        if self.ec_len(rest) == 0 {
+                            self.ec_remove(cx, rest);
+                        }
+                    }
+                    break;
+                }
+                line.push(n);
+                cur = next;
+                continue;
+            }
+            if !self.ec_line_ends_in(n) {
+                line.push(n);
+                cur = next;
+                continue;
+            }
+            let inner = match self.ec_first_child(n) {
+                Some(c) => self.ec_take_first_line(cx, c),
+                None => Vec::new(),
+            };
+            if !inner.is_empty() {
+                let clone = self.dom_mut().clone_node(n, false);
+                if let (Ok(clone), Some(parent)) = (clone, self.ec_parent(n)) {
+                    self.ec_insert(cx, parent, clone, Some(n));
+                    for c in inner {
+                        let len = self.dom().child_count(clone) as u32;
+                        self.ec_move(cx, c, clone, len);
+                    }
+                    line.push(clone);
+                }
+            }
+            if !self.dom().has_child_nodes(n) {
+                self.ec_remove(cx, n);
+            }
+            break;
+        }
+        line
+    }
+
+    /// Whether the boundary point `bp` starts a line inside `block`: nothing visible is between
+    /// it and `block`'s start, a `br`, a block or a line feed its `white-space` keeps.
+    fn ec_point_starts_line(&self, (mut node, mut offset): Bp, block: NodeId) -> bool {
+        loop {
+            if self.dom().is_text(node) {
+                if offset > 0 {
+                    if self.ec_unit(node, offset - 1) == Some(0x0a)
+                        && self.ec_preserves_line_feeds(node)
+                    {
+                        return true;
+                    }
+                    if self.ec_visible(node) {
+                        return false;
+                    }
+                }
+                let Some(p) = self.ec_parent(node) else {
+                    return false;
+                };
+                offset = self.ec_index(node);
+                node = p;
+                continue;
+            }
+            if offset == 0 {
+                if node == block || self.ec_block(node) {
+                    return true;
+                }
+                let Some(p) = self.ec_parent(node) else {
+                    return false;
+                };
+                offset = self.ec_index(node);
+                node = p;
+                continue;
+            }
+            let Some(before) = self.ec_child_before(node, offset) else {
+                return false;
+            };
+            if self.ec_is(before, &["br"]) || self.ec_block(before) {
+                return true;
+            }
+            if self.dom().is_text(before) || self.dom().is_element(before) {
+                if self.dom().is_element(before) && self.ec_is(before, &["img", "hr"]) {
+                    return false;
+                }
+                node = before;
+                offset = self.ec_len(before);
+                continue;
+            }
+            offset -= 1;
+        }
+    }
+
+    /// The `white-space` a block merge keeps on the line it moves into `dest`: the line's own when
+    /// it differs from `dest`'s and a declaration of the page (not the user agent's style sheet)
+    /// gives either of them, on the line's first element, on `dest` or on an ancestor of them
+    /// inside the editing host (a `pre`'s own value joining a `div`'s is not kept). Read before
+    /// the line moves.
+    fn ec_white_space_to_keep(&self, line: &[NodeId], dest: NodeId) -> Option<String> {
+        let first = *line.first()?;
+        let el = if self.dom().is_element(first) {
+            first
+        } else {
+            self.ec_parent(first)?
+        };
+        let ws = self.ec_white_space(el);
+        if ws == self.ec_white_space(dest) {
+            return None;
+        }
+        let host = self.ec_host_of(el)?;
+        let declared = |from: NodeId| {
+            let mut a = Some(from);
+            while let Some(e) = a.filter(|&e| e != host) {
+                if self.ec_author_declares(e, "white-space") {
+                    return true;
+                }
+                a = self.ec_parent(e);
+            }
+            false
+        };
+        (declared(el) || declared(dest)).then_some(ws)
+    }
+
+    /// Gives a moved line the `white-space` it had: on the line's element when it is one inline
+    /// element, else on a new `span` around the line.
+    fn ec_keep_white_space(&self, cx: &mut Cx, doc: NodeId, line: &[NodeId], ws: &str) {
+        let Some(&first) = line.first() else {
+            return;
+        };
+        if line.len() == 1 && self.ec_html(first) && self.ec_inline(first) {
+            self.ec_set_style(cx, first, "white-space", ws);
+            return;
+        }
+        let Some(parent) = self.ec_parent(first) else {
+            return;
+        };
+        let span = self.ec_create(doc, "span");
+        self.ec_insert(cx, parent, span, Some(first));
+        for &n in line {
+            let len = self.dom().child_count(span) as u32;
+            self.ec_move(cx, n, span, len);
+        }
+        self.ec_set_style(cx, span, "white-space", ws);
+    }
+
     /// "The block" of a boundary point's node for "delete the selection": its nearest ancestor in
     /// the same editing host that is not inline, when it is a block node or an editing host that
     /// may contain a `span` and is not a `td` or `th`.
@@ -191,8 +392,11 @@ impl Engine {
             finish(self);
             return Some(overrides);
         }
+        // (whether anything visible goes: a selection of nothing but a block boundary still merges)
+        let mut deleted_visible = false;
         if self.ec_editable(start_node) && self.dom().is_text(start_node) {
             let len = self.ec_len(start_node);
+            deleted_visible |= len > start_offset;
             self.ec_delete_data(cx, start_node, start_offset, len - start_offset);
         }
         let Some(r) = self.ec_active(doc) else {
@@ -201,6 +405,7 @@ impl Engine {
         let list = self.ec_contained_nodes(r, false, |e, n| {
             e.ec_editable(n) && !e.ec_is(n, &["thead", "tbody", "tfoot", "tr", "th", "td"])
         });
+        deleted_visible |= list.iter().any(|&n| self.ec_visible(n));
         for node in list {
             let Some(mut parent) = self.ec_parent(node) else {
                 continue;
@@ -231,7 +436,9 @@ impl Engine {
             && self.ec_editable(end_node)
             && self.dom().is_text(end_node)
         {
-            self.ec_delete_data(cx, end_node, 0, end_offset.min(self.ec_len(end_node)));
+            let n = end_offset.min(self.ec_len(end_node));
+            deleted_visible |= n > 0;
+            self.ec_delete_data(cx, end_node, 0, n);
         }
         if let Some(r) = self.ec_active(doc) {
             self.ec_canonicalize_whitespace(cx, r.start.0, r.start.1, false);
@@ -256,6 +463,17 @@ impl Engine {
             self.ec_remove(cx, children[0]);
         }
         if self.dom().is_ancestor_of(start_block, end_block) {
+            // (when what was deleted was visible and started a line, the end block's first line
+            // stays in it and the caret goes there: only the lines before the block went, as in
+            // browsers)
+            let starts_line = deleted_visible
+                && self
+                    .ec_active(doc)
+                    .is_some_and(|r| self.ec_point_starts_line(r.start, start_block));
+            if starts_line && self.dom().has_child_nodes(end_block) {
+                self.ec_collapse(doc, (end_block, 0));
+                return Some(overrides);
+            }
             let mut reference = end_block;
             while let Some(p) = self.ec_parent(reference) {
                 if p == start_block {
@@ -296,28 +514,28 @@ impl Engine {
             if !self.ec_inline_o(self.dom().first_child(end_block)) {
                 return Some(overrides);
             }
-            let mut children = vec![self.dom().first_child(end_block).unwrap()];
-            loop {
-                let last = *children.last().unwrap();
-                if self.ec_is(last, &["br"]) {
-                    break;
-                }
-                match self.ec_next_sibling(last) {
-                    Some(n) if self.ec_inline(n) => children.push(n),
-                    _ => break,
-                }
-            }
+            // (the first line of the end block moves out of it, without the `br` or line feed
+            // that ends it, as in browsers)
+            let first = self.dom().first_child(end_block).unwrap();
+            let children = self.ec_take_first_line(cx, first);
             values = self.ec_record_values(&children);
-            while self.ec_parent(children[0]) != Some(start_block) {
-                let before = self.ec_parent(children[0]);
-                self.ec_split_parent(cx, &children);
-                if self.ec_parent(children[0]) == before {
-                    break;
+            let keep = self.ec_white_space_to_keep(&children, start_block);
+            if let Some(&first) = children.first() {
+                while self.ec_parent(first) != Some(start_block) {
+                    let before = self.ec_parent(first);
+                    self.ec_split_parent(cx, &children);
+                    if self.ec_parent(first) == before {
+                        break;
+                    }
                 }
-            }
-            let prev = self.dom().previous_sibling(children[0]);
-            if let Some(prev) = prev.filter(|&p| self.ec_editable(p) && self.ec_is(p, &["br"])) {
-                self.ec_remove(cx, prev);
+                let prev = self.dom().previous_sibling(first);
+                if let Some(prev) = prev.filter(|&p| self.ec_editable(p) && self.ec_is(p, &["br"]))
+                {
+                    self.ec_remove(cx, prev);
+                }
+                if let Some(ws) = keep {
+                    self.ec_keep_white_space(cx, doc, &children, &ws);
+                }
             }
         } else if self.dom().is_ancestor_of(end_block, start_block) {
             let len = self.ec_len(start_block);
@@ -334,22 +552,20 @@ impl Engine {
             if self.ec_inline_o(next) && self.ec_is_o(last, &["br"]) {
                 self.ec_remove(cx, last.unwrap());
             }
-            let mut nodes_to_move = Vec::new();
+            // (the line after the reference moves, as in browsers)
             let next = self.dom().next_sibling(reference);
-            if let Some(n) = next.filter(|&n| !self.ec_block(n)) {
-                nodes_to_move.push(n);
-            }
-            // (as the spec's reference implementation: one more node at most)
-            if let Some(&last) = nodes_to_move.last() {
-                let next = self.dom().next_sibling(last);
-                if !self.ec_is(last, &["br"]) && next.is_some_and(|n| !self.ec_block(n)) {
-                    nodes_to_move.push(next.unwrap());
-                }
-            }
+            let nodes_to_move = match next.filter(|&n| !self.ec_block(n)) {
+                Some(n) => self.ec_take_first_line(cx, n),
+                None => Vec::new(),
+            };
             values = self.ec_record_values(&nodes_to_move);
-            for n in nodes_to_move {
+            let keep = self.ec_white_space_to_keep(&nodes_to_move, start_block);
+            for &n in &nodes_to_move {
                 let len = self.dom().child_count(start_block) as u32;
                 self.ec_move(cx, n, start_block, len);
+            }
+            if let Some(ws) = keep {
+                self.ec_keep_white_space(cx, doc, &nodes_to_move, &ws);
             }
         } else {
             let len = self.ec_len(start_block);
@@ -359,10 +575,23 @@ impl Engine {
             if self.ec_inline_o(first) && self.ec_is_o(last, &["br"]) {
                 self.ec_remove(cx, last.unwrap());
             }
-            values = self.ec_record_values(&self.ec_children(end_block));
-            while let Some(c) = self.ec_first_child(end_block) {
+            // (the first line of the end block moves, as in browsers; the spec moves all of it,
+            // as it still does when list items merge or the end block starts with a block)
+            let first = self.ec_first_child(end_block);
+            let line = match first {
+                Some(f) if self.ec_inline(f) && !self.ec_is(end_block, &["li", "dt", "dd"]) => {
+                    self.ec_take_first_line(cx, f)
+                }
+                _ => self.ec_children(end_block),
+            };
+            values = self.ec_record_values(&line);
+            let keep = self.ec_white_space_to_keep(&line, start_block);
+            for &c in &line {
                 let len = self.dom().child_count(start_block) as u32;
                 self.ec_move(cx, c, start_block, len);
+            }
+            if let Some(ws) = keep {
+                self.ec_keep_white_space(cx, doc, &line, &ws);
             }
             while !self.dom().has_child_nodes(end_block) {
                 let Some(p) = self.ec_parent(end_block) else {

@@ -34,8 +34,8 @@ pub use declarations::{
     supported_property_names, supports_condition, supports_declaration, DeclarationBlock,
 };
 pub use engine::{
-    highlight_colors_declared, is_style_element, ColorScheme, DeclaredColor, DeviceConfig,
-    MediaKind, Parallelism, RegisterPropertyError, StyleAttributeCheck, StyleEngine,
+    author_declares, highlight_colors_declared, is_style_element, ColorScheme, DeclaredColor,
+    DeviceConfig, MediaKind, Parallelism, RegisterPropertyError, StyleAttributeCheck, StyleEngine,
 };
 pub use handle::flat_parent;
 pub use hints::{svg_presentation_declaration, svg_presentation_property};

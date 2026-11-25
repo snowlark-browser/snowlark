@@ -338,6 +338,35 @@ impl Engine {
         }
     }
 
+    /// Whether an author (or user) declaration gives the element `el` its own value for
+    /// `property`: a rule of a page's style sheet, its `style` attribute or a presentational hint,
+    /// not the user agent's style sheet and not inheritance.
+    pub(super) fn ec_author_declares(&self, el: NodeId, property: &str) -> bool {
+        let connected = {
+            let dom = self.dom();
+            dom.is_alive(el) && dom.is_element(el) && dom.is_connected(el)
+        };
+        connected
+            && self
+                .with_style(el, |r| r.author_declares(el, property))
+                .unwrap_or(false)
+    }
+
+    /// Whether line feeds in a Text node are line breaks: its parent's `white-space` preserves
+    /// segment breaks (`pre`, `pre-wrap`, `pre-line`, `break-spaces`).
+    pub(super) fn ec_preserves_line_feeds(&self, text: NodeId) -> bool {
+        self.dom()
+            .parent(text)
+            .is_some_and(|p| self.ec_keeps_line_feeds(p))
+    }
+
+    /// Whether line feeds in the element `el`'s own text are line breaks (its `white-space`
+    /// preserves segment breaks).
+    pub(super) fn ec_keeps_line_feeds(&self, el: NodeId) -> bool {
+        let ws = self.ec_white_space(el);
+        !(ws == "normal" || ws == "nowrap" || ws.starts_with("collapse"))
+    }
+
     /// Whether a Text node's white space is preserved: its parent's `white-space` is `pre` or
     /// `pre-wrap`.
     pub(super) fn ec_pre(&self, text: NodeId) -> bool {

@@ -5077,6 +5077,27 @@ pub fn highlight_colors_declared(
     )
 }
 
+/// Whether an author or user declaration (a style sheet rule, the `style` attribute or a
+/// presentational hint, not the user agent's style sheet) gives the element whose style is
+/// `values` a value for the property `name`, or for any longhand of it when it is a shorthand.
+/// Inherited values do not count: only the element's own rules are read.
+pub fn author_declares(data: &StyleData, values: &ComputedValues, name: &str) -> bool {
+    use style::properties::PropertyId;
+    let Some(id) = crate::computed::property_id(name) else {
+        return false;
+    };
+    let longhands: Vec<LonghandId> = match id {
+        PropertyId::NonCustom(nc) => match nc.longhand_or_shorthand() {
+            Ok(l) => vec![l],
+            Err(s) => s.longhands().collect(),
+        },
+        PropertyId::Custom(_) => return false,
+    };
+    longhands
+        .into_iter()
+        .any(|l| declared_kind(data, values, l) != DeclaredColor::No)
+}
+
 /// What the author and user declarations behind `values` give the longhand `id` (the first one
 /// found from the rule node up is the one the cascade uses): see [`DeclaredColor`].
 fn declared_kind(data: &StyleData, values: &ComputedValues, id: LonghandId) -> DeclaredColor {
