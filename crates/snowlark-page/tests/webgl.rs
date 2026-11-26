@@ -69,10 +69,6 @@ const TRIANGLE: &str = "
 ";
 
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
-)]
 fn a_webgl_canvas_draws_into_the_page() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(
@@ -122,10 +118,6 @@ fn a_webgl_canvas_draws_into_the_page() {
 }
 
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
-)]
 fn a_canvas_keeps_its_first_kind_of_context() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(
@@ -143,10 +135,6 @@ fn a_canvas_keeps_its_first_kind_of_context() {
 }
 
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
-)]
 fn objects_of_another_context_or_deleted_ones_are_refused() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(
@@ -206,10 +194,6 @@ const TEXTURE: &str = "
 ";
 
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
-)]
 fn textures_from_image_data_with_the_unpack_parameters() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(
@@ -257,10 +241,6 @@ fn textures_from_image_data_with_the_unpack_parameters() {
 }
 
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
-)]
 fn textures_from_canvases_and_a_webgl_canvas_in_a_2d_one() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(
@@ -308,10 +288,6 @@ fn textures_from_canvases_and_a_webgl_canvas_in_a_2d_one() {
 }
 
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
-)]
 fn a_texture_from_an_image_element() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(
@@ -387,10 +363,6 @@ pub(crate) fn serve_png(png: Vec<u8>) -> u16 {
 }
 
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
-)]
 fn a_cross_origin_image_is_not_uploaded() {
     let dir = std::env::temp_dir().join(format!("snowlark-webgl-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -441,10 +413,6 @@ fn a_cross_origin_image_is_not_uploaded() {
 }
 
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
-)]
 fn a_preserved_drawing_buffer_and_to_data_url() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(

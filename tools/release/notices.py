@@ -5,7 +5,15 @@
 
 """Writes THIRD-PARTY-NOTICES.txt for a release of the browser (shipped as snowlark.exe).
 
-    python tools/release/notices.py <out.txt> [--v8-src <dir>]
+    python tools/release/notices.py <out.txt> [--v8-src <dir>] [--angle-src <dir>] [--platform linux]
+
+With `--platform linux` it describes the Linux build (tools/release/package.sh) instead: the crates
+`cargo metadata` gives for the Linux target, V8's Linux library (which also links libc++abi), ANGLE
+as tools/angle/build.sh builds it (libEGL.so and libGLESv2.so, the OpenGL back end), Skia (the
+prebuilt library skia-bindings links, with the libraries in it: SKIA_PARTS, their licence files
+kept in tools/release/skia), and no dav1d (the Linux build decodes AVIF without it). The system's
+own libraries the program loads (fontconfig, FreeType, HarfBuzz, xkbcommon, Wayland, EGL) are not
+shipped and not listed. The file has LF line ends there, CRLF on Windows.
 
 What it covers, and where each part comes from:
 
@@ -150,6 +158,42 @@ ANGLE_PARTS = [
      [], "The licence text is the one given under libc++ above."),
 ]
 
+# What tools/angle/build.sh's Linux build (the OpenGL back end through the system's EGL, no Vulkan)
+# links into libGLESv2.so: the link inputs of `ninja -C out/Release -t query libGLESv2.so`, walked as
+# for Windows.
+ANGLE_PARTS_LINUX = ANGLE_PARTS + [
+    ("libc++abi", "Apache-2.0 WITH LLVM-exception", "https://libcxx.llvm.org/",
+     [], "The licence text is the one given under libc++ above."),
+    # (libdrm has no licence file: each source file carries its notice; `#notice` takes it)
+    ("libdrm", "MIT", "https://gitlab.freedesktop.org/mesa/drm",
+     [f"third_party/libdrm/src/{f}.c#notice" for f in ("xf86drm", "xf86drmHash", "xf86drmMode", "xf86drmRandom")],
+     ""),
+]
+
+# V8's Linux library also links libc++abi (Windows' uses the C runtime's).
+V8_PARTS_LINUX = V8_PARTS + [
+    ("libc++abi", "Apache-2.0 WITH LLVM-exception", "https://libcxx.llvm.org/",
+     ["third_party/libc++abi/src/LICENSE.TXT"]),
+]
+
+# Skia and what its prebuilt library (skia-bindings, features ganesh, gl, jpeg and pdf; FreeType is the
+# system's) links in: (name, licence, home, files relative to the repository). The licence files are kept
+# in tools/release/skia, from the revisions the DEPS file of Skia m158.4 (rust-skia's) pins; renew them with
+# a Skia upgrade.
+SKIA_PARTS = [
+    ("Skia", "BSD-3-Clause", "https://skia.org/ (rust-skia's m158.4)", ["tools/release/skia/LICENSE.skia"]),
+    ("libpng", "libpng-2.0", "https://www.libpng.org/", ["tools/release/skia/LICENSE.libpng"]),
+    ("libjpeg-turbo", "IJG AND BSD-3-Clause AND Zlib", "https://libjpeg-turbo.org/",
+     ["tools/release/skia/LICENSE.libjpeg-turbo", "tools/release/skia/README.ijg"]),
+    ("zlib (Chromium's copy)", "Zlib", "https://chromium.googlesource.com/chromium/src/third_party/zlib/",
+     ["tools/release/skia/LICENSE.zlib"]),
+    ("Expat", "MIT", "https://libexpat.github.io/", ["tools/release/skia/LICENSE.expat"]),
+    ("Wuffs", "Apache-2.0 OR MIT", "https://github.com/google/wuffs", ["tools/release/skia/LICENSE.wuffs"]),
+]
+
+# The Rust target each platform's program is built for.
+TARGETS = {"windows": "x86_64-pc-windows-msvc", "linux": "x86_64-unknown-linux-gnu"}
+
 MIT_TEXT = """Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
 including without limitation the rights to use, copy, modify, merge, publish, distribute,
@@ -215,9 +259,23 @@ def standard_text(spdx, holders, by_spdx):
 
 
 def file_text(path):
+    """A licence file's text; for `<source file>#notice`, the first comment of that source file that
+    holds a copyright notice, without its comment marks."""
+    notice = path.name.endswith("#notice")
+    if notice:
+        path = path.with_name(path.name[: -len("#notice")])
     if not path.is_file():
         sys.exit(f"missing licence file: {path}")
-    return credits.read_text(path)
+    text = credits.read_text(path)
+    if not notice:
+        return text
+    for block in text.split("/*")[1:]:
+        body = block.split("*/", 1)[0]
+        if "Copyright" in body:
+            lines = [ln.strip() for ln in body.splitlines()]
+            lines = [ln[1:].strip() if ln.startswith("*") else ln for ln in lines]
+            return "\n".join(lines).strip("\n") + "\n"
+    sys.exit(f"no copyright notice in {path}")
 
 
 def crate_texts(md):
@@ -284,9 +342,27 @@ def angle_commit():
     sys.exit(f"{ANGLE_PIN} names no commit")
 
 
-def write(out_path, v8_src, angle_src):
-    md = credits.metadata()
+def write(out_path, v8_src, angle_src, platform="windows"):
+    linux = platform == "linux"
+    md = credits.metadata(TARGETS[platform])
     groups, mpl, ncrates = crate_texts(md)
+    v8_parts = V8_PARTS_LINUX if linux else V8_PARTS
+    angle_parts = ANGLE_PARTS_LINUX if linux else ANGLE_PARTS
+    angle_libs = ("libEGL.so", "libGLESv2.so") if linux else ("libEGL.dll", "libGLESv2.dll")
+    # (the Linux build has no dav1d: tools/release/package.sh builds without SNOWLARK_DAV1D_DIR)
+    vendored = [v for v in VENDORED_LIBRARIES if not (linux and v[0].startswith("dav1d"))]
+    sections = ["Source code of Mozilla Public License 2.0 components",
+                "V8 and the libraries it includes",
+                f"ANGLE ({angle_libs[0]}, {angle_libs[1]}) and the libraries it includes"]
+    if linux:
+        sections.append("Skia and the libraries it includes")
+    sections += ["Other C and C++ libraries", "The Rust standard library",
+                 f"Rust crates ({ncrates}), grouped by licence"]
+    number = {s.split(" ")[0]: i + 1 for i, s in enumerate(sections)}
+
+    def heading(word):
+        i = number[word]
+        return f"{i}. {sections[i - 1]}"
     head = git_head(v8_src)
     if head != V8_COMMIT:
         sys.exit(f"{v8_src} is at {head or 'no commit'}, not {V8_COMMIT} (vendor/v8's commit)")
@@ -302,18 +378,14 @@ def write(out_path, v8_src, angle_src):
     w("shown, and the full text of each licence follows its list of components.")
     w("")
     w("Contents")
-    w("  1. Source code of Mozilla Public License 2.0 components")
-    w("  2. V8 and the libraries it includes")
-    w("  3. ANGLE (libEGL.dll, libGLESv2.dll) and the libraries it includes")
-    w("  4. Other C++ libraries")
-    w("  5. The Rust standard library")
-    w(f"  6. Rust crates ({ncrates}), grouped by licence")
+    for i, s in enumerate(sections):
+        w(f"  {i + 1}. {s}")
     w("")
     w(RULE)
-    w("1. Source code of Mozilla Public License 2.0 components")
+    w(heading("Source"))
     w(RULE)
     w("")
-    w("These components are licensed under the Mozilla Public License 2.0 (its text is in part 6,")
+    w(f"These components are licensed under the Mozilla Public License 2.0 (its text is in part {number['Rust']},")
     w("under MPL-2.0). Their source code is available at the addresses below. Stylo is included in")
     w("modified form; the published source is the complete source of the version included here,")
     w("with a list of the changes.")
@@ -322,13 +394,13 @@ def write(out_path, v8_src, angle_src):
         w(f"  {m}")
     w("")
     w(RULE)
-    w("2. V8 and the libraries it includes")
+    w(heading("V8"))
     w(RULE)
     w("")
     w(f"V8 (https://v8.dev/), the JavaScript engine, from the rusty_v8 project")
     w(f"(https://github.com/denoland/rusty_v8, commit {V8_COMMIT}),")
     w("is linked statically together with the libraries below.")
-    for name, lic, home, files in V8_PARTS:
+    for name, lic, home, files in v8_parts:
         w("")
         w(THIN)
         w(f"{name}  ({home})")
@@ -361,14 +433,14 @@ def write(out_path, v8_src, angle_src):
         w(text.rstrip("\n"))
     w("")
     w(RULE)
-    w("3. ANGLE (libEGL.dll, libGLESv2.dll) and the libraries it includes")
+    w(heading("ANGLE"))
     w(RULE)
     w("")
     w("ANGLE (https://chromium.googlesource.com/angle/angle, commit")
     w(f"{angle}), the OpenGL ES implementation WebGL runs on, is")
-    w("built from its unmodified source into libEGL.dll and libGLESv2.dll, which ship beside the")
-    w("program. libGLESv2.dll includes the libraries below.")
-    for name, lic, home, files, note in ANGLE_PARTS:
+    w(f"built from its unmodified source into {angle_libs[0]} and {angle_libs[1]}, which ship beside the")
+    w(f"program. {angle_libs[1]} includes the libraries below.")
+    for name, lic, home, files, note in angle_parts:
         w("")
         w(THIN)
         w(f"{name}  ({home})")
@@ -380,13 +452,31 @@ def write(out_path, v8_src, angle_src):
         for f in files:
             w("")
             w(file_text(angle_src / f).rstrip("\n"))
+    if linux:
+        w("")
+        w(RULE)
+        w(heading("Skia"))
+        w(RULE)
+        w("")
+        w("Skia, the 2D graphics library pages are drawn with, is linked statically as the rust-skia")
+        w("project builds it from its unmodified source (https://github.com/rust-skia/rust-skia), together")
+        w("with the libraries below.")
+        for name, lic, home, files in SKIA_PARTS:
+            w("")
+            w(THIN)
+            w(f"{name}  ({home})")
+            w(f"Licence: {lic}")
+            w(THIN)
+            for f in files:
+                w("")
+                w(file_text(ROOT / f).rstrip("\n"))
     w("")
     w(RULE)
-    w("4. Other C and C++ libraries")
+    w(heading("Other"))
     w(RULE)
     w("")
     w("These libraries are compiled from their unmodified source into the program.")
-    for name, lic, home, files in VENDORED_LIBRARIES:
+    for name, lic, home, files in vendored:
         w("")
         w(THIN)
         w(f"{name}  ({home})")
@@ -397,7 +487,7 @@ def write(out_path, v8_src, angle_src):
             w(file_text(ROOT / f).rstrip("\n"))
     w("")
     w(RULE)
-    w("5. The Rust standard library")
+    w(heading("The"))
     w(RULE)
     w("")
     w("The Rust standard library (https://www.rust-lang.org/) is linked into the program. It is")
@@ -411,7 +501,7 @@ def write(out_path, v8_src, angle_src):
         w(file_text(lic / f).rstrip("\n"))
     w("")
     w(RULE)
-    w(f"6. Rust crates ({ncrates}), grouped by licence")
+    w(heading("Rust"))
     w(RULE)
     for group, entries in groups:
         names = sorted({c for _, cs in entries for c in cs}, key=str.lower)
@@ -430,10 +520,12 @@ def write(out_path, v8_src, angle_src):
             w("")
             w(text.rstrip("\n"))
     w("")
-    data = "\r\n".join(lines) + "\r\n"
+    end = "\n" if linux else "\r\n"
+    data = end.join(lines) + end
     Path(out_path).write_bytes(data.encode("utf-8"))
+    skia = f", {len(SKIA_PARTS)} Skia parts" if linux else ""
     print(f"{out_path}: {ncrates} crates in {len(groups)} licence groups, "
-          f"{len(V8_PARTS)} V8 parts, {len(ANGLE_PARTS)} ANGLE parts, {len(data) // 1024} KB")
+          f"{len(v8_parts)} V8 parts, {len(angle_parts)} ANGLE parts{skia}, {len(data) // 1024} KB")
 
 
 def main():
@@ -441,8 +533,9 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--v8-src", type=Path, default=DEFAULT_V8_SRC)
     ap.add_argument("--angle-src", type=Path, default=DEFAULT_ANGLE_SRC)
+    ap.add_argument("--platform", choices=sorted(TARGETS), default="windows")
     a = ap.parse_args()
-    write(a.out, a.v8_src, a.angle_src)
+    write(a.out, a.v8_src, a.angle_src, a.platform)
 
 
 if __name__ == "__main__":

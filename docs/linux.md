@@ -28,7 +28,7 @@ Linux V8 library and pass their tests (69, among them the access check, streamin
 inline field tests that drive the mangled-name declarations through V8). `snowlark-paint` has the Linux text
 engine (below) with its tests, and the Skia painter with its own. `snowlark-layout` and `snowlark-render` build
 and pass their tests (`snowlark-render`'s GPU canvas tests are ignored there). `snowlark-page`, `snowlark-media`
-and `snowlark-ipc` build and pass their tests; the page tests that need WebGL (stage 6), a media backend (stage
+and `snowlark-ipc` build and pass their tests; the page tests that need a media backend (stage
 7), the GPU canvas (stage 5) or the PDF viewer (stage 9) are ignored there, each with its reason.
 
 **The binary** builds on Linux with its headless modes: `--eval`, `--render`, `--wpt`, `--reftest`, `--fetch`,
@@ -44,8 +44,7 @@ windows (new and Incognito windows, undocked developer tools, popups). Not there
 dialogs, drag and drop, IME, the desktop's dark setting, the password store (no key: Linux's Secret Service is
 not used yet, so no password is saved), updates (releases there are not signed). The chrome's icons are Unicode symbols where Windows' icon font is missing. The profile is
 `~/.config/snowlark` (`XDG_CONFIG_HOME`). What is missing behaves as on a system without it: a media element fails with
-`MEDIA_ERR_SRC_NOT_SUPPORTED`, `MediaSource` cannot attach, `getContext("webgl")` returns null, canvases draw on
-the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is false and
+`MEDIA_ERR_SRC_NOT_SUPPORTED`, `MediaSource` cannot attach, canvases draw on the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is false and
 `navigator.plugins` empty).
 
 **Processes:** `snowlark-ipc`'s `posix/` half gives the process boundary the same names and rules as on
@@ -214,6 +213,21 @@ The rest of `snowlark-paint` (video, cursors, the PDF viewer) is Windows-only an
 integration tests too. `video` has a
 Linux half that hands out slots no frame reaches, and `pdf` one that renders nothing (`AVAILABLE` false).
 
+**WebGL** runs on ANGLE built for Linux (`tools/angle/build.sh`; `docs/webgl.md`): its OpenGL back end on the
+system's EGL with no window system, in the window and headless, WebGL 1 and 2. On a machine without a graphics
+card the system's software driver draws (Mesa's llvmpipe in WSL). WPT's `webgl/` passes as on Windows (4249
+subtests in both).
+
+**Packaging:** `tools/release/package.sh` makes the preview `.tar.gz` (stage 9's first package, decision 6): a
+`--release` build, its debug information and symbols moved into a `.debug` file kept beside the archive (about 50
+MB packed, the program 134 MB unpacked), ANGLE's two
+libraries (checked against `pin.txt`), `THIRD-PARTY-NOTICES.txt` (`notices.py --platform linux`: the Linux crate
+set, V8's Linux library, ANGLE's Linux link list, Skia and the libraries its prebuilt library carries, whose
+licence files are kept in `tools/release/skia`) and `README-linux.txt`, one top-level folder, with its SHA-256
+beside it. The build has no release name, so it never checks for updates (Linux releases are not signed); the
+system's own libraries (fontconfig, FreeType, HarfBuzz, xkbcommon, Wayland, EGL) are not shipped. Publishing a
+release is a separate decision.
+
 `snowlark-gl` (ANGLE), `snowlark-ipc` (pipes, sections, process launch), `snowlark-media` (Media Foundation,
 PlayReady, WASAPI) and the window half of `snowlark-paint` are platform halves by nature: each gets a Linux half.
 
@@ -267,7 +281,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | Window | `snowlark-paint` `window.rs` `Window`, `Event`, `WindowProxy` | started: `linux/window.rs` on Wayland (X11 desktops through XWayland) |
 | Process boundary | `snowlark-ipc`'s `Link`, `Section`, `RemoteHandle`, `launch` | done: the `posix/` half under the same names |
 | Media player | `snowlark-media` `win/` (`Player`, MSE) | an FFmpeg half |
-| ANGLE | `snowlark-gl` `ffi.rs` loads two libraries by name | the `.so` names |
+| ANGLE | `snowlark-gl` `ffi.rs` loads two libraries by name | done: the `.so` names, a surfaceless EGL display |
 | OS services | `os_crypt.rs`, shell `profile.rs`, `downloads_ui.rs` | a function each behind `cfg` |
 
 ## Stages
@@ -279,10 +293,10 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | 3 | **Headless on Linux**: V8 for Linux; the Itanium declarations in `snowlark-js`; the Linux text engine (fontconfig, FreeType, HarfBuzz); Skia behind `HeadlessRenderer`; WIC formats in Rust. `--eval`, `--render`, `--wpt` and reftests run on Linux | L | WPT on Linux within a known distance of the Windows counts, read per area. Done so far: V8 for Linux and the Itanium declarations (`snowlark-js` and `snowlark-bindings` tested on Linux), the text engine, Skia behind `HeadlessRenderer` (`snowlark-render`'s tests pass on Linux but its GPU canvas ones) |
 | 4 | **Processes**: the `posix/` half of `snowlark-ipc` (sockets, descriptor passing, memfd sections, launch, a fork server), crash dumps | M | the renderer process model on Linux; IPC tests green there. Done so far: the `posix/` half of `snowlark-ipc` and crash dumps (no fork server yet), its tests and `snowlark-tab`'s renderer process tests green on Linux |
 | 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop. Done so far: tiles and the compositor on the CPU, the Wayland window (input, keys, integer scale, CPU pixels, frame callbacks, moves and resizes from its own frame, the clipboard, cursors, several windows), `snowlark-tab` and the browser window (`snowlark-shell`) on Linux |
-| 6 | **WebGL** on ANGLE for Linux | S | the WebGL conformance areas as on Windows |
+| 6 | **WebGL** on ANGLE for Linux | S | done: the WebGL conformance areas as on Windows (WPT `webgl/` 4249 subtests on both) |
 | 7 | **Media**: playback and MSE on FFmpeg, audio output; hardware decoding later | L | `<video>`, `<audio>`, MSE sites play |
 | 8 | **Sandbox**: namespaces and seccomp-bpf for renderers, a font broker | L | a renderer that cannot open a file or a socket |
-| 9 | **OS integration and distribution**: profile folders, the password store's key, PDF, opening downloads, packages and their signing | M | a package a user can install |
+| 9 | **OS integration and distribution**: profile folders, the password store's key, PDF, opening downloads, packages and their signing | M | a package a user can install. Done so far: profile folder, opening downloads, the preview `.tar.gz` (`tools/release/package.sh`) |
 
 Stages 2 and 3 need no window; stage 3 builds on the painting backend and the text stack decided below. Stages 4
 and 5 can go side by side; 6 follows 5. The sandbox (8) comes

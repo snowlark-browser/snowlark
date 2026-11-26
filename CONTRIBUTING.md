@@ -37,7 +37,8 @@ ANGLE, for WebGL (`tools\angle\build.ps1`, `docs/webgl.md`), and dav1d, the AV1 
 (`.\tools\dav1d\build.ps1`: a static library of the release `tools\dav1d\pin.txt` names, about two minutes; it
 fetches NASM, meson and ninja for itself). Without ANGLE the build has no WebGL; without dav1d it decodes AVIF
 through Windows' codec instead, and the AVIF tests in `snowlark-graphics` fail. (For Linux, the folder holds
-`libdav1d.a` in place of `dav1d.lib`.)
+`libdav1d.a` in place of `dav1d.lib`, and `tools/angle/build.sh` builds ANGLE, which `tools/linux/cargo.sh`
+finds.)
 
 `snowlark.exe` is a Windows-subsystem program: the window opens without a console, and PowerShell neither waits
 for it nor captures its output. Scripts use `snowlark-cli.exe`, the same program built for the console

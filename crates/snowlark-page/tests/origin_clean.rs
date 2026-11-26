@@ -131,10 +131,6 @@ fn the_flag_follows_canvases_and_patterns_and_never_comes_back() {
 }
 
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
-)]
 fn webgl_refuses_a_canvas_that_is_not_origin_clean() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page_with_images(&net);

@@ -16,6 +16,10 @@ path = "tests/it.rs"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 
+# dlopen and dlsym for ANGLE's libraries on Linux (`ffi.rs`).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.62"
 features = [

@@ -81,6 +81,16 @@ pinned ones and signs them with the executable), and `THIRD-PARTY-NOTICES.txt` h
 the link inputs of `libGLESv2.dll`, `ninja -C out/Release -t query libGLESv2.dll`, and is checked again when the
 pin moves).
 
+**On Linux** `tools/angle/build.sh` builds the same commit into `<SNOWLARK_DEV_DIR>/angle/<name>-linux` (`libEGL.so`
+and `libGLESv2.so`, hashed in `pin.txt` as `*-linux-sha256`) with ANGLE's OpenGL back end only (no Vulkan, no X11
+or Wayland: the service draws into pbuffers), and `tools/linux/cargo.sh` hands that folder to cargo as Windows'
+`dev.ps1` does. The service opens ANGLE's display on the system's EGL with no window system
+(`EGL_PLATFORM_ANGLE_DEVICE_TYPE_EGL_ANGLE` on `EGL_PLATFORM_SURFACELESS_MESA`), desktop OpenGL first and OpenGL ES
+after it; where there is no graphics card the system's driver is its software one (Mesa's llvmpipe). The Linux
+libraries also link libc++abi and libdrm. `tools/angle/build.sh` takes about 20 GB with the toolchain and the
+Linux system image ANGLE builds against; the libraries carry their line tables (7.9 and 23.3 MB) until the
+release package strips them.
+
 Measured on the pinned commit: `libEGL.dll` 0.5 MB and `libGLESv2.dll` 5.6 MB (6.1 MB together, release, line
 tables); a clean build of the two libraries takes about 4 minutes on 8 jobs after the checkout (about 14 GB with
 its toolchain). The Rust side adds `snowlark-gl` (no new crates from outside).

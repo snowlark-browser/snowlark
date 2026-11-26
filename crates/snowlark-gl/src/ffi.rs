@@ -2,7 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! EGL and OpenGL ES 2.0 entry points of ANGLE (`libEGL.dll`, `libGLESv2.dll`), loaded at run time
+//! EGL and OpenGL ES 2.0 entry points of ANGLE (`libEGL.dll` and `libGLESv2.dll` on Windows,
+//! `libEGL.so` and `libGLESv2.so` on Linux), loaded at run time
 //! from the folder of the running executable (or, for a test binary in `deps`, its parent). The
 //! libraries are optional: without them there is no WebGL and `getContext("webgl")` returns null.
 
@@ -44,6 +45,11 @@ pub const EGL_PLATFORM_ANGLE_TYPE_ANGLE: EGLint = 0x3203;
 pub const EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE: EGLint = 0x3208;
 pub const EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE: EGLint = 0x3209;
 pub const EGL_PLATFORM_ANGLE_DEVICE_TYPE_D3D_WARP_ANGLE: EGLint = 0x320B;
+pub const EGL_PLATFORM_ANGLE_TYPE_OPENGL_ANGLE: EGLint = 0x320D;
+pub const EGL_PLATFORM_ANGLE_TYPE_OPENGLES_ANGLE: EGLint = 0x320E;
+pub const EGL_PLATFORM_ANGLE_DEVICE_TYPE_EGL_ANGLE: EGLint = 0x348E;
+pub const EGL_PLATFORM_ANGLE_NATIVE_PLATFORM_TYPE_ANGLE: EGLint = 0x348F;
+pub const EGL_PLATFORM_SURFACELESS_MESA: EGLint = 0x31DD;
 pub const EGL_CONTEXT_WEBGL_COMPATIBILITY_ANGLE: EGLint = 0x33AC;
 pub const EGL_CONTEXT_BIND_GENERATES_RESOURCE_CHROMIUM: EGLint = 0x33AD;
 pub const EGL_CONTEXT_CLIENT_ARRAYS_ENABLED_ANGLE: EGLint = 0x3452;
@@ -321,16 +327,27 @@ pub struct Angle {
 }
 
 /// The folders searched for ANGLE: the executable's, then its parent (test binaries run from
-/// `deps`).
+/// `deps`), then, for a test binary under `build/<crate>/<hash>/out` (newer cargo's layout), the
+/// profile folder that holds that `build`.
 fn folders() -> Vec<PathBuf> {
     let Ok(exe) = std::env::current_exe() else {
         return Vec::new();
     };
-    exe.ancestors()
+    let mut folders: Vec<PathBuf> = exe
+        .ancestors()
         .skip(1)
         .take(2)
         .map(Path::to_path_buf)
-        .collect()
+        .collect();
+    if let Some(profile) = exe
+        .ancestors()
+        .skip(1)
+        .find(|p| p.file_name().is_some_and(|n| n == "build"))
+        .and_then(Path::parent)
+    {
+        folders.push(profile.to_path_buf());
+    }
+    folders
 }
 
 #[cfg(windows)]
@@ -369,6 +386,43 @@ pub fn load() -> Result<Angle, String> {
 
 #[cfg(not(windows))]
 pub fn load() -> Result<Angle, String> {
-    let _ = folders();
-    Err("WebGL needs ANGLE, which is built for Windows only so far".into())
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+    let dir = folders()
+        .into_iter()
+        .find(|d| d.join("libEGL.so").is_file() && d.join("libGLESv2.so").is_file())
+        .ok_or("libEGL.so and libGLESv2.so are not beside the executable")?;
+    let open = |name: &str| {
+        let path = CString::new(dir.join(name).as_os_str().as_bytes())
+            .map_err(|_| format!("{name}'s path holds a NUL"))?;
+        // SAFETY: a full path to a library, NUL-terminated. Local binding keeps ANGLE's EGL names
+        // apart from the system's EGL, which ANGLE's GL back end loads itself. The library is never
+        // closed.
+        let handle = unsafe { libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
+        if handle.is_null() {
+            // SAFETY: dlerror returns null or the NUL-terminated message of the failed call.
+            let why = unsafe { libc::dlerror() };
+            let why = if why.is_null() {
+                String::new()
+            } else {
+                // SAFETY: as above.
+                unsafe { std::ffi::CStr::from_ptr(why) }
+                    .to_string_lossy()
+                    .into_owned()
+            };
+            return Err(format!("cannot load {name}: {why}"));
+        }
+        Ok(handle)
+    };
+    // (libEGL finds libGLESv2 beside itself; loading it first keeps the copy found here)
+    let gles = open("libGLESv2.so")?;
+    let egl_module = open("libEGL.so")?;
+    let symbol = |module: *mut c_void, name: &str| -> *const c_void {
+        // SAFETY: `name` ends in NUL; the module is loaded and stays so.
+        unsafe { libc::dlsym(module, name.as_ptr().cast()) as *const c_void }
+    };
+    let egl = Egl::load(&mut |name| symbol(egl_module, name))?;
+    // (libGLESv2 exports every core and extension entry point)
+    let gl = Gles::load(&mut |name| symbol(gles, name))?;
+    Ok(Angle { egl, gl })
 }

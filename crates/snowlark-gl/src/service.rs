@@ -94,20 +94,10 @@ struct Context {
     syncs: HashMap<u32, usize>,
 }
 
-/// ANGLE on one Direct3D 11 device, and the contexts on it. Used from one thread only: the
-/// process's WebGL thread ([`crate::Service`]).
-pub(crate) struct Device {
-    angle: Angle,
-    display: EGLDisplay,
-    contexts: HashMap<ContextId, Context>,
-    current: Option<ContextId>,
-}
-
-impl Device {
-    /// Loads ANGLE and opens its display: the graphics card, or WARP (Direct3D's software
-    /// rasterizer) when `warp`.
-    pub(crate) fn new(warp: bool) -> Result<Device, String> {
-        let angle = load()?;
+/// The displays [`Device::new`] tries, in order: each an attribute list for
+/// `eglGetPlatformDisplayEXT`, ending in `EGL_NONE`.
+fn display_attributes(warp: bool) -> Vec<Vec<EGLint>> {
+    if cfg!(windows) {
         let mut attrs = vec![
             EGL_PLATFORM_ANGLE_TYPE_ANGLE,
             EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
@@ -119,30 +109,83 @@ impl Device {
             ]);
         }
         attrs.push(EGL_NONE);
-        let e = &angle.egl;
-        // SAFETY: the attribute list ends in EGL_NONE; EGL_DEFAULT_DISPLAY is null.
-        let display = unsafe {
-            (e.eglGetPlatformDisplayEXT)(EGL_PLATFORM_ANGLE_ANGLE, null_mut(), attrs.as_ptr())
-        };
-        if display.is_null() {
-            return Err("ANGLE has no Direct3D 11 display".into());
+        return vec![attrs];
+    }
+    [
+        EGL_PLATFORM_ANGLE_TYPE_OPENGL_ANGLE,
+        EGL_PLATFORM_ANGLE_TYPE_OPENGLES_ANGLE,
+    ]
+    .into_iter()
+    .map(|kind| {
+        vec![
+            EGL_PLATFORM_ANGLE_TYPE_ANGLE,
+            kind,
+            EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE,
+            EGL_PLATFORM_ANGLE_DEVICE_TYPE_EGL_ANGLE,
+            EGL_PLATFORM_ANGLE_NATIVE_PLATFORM_TYPE_ANGLE,
+            EGL_PLATFORM_SURFACELESS_MESA,
+            EGL_NONE,
+        ]
+    })
+    .collect()
+}
+
+/// Opens and initializes ANGLE's display of `attrs`.
+fn open_display(angle: &Angle, attrs: &[EGLint]) -> Result<EGLDisplay, String> {
+    let e = &angle.egl;
+    // SAFETY: the attribute list ends in EGL_NONE; EGL_DEFAULT_DISPLAY is null.
+    let display = unsafe {
+        (e.eglGetPlatformDisplayEXT)(EGL_PLATFORM_ANGLE_ANGLE, null_mut(), attrs.as_ptr())
+    };
+    if display.is_null() {
+        return Err(format!("ANGLE has no display of {attrs:#x?}"));
+    }
+    let (mut major, mut minor) = (0, 0);
+    // SAFETY: a display from eglGetPlatformDisplayEXT; out pointers are locals.
+    if unsafe { (e.eglInitialize)(display, &mut major, &mut minor) } == 0 {
+        // SAFETY: no arguments.
+        return Err(format!("eglInitialize failed: {:#x}", unsafe {
+            (e.eglGetError)()
+        }));
+    }
+    Ok(display)
+}
+
+/// ANGLE on one device (Direct3D 11 on Windows, the system's OpenGL on Linux), and the contexts
+/// on it. Used from one thread only: the
+/// process's WebGL thread ([`crate::Service`]).
+pub(crate) struct Device {
+    angle: Angle,
+    display: EGLDisplay,
+    contexts: HashMap<ContextId, Context>,
+    current: Option<ContextId>,
+}
+
+impl Device {
+    /// Loads ANGLE and opens its display. On Windows: the graphics card through Direct3D 11, or
+    /// WARP (Direct3D's software rasterizer) when `warp`. On Linux: the system's OpenGL through its
+    /// EGL on no window system (the drawing buffers are pbuffers), desktop OpenGL first, else
+    /// OpenGL ES; the system's driver is the software one where there is no graphics card, so
+    /// `warp` asks nothing more.
+    pub(crate) fn new(warp: bool) -> Result<Device, String> {
+        let angle = load()?;
+        let mut last = String::new();
+        for attrs in display_attributes(warp) {
+            match open_display(&angle, &attrs) {
+                Ok(display) => {
+                    // SAFETY: a constant enum.
+                    unsafe { (angle.egl.eglBindAPI)(EGL_OPENGL_ES_API) };
+                    return Ok(Device {
+                        angle,
+                        display,
+                        contexts: HashMap::new(),
+                        current: None,
+                    });
+                }
+                Err(e) => last = e,
+            }
         }
-        let (mut major, mut minor) = (0, 0);
-        // SAFETY: a display from eglGetPlatformDisplayEXT; out pointers are locals.
-        if unsafe { (e.eglInitialize)(display, &mut major, &mut minor) } == 0 {
-            // SAFETY: no arguments.
-            return Err(format!("eglInitialize failed: {:#x}", unsafe {
-                (e.eglGetError)()
-            }));
-        }
-        // SAFETY: a constant enum.
-        unsafe { (e.eglBindAPI)(EGL_OPENGL_ES_API) };
-        Ok(Device {
-            angle,
-            display,
-            contexts: HashMap::new(),
-            current: None,
-        })
+        Err(last)
     }
 
     /// Another display made its context current on this thread: this one's is not any more.

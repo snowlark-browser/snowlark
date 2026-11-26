@@ -42,5 +42,15 @@ if [ -z "${RUSTY_V8_ARCHIVE:-}" ] && [ -z "${V8_FROM_SOURCE:-}" ]; then
     fi
 fi
 
+# ANGLE, WebGL's OpenGL ES (docs/webgl.md): the Linux build of the commit tools/angle/pin.txt names, in
+# SNOWLARK_ANGLE_DIR or <SNOWLARK_DEV_DIR>/angle/<name>-linux (tools/angle/build.sh makes it). snowlark-gl's build
+# script copies its libraries beside the executables; without them getContext("webgl") returns null.
+if [ -z "${SNOWLARK_ANGLE_DIR:-}" ] && [ -n "${SNOWLARK_DEV_DIR:-}" ]; then
+    angle="$SNOWLARK_DEV_DIR/angle/$(sed -n 's/^name=//p' "$root/tools/angle/pin.txt" | tr -d '\r')-linux"
+    if [ -f "$angle/libGLESv2.so" ]; then
+        export SNOWLARK_ANGLE_DIR="$angle"
+    fi
+fi
+
 cd "$root"
 exec cargo "$@"

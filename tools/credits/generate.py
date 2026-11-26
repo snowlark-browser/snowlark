@@ -123,11 +123,11 @@ def run(*args, cwd=ROOT):
     return subprocess.run(args, cwd=cwd, check=True, capture_output=True, text=True, encoding="utf-8").stdout
 
 
-def metadata():
+def metadata(target=TARGET):
     env = dict(os.environ)
     env.setdefault("CARGO_HOME", str(devenv.cargo_home()))
     out = subprocess.run(
-        ["cargo", "metadata", "--format-version", "1", "--offline", "--filter-platform", TARGET],
+        ["cargo", "metadata", "--format-version", "1", "--offline", "--filter-platform", target],
         cwd=ROOT, check=True, capture_output=True, text=True, encoding="utf-8", env=env,
     ).stdout
     return json.loads(out)
