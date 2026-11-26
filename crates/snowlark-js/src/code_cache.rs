@@ -596,47 +596,85 @@ mod tests {
 /// A code cache entry V8 deserializes on a thread of its own (`ScriptCompiler::
 /// StartConsumingCodeCache` and `ConsumeCodeCacheTask`, as Chromium consumes its code cache), so that
 /// the page thread only finishes the script from it. Like script streaming, the `v8` crate binds none
-/// of this; the entry points are declared by their MSVC x64 names (see [`crate::streaming`]), and
+/// of this; the entry points are declared by their MSVC x64 and Itanium x86-64 names (see
+/// [`crate::streaming`]), and
 /// the task is handed to V8 through the `consume_cache_task` member of the `Source` (a
 /// `std::unique_ptr`, one pointer, that the `Source`'s destructor deletes).
 pub struct CacheConsumer {
     data: Box<[u8]>,
-    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[cfg(v8_abi)]
     task: *mut std::ffi::c_void,
     thread: Option<std::thread::JoinHandle<()>>,
     done: Arc<std::sync::atomic::AtomicBool>,
 }
 
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 mod ffi {
     use std::ffi::c_void;
 
-    // SAFETY (all declarations): MSVC x64 names of V8 functions in the library the `v8` crate links,
-    // with the Microsoft x64 convention (a `std::unique_ptr` argument is passed by address, the
-    // callee moves out of it).
+    // SAFETY (all declarations): MSVC x64 and Itanium x86-64 names of V8 functions in the library the
+    // `v8` crate links, with the target's convention (see [`crate::streaming`]).
+    extern "C" {
+        /// `void v8::ScriptCompiler::ConsumeCodeCacheTask::Run()`.
+        #[cfg_attr(
+            v8_abi_msvc,
+            link_name = "?Run@ConsumeCodeCacheTask@ScriptCompiler@v8@@QEAAXXZ"
+        )]
+        #[cfg_attr(
+            v8_abi_itanium,
+            link_name = "_ZN2v814ScriptCompiler20ConsumeCodeCacheTask3RunEv"
+        )]
+        pub fn consume_task_run(this: *mut c_void);
+
+        /// `v8::ScriptCompiler::ConsumeCodeCacheTask::~ConsumeCodeCacheTask()` (Itanium: the
+        /// complete object destructor).
+        #[cfg_attr(
+            v8_abi_msvc,
+            link_name = "??1ConsumeCodeCacheTask@ScriptCompiler@v8@@QEAA@XZ"
+        )]
+        #[cfg_attr(
+            v8_abi_itanium,
+            link_name = "_ZN2v814ScriptCompiler20ConsumeCodeCacheTaskD1Ev"
+        )]
+        pub fn consume_task_destruct(this: *mut c_void);
+
+        /// `void operator delete(void*)`.
+        #[cfg_attr(v8_abi_msvc, link_name = "??3@YAXPEAX@Z")]
+        #[cfg_attr(v8_abi_itanium, link_name = "_ZdlPv")]
+        pub fn operator_delete(p: *mut c_void);
+    }
+
+    // MSVC: the `std::unique_ptr` argument is passed by address, and the callee moves out of it.
+    #[cfg(v8_abi_msvc)]
     extern "C" {
         /// `static ConsumeCodeCacheTask* v8::ScriptCompiler::StartConsumingCodeCache(Isolate*,
         /// std::unique_ptr<CachedData>)`.
         #[link_name = "?StartConsumingCodeCache@ScriptCompiler@v8@@SAPEAVConsumeCodeCacheTask@12@PEAVIsolate@2@V?$unique_ptr@UCachedData@ScriptCompiler@v8@@U?$default_delete@UCachedData@ScriptCompiler@v8@@@__Cr@std@@@__Cr@std@@@Z"]
         pub fn start_consuming(isolate: *mut c_void, data: *mut *mut c_void) -> *mut c_void;
+    }
 
-        /// `void v8::ScriptCompiler::ConsumeCodeCacheTask::Run()`.
-        #[link_name = "?Run@ConsumeCodeCacheTask@ScriptCompiler@v8@@QEAAXXZ"]
-        pub fn consume_task_run(this: *mut c_void);
+    // Itanium: the `[[clang::trivial_abi]]` `std::unique_ptr` travels as the pointer it holds, and the
+    // callee owns it.
+    #[cfg(v8_abi_itanium)]
+    extern "C" {
+        #[link_name = "_ZN2v814ScriptCompiler23StartConsumingCodeCacheEPNS_7IsolateENSt4__Cr10unique_ptrINS0_10CachedDataENS3_14default_deleteIS5_EEEE"]
+        fn start_consuming_itanium(isolate: *mut c_void, data: *mut c_void) -> *mut c_void;
+    }
 
-        /// `v8::ScriptCompiler::ConsumeCodeCacheTask::~ConsumeCodeCacheTask()`.
-        #[link_name = "??1ConsumeCodeCacheTask@ScriptCompiler@v8@@QEAA@XZ"]
-        pub fn consume_task_destruct(this: *mut c_void);
-
-        /// `void operator delete(void*)`.
-        #[link_name = "??3@YAXPEAX@Z"]
-        pub fn operator_delete(p: *mut c_void);
+    /// `StartConsumingCodeCache`, taking the `CachedData` out of the `unique_ptr` storage `data`.
+    #[cfg(v8_abi_itanium)]
+    pub unsafe fn start_consuming(isolate: *mut c_void, data: *mut *mut c_void) -> *mut c_void {
+        // SAFETY: the caller's contract, as for the MSVC declaration; the pointer moves to V8.
+        unsafe {
+            let owned = std::mem::replace(&mut *data, std::ptr::null_mut());
+            start_consuming_itanium(isolate, owned)
+        }
     }
 }
 
 /// The layout of `v8::ScriptCompiler::Source` as the `v8` crate mirrors it, to reach the
 /// `consume_cache_task` member.
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 #[repr(C)]
 #[allow(dead_code)]
 struct SourceLayout {
@@ -654,23 +692,23 @@ struct SourceLayout {
     compilation_details: [usize; 3],
 }
 
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 const _: () = assert!(
     std::mem::size_of::<SourceLayout>() == std::mem::size_of::<v8::script_compiler::Source>()
 );
 
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 struct SendPtr(*mut std::ffi::c_void);
 
 // SAFETY: a ConsumeCodeCacheTask is made to run on another thread (V8's documented use); the pointer
 // is used there only until that thread is joined.
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 unsafe impl Send for SendPtr {}
 
 impl CacheConsumer {
     /// Starts deserializing `data` (an entry's V8 bytes) on a new thread; `None` if V8 does not do
     /// it off-thread. `on_done` runs on that thread when it is done.
-    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[cfg(v8_abi)]
     pub fn start(
         isolate: &v8::Isolate,
         data: Vec<u8>,
@@ -722,7 +760,7 @@ impl CacheConsumer {
         Some(consumer)
     }
 
-    #[cfg(not(all(windows, target_arch = "x86_64")))]
+    #[cfg(not(v8_abi))]
     pub fn start(
         _isolate: &v8::Isolate,
         _data: Vec<u8>,
@@ -763,7 +801,7 @@ impl CacheConsumer {
         let cached = v8::script_compiler::CachedData::new(&self.data);
         let mut source =
             v8::script_compiler::Source::new_with_cached_data(code, Some(origin), cached);
-        #[cfg(all(windows, target_arch = "x86_64"))]
+        #[cfg(v8_abi)]
         // SAFETY: `source` has the layout `SourceLayout` mirrors (checked by size above, the crate's
         // own mirror of V8's class); its consume_cache_task member is a null unique_ptr, which now
         // owns the finished task (the Source's destructor deletes it).
@@ -785,7 +823,7 @@ impl CacheConsumer {
 impl Drop for CacheConsumer {
     fn drop(&mut self) {
         self.join();
-        #[cfg(all(windows, target_arch = "x86_64"))]
+        #[cfg(v8_abi)]
         if !self.task.is_null() {
             // SAFETY: the task's thread has finished and nothing else owns the task (it was not
             // handed to a Source): destroyed and freed once, as `delete task` would.

@@ -14,3 +14,9 @@ lib-sha256=ad1b3911a7c1efd4e72b47e611fd7a4b84a6f24d0fc04b52fcce4d86d4ce0848
 url=https://github.com/snowlark-browser/snowlark/releases/download/v8-158.0.0-pgo2/rusty_v8_ptrcomp_release_x86_64-pc-windows-msvc.lib.gz
 url-sha256=a38e95d6d482afb1cfbac42c31b2ac3abf33e8a9e4b345338ddb6b1a43fa640d
 binding-url=https://github.com/snowlark-browser/snowlark/releases/download/v8-158.0.0-pgo2/src_binding_ptrcomp_release_x86_64-pc-windows-msvc.rs
+#
+# Linux (docs/v8-build.md, "Linux"): the same V8 and arguments, a plain build by tools/linux/build-v8.sh, which
+# tools/linux/cargo.sh finds in <SNOWLARK_DEV_DIR>/v8/<linux-name> (librusty_v8.a, src_binding.rs). Not
+# published yet.
+linux-name=158.0.0-ptrcomp-linux
+linux-lib-sha256=ccb8db092663a38fc9a23c65a0ded79e7bdf19118913dd88934daab40daa9fcc

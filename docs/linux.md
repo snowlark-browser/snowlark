@@ -22,8 +22,10 @@ It needs the target once (`rustup target add x86_64-unknown-linux-gnu`). Build s
 **Built and tested on Linux:** `snowlark-dom`, `snowlark-idl`, `snowlark-audio`, `snowlark-idb`, `snowlark-style`
 and `snowlark-net` build natively and pass their tests there (11 test binaries, 588 tests, none failing).
 `snowlark-graphics` and `snowlark-paint` build and pass their tests too (115 tests), except `snowlark-graphics`'s
-six AVIF tests, which need the dav1d library (below). `snowlark-layout` and `snowlark-render` build and link with
-their tests; those tests need a text engine, which Linux does not have yet.
+six AVIF tests, which need the dav1d library (below). `snowlark-js` and `snowlark-bindings` build against the
+Linux V8 library and pass their tests (69, among them the access check, streaming, code cache, object clone and
+inline field tests that drive the mangled-name declarations through V8). `snowlark-layout` and `snowlark-render`
+build and link with their tests; those tests need a text engine, which Linux does not have yet.
 
 ### A Linux machine for building
 
@@ -46,23 +48,26 @@ The fontconfig and FreeType headers are for the text engine of stage 3. Add `-j 
 shares. `dev.ps1` is Windows-only; on Linux cargo runs directly.
 
 `snowlark-js`, `snowlark-bindings` and every crate above them need a V8 library to link, and none is published
-for Linux at the V8 version the workspace pins (`vendor/v8`, with pointer compression): building it from source
-for Linux, as the Windows library is built (`docs/v8-build.md`), is the first step of stage 3.
+for Linux at the V8 version the workspace pins (`vendor/v8`, with pointer compression): `tools/linux/build-v8.sh`
+builds it from the crate's source, as the Windows library is built, and `tools/linux/cargo.sh` runs cargo with it
+(`docs/v8-build.md`, "Linux"):
 
-`snowlark-js` has three Windows-only pieces, each with a fallback elsewhere:
+```sh
+tools/linux/cargo.sh test --profile iter -p snowlark-js -p snowlark-bindings
+```
+
+The V8 entry points the `v8` crate does not expose (the access check with interceptors, the accessor cache,
+consuming a code cache on a worker, streamed compilation, object clones, global handles) are declared by their
+MSVC names on Windows and their Itanium names on Linux, checked against each library (`docs/v8-upgrade.md`), so
+they work the same on both.
+
+`snowlark-js` has two Windows-only pieces, each with a fallback elsewhere:
 
 - The native sampling profiler (`native_profile.rs`, `SNOWLARK_PROFILE=1`) suspends the thread and unwinds with the
   Windows unwind tables. Elsewhere `NativeSampler::start` returns `None`; the V8 profile and the binding counts
   still work. The Linux design: the sampler sends a signal to the profiled thread, whose handler copies its
   registers and stack into a preallocated buffer (only async-signal-safe code there), and the copy is unwound with
   the DWARF call frame information afterwards; names come from the ELF symbols.
-- Four V8 entry points the `v8` crate does not expose are declared by their MSVC-mangled names: the access check
-  with interceptors (`access_check.rs`), the accessor cache (`cached_accessor.rs`), consuming a code cache on a
-  worker (`code_cache.rs`) and streamed compilation (`streaming.rs`). Elsewhere the code falls back: code caches
-  are consumed on the page thread, scripts compile without streaming, and **a cross-origin access to a `Window`
-  is refused outright**, with none of HTML's cross-origin properties (closed, not open: safe, but pages that
-  `postMessage` to another origin's window break). Linux needs the same declarations under their Itanium names
-  (`_ZN2v8...`), checked against the same V8 version (`docs/v8-upgrade.md`).
 - The C runtime's heap on mimalloc (`crt_heap.rs`) is only for the static MSVC runtime; on Linux the allocator is
   set in the binary as on Windows.
 
@@ -148,7 +153,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 |---|---|---|---|
 | 1 | The map, the Linux check of the platform-free crates, this plan | S | done: `tools/linux/check.ps1` green for eight crates; six of them built and tested on Linux |
 | 2 | **Split `snowlark-paint`**: the platform-free modules (geometry, display list, layer animation, filters, scroll curves, colour profiles, the Rust image decoders, the text types and shape cache, a canvas's operations) into `snowlark-graphics` with its own error type; the Windows half keeps Direct2D, DirectWrite and the window. Linux halves of the text engine, the headless renderer and the GPU canvas with the same methods and nothing behind them | M | done: `snowlark-graphics`, `-paint`, `-layout` and `-render` in `check.ps1`; nothing changes on Windows (WPT gate) |
-| 3 | **Headless on Linux**: V8 for Linux; the Itanium declarations in `snowlark-js`; the Linux text engine (fontconfig, FreeType, HarfBuzz); Skia behind `HeadlessRenderer`; WIC formats in Rust. `--eval`, `--render`, `--wpt` and reftests run on Linux | L | WPT on Linux within a known distance of the Windows counts, read per area |
+| 3 | **Headless on Linux**: V8 for Linux; the Itanium declarations in `snowlark-js`; the Linux text engine (fontconfig, FreeType, HarfBuzz); Skia behind `HeadlessRenderer`; WIC formats in Rust. `--eval`, `--render`, `--wpt` and reftests run on Linux | L | WPT on Linux within a known distance of the Windows counts, read per area. Done so far: V8 for Linux and the Itanium declarations (`snowlark-js` and `snowlark-bindings` tested on Linux) |
 | 4 | **Processes**: the `posix/` half of `snowlark-ipc` (sockets, descriptor passing, memfd sections, launch, a fork server), crash dumps | M | the renderer process model on Linux; IPC tests green there |
 | 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop |
 | 6 | **WebGL** on ANGLE for Linux | S | the WebGL conformance areas as on Windows |

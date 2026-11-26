@@ -6,7 +6,7 @@
 //! properties and internal fields. Blink makes a new wrapper by cloning a per-realm boilerplate of its
 //! interface instead of instantiating the template each time (`V8PerContextData::CreateWrapperFromCache`).
 //!
-//! The `v8` crate does not bind it, so it is reached by its MSVC x64 name, as
+//! The `v8` crate does not bind it, so it is reached by its mangled name, as
 //! [`crate::access_check::incumbent_context`] reaches `Isolate::GetIncumbentContext` (see
 //! `docs/v8-upgrade.md`).
 
@@ -15,9 +15,31 @@ use std::ffi::c_void;
 mod ffi {
     use std::ffi::c_void;
 
+    // SAFETY: the Itanium x86-64 name of `Local<Object> v8::Object::Clone(Isolate*)` in the static
+    // library the `v8` crate links (`v8-object.h`): `this`, then the isolate; the `Local` (one
+    // trivially copyable pointer) comes back in a register.
+    #[cfg(v8_abi_itanium)]
+    extern "C" {
+        #[link_name = "_ZN2v86Object5CloneEPNS_7IsolateE"]
+        fn object_clone_itanium(this: *const c_void, isolate: *mut c_void) -> *const c_void;
+    }
+
+    /// `Object::Clone`, its `Local` stored through `ret`.
+    #[cfg(v8_abi_itanium)]
+    pub unsafe fn object_clone(
+        this: *const c_void,
+        ret: *mut *const c_void,
+        isolate: *mut c_void,
+    ) -> *mut *const c_void {
+        // SAFETY: the caller's contract, as for the MSVC declaration.
+        unsafe { *ret = object_clone_itanium(this, isolate) };
+        ret
+    }
+
     // SAFETY: the MSVC x64 name of `Local<Object> v8::Object::Clone(Isolate*)` in the static library
     // the `v8` crate links (`v8-object.h`). A member function returning a class: `this` comes first,
     // then the hidden pointer the `Local` (one pointer) is stored through, then the isolate.
+    #[cfg(not(v8_abi_itanium))]
     extern "C" {
         #[link_name = "?Clone@Object@v8@@QEAA?AV?$Local@VObject@v8@@@2@PEAVIsolate@2@@Z"]
         pub fn object_clone(

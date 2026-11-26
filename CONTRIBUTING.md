@@ -110,6 +110,9 @@ x86_64-unknown-linux-gnu` once; [docs/linux.md](docs/linux.md)). A change to one
 .\tools\linux\check.ps1
 ```
 
+On a Linux machine, cargo runs through `tools/linux/cargo.sh`, which links the V8 library
+`tools/linux/build-v8.sh` builds ([docs/v8-build.md](docs/v8-build.md), "Linux").
+
 ## Running and diagnosing
 
 `snowlark.exe [url]` opens the browser. Headless modes (use `snowlark-cli.exe`):

@@ -6,7 +6,7 @@
 //! script gets it as a data property, inline caches and optimised code included, and the getter only
 //! runs when called directly (through its property descriptor).
 //!
-//! The `v8` crate does not bind `FunctionTemplate::NewWithCache`, so this reaches it by its MSVC x64
+//! The `v8` crate does not bind `FunctionTemplate::NewWithCache`, so this reaches it by its mangled
 //! name, as [`crate::access_check`] does for what it needs (see `docs/v8-upgrade.md`).
 //!
 //! **The private must be on the holder before script can read the accessor.** V8 checks that the
@@ -19,14 +19,61 @@ use std::ptr::{null, NonNull};
 mod ffi {
     use std::ffi::c_void;
 
-    // SAFETY (all declarations): these are the MSVC x64 names of the V8 functions in the static
-    // library the `v8` crate links. A `Local` is one pointer, passed in a register; returned, it goes
-    // through a hidden first argument, as it is not a plain C++03 aggregate.
+    // SAFETY (all declarations): these are the MSVC x64 and Itanium x86-64 names of the V8 functions
+    // in the static library the `v8` crate links. A `Local` is one pointer, passed in a register;
+    // returned, it goes through a hidden first argument on MSVC, as it is not a plain C++03 aggregate,
+    // and in a register on Itanium, as it is trivially copyable.
     extern "C" {
         /// `static Isolate* v8::Isolate::GetCurrent()`.
-        #[link_name = "?GetCurrent@Isolate@v8@@SAPEAV12@XZ"]
+        #[cfg_attr(v8_abi_msvc, link_name = "?GetCurrent@Isolate@v8@@SAPEAV12@XZ")]
+        #[cfg_attr(v8_abi_itanium, link_name = "_ZN2v87Isolate10GetCurrentEv")]
         pub fn get_current_isolate() -> *mut c_void;
+    }
 
+    #[cfg(v8_abi_itanium)]
+    extern "C" {
+        #[link_name = "_ZN2v816FunctionTemplate12NewWithCacheEPNS_7IsolateEPFvRKNS_20FunctionCallbackInfoINS_5ValueEEEENS_5LocalINS_7PrivateEEENSA_IS4_EENSA_INS_9SignatureEEEiNS_14SideEffectTypeE"]
+        fn new_with_cache_itanium(
+            isolate: *mut c_void,
+            callback: v8::FunctionCallback,
+            cache_property: *const v8::Private,
+            data: *const v8::Value,
+            signature: *const v8::Signature,
+            length: i32,
+            side_effect_type: i32,
+        ) -> *const c_void;
+    }
+
+    /// `FunctionTemplate::NewWithCache`, its `Local` stored through `ret`.
+    #[cfg(v8_abi_itanium)]
+    #[allow(clippy::too_many_arguments)]
+    pub unsafe fn new_with_cache(
+        ret: *mut *const c_void,
+        isolate: *mut c_void,
+        callback: v8::FunctionCallback,
+        cache_property: *const v8::Private,
+        data: *const v8::Value,
+        signature: *const v8::Signature,
+        length: i32,
+        side_effect_type: i32,
+    ) -> *mut *const c_void {
+        // SAFETY: the caller's contract, as for the MSVC declaration.
+        unsafe {
+            *ret = new_with_cache_itanium(
+                isolate,
+                callback,
+                cache_property,
+                data,
+                signature,
+                length,
+                side_effect_type,
+            );
+        }
+        ret
+    }
+
+    #[cfg(not(v8_abi_itanium))]
+    extern "C" {
         /// `static Local<FunctionTemplate> v8::FunctionTemplate::NewWithCache(Isolate*,
         /// FunctionCallback, Local<Private>, Local<Value>, Local<Signature>, int, SideEffectType)`.
         #[link_name = "?NewWithCache@FunctionTemplate@v8@@SA?AV?$Local@VFunctionTemplate@v8@@@2@PEAVIsolate@2@P6AXAEBV?$FunctionCallbackInfo@VValue@v8@@@2@@ZV?$Local@VPrivate@v8@@@2@V?$Local@VValue@v8@@@2@V?$Local@VSignature@v8@@@2@HW4SideEffectType@2@@Z"]

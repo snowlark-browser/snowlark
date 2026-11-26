@@ -142,10 +142,17 @@ fn codegen_callback<'s>(
 /// Makes the objects of `template` "undetectable" (V8's name for HTML's [[IsHTMLDDA]] internal slot,
 /// ECMA-262 Annex B.3.6): `typeof` says "undefined", they compare loosely equal to undefined and
 /// null, and convert to false. The `v8` crate does not bind `ObjectTemplate::MarkAsUndetectable`, so
-/// it is reached by its MSVC x64 mangled name (see `docs/v8-upgrade.md`).
+/// it is reached by its mangled name (see `docs/v8-upgrade.md`).
 pub fn mark_as_undetectable(template: v8::Local<v8::ObjectTemplate>) {
     extern "C" {
-        #[link_name = "?MarkAsUndetectable@ObjectTemplate@v8@@QEAAXXZ"]
+        #[cfg_attr(
+            not(v8_abi_itanium),
+            link_name = "?MarkAsUndetectable@ObjectTemplate@v8@@QEAAXXZ"
+        )]
+        #[cfg_attr(
+            v8_abi_itanium,
+            link_name = "_ZN2v814ObjectTemplate18MarkAsUndetectableEv"
+        )]
         fn mark_as_undetectable_raw(this: *const v8::ObjectTemplate);
     }
     // SAFETY: a `Local<ObjectTemplate>` is the handle pointer the C++ API takes as `this` (as the
@@ -158,11 +165,15 @@ pub fn mark_as_undetectable(template: v8::Local<v8::ObjectTemplate>) {
 /// TrustedScript): `eval()` and the `Function` constructor hand them to the string compilation hook
 /// instead of passing them through, and a `Function` whose arguments were all code like reaches the
 /// hook as its source with `is_code_like` set. The `v8` crate does not bind
-/// `ObjectTemplate::SetCodeLike`, so it is reached by its MSVC x64 mangled name (see
+/// `ObjectTemplate::SetCodeLike`, so it is reached by its mangled name (see
 /// `docs/v8-upgrade.md`).
 pub fn mark_as_code_like(template: v8::Local<v8::ObjectTemplate>) {
     extern "C" {
-        #[link_name = "?SetCodeLike@ObjectTemplate@v8@@QEAAXXZ"]
+        #[cfg_attr(
+            not(v8_abi_itanium),
+            link_name = "?SetCodeLike@ObjectTemplate@v8@@QEAAXXZ"
+        )]
+        #[cfg_attr(v8_abi_itanium, link_name = "_ZN2v814ObjectTemplate11SetCodeLikeEv")]
         fn set_code_like_raw(this: *const v8::ObjectTemplate);
     }
     // SAFETY: as for `mark_as_undetectable`: `this` is the template's handle pointer, the method

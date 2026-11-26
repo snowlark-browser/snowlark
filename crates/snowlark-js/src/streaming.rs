@@ -7,24 +7,26 @@
 //! `StreamedSource`, `ScriptStreamingTask` and the `Compile`/`CompileModule` overloads taking a
 //! `StreamedSource`, as Chromium's `ScriptStreamer` uses them).
 //!
-//! The `v8` crate (152) binds none of this API, but the prebuilt V8 library it links contains all of
-//! it. The few entry points are declared here by their MSVC x64 names and called with the Microsoft
-//! x64 calling convention, which is what the C++ ABI uses on that target; the layouts that matter
-//! were read from V8's headers and checked against the library's disassembly:
+//! The `v8` crate (152) binds none of this API, but the V8 library it links contains all of it. The
+//! few entry points are declared here by their MSVC x64 names on Windows and their Itanium x86-64
+//! names on Linux, and called with that target's C++ calling convention; the layouts that matter
+//! were read from V8's headers and checked against each library's disassembly:
 //!
-//! - `StreamedSource(std::unique_ptr<ExternalSourceStream>, Encoding)`: `this`, then the address of
-//!   the `unique_ptr` (a non-trivially-copyable class argument is passed by address; the callee moves
-//!   out of it and destroys it), then the encoding. The object is a `unique_ptr` and a
+//! - `StreamedSource(std::unique_ptr<ExternalSourceStream>, Encoding)`: `this`, then the
+//!   `unique_ptr`, then the encoding. MSVC passes the `unique_ptr` by address (the callee moves out of
+//!   it and destroys it); Itanium passes the pointer it holds in a register, as V8's libc++ (ABI
+//!   version 2) makes `unique_ptr` `[[clang::trivial_abi]]`. The object is a `unique_ptr` and a
 //!   `CompilationDetails`: 32 bytes, 8-aligned.
-//! - `ExternalSourceStream` is a class with a virtual destructor (slot 0, MSVC's scalar deleting
-//!   destructor taking a "delete" flag) and `GetMoreData` (slot 1). [`SourceStream`] lays out the same
-//!   vtable. V8 takes ownership of every chunk `GetMoreData` returns and frees it with `delete[]`, so
-//!   chunks are allocated with `operator new[]`.
-//! - `Compile`/`CompileModule` return a `MaybeLocal` (a class with constructors) through a hidden
-//!   pointer passed first.
+//! - `ExternalSourceStream` is a class with a virtual destructor and `GetMoreData`. MSVC's vtable has
+//!   one destructor slot (the scalar deleting destructor taking a "delete" flag), Itanium's two (the
+//!   complete object and the deleting destructor); [`SourceStream`] lays out the target's. V8 takes
+//!   ownership of every chunk `GetMoreData` returns and frees it with `delete[]`, so chunks are
+//!   allocated with `operator new[]`.
+//! - `Compile`/`CompileModule` return a `MaybeLocal` through a hidden pointer passed first on MSVC (a
+//!   class with constructors), in a register on Itanium (trivially copyable).
 //!
-//! Only Windows x64 has these declarations; elsewhere [`ScriptStreamer::start`] returns `None` and
-//! callers compile on the page thread as before.
+//! Only Windows x64 and Linux x86-64 have these declarations; elsewhere [`ScriptStreamer::start`]
+//! returns `None` and callers compile on the page thread as before.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -129,7 +131,7 @@ impl Feed {
     /// The next chunk for V8: blocks until there is one, or `None` at the end. A chunk is at least 4
     /// bytes unless it ends the stream (V8's UTF-8 decoder handles a character split across two
     /// chunks, not three).
-    #[cfg_attr(not(all(windows, target_arch = "x86_64")), allow(dead_code))]
+    #[cfg_attr(not(v8_abi), allow(dead_code))]
     fn next_chunk(&self) -> Option<Vec<u8>> {
         let mut s = self.state.lock().unwrap();
         loop {
@@ -154,7 +156,7 @@ impl Feed {
         }
     }
 
-    #[cfg_attr(not(all(windows, target_arch = "x86_64")), allow(dead_code))]
+    #[cfg_attr(not(v8_abi), allow(dead_code))]
     fn set_mismatch(&self) {
         self.state.lock().unwrap().mismatch = true;
     }
@@ -169,30 +171,37 @@ pub enum Streamed<T> {
     Fallback,
 }
 
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 mod ffi {
     use std::ffi::c_void;
 
-    // SAFETY (all declarations): these are the MSVC x64 names of the V8 functions in the static
-    // library the `v8` crate links; the Rust signatures follow the Microsoft x64 convention for them
-    // (see the module documentation and the comment on each).
+    // SAFETY (all declarations): these are the MSVC x64 and Itanium x86-64 names of the V8 functions
+    // in the static library the `v8` crate links; the Rust signatures follow the target's convention
+    // for them (see the module documentation and the comment on each). Where the two differ, the
+    // Itanium declaration is private and a function of the MSVC shape wraps it.
     extern "C" {
-        /// `v8::ScriptCompiler::StreamedSource::StreamedSource(std::unique_ptr<ExternalSourceStream>,
-        /// Encoding)`.
-        #[link_name = "??0StreamedSource@ScriptCompiler@v8@@QEAA@V?$unique_ptr@VExternalSourceStream@ScriptCompiler@v8@@U?$default_delete@VExternalSourceStream@ScriptCompiler@v8@@@__Cr@std@@@__Cr@std@@W4Encoding@012@@Z"]
-        pub fn streamed_source_construct(
-            this: *mut c_void,
-            stream: *mut *mut c_void,
-            encoding: i32,
-        ) -> *mut c_void;
-
-        /// `v8::ScriptCompiler::StreamedSource::~StreamedSource()`.
-        #[link_name = "??1StreamedSource@ScriptCompiler@v8@@QEAA@XZ"]
+        /// `v8::ScriptCompiler::StreamedSource::~StreamedSource()` (Itanium: the complete object
+        /// destructor).
+        #[cfg_attr(
+            v8_abi_msvc,
+            link_name = "??1StreamedSource@ScriptCompiler@v8@@QEAA@XZ"
+        )]
+        #[cfg_attr(
+            v8_abi_itanium,
+            link_name = "_ZN2v814ScriptCompiler14StreamedSourceD1Ev"
+        )]
         pub fn streamed_source_destruct(this: *mut c_void);
 
         /// `static ScriptStreamingTask* v8::ScriptCompiler::StartStreaming(Isolate*, StreamedSource*,
         /// ScriptType, CompileOptions, CompileHintCallback, void*)`.
-        #[link_name = "?StartStreaming@ScriptCompiler@v8@@SAPEAVScriptStreamingTask@12@PEAVIsolate@2@PEAVStreamedSource@12@W4ScriptType@2@W4CompileOptions@12@P6A_NHPEAX@Z4@Z"]
+        #[cfg_attr(
+            v8_abi_msvc,
+            link_name = "?StartStreaming@ScriptCompiler@v8@@SAPEAVScriptStreamingTask@12@PEAVIsolate@2@PEAVStreamedSource@12@W4ScriptType@2@W4CompileOptions@12@P6A_NHPEAX@Z4@Z"
+        )]
+        #[cfg_attr(
+            v8_abi_itanium,
+            link_name = "_ZN2v814ScriptCompiler14StartStreamingEPNS_7IsolateEPNS0_14StreamedSourceENS_10ScriptTypeENS0_14CompileOptionsEPFbiPvES7_"
+        )]
         pub fn start_streaming(
             isolate: *mut c_void,
             source: *mut c_void,
@@ -203,8 +212,112 @@ mod ffi {
         ) -> *mut c_void;
 
         /// `void v8::ScriptCompiler::ScriptStreamingTask::Run()`.
-        #[link_name = "?Run@ScriptStreamingTask@ScriptCompiler@v8@@QEAAXXZ"]
+        #[cfg_attr(
+            v8_abi_msvc,
+            link_name = "?Run@ScriptStreamingTask@ScriptCompiler@v8@@QEAAXXZ"
+        )]
+        #[cfg_attr(
+            v8_abi_itanium,
+            link_name = "_ZN2v814ScriptCompiler19ScriptStreamingTask3RunEv"
+        )]
         pub fn streaming_task_run(this: *mut c_void);
+
+        /// `void* operator new[](size_t)`.
+        #[cfg_attr(v8_abi_msvc, link_name = "??_U@YAPEAX_K@Z")]
+        #[cfg_attr(v8_abi_itanium, link_name = "_Znam")]
+        pub fn operator_new_array(size: usize) -> *mut u8;
+
+        /// `void operator delete(void*)`, for the `ScriptStreamingTask` V8 allocated with `new`.
+        #[cfg_attr(v8_abi_msvc, link_name = "??3@YAXPEAX@Z")]
+        #[cfg_attr(v8_abi_itanium, link_name = "_ZdlPv")]
+        pub fn operator_delete(p: *mut c_void);
+    }
+
+    // Itanium: the `std::unique_ptr` argument is `[[clang::trivial_abi]]` in V8's libc++ (ABI version
+    // 2), so it travels as the pointer it holds, in a register, and the callee owns it; a trivially
+    // copyable `MaybeLocal` comes back in a register; a constructor returns nothing.
+    #[cfg(v8_abi_itanium)]
+    mod itanium {
+        use std::ffi::c_void;
+
+        extern "C" {
+            /// The complete object constructor.
+            #[link_name = "_ZN2v814ScriptCompiler14StreamedSourceC1ENSt4__Cr10unique_ptrINS0_20ExternalSourceStreamENS2_14default_deleteIS4_EEEENS1_8EncodingE"]
+            pub fn streamed_source_construct(this: *mut c_void, stream: *mut c_void, encoding: i32);
+
+            #[link_name = "_ZN2v814ScriptCompiler7CompileENS_5LocalINS_7ContextEEEPNS0_14StreamedSourceENS1_INS_6StringEEERKNS_12ScriptOriginE"]
+            pub fn compile_streamed(
+                context: *const v8::Context,
+                source: *mut c_void,
+                full_source: *const v8::String,
+                origin: *const v8::ScriptOrigin,
+            ) -> *const c_void;
+
+            #[link_name = "_ZN2v814ScriptCompiler13CompileModuleENS_5LocalINS_7ContextEEEPNS0_14StreamedSourceENS1_INS_6StringEEERKNS_12ScriptOriginE"]
+            pub fn compile_module_streamed(
+                context: *const v8::Context,
+                source: *mut c_void,
+                full_source: *const v8::String,
+                origin: *const v8::ScriptOrigin,
+            ) -> *const c_void;
+        }
+    }
+
+    /// The `StreamedSource` constructor, taking the stream out of the `unique_ptr` storage `stream`.
+    #[cfg(v8_abi_itanium)]
+    pub unsafe fn streamed_source_construct(
+        this: *mut c_void,
+        stream: *mut *mut c_void,
+        encoding: i32,
+    ) -> *mut c_void {
+        // SAFETY: the caller's contract, as for the MSVC declaration; the pointer moves to V8.
+        unsafe {
+            let owned = std::mem::replace(&mut *stream, std::ptr::null_mut());
+            itanium::streamed_source_construct(this, owned, encoding);
+        }
+        this
+    }
+
+    /// `ScriptCompiler::Compile` of a streamed source, its `MaybeLocal` stored through `ret`.
+    #[cfg(v8_abi_itanium)]
+    pub unsafe fn compile_streamed(
+        ret: *mut *const c_void,
+        context: *const v8::Context,
+        source: *mut c_void,
+        full_source: *const v8::String,
+        origin: *const v8::ScriptOrigin,
+    ) -> *mut *const c_void {
+        // SAFETY: the caller's contract, as for the MSVC declaration.
+        unsafe { *ret = itanium::compile_streamed(context, source, full_source, origin) };
+        ret
+    }
+
+    /// `ScriptCompiler::CompileModule` of a streamed source, its `MaybeLocal` stored through `ret`.
+    #[cfg(v8_abi_itanium)]
+    pub unsafe fn compile_module_streamed(
+        ret: *mut *const c_void,
+        context: *const v8::Context,
+        source: *mut c_void,
+        full_source: *const v8::String,
+        origin: *const v8::ScriptOrigin,
+    ) -> *mut *const c_void {
+        // SAFETY: the caller's contract, as for the MSVC declaration.
+        unsafe { *ret = itanium::compile_module_streamed(context, source, full_source, origin) };
+        ret
+    }
+
+    // MSVC: the `std::unique_ptr` argument is passed by address and the callee moves out of it; a
+    // `MaybeLocal` return value comes back through a hidden pointer; a constructor returns `this`.
+    #[cfg(v8_abi_msvc)]
+    extern "C" {
+        /// `v8::ScriptCompiler::StreamedSource::StreamedSource(std::unique_ptr<ExternalSourceStream>,
+        /// Encoding)`.
+        #[link_name = "??0StreamedSource@ScriptCompiler@v8@@QEAA@V?$unique_ptr@VExternalSourceStream@ScriptCompiler@v8@@U?$default_delete@VExternalSourceStream@ScriptCompiler@v8@@@__Cr@std@@@__Cr@std@@W4Encoding@012@@Z"]
+        pub fn streamed_source_construct(
+            this: *mut c_void,
+            stream: *mut *mut c_void,
+            encoding: i32,
+        ) -> *mut c_void;
 
         /// `static MaybeLocal<Script> v8::ScriptCompiler::Compile(Local<Context>, StreamedSource*,
         /// Local<String>, const ScriptOrigin&)`: the `MaybeLocal` comes back through `ret`.
@@ -227,19 +340,11 @@ mod ffi {
             full_source: *const v8::String,
             origin: *const v8::ScriptOrigin,
         ) -> *mut *const c_void;
-
-        /// `void* operator new[](size_t)`.
-        #[link_name = "??_U@YAPEAX_K@Z"]
-        pub fn operator_new_array(size: usize) -> *mut u8;
-
-        /// `void operator delete(void*)`, for the `ScriptStreamingTask` V8 allocated with `new`.
-        #[link_name = "??3@YAXPEAX@Z"]
-        pub fn operator_delete(p: *mut c_void);
     }
 }
 
 /// An `ExternalSourceStream` subclass in Rust: the vtable pointer first, as C++ lays it out.
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 #[repr(C)]
 struct SourceStream {
     vtable: *const unsafe extern "C" fn(),
@@ -248,10 +353,10 @@ struct SourceStream {
     first: bool,
 }
 
-/// The vtable: a null RTTI slot (MSVC puts the complete object locator before the first virtual
+/// The MSVC vtable: a null RTTI slot (MSVC puts the complete object locator before the first virtual
 /// function; V8 is built without RTTI and never reads it), the scalar deleting destructor, then
 /// `GetMoreData`.
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi_msvc)]
 #[repr(C)]
 struct SourceStreamVtable {
     rtti: *const std::ffi::c_void,
@@ -259,23 +364,69 @@ struct SourceStreamVtable {
     get_more_data: unsafe extern "C" fn(*mut SourceStream, *mut *const u8) -> usize,
 }
 
-#[cfg(all(windows, target_arch = "x86_64"))]
+/// The Itanium vtable: the offset to the top of the object (0) and a null RTTI pointer before the
+/// address point, then the complete object destructor, the deleting destructor and `GetMoreData`.
+#[cfg(v8_abi_itanium)]
+#[repr(C)]
+struct SourceStreamVtable {
+    offset_to_top: isize,
+    rtti: *const std::ffi::c_void,
+    complete_destructor: unsafe extern "C" fn(*mut SourceStream),
+    deleting_destructor: unsafe extern "C" fn(*mut SourceStream),
+    get_more_data: unsafe extern "C" fn(*mut SourceStream, *mut *const u8) -> usize,
+}
+
+#[cfg(v8_abi)]
 struct VtableCell(SourceStreamVtable);
 
-// SAFETY: the vtable is immutable data (a null pointer and two function pointers).
-#[cfg(all(windows, target_arch = "x86_64"))]
+// SAFETY: the vtable is immutable data (integers, a null pointer and function pointers).
+#[cfg(v8_abi)]
 unsafe impl Sync for VtableCell {}
 
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi_msvc)]
 static SOURCE_STREAM_VTABLE: VtableCell = VtableCell(SourceStreamVtable {
     rtti: std::ptr::null(),
     destructor: source_stream_destructor,
     get_more_data: source_stream_get_more_data,
 });
 
+#[cfg(v8_abi_itanium)]
+static SOURCE_STREAM_VTABLE: VtableCell = VtableCell(SourceStreamVtable {
+    offset_to_top: 0,
+    rtti: std::ptr::null(),
+    complete_destructor: source_stream_complete_destructor,
+    deleting_destructor: source_stream_deleting_destructor,
+    get_more_data: source_stream_get_more_data,
+});
+
+/// Where an object's vtable pointer points: the first virtual function's slot.
+#[cfg(v8_abi)]
+fn source_stream_vtable() -> *const unsafe extern "C" fn() {
+    #[cfg(v8_abi_msvc)]
+    let first = &SOURCE_STREAM_VTABLE.0.destructor as *const _;
+    #[cfg(v8_abi_itanium)]
+    let first = &SOURCE_STREAM_VTABLE.0.complete_destructor as *const _;
+    first as *const unsafe extern "C" fn()
+}
+
+/// The Itanium complete object destructor: drops the stream in place (not a path V8 takes).
+#[cfg(v8_abi_itanium)]
+unsafe extern "C" fn source_stream_complete_destructor(this: *mut SourceStream) {
+    // SAFETY: V8 destroys the stream it owns exactly once.
+    unsafe { std::ptr::drop_in_place(this) };
+}
+
+/// The Itanium deleting destructor (`delete stream`): drops and frees the stream.
+#[cfg(v8_abi_itanium)]
+unsafe extern "C" fn source_stream_deleting_destructor(this: *mut SourceStream) {
+    // SAFETY: V8 deletes the stream it owns exactly once; it was made by `Box::into_raw` in
+    // `ScriptStreamer::start`.
+    drop(unsafe { Box::from_raw(this) });
+}
+
 /// The scalar deleting destructor: drops the stream, and frees it when bit 0 of `flags` says so
 /// (`delete stream`).
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi_msvc)]
 unsafe extern "C" fn source_stream_destructor(
     this: *mut SourceStream,
     flags: u32,
@@ -292,7 +443,7 @@ unsafe extern "C" fn source_stream_destructor(
 }
 
 /// `GetMoreData`: runs on the streaming thread; blocks until bytes arrive, returns 0 at the end.
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 unsafe extern "C" fn source_stream_get_more_data(
     this: *mut SourceStream,
     src: *mut *const u8,
@@ -332,25 +483,25 @@ unsafe extern "C" fn source_stream_get_more_data(
 }
 
 /// The `StreamedSource` object's storage (32 bytes in V8 152; room to spare).
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 #[repr(C, align(16))]
 struct StreamedSourceStorage([u8; 64]);
 
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 struct TaskPtr(*mut std::ffi::c_void);
 
 // SAFETY: a ScriptStreamingTask is made to be run on another thread (V8's documented use); the pointer
 // is moved to that thread and used only there until the thread is joined.
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 unsafe impl Send for TaskPtr {}
 
 /// A script V8 parses and compiles on a thread of its own as its bytes arrive.
 pub struct ScriptStreamer {
     feed: Arc<Feed>,
     kind: StreamKind,
-    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[cfg(v8_abi)]
     source: Box<StreamedSourceStorage>,
-    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[cfg(v8_abi)]
     task: *mut std::ffi::c_void,
     thread: Option<std::thread::JoinHandle<()>>,
     /// The background task has returned.
@@ -361,7 +512,7 @@ impl ScriptStreamer {
     /// Starts streaming `feed` into V8 on a new thread; `None` when V8 cannot stream it (or on a
     /// target without the bindings), and the caller compiles the text when it is complete.
     /// `on_done` runs on that thread when V8's part is done ([`ScriptStreamer::is_done`]).
-    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[cfg(v8_abi)]
     pub fn start(
         isolate: &v8::Isolate,
         feed: Arc<Feed>,
@@ -371,8 +522,7 @@ impl ScriptStreamer {
     ) -> Option<ScriptStreamer> {
         use std::ffi::c_void;
         let stream = Box::new(SourceStream {
-            vtable: &SOURCE_STREAM_VTABLE.0.destructor as *const _
-                as *const unsafe extern "C" fn(),
+            vtable: source_stream_vtable(),
             feed: feed.clone(),
             encoding,
             first: true,
@@ -441,7 +591,7 @@ impl ScriptStreamer {
         }
     }
 
-    #[cfg(not(all(windows, target_arch = "x86_64")))]
+    #[cfg(not(v8_abi))]
     pub fn start(
         _isolate: &v8::Isolate,
         _feed: Arc<Feed>,
@@ -480,7 +630,7 @@ impl ScriptStreamer {
         if !self.feed.usable() || self.kind != StreamKind::Classic {
             return Streamed::Fallback;
         }
-        #[cfg(all(windows, target_arch = "x86_64"))]
+        #[cfg(v8_abi)]
         {
             let context = scope.get_current_context();
             let mut out: *const std::ffi::c_void = std::ptr::null();
@@ -491,7 +641,7 @@ impl ScriptStreamer {
             }
             Streamed::Compiled(local_from_raw::<v8::Script>(scope, out))
         }
-        #[cfg(not(all(windows, target_arch = "x86_64")))]
+        #[cfg(not(v8_abi))]
         {
             let _ = (scope, source, origin);
             Streamed::Fallback
@@ -509,7 +659,7 @@ impl ScriptStreamer {
         if !self.feed.usable() || self.kind != StreamKind::Module {
             return Streamed::Fallback;
         }
-        #[cfg(all(windows, target_arch = "x86_64"))]
+        #[cfg(v8_abi)]
         {
             let context = scope.get_current_context();
             let mut out: *const std::ffi::c_void = std::ptr::null();
@@ -525,21 +675,21 @@ impl ScriptStreamer {
             }
             Streamed::Compiled(local_from_raw::<v8::Module>(scope, out))
         }
-        #[cfg(not(all(windows, target_arch = "x86_64")))]
+        #[cfg(not(v8_abi))]
         {
             let _ = (scope, source, origin);
             Streamed::Fallback
         }
     }
 
-    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[cfg(v8_abi)]
     fn source_ptr(&mut self) -> *mut std::ffi::c_void {
         &mut *self.source as *mut StreamedSourceStorage as *mut std::ffi::c_void
     }
 }
 
 /// A handle V8 returned in the current handle scope, as a `Local` of that scope.
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 fn local_from_raw<'s, T>(
     _scope: &mut v8::PinScope<'s, '_>,
     raw: *const std::ffi::c_void,
@@ -555,7 +705,7 @@ impl Drop for ScriptStreamer {
         // The background thread may still wait for bytes: end the stream first.
         self.feed.abort();
         self.join();
-        #[cfg(all(windows, target_arch = "x86_64"))]
+        #[cfg(v8_abi)]
         // SAFETY: the task's thread has finished; the StreamedSource was constructed in `start` and
         // is destroyed once, here; the task was allocated by V8 with `new` and is deleted once.
         unsafe {

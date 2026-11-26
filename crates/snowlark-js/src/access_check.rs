@@ -13,14 +13,15 @@
 //! callback, which throws. A `JSGlobalProxy` compares security tokens first, so same-origin access
 //! never reaches the callback and costs what it always did.
 //!
-//! The `v8` crate (152) binds none of this, but the prebuilt V8 library it links contains all of it,
-//! so the few entry points are declared here by their MSVC x64 names, as [`crate::streaming`] does
-//! (`docs/v8-upgrade.md`). The ABI facts that matter, read from `v8-template.h`, `v8-isolate.h`
-//! and `v8-local-handle.h`:
+//! The `v8` crate (152) binds none of this, but the V8 library it links contains all of it, so the
+//! few entry points are declared here by their MSVC x64 and Itanium x86-64 names, as
+//! [`crate::streaming`] does (`docs/v8-upgrade.md`). The ABI facts that matter, read from
+//! `v8-template.h`, `v8-isolate.h` and `v8-local-handle.h`:
 //!
 //! - `Local<T>` is a trivially copyable class holding one pointer: by value it travels in a register,
-//!   as a pointer does. A `Local` return value (the class has constructors) comes back through a hidden
-//!   pointer, passed after `this`.
+//!   as a pointer does. A `Local` return value comes back through a hidden pointer, passed after
+//!   `this`, on MSVC (the class has constructors), and in a register on Itanium (it is trivially
+//!   copyable and destructible). Itanium constructors return nothing; MSVC's return `this`.
 //! - `NamedPropertyHandlerConfiguration` is seven function pointers, a `Local<Value>` and a
 //!   `PropertyHandlerFlags`; `IndexedPropertyHandlerConfiguration` has two more function pointers after
 //!   the seven.
@@ -31,11 +32,11 @@
 //! [`install`] until someone re-verifies (`docs/v8-upgrade.md`), and the test below drives every
 //! handler slot through V8: a slot that moved calls the wrong function.
 //!
-//! Only Windows x64 has these declarations. Elsewhere V8's default stands: an access across security
+//! Only Windows x64 and Linux x86-64 have these declarations. Elsewhere V8's default stands: an access across security
 //! tokens to a global proxy is refused outright, with no cross-origin properties, and Location has no
 //! guard of its own (it cannot be reached: the Window it hangs off refuses).
 
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 use std::ffi::c_void;
 
 /// The V8 version these declarations were checked against. An access check that silently misreads
@@ -79,7 +80,7 @@ pub struct IndexedHandlers {
     pub descriptor: v8::IndexedPropertyDescriptorCallback,
 }
 
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 mod ffi {
     use std::ffi::c_void;
 
@@ -116,14 +117,22 @@ mod ffi {
         pub flags: i32,
     }
 
-    // SAFETY (all declarations): these are the MSVC x64 names of the V8 functions in the static
-    // library the `v8` crate links; the Rust signatures follow the Microsoft x64 convention for them
-    // (see the module documentation).
+    // SAFETY (all declarations): these are the MSVC x64 and Itanium x86-64 names of the V8 functions in
+    // the static library the `v8` crate links; the Rust signatures follow the target's convention for
+    // them (see the module documentation). Where the two differ, the Itanium declaration is private
+    // and a function of the MSVC shape wraps it.
     extern "C" {
         /// `void v8::ObjectTemplate::SetAccessCheckCallbackAndHandler(AccessCheckCallback, const
         /// NamedPropertyHandlerConfiguration&, const IndexedPropertyHandlerConfiguration&,
         /// Local<Value>)`.
-        #[link_name = "?SetAccessCheckCallbackAndHandler@ObjectTemplate@v8@@QEAAXP6A_NV?$Local@VContext@v8@@@2@V?$Local@VObject@v8@@@2@V?$Local@VValue@v8@@@2@@ZAEBUNamedPropertyHandlerConfiguration@2@AEBUIndexedPropertyHandlerConfiguration@2@2@Z"]
+        #[cfg_attr(
+            v8_abi_msvc,
+            link_name = "?SetAccessCheckCallbackAndHandler@ObjectTemplate@v8@@QEAAXP6A_NV?$Local@VContext@v8@@@2@V?$Local@VObject@v8@@@2@V?$Local@VValue@v8@@@2@@ZAEBUNamedPropertyHandlerConfiguration@2@AEBUIndexedPropertyHandlerConfiguration@2@2@Z"
+        )]
+        #[cfg_attr(
+            v8_abi_itanium,
+            link_name = "_ZN2v814ObjectTemplate32SetAccessCheckCallbackAndHandlerEPFbNS_5LocalINS_7ContextEEENS1_INS_6ObjectEEENS1_INS_5ValueEEEERKNS_33NamedPropertyHandlerConfigurationERKNS_35IndexedPropertyHandlerConfigurationES7_"
+        )]
         pub fn set_access_check_callback_and_handler(
             this: *const v8::ObjectTemplate,
             callback: *const c_void,
@@ -133,16 +142,82 @@ mod ffi {
         );
 
         /// `void v8::Isolate::SetFailedAccessCheckCallbackFunction(FailedAccessCheckCallback)`.
-        #[link_name = "?SetFailedAccessCheckCallbackFunction@Isolate@v8@@QEAAXP6AXV?$Local@VObject@v8@@@2@W4AccessType@2@V?$Local@VValue@v8@@@2@@Z@Z"]
+        #[cfg_attr(
+            v8_abi_msvc,
+            link_name = "?SetFailedAccessCheckCallbackFunction@Isolate@v8@@QEAAXP6AXV?$Local@VObject@v8@@@2@W4AccessType@2@V?$Local@VValue@v8@@@2@@Z@Z"
+        )]
+        #[cfg_attr(
+            v8_abi_itanium,
+            link_name = "_ZN2v87Isolate36SetFailedAccessCheckCallbackFunctionEPFvNS_5LocalINS_6ObjectEEENS_10AccessTypeENS1_INS_5ValueEEEE"
+        )]
         pub fn set_failed_access_check_callback_function(
             this: *mut c_void,
             callback: *const c_void,
         );
 
         /// `static Isolate* v8::Isolate::GetCurrent()`.
-        #[link_name = "?GetCurrent@Isolate@v8@@SAPEAV12@XZ"]
+        #[cfg_attr(v8_abi_msvc, link_name = "?GetCurrent@Isolate@v8@@SAPEAV12@XZ")]
+        #[cfg_attr(v8_abi_itanium, link_name = "_ZN2v87Isolate10GetCurrentEv")]
         pub fn get_current_isolate() -> *mut c_void;
 
+        /// `Context::BackupIncumbentScope::~BackupIncumbentScope()` (Itanium: the complete object
+        /// destructor).
+        #[cfg_attr(v8_abi_msvc, link_name = "??1BackupIncumbentScope@Context@v8@@QEAA@XZ")]
+        #[cfg_attr(v8_abi_itanium, link_name = "_ZN2v87Context20BackupIncumbentScopeD1Ev")]
+        pub fn backup_incumbent_scope_drop(this: *mut BackupIncumbentScope);
+    }
+
+    // Itanium: a trivially copyable `Local` comes back in a register, and a constructor returns
+    // nothing.
+    #[cfg(v8_abi_itanium)]
+    mod itanium {
+        use super::BackupIncumbentScope;
+        use std::ffi::c_void;
+
+        extern "C" {
+            #[link_name = "_ZN2v87Isolate17GetCurrentContextEv"]
+            pub fn get_current_context(this: *mut c_void) -> *const c_void;
+
+            #[link_name = "_ZN2v87Isolate19GetIncumbentContextEv"]
+            pub fn get_incumbent_context(this: *mut c_void) -> *const c_void;
+
+            /// The complete object constructor.
+            #[link_name = "_ZN2v87Context20BackupIncumbentScopeC1ENS_5LocalIS0_EE"]
+            pub fn backup_incumbent_scope_new(
+                this: *mut BackupIncumbentScope,
+                context: *const c_void,
+            );
+        }
+    }
+
+    /// `Isolate::GetCurrentContext`, its `Local` stored through `ret`.
+    #[cfg(v8_abi_itanium)]
+    pub unsafe fn get_current_context(this: *mut c_void, ret: *mut *const c_void) {
+        // SAFETY: the caller's contract, as for the MSVC declaration.
+        unsafe { *ret = itanium::get_current_context(this) };
+    }
+
+    /// `Isolate::GetIncumbentContext`, its `Local` stored through `ret`.
+    #[cfg(v8_abi_itanium)]
+    pub unsafe fn get_incumbent_context(this: *mut c_void, ret: *mut *const c_void) {
+        // SAFETY: the caller's contract, as for the MSVC declaration.
+        unsafe { *ret = itanium::get_incumbent_context(this) };
+    }
+
+    /// `BackupIncumbentScope::BackupIncumbentScope(Local<Context>)`.
+    #[cfg(v8_abi_itanium)]
+    pub unsafe fn backup_incumbent_scope_new(
+        this: *mut BackupIncumbentScope,
+        context: *const c_void,
+    ) {
+        // SAFETY: the caller's contract, as for the MSVC declaration.
+        unsafe { itanium::backup_incumbent_scope_new(this, context) };
+    }
+
+    // MSVC: a member function returns a class through a hidden pointer after `this`, and a
+    // constructor returns `this`.
+    #[cfg(v8_abi_msvc)]
+    extern "C" {
         /// `Local<Context> v8::Isolate::GetCurrentContext()`: the `Local` comes back through `ret`.
         #[link_name = "?GetCurrentContext@Isolate@v8@@QEAA?AV?$Local@VContext@v8@@@2@XZ"]
         pub fn get_current_context(
@@ -163,10 +238,6 @@ mod ffi {
             this: *mut BackupIncumbentScope,
             context: *const c_void,
         ) -> *mut BackupIncumbentScope;
-
-        /// `Context::BackupIncumbentScope::~BackupIncumbentScope()`.
-        #[link_name = "??1BackupIncumbentScope@Context@v8@@QEAA@XZ"]
-        pub fn backup_incumbent_scope_drop(this: *mut BackupIncumbentScope);
     }
 
     /// `v8::Context::BackupIncumbentScope`.
@@ -181,7 +252,7 @@ mod ffi {
 /// `bool (*)(Local<Context> accessing_context, Local<Object> accessed_object, Local<Value> data)`.
 ///
 /// Fails closed: without hooks, or after a panic in them, the access is refused.
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 #[allow(improper_ctypes_definitions)]
 unsafe extern "C" fn access_check<'a>(
     context: v8::Local<'a, v8::Context>,
@@ -197,7 +268,7 @@ unsafe extern "C" fn access_check<'a>(
 
 /// `void (*)(Local<Object> target, AccessType type, Local<Value> data)`. V8 requires an exception
 /// from it; a panic terminates the script instead, which also unwinds out of the access.
-#[cfg(all(windows, target_arch = "x86_64"))]
+#[cfg(v8_abi)]
 #[allow(improper_ctypes_definitions)]
 unsafe extern "C" fn failed_access_check<'a>(
     target: v8::Local<'a, v8::Object>,
@@ -234,7 +305,7 @@ pub fn install(isolate: &mut v8::Isolate, hooks: Hooks) {
         "V8 is {version}, access_check.rs was verified against {VERIFIED_V8}: see docs/v8-upgrade.md"
     );
     isolate.set_slot(hooks);
-    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[cfg(v8_abi)]
     {
         let callback: unsafe extern "C" fn(v8::Local<'static, v8::Object>, i32, *const v8::Value) =
             failed_access_check;
@@ -250,13 +321,13 @@ pub fn install(isolate: &mut v8::Isolate, hooks: Hooks) {
 
 /// Makes instances of `template` (and, for a global template, the global proxy of contexts made from
 /// it) access checked. The template must not have been instantiated yet.
-#[cfg_attr(not(all(windows, target_arch = "x86_64")), allow(unused_variables))]
+#[cfg_attr(not(v8_abi), allow(unused_variables))]
 pub fn guard_template(
     template: v8::Local<'_, v8::ObjectTemplate>,
     named: NamedHandlers,
     indexed: IndexedHandlers,
 ) {
-    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[cfg(v8_abi)]
     {
         let n = ffi::NamedConfiguration {
             getter: Some(named.getter),
@@ -306,7 +377,7 @@ pub fn guard_template(
 /// HTML's incumbent realm: V8's incumbent context (the context of the topmost script on the stack,
 /// not of the API function being called, which is the current one).
 pub fn incumbent_context<'s>(scope: &v8::PinScope<'s, '_>) -> v8::Local<'s, v8::Context> {
-    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[cfg(v8_abi)]
     {
         let mut out: *const c_void = std::ptr::null();
         // SAFETY: the isolate is entered on this thread; `out` receives the `Local`'s one pointer, a
@@ -331,7 +402,7 @@ pub fn with_backup_incumbent<'s, R>(
     context: v8::Local<'s, v8::Context>,
     f: impl FnOnce() -> R,
 ) -> R {
-    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[cfg(v8_abi)]
     {
         struct Scope(std::mem::MaybeUninit<ffi::BackupIncumbentScope>);
         impl Drop for Scope {
@@ -353,14 +424,14 @@ pub fn with_backup_incumbent<'s, R>(
         }
         f()
     }
-    #[cfg(not(all(windows, target_arch = "x86_64")))]
+    #[cfg(not(v8_abi))]
     {
         let _ = context;
         f()
     }
 }
 
-#[cfg(all(test, windows, target_arch = "x86_64"))]
+#[cfg(all(test, v8_abi))]
 mod tests {
     use super::*;
     use std::cell::RefCell;

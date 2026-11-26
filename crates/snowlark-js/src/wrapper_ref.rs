@@ -15,7 +15,7 @@
 //! object dies or [`WrapperRef::make_strong`] runs. Its owner keeps it in place (the wrapper table in
 //! `snowlark-bindings` stores entries in pages that never move) and drops it there.
 //!
-//! The `v8` crate binds none of this, so it is reached by the MSVC x64 names of the functions behind
+//! The `v8` crate binds none of this, so it is reached by the mangled names of the functions behind
 //! V8's inline handle code, as [`crate::cached_accessor`] does (see `docs/v8-upgrade.md`).
 
 use std::cell::Cell;
@@ -29,23 +29,42 @@ mod ffi {
     use super::Address;
     use std::ffi::c_void;
 
-    // SAFETY (all declarations): the MSVC x64 names of `v8::api_internal` functions in the static library
-    // the `v8` crate links, with their C++ signatures (`v8-persistent-handle.h`, `v8-internal.h`). Every
-    // argument is a pointer or an integer, passed in a register.
+    // SAFETY (all declarations): the MSVC x64 and Itanium x86-64 names of `v8::api_internal` functions
+    // in the static library the `v8` crate links, with their C++ signatures (`v8-persistent-handle.h`,
+    // `v8-internal.h`). Every argument is a pointer or an integer, passed in a register.
     extern "C" {
         /// `internal::Address* GlobalizeReference(internal::Isolate*, internal::Address)`: a new strong
         /// global handle to the object at `value`. A `v8::Isolate*` is the `internal::Isolate*` itself.
-        #[link_name = "?GlobalizeReference@api_internal@v8@@YAPEA_KPEAVIsolate@internal@2@_K@Z"]
+        #[cfg_attr(
+            not(v8_abi_itanium),
+            link_name = "?GlobalizeReference@api_internal@v8@@YAPEA_KPEAVIsolate@internal@2@_K@Z"
+        )]
+        #[cfg_attr(
+            v8_abi_itanium,
+            link_name = "_ZN2v812api_internal18GlobalizeReferenceEPNS_8internal7IsolateEm"
+        )]
         pub fn globalize_reference(isolate: *mut c_void, value: Address) -> *mut Address;
         /// `void MakeWeak(internal::Address** location_addr)`: the handle at `*location_addr` turns
         /// weak; when its object dies, V8 stores null at `location_addr` and frees the handle.
-        #[link_name = "?MakeWeak@api_internal@v8@@YAXPEAPEA_K@Z"]
+        #[cfg_attr(
+            not(v8_abi_itanium),
+            link_name = "?MakeWeak@api_internal@v8@@YAXPEAPEA_K@Z"
+        )]
+        #[cfg_attr(v8_abi_itanium, link_name = "_ZN2v812api_internal8MakeWeakEPPm")]
         pub fn make_weak(location_addr: *mut *mut Address);
         /// `void* ClearWeak(internal::Address* location)`: a weak handle turns strong again.
-        #[link_name = "?ClearWeak@api_internal@v8@@YAPEAXPEA_K@Z"]
+        #[cfg_attr(
+            not(v8_abi_itanium),
+            link_name = "?ClearWeak@api_internal@v8@@YAPEAXPEA_K@Z"
+        )]
+        #[cfg_attr(v8_abi_itanium, link_name = "_ZN2v812api_internal9ClearWeakEPm")]
         pub fn clear_weak(location: *mut Address) -> *mut c_void;
         /// `void DisposeGlobal(internal::Address* location)`: frees a global handle, weak or strong.
-        #[link_name = "?DisposeGlobal@api_internal@v8@@YAXPEA_K@Z"]
+        #[cfg_attr(
+            not(v8_abi_itanium),
+            link_name = "?DisposeGlobal@api_internal@v8@@YAXPEA_K@Z"
+        )]
+        #[cfg_attr(v8_abi_itanium, link_name = "_ZN2v812api_internal13DisposeGlobalEPm")]
         pub fn dispose_global(location: *mut Address);
     }
 

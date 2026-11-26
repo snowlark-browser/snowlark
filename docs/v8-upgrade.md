@@ -5,11 +5,19 @@ change of the `v8` crate version, or of the V8 library's build arguments, must r
 against the new library (symbol names, argument passing, vtable and struct layout) and run the streaming, code
 cache and access check tests before anything else.
 
+Every such declaration has two names: the MSVC x64 one (Windows) and the Itanium x86-64 one (Linux), chosen by
+the `v8_abi_msvc` and `v8_abi_itanium` cfgs that `crates/snowlark-js/build.rs` sets (`v8_abi` for either; code
+that needs one is compiled only where it holds). Where the two conventions pass or return differently (a `Local`
+or `MaybeLocal` returned through a hidden pointer on MSVC and in a register on Itanium; a `std::unique_ptr`
+argument passed by address on MSVC and, being `[[clang::trivial_abi]]` in V8's libc++, as the pointer it holds
+on Itanium; constructors returning `this` on MSVC and nothing on Itanium; the vtable's destructor slots), the
+Itanium declaration is private and a function of the MSVC shape wraps it, so callers are the same on both.
+
 ## What is reached directly
 
 - `crates/snowlark-js/src/cached_accessor.rs` reaches `FunctionTemplate::NewWithCache` by its mangled name.
 - `crates/snowlark-js/src/streaming.rs` reaches V8's script-streaming and off-thread code-cache APIs through
-  their MSVC x64 mangled symbol names and a hand-laid vtable.
+  their mangled symbol names and a hand-laid vtable.
 - `crates/snowlark-js/src/access_check.rs` reaches V8's access checks the same way, with hand-laid
   `*PropertyHandlerConfiguration` structs.
 - `crates/snowlark-js/src/object_clone.rs` reaches `Object::Clone(Isolate*)` (new wrappers are clones of a
@@ -49,8 +57,9 @@ starts until the new version is verified. A symbol that moved stops the link; a 
 which is why the pin exists. To re-verify, with `$v8` the crate's source (it ships V8's headers and sources in
 `v8/`):
 
-1. **Names.** `dumpbin /linkermember:1 <the library>`, and search for each `link_name` in the files above. The
-   mangled name carries the argument types, so a changed signature shows here.
+1. **Names.** `dumpbin /linkermember:1 <the library>` on Windows, `nm --defined-only librusty_v8.a` on Linux, and
+   search for each `link_name` in the files above. The mangled name carries the argument types, so a changed
+   signature shows here.
 2. **Layout.** In `$v8/v8/include/v8-template.h`, compare the fields of `NamedPropertyHandlerConfiguration` and
    `IndexedPropertyHandlerConfiguration`, in order, with `ffi::NamedConfiguration` and
    `ffi::IndexedConfiguration`, and the callback typedefs with the crate's `Named*Callback` and
@@ -60,7 +69,8 @@ which is why the pin exists. To re-verify, with `$v8` the crate's source (it shi
    callback after, an exception required.
 4. Set `VERIFIED_V8`, then run `.\dev.ps1 test --release --package snowlark-js access_check` (every handler slot
    is driven through V8: one that moved fails or crashes) and
-   `.\dev.ps1 test --release --package snowlark-page --test it cross_origin::`.
+   `.\dev.ps1 test --release --package snowlark-page --test it cross_origin::`; on Linux,
+   `tools/linux/cargo.sh test --profile iter -p snowlark-js` (`docs/v8-build.md`, "Linux").
 
 ## The library
 
