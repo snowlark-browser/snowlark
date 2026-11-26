@@ -16,9 +16,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   and some reveals never happen: a background
   video that a lazily loaded player draws into a WebGL canvas, an animated hero that stays hidden (ref 778), and
   tiles and sections a page's script keeps at opacity 0 (ref 779).
-- Dragging some draggable elements made by a page's script selects the page's text instead of moving the element
-  (ref 838).
-- On gsap.com the hero's heading shows a swapped-in letter over the final one (ref 841).
+- A point over an `svg` with `pointer-events: none` but none of its shapes still targets the `svg` instead of what
+  is beneath it (ref 839).
+- Dragging a selection beside an inline `svg` heading extends it to the next line's text (ref 840).
 - A link opened in a new background tab keeps loading until you switch to the tab (ref 842).
 - Opening some pages, such as About Snowlark, shows the busy pointer for a few seconds (ref 843).
 - An image opened on its own shows in the top-left corner instead of centred (ref 853).

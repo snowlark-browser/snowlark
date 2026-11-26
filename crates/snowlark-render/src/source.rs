@@ -470,6 +470,7 @@ impl<'a> DocumentStyles<'a> {
                 controls,
             })),
             generated: None,
+            svg_root: false,
         })
     }
 
@@ -615,13 +616,9 @@ impl<'a> DocumentStyles<'a> {
                         // given by CSS it is 0×0 (it represents nothing, or its alt text, which
                         // is not rendered here).
                         _ => ReplacedContent {
-                            image: None,
                             natural_width: Some(0.0),
                             natural_height: Some(0.0),
-                            natural_ratio: None,
-                            control: None,
-                            media: None,
-                            generated: None,
+                            ..ReplacedContent::default()
                         },
                     });
                 }
@@ -674,6 +671,7 @@ impl<'a> DocumentStyles<'a> {
                         control: None,
                         media: None,
                         generated: None,
+                        svg_root: false,
                     });
                 }
                 local_name!("object") | local_name!("embed")
@@ -715,15 +713,7 @@ impl<'a> DocumentStyles<'a> {
                 | local_name!("embed")
                 | local_name!("object") => {
                     // No natural dimensions: CSS 2 §10.3.2's 300×150 default applies.
-                    return Some(ReplacedContent {
-                        image: None,
-                        natural_width: None,
-                        natural_height: None,
-                        natural_ratio: None,
-                        control: None,
-                        media: None,
-                        generated: None,
-                    });
+                    return Some(ReplacedContent::default());
                 }
                 _ => return None,
             }
@@ -749,9 +739,8 @@ impl<'a> DocumentStyles<'a> {
                 natural_width: w,
                 natural_height: h,
                 natural_ratio: ratio,
-                control: None,
-                media: None,
-                generated: None,
+                svg_root: true,
+                ..ReplacedContent::default()
             });
         }
         None

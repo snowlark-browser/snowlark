@@ -617,6 +617,10 @@ pub(crate) struct Painter<'k, K> {
     pub in_layer: bool,
     /// Painting the content of a layer attached to the viewport ([`LayerKind::Fixed`]).
     pub in_fixed: bool,
+    /// Painting the content of a `transform-style: preserve-3d` stacking context: what is in it is
+    /// in a 3D rendering context, whose accumulated matrices are not computed, so its backface
+    /// visibility is not decided (everything shows).
+    pub in_3d: bool,
     /// Painting the content of a sticky layer that is outside every group: `groups` when it was
     /// pushed (a fixed box in it, with no group opened since, is a fixed layer of its own).
     pub sticky_base: Option<u32>,
@@ -1049,6 +1053,11 @@ impl<K> Painter<'_, K> {
             return;
         };
         let s = &b.style;
+        // (an element that shows its hidden back face renders nothing and takes no hit; one in or
+        // establishing a 3D rendering context is not judged by its own matrix alone)
+        if s.backface_hidden() && !self.in_3d && !s.preserve_3d() {
+            return;
+        }
         // A direct compositing reason (Blink's `CompositingReasonFinder::DirectReasonsForPaintProperties`:
         // a transform or opacity animation in effect, `will-change: transform | opacity`) makes the
         // stacking context a layer of its own inside its transform and opacity groups, which a
@@ -1178,7 +1187,9 @@ impl<K> Painter<'_, K> {
             self.sink.push_filter(&filters, group_bounds());
             self.groups += 1;
         }
+        let was_3d = std::mem::replace(&mut self.in_3d, s.preserve_3d());
         self.stacking_context(f, at, path, adopted, base_clip);
+        self.in_3d = was_3d;
         if inner_filter {
             self.sink.pop_filter();
             self.groups -= 1;
@@ -4935,15 +4946,24 @@ impl<S: Style> Sink<S> for HitSink {
 
     fn replaced(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point) {
         // (an inert replaced element's content, an SVG document fragment or a nested document,
-        // is inert with it: HTML §6.3; `pointer-events` alone does not decide, since an SVG
-        // element inside may set it back)
+        // is inert with it: HTML §6.3)
         if b.style.inert() {
             return;
         }
-        let content = match &b.content {
-            BoxContent::Replaced { clip, .. } => Some(Point::new(at.x + clip.x, at.y + clip.y)),
-            _ => None,
+        let (content, svg_root) = match &b.content {
+            BoxContent::Replaced { clip, content, .. } => (
+                Some(Point::new(at.x + clip.x, at.y + clip.y)),
+                content.svg_root,
+            ),
+            _ => (None, false),
         };
+        // CSS UI 4 §5.2 `pointer-events: none`, and `visibility`: the element is not the target
+        // of pointer events, and the point goes to what is beneath it (a canvas, an image, a
+        // video, a frame's whole document). An outermost `svg` element alone is hit tested
+        // still: an element inside may set them back.
+        if !svg_root && (!b.style.pointer_events() || b.style.visibility() != Visibility::Visible) {
+            return;
+        }
         self.record_with(
             Rect::new(at.x, at.y, f.size.width, f.size.height),
             None,

@@ -1843,6 +1843,9 @@ pub struct ReplacedContent {
     /// An image that is not a stored bitmap (a gradient or a cross-fade from `content`), painted
     /// into the object-fit rectangle.
     pub generated: Option<Image>,
+    /// An outermost `svg` element: its graphics elements take hits by their own `pointer-events`
+    /// and `visibility` (SVG 2 §16.5), so its box is hit tested whatever its own say.
+    pub svg_root: bool,
 }
 
 /// A form control widget as HTML §15.5 renders it: an `input`, `select`, `textarea`, `progress` or
@@ -1965,6 +1968,7 @@ impl ReplacedContent {
             control: None,
             media: None,
             generated: None,
+            svg_root: false,
         }
     }
 
@@ -1978,6 +1982,7 @@ impl ReplacedContent {
             control: None,
             media: None,
             generated: None,
+            svg_root: false,
         }
     }
 
@@ -2706,6 +2711,18 @@ pub trait Style: Clone {
     }
     /// Whether `transform` (or `translate`/`rotate`/`scale`) is not `none`.
     fn has_transform(&self) -> bool {
+        false
+    }
+    /// CSS Transforms 2 §11 `backface-visibility: hidden` with the back face toward the viewer: the
+    /// element is not rendered. The element is not in a 3D rendering context (`transform-style:
+    /// preserve-3d` is not supported), so its own 3D transformation matrix decides: its row 3,
+    /// column 3 component is negative.
+    fn backface_hidden(&self) -> bool {
+        false
+    }
+    /// `transform-style: preserve-3d`: the element's children are in a 3D rendering context, where
+    /// backface visibility follows the accumulated matrix (CSS Transforms 2 §6).
+    fn preserve_3d(&self) -> bool {
         false
     }
     /// The transform as a 2D matrix in the box's local coordinates (origin at the border box's top-left),

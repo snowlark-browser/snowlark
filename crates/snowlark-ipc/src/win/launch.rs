@@ -398,6 +398,9 @@ fn create(
             let mut startup = STARTUPINFOEXW::default();
             startup.StartupInfo.cb = std::mem::size_of::<STARTUPINFOEXW>() as u32;
             startup.lpAttributeList = attributes;
+            // (no "app starting" feedback cursor: Windows shows it for a new GUI-subsystem
+            // process until it takes input or a timeout passes, and a child never shows a window)
+            startup.StartupInfo.dwFlags |= STARTF_FORCEOFFFEEDBACK;
             if let Some(stderr) = stderr {
                 startup.StartupInfo.dwFlags |= STARTF_USESTDHANDLES;
                 startup.StartupInfo.hStdError = stderr;

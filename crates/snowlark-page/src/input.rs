@@ -79,6 +79,10 @@ pub struct PointerState {
     /// The buttons held (UI Events `buttons` bits).
     pub buttons: u16,
     pub last: Point,
+    /// Pointer Events 3 §11.2 "PREVENT MOUSE EVENT flag" of the mouse: its primary `pointerdown`
+    /// was canceled, so no compatibility `mousedown`, `mousemove` or `mouseup` is fired until the
+    /// `pointerup` (the boundary mouse events and `click` still are).
+    pub prevent_mouse: bool,
     /// The last `keydown` was canceled: its character is not typed.
     pub suppress_char: bool,
     /// A press-and-drag selecting in a text control.
@@ -714,8 +718,18 @@ impl Engine {
                 .iter()
                 .map(|&(at, time)| (Point::new(at.x + dx, at.y + dy), time))
                 .collect();
-            let (not_canceled, movement) = self.fire_pointer_move(cx, t, p, buttons, mods, &moves);
-            if not_canceled && self.dom().is_alive(t) {
+            let (_, movement) = self.fire_pointer_move(cx, t, p, buttons, mods, &moves);
+            // Pointer Events 3 §11.2: the compatibility `mousemove` follows unless the PREVENT
+            // MOUSE EVENT flag is set (canceling the `pointermove` itself does not suppress it).
+            let prevented = {
+                let mut ps = self.pointer.borrow_mut();
+                // (a move with no button held: the press ended outside the page)
+                if ps.buttons == 0 {
+                    ps.prevent_mouse = false;
+                }
+                ps.prevent_mouse
+            };
+            if !prevented && self.dom().is_alive(t) {
                 // (the move's compatibility mouse event moved as far as its pointermove)
                 let e = self.pointer_event(
                     InterfaceId::MouseEvent,
@@ -1125,8 +1139,19 @@ impl Engine {
             0,
             None,
         );
-        let mut default = true;
-        if go {
+        // Pointer Events 3 §11.2: a canceled `pointerdown` sets the PREVENT MOUSE EVENT flag, and
+        // while it is set no compatibility `mousedown` is fired. The press's default actions
+        // (focus, starting a selection or a drag) are those of an uncanceled press: canceling
+        // either event suppresses them.
+        let prevented = {
+            let mut ps = self.pointer.borrow_mut();
+            if !go {
+                ps.prevent_mouse = true;
+            }
+            ps.prevent_mouse
+        };
+        let mut default = go;
+        if !prevented {
             default = self.fire_pointer(
                 cx,
                 InterfaceId::MouseEvent,
@@ -1324,7 +1349,7 @@ impl Engine {
         let Some(t) = target else {
             return self.pointer_outcome(None, false);
         };
-        let go = self.fire_pointer(
+        self.fire_pointer(
             cx,
             InterfaceId::PointerEvent,
             "pointerup",
@@ -1336,7 +1361,18 @@ impl Engine {
             0,
             None,
         );
-        if go {
+        // Pointer Events 3 §11.2: the compatibility `mouseup` follows unless the PREVENT MOUSE
+        // EVENT flag is set (canceling the `pointerup` does not suppress it); the `pointerup` of the
+        // last button clears the flag.
+        let prevented = {
+            let mut ps = self.pointer.borrow_mut();
+            let prevented = ps.prevent_mouse;
+            if buttons == 0 {
+                ps.prevent_mouse = false;
+            }
+            prevented
+        };
+        if !prevented {
             self.fire_pointer(
                 cx,
                 InterfaceId::MouseEvent,

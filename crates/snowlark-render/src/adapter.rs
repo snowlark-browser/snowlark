@@ -684,6 +684,39 @@ pub(crate) fn css_transform(
     full.is_finite().then_some(full)
 }
 
+/// CSS Transforms 2 §11: `backface-visibility: hidden` and the element's 3D transformation matrix
+/// (`transform`, then `scale` and `rotate`) has a negative row 3, column 3 component, its back face
+/// toward the viewer. Translations, the origin, a parent's `perspective` and 2D rotations leave that
+/// component as it is, so no reference box is needed.
+pub(crate) fn backface_hidden(values: &ComputedValues) -> bool {
+    use style::values::computed::BackfaceVisibility;
+    use style::values::generics::transform::{GenericRotate, GenericScale};
+    let b = values.get_box();
+    if b.backface_visibility != BackfaceVisibility::Hidden || !has_css_transform(values) {
+        return false;
+    }
+    let basis = euclid::default::Rect::new(
+        euclid::default::Point2D::new(Length::new(0.0), Length::new(0.0)),
+        euclid::default::Size2D::new(Length::new(0.0), Length::new(0.0)),
+    );
+    let mut m = match b.transform.to_transform_3d_matrix(Some(&basis)) {
+        Ok((t, _)) => t,
+        Err(()) => return false,
+    };
+    if let GenericScale::Scale(x, y, z) = &b.scale {
+        m = m.then(&euclid::default::Transform3D::scale(*x, *y, *z));
+    }
+    if let GenericRotate::Rotate3D(x, y, z, a) = &b.rotate {
+        m = m.then(&euclid::default::Transform3D::rotation(
+            *x,
+            *y,
+            *z,
+            euclid::Angle::radians(a.radians()),
+        ));
+    }
+    m.m33 < 0.0
+}
+
 /// `transform-origin` in the `reference` box's coordinates.
 pub(crate) fn transform_origin(values: &ComputedValues, reference: Rect) -> Point {
     let o = &values.get_box().transform_origin;
@@ -3209,6 +3242,14 @@ impl ls::Style for RenderStyle {
 
     fn has_transform(&self) -> bool {
         has_css_transform(&self.values)
+    }
+
+    fn backface_hidden(&self) -> bool {
+        backface_hidden(&self.values)
+    }
+
+    fn preserve_3d(&self) -> bool {
+        self.values.get_box().transform_style == style::values::computed::TransformStyle::Preserve3d
     }
 
     fn phys_transform(&self, reference: Rect) -> Option<Matrix> {
