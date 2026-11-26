@@ -220,6 +220,87 @@ fn a_backdrop_read_from_the_root_holds_the_canvas_and_only_what_is_under_the_box
     );
 }
 
+/// `n` sibling backdrop filters that invert, stacked over the same box: each one's backdrop holds
+/// what the ones before it drew (Filter Effects 2 §3: the backdrop is everything painted since the
+/// backdrop root), so the box shows the page inverted `n` times.
+fn stacked_inverts(n: usize, rect: Rect) -> DisplayList {
+    let mut b = DisplayListBuilder::new();
+    halves(&mut b);
+    for _ in 0..n {
+        b.backdrop_filter(&[FilterOp::Invert(1.0)], rect, Radii::ZERO, 0);
+    }
+    b.build()
+}
+
+#[test]
+fn stacked_backdrops_each_read_what_the_ones_before_drew() {
+    for n in 1..=8 {
+        let list = stacked_inverts(n, Rect::new(20.0, 20.0, 80.0, 80.0));
+        let (left, right) = if n % 2 == 0 {
+            (RED, BLUE)
+        } else {
+            (CYAN, YELLOW)
+        };
+        for (what, pm) in ["headless", "tiles"].into_iter().zip(render(&list)) {
+            for (x, expected) in [(40, left), (80, right), (10, RED)] {
+                let got = pm.pixel(x, 60);
+                assert!(
+                    close(got, expected, 0),
+                    "{n} stacked, {what}: ({x}, 60) is {got:?}, expected {expected:?}"
+                );
+            }
+        }
+    }
+}
+
+/// Stacked backdrop filters, as a header that blurs more towards its edge stacks them: each is
+/// rendered once a frame, not once more inside each later one's backdrop, nor once per tile it is
+/// in (at a display scale, where a tile's pixels are offset from the frame's).
+#[test]
+fn stacked_backdrops_are_rendered_once_a_frame() {
+    let text = TextEngine::new().unwrap();
+    let images = ImageStore::new();
+    let mut tiles = TileRasterizer::new(Gpu::with_driver(Driver::Warp).unwrap()).unwrap();
+    let sources = Sources {
+        text: &text,
+        images: &images,
+    };
+    let view = Viewport {
+        width: 1024,
+        height: 300,
+        scale: 1.5,
+        background: Color::WHITE,
+    };
+    // (the box spans the tile edge at device pixel 512)
+    let rect = Rect::new(300.0, 20.0, 100.0, 140.0);
+    let stack = |ops: &dyn Fn(usize) -> FilterOp, n: usize| {
+        let mut b = DisplayListBuilder::new();
+        b.fill_rect(Rect::new(0.0, 0.0, 360.0, 200.0), RED);
+        b.fill_rect(Rect::new(360.0, 0.0, 400.0, 200.0), BLUE);
+        for i in 0..n {
+            b.backdrop_filter(&[ops(i)], rect, Radii::ZERO, 0);
+        }
+        b.build()
+    };
+    let list = stack(&|i| FilterOp::Blur(1.0 + i as f32), 12);
+    let frame = tiles.raster(&list, sources, &view).unwrap();
+    assert!(frame.tiles.len() > 1);
+    assert_eq!(tiles.backdrops_made(), 12);
+    tiles.recycle(frame);
+
+    // What the tiles show of one result agrees on both sides of their edge: five inverts.
+    let list = stack(&|_| FilterOp::Invert(1.0), 5);
+    let made = tiles.backdrops_made();
+    let frame = tiles.raster(&list, sources, &view).unwrap();
+    assert_eq!(tiles.backdrops_made() - made, 5);
+    let pm = tiles.read_back(&frame).unwrap();
+    // (red up to device pixel 540, blue beyond)
+    for (x, expected) in [(460, CYAN), (505, CYAN), (520, CYAN), (590, YELLOW)] {
+        assert_eq!(pm.pixel(x, 100), expected, "{x}");
+    }
+    assert_eq!(pm.pixel(440, 100), RED);
+}
+
 /// An opacity group at 1 draws no layer of its own (it is a backdrop root and nothing more), so a
 /// `plus-lighter` sum (a cross-fade's) isolates itself: two half-transparent reds add up to red
 /// before they are composited over the blue page, once.

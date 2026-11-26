@@ -90,6 +90,62 @@ fn a_blurred_shadow_fades_at_every_scale() {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
+/// The shadow of a box far taller than the page shown (a long column, a page-high wrapper) is
+/// blurred where it is shown, at full resolution: its edge fades as a small box's does. (Blurred
+/// whole, it needs an intermediate past the largest a device makes, so it was made smaller and the
+/// edge came out blocky.)
+#[test]
+fn a_shadow_taller_than_the_page_fades_as_a_small_one_does() {
+    let text = TextEngine::new().unwrap();
+    let images = ImageStore::new();
+    let sources = Sources {
+        text: &text,
+        images: &images,
+    };
+    let tall = Rect::new(CARD.x, -50_000.0, CARD.width, 100_000.0);
+    let mut b = DisplayListBuilder::new();
+    b.box_shadow(BoxShadow {
+        rect: tall,
+        radii: Radii::ZERO,
+        offset: Point::new(0.0, 3.0),
+        blur: 12.0,
+        spread: 0.0,
+        color: Color::rgba(0, 0, 0, ALPHA),
+        inset: false,
+    });
+    b.fill_rect(tall, Color::rgb(255, 255, 255));
+    let list = b.build();
+    let mut headless = HeadlessRenderer::new().unwrap();
+    let mut tiles = TileRasterizer::new(Gpu::with_driver(Driver::Warp).unwrap()).unwrap();
+    let mut wrong = Vec::new();
+    for scale in [1.0f32, 1.5] {
+        let view = Viewport {
+            width: (W as f32 * scale) as u32,
+            height: (H as f32 * scale) as u32,
+            scale,
+            background: BG,
+        };
+        let a = headless.render(&list, sources, &view).unwrap();
+        let frame = tiles.raster(&list, sources, &view).unwrap();
+        let t = tiles.read_back(&frame).unwrap();
+        for (what, pm) in [("headless", &a), ("tiles", &t)] {
+            for y in [5.0f32, 70.0, 135.0] {
+                for x in [161.0f32, 163.0, 166.0, 170.0, 176.0, 182.0] {
+                    let px = (x * scale) as u32;
+                    let want = expected((px as f32 + 0.5) / scale);
+                    let got = pm.pixel(px, (y * scale) as u32).r as f32;
+                    if (got - want).abs() > 8.0 {
+                        wrong.push(format!(
+                            "{what} at {scale}x: CSS ({x}, {y}) is {got}, expected {want:.0}"
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
 /// An inset shadow is cast by the edges of a hole: inside the box, at distance d from an edge it
 /// covers as much as the Gaussian's tail beyond d.
 #[test]

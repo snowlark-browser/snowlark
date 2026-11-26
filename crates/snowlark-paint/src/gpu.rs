@@ -519,6 +519,12 @@ impl TileRasterizer {
         self.res.as_ref().map_or(0, |r| r.stops_made)
     }
 
+    /// How many backdrop filter results this rasterizer has rendered so far (each backdrop filter
+    /// once a frame, however many tiles and later backdrops show it: for tests).
+    pub fn backdrops_made(&self) -> u64 {
+        self.res.as_ref().map_or(0, |r| r.backdrops_made)
+    }
+
     /// [`TileRasterizer::raster`] for the part of `list` whose top-left corner is at device pixel
     /// `origin` (the frame's pixel (0, 0) shows the list's device pixel `origin`). With `sparse`,
     /// tiles that nothing draws into are left out of the frame (for a transparent layer that a
@@ -620,6 +626,7 @@ impl TileRasterizer {
         });
         let mut stats = RasterStats::default();
         let mut tiles = Vec::new();
+        self.res.as_mut().unwrap().begin_frame();
         let result = (|| -> Result<()> {
             for ty in 0..rows {
                 for tx in 0..columns {
@@ -665,6 +672,7 @@ impl TileRasterizer {
             }
             Ok(())
         })();
+        self.res.as_mut().unwrap().end_frame();
         self.work.paint += paint;
         self.work.copy += copy;
         bounds.clear();
@@ -731,7 +739,18 @@ impl TileRasterizer {
                 let res = self.res.as_mut().unwrap();
                 let mut painter =
                     Painter::new(&self.ctx, res, sources, base.then(&offset), tile.opaque)
-                        .over_canvas(view.background);
+                        .over_canvas(view.background)
+                        // (the whole frame, so that a backdrop filter's result serves every
+                        // tile it is in)
+                        .within(
+                            Rect::new(
+                                -(tile.x as f32),
+                                -(tile.y as f32),
+                                view.width as f32,
+                                view.height as f32,
+                            ),
+                            crate::geom::Point::new(tile.x as f32, tile.y as f32),
+                        );
                 // (bounds are frame device pixels: compare with the tile's area there)
                 painter.paint(list, Some((bounds, area)));
                 self.work.items += painter.drawn();

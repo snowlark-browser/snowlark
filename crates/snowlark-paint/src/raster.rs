@@ -116,6 +116,58 @@ pub(crate) struct Resources {
     record_ctxs: Vec<ID2D1DeviceContext>,
     /// How this context blurs (see [`BlurPath`]).
     blur: BlurPath,
+    /// The backdrop filter results of the frame being painted, each rendered once and drawn again
+    /// wherever a later backdrop paints its backdrop over again ([`Painter::backdrop_filter`]).
+    backdrops: Vec<BackdropResult>,
+    /// Whether `backdrops` lasts over several paints (the tiles of one frame) rather than one.
+    frame_open: bool,
+    /// How many backdrop filter results were rendered (for tests).
+    pub(crate) backdrops_made: u64,
+}
+
+/// A backdrop filter's result rendered into a bitmap: the item (`at` of the list at address
+/// `list`), the transform and crop it was rendered with, and the part of the crop the bitmap
+/// holds, all in the frame's device pixels (a tile's painter is offset from them).
+struct BackdropResult {
+    list: usize,
+    at: usize,
+    transform: Matrix,
+    crop: Rect,
+    region: Rect,
+    bitmap: ID2D1Bitmap1,
+}
+
+/// The most pixels the backdrop results of one frame hold together (beyond it a backdrop filter is
+/// drawn straight from its effect graph, and a later backdrop that reads it paints it again).
+const BACKDROP_PIXELS: u64 = 32 << 20;
+
+/// `r` grown to whole device pixels.
+fn round_out(r: &Rect) -> Rect {
+    Rect::from_ltrb(
+        r.x.floor(),
+        r.y.floor(),
+        r.right().ceil(),
+        r.bottom().ceil(),
+    )
+}
+
+/// Whether `outer` holds all of `inner`.
+fn covers(outer: &Rect, inner: &Rect) -> bool {
+    outer.x <= inner.x
+        && outer.y <= inner.y
+        && outer.right() >= inner.right()
+        && outer.bottom() >= inner.bottom()
+}
+
+/// Whether two transforms are the same but for rounding (a tile's offset added and taken away).
+fn same_matrix(a: &Matrix, b: &Matrix) -> bool {
+    let close = |x: f32, y: f32| (x - y).abs() <= 1e-4 * (1.0 + x.abs().max(y.abs()));
+    close(a.m11, b.m11)
+        && close(a.m12, b.m12)
+        && close(a.m21, b.m21)
+        && close(a.m22, b.m22)
+        && close(a.dx, b.dx)
+        && close(a.dy, b.dy)
 }
 
 /// A gradient stop collection and what it was made from.
@@ -247,8 +299,24 @@ impl Resources {
                 open_groups: Vec::new(),
                 record_ctxs: Vec::new(),
                 blur: BlurPath::from_env(),
+                backdrops: Vec::new(),
+                frame_open: false,
+                backdrops_made: 0,
             })
         }
+    }
+
+    /// Starts a frame painted in several pieces (tiles): backdrop results are kept until
+    /// [`Resources::end_frame`], so each is rendered once for all of them.
+    pub(crate) fn begin_frame(&mut self) {
+        self.backdrops.clear();
+        self.frame_open = true;
+    }
+
+    /// Ends what [`Resources::begin_frame`] started, freeing its backdrop results.
+    pub(crate) fn end_frame(&mut self) {
+        self.backdrops.clear();
+        self.frame_open = false;
     }
 
     /// Drops uploads of images that are gone (or showing another frame or other pixels).
@@ -327,6 +395,11 @@ pub(crate) struct Painter<'a> {
     canvas: Option<Color>,
     /// How many items it has drawn ([`Painter::drawn`]).
     drawn: u32,
+    /// The device pixels of what it paints that are shown or read: the frame, or for a backdrop
+    /// painted again, what its filters read. A backdrop filter renders its result there only.
+    need: Rect,
+    /// Where the painter's device pixel (0, 0) is in the frame's (a tile's top-left corner).
+    origin: Point,
 }
 
 /// An open backdrop root: where its content starts, the transform and snapping there, and the
@@ -383,12 +456,22 @@ impl<'a> Painter<'a> {
             depth: 0,
             canvas: None,
             drawn: 0,
+            need: Rect::infinite(),
+            origin: Point::new(0.0, 0.0),
         }
     }
 
     /// Says the list is painted over the canvas color `c` (see [`Painter::canvas`]).
     pub(crate) fn over_canvas(mut self, c: Color) -> Self {
         self.canvas = Some(c);
+        self
+    }
+
+    /// Says which device pixels are shown (`need`, the frame's in this painter's pixels) and where
+    /// its pixel (0, 0) is in the frame (`origin`).
+    pub(crate) fn within(mut self, need: Rect, origin: Point) -> Self {
+        self.need = need;
+        self.origin = origin;
         self
     }
 
@@ -410,10 +493,17 @@ impl<'a> Painter<'a> {
     /// Draws `list`. With `cull`, drawing items whose device bounds (from
     /// [`DisplayList::item_bounds`] under the same base) miss the rectangle are skipped.
     pub(crate) fn paint(&mut self, list: &DisplayList, cull: Option<(&[Rect], Rect)>) {
+        let own_frame = !self.res.frame_open;
+        if own_frame {
+            self.res.backdrops.clear();
+        }
         self.paint_items(list, 0..list.items.len(), cull);
         // (a list is validated before painting, so nothing is left open; this is belt and braces)
         while let Some(open) = self.stack.pop() {
             self.close(open);
+        }
+        if own_frame {
+            self.res.backdrops.clear();
         }
     }
 
@@ -662,11 +752,22 @@ impl<'a> Painter<'a> {
         range: std::ops::Range<usize>,
         cull: Option<(&[Rect], Rect)>,
     ) -> Result<ID2D1CommandList> {
-        self.record_at(list, range, self.transform, self.snap, cull, self.depth)
+        let space = (self.need, self.origin);
+        self.record_at(
+            list,
+            range,
+            self.transform,
+            self.snap,
+            cull,
+            self.depth,
+            space,
+        )
     }
 
-    /// [`Painter::record`] starting with `transform` and `snap`, `depth` backdrops deep.
+    /// [`Painter::record`] starting with `transform` and `snap`, `depth` backdrops deep, the
+    /// recording's needed pixels and frame origin `space` (see [`Painter::within`]).
     // SAFETY contract: as `record`.
+    #[allow(clippy::too_many_arguments)]
     unsafe fn record_at(
         &mut self,
         list: &DisplayList,
@@ -675,6 +776,7 @@ impl<'a> Painter<'a> {
         snap: Option<Snap>,
         cull: Option<(&[Rect], Rect)>,
         depth: u32,
+        space: (Rect, Point),
     ) -> Result<ID2D1CommandList> {
         let rctx = match self.res.record_ctxs.pop() {
             Some(c) => c,
@@ -691,6 +793,7 @@ impl<'a> Painter<'a> {
                 p.snap = snap;
                 p.root = (range.start, transform, snap);
                 p.depth = depth;
+                (p.need, p.origin) = space;
                 p.paint_items(list, range, cull);
                 while let Some(open) = p.stack.pop() {
                     p.close(open);
@@ -728,6 +831,8 @@ impl<'a> Painter<'a> {
             None,
             None,
             self.depth,
+            // (a tile's own pixels: the same in every tile of the frame)
+            (Rect::infinite(), Point::new(0.0, 0.0)),
         )?;
         let image: ID2D1Image = cmd.cast()?;
         let brush = self.ctx.CreateImageBrush(
@@ -768,7 +873,25 @@ impl<'a> Painter<'a> {
             (Some((bounds, area)), None) => Some((bounds, area)),
             (None, _) => None,
         };
-        let content: ID2D1Image = self.record(list, range, cull)?.cast()?;
+        // (what the functions read of the content to show the needed pixels)
+        let need = match self.transform.inverse() {
+            Some(inverse) => self.transform.apply_rect(&crate::filter::source_rect(
+                ops,
+                inverse.apply_rect(&self.need),
+            )),
+            None => Rect::infinite(),
+        };
+        let content: ID2D1Image = self
+            .record_at(
+                list,
+                range,
+                self.transform,
+                self.snap,
+                cull,
+                self.depth,
+                (need, self.origin),
+            )?
+            .cast()?;
         let (ctx, res, images) = (self.ctx, &mut *self.res, self.sources.images);
         let mut bitmaps = |id| uploaded(ctx, res, images, id).ok().map(|(b, _)| b);
         let out = crate::effects::apply(self.ctx, ops, &content, &self.transform, &mut bitmaps)?;
@@ -789,6 +912,12 @@ impl<'a> Painter<'a> {
     /// the border box's device rectangle with mirrored edges, filtered, and drawn clipped to the
     /// rounded border box. (Painting it again, rather than reading the target, works inside
     /// recorded groups and layers, whose pixels can't be read back.)
+    ///
+    /// The result is rendered once per frame, for the pixels that are shown or that a later
+    /// backdrop reads ([`Painter::need`]), into a bitmap ([`Resources::backdrops`]): a later
+    /// backdrop filter that paints this one again as part of its own backdrop draws that bitmap,
+    /// as reading the target's pixels would give it. Without it, each backdrop painted every
+    /// earlier one again, and stacked backdrops grew as the cube of their number.
     // SAFETY contract: as `record`.
     #[allow(clippy::too_many_arguments)]
     unsafe fn backdrop_filter(
@@ -801,18 +930,6 @@ impl<'a> Painter<'a> {
         own: u8,
         cull: Option<(&[Rect], Rect)>,
     ) -> Result<()> {
-        if self.depth >= MAX_BACKDROP_DEPTH {
-            return Ok(());
-        }
-        let ops = list.filter(filters);
-        let keep = self.marks.len().saturating_sub(own as usize);
-        let (from, transform, snap) = match keep.checked_sub(1) {
-            Some(k) => {
-                let m = self.marks[k];
-                (m.start, m.transform, m.snap)
-            }
-            None => self.root,
-        };
         // (the border box, snapped as the box was, in whole device pixels)
         let device = self.transform.apply_rect(&self.snapped(&rect));
         let crop = Rect::from_ltrb(
@@ -824,38 +941,137 @@ impl<'a> Painter<'a> {
         if crop.is_empty() {
             return Ok(());
         }
-        // (what is under the border box: with mirrored edges nothing beyond it is read)
-        let cull = cull.map(|(bounds, _)| (bounds, bounds[at]));
-        let under: ID2D1Image = self
-            .record_at(
-                list,
-                from..at.max(from),
-                transform,
-                snap,
-                cull,
-                self.depth + 1,
-            )?
-            .cast()?;
-        let base = match (keep, self.canvas) {
-            (0, Some(c)) => c,
-            _ => Color::TRANSPARENT,
+        // (of the result, what is shown or read later, in whole device pixels)
+        let region = crop.intersect(&round_out(&crop.intersect(&self.need)));
+        if region.is_empty() {
+            return Ok(());
+        }
+        let (ox, oy) = (self.origin.x, self.origin.y);
+        let list_key = list as *const DisplayList as usize;
+        let frame_transform = self.transform.then(&Matrix::translation(ox, oy));
+        let frame_crop = crop.translate(ox, oy);
+        let found = self.res.backdrops.iter().position(|b| {
+            b.list == list_key
+                && b.at == at
+                && b.crop == frame_crop
+                && same_matrix(&b.transform, &frame_transform)
+        });
+        let wanted = region.translate(ox, oy);
+        let (image, offset): (ID2D1Image, Option<Vector2>) = match found
+            .map(|i| &self.res.backdrops[i])
+            .filter(|b| covers(&b.region, &wanted))
+        {
+            Some(b) => (
+                b.bitmap.cast()?,
+                Some(Vector2 {
+                    X: b.region.x - ox,
+                    Y: b.region.y - oy,
+                }),
+            ),
+            None => {
+                if self.depth >= MAX_BACKDROP_DEPTH {
+                    return Ok(());
+                }
+                // (a part rendered before is rendered again with this one)
+                let region = match found {
+                    Some(i) => self.res.backdrops[i]
+                        .region
+                        .translate(-ox, -oy)
+                        .union(&region),
+                    None => region,
+                };
+                let ops = list.filter(filters);
+                let keep = self.marks.len().saturating_sub(own as usize);
+                let (from, transform, snap) = match keep.checked_sub(1) {
+                    Some(k) => {
+                        let m = self.marks[k];
+                        (m.start, m.transform, m.snap)
+                    }
+                    None => self.root,
+                };
+                // (what the filters read of the backdrop for the region: with mirrored edges,
+                // nothing beyond the border box)
+                let reads = match self.transform.inverse() {
+                    Some(inverse) => self
+                        .transform
+                        .apply_rect(&crate::filter::source_rect(
+                            ops,
+                            inverse.apply_rect(&region),
+                        ))
+                        .intersect(&crop),
+                    None => crop,
+                };
+                // (cull bounds are the frame's device pixels)
+                let cull = cull
+                    .map(|(bounds, _)| (bounds, bounds[at].intersect(&reads.translate(ox, oy))));
+                let under: ID2D1Image = self
+                    .record_at(
+                        list,
+                        from..at.max(from),
+                        transform,
+                        snap,
+                        cull,
+                        self.depth + 1,
+                        (reads, self.origin),
+                    )?
+                    .cast()?;
+                let base = match (keep, self.canvas) {
+                    (0, Some(c)) => c,
+                    _ => Color::TRANSPARENT,
+                };
+                self.res.backdrops_made += 1;
+                let held: f64 = self
+                    .res
+                    .backdrops
+                    .iter()
+                    .map(|b| b.region.width as f64 * b.region.height as f64)
+                    .sum();
+                let max = self.ctx.GetMaximumBitmapSize() as f32;
+                if region.width <= max
+                    && region.height <= max
+                    && held + region.width as f64 * region.height as f64 <= BACKDROP_PIXELS as f64
+                {
+                    let bitmap = self.render_backdrop(ops, &under, base, &crop, &region)?;
+                    let result = BackdropResult {
+                        list: list_key,
+                        at,
+                        transform: frame_transform,
+                        crop: frame_crop,
+                        region: region.translate(ox, oy),
+                        bitmap: bitmap.clone(),
+                    };
+                    match found {
+                        Some(i) => self.res.backdrops[i] = result,
+                        None => self.res.backdrops.push(result),
+                    }
+                    (
+                        bitmap.cast()?,
+                        Some(Vector2 {
+                            X: region.x,
+                            Y: region.y,
+                        }),
+                    )
+                } else {
+                    let (ctx, res, images) = (self.ctx, &mut *self.res, self.sources.images);
+                    let mut bitmaps = |id| uploaded(ctx, res, images, id).ok().map(|(b, _)| b);
+                    let out = crate::effects::backdrop(
+                        self.ctx,
+                        ops,
+                        &under,
+                        base,
+                        &crop,
+                        &self.transform,
+                        &mut bitmaps,
+                    )?;
+                    (out, None)
+                }
+            }
         };
-        let (ctx, res, images) = (self.ctx, &mut *self.res, self.sources.images);
-        let mut bitmaps = |id| uploaded(ctx, res, images, id).ok().map(|(b, _)| b);
-        let out = crate::effects::backdrop(
-            self.ctx,
-            ops,
-            &under,
-            base,
-            &crop,
-            &self.transform,
-            &mut bitmaps,
-        )?;
         self.push_shape_clip(&rect, &radii)?;
         self.ctx.SetTransform(&Matrix3x2::identity());
         self.ctx.DrawImage(
-            &out,
-            None,
+            &image,
+            offset.as_ref().map(|p| p as *const Vector2),
             None,
             D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR,
             D2D1_COMPOSITE_MODE_SOURCE_OVER,
@@ -865,6 +1081,79 @@ impl<'a> Painter<'a> {
             self.close(open);
         }
         Ok(())
+    }
+
+    /// A backdrop filter's result ([`crate::effects::backdrop`] of `under` over `base`, cut to
+    /// `crop`) rendered for the device pixels `region` (whole, inside `crop`) into a bitmap of its
+    /// own, with a context of the same device.
+    // SAFETY contract: as `record`.
+    unsafe fn render_backdrop(
+        &mut self,
+        ops: &[crate::filter::FilterOp],
+        under: &ID2D1Image,
+        base: Color,
+        crop: &Rect,
+        region: &Rect,
+    ) -> Result<ID2D1Bitmap1> {
+        let bctx = match self.res.record_ctxs.pop() {
+            Some(c) => c,
+            None => self
+                .ctx
+                .GetDevice()?
+                .CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE)?,
+        };
+        let made = (|| -> Result<ID2D1Bitmap1> {
+            let bitmap = bctx.CreateBitmap(
+                D2D_SIZE_U {
+                    width: region.width as u32,
+                    height: region.height as u32,
+                },
+                None,
+                0,
+                &D2D1_BITMAP_PROPERTIES1 {
+                    pixelFormat: D2D1_PIXEL_FORMAT {
+                        format: DXGI_FORMAT_B8G8R8A8_UNORM,
+                        alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+                    },
+                    dpiX: 96.0,
+                    dpiY: 96.0,
+                    bitmapOptions: D2D1_BITMAP_OPTIONS_TARGET,
+                    colorContext: ManuallyDrop::new(None),
+                },
+            )?;
+            let (res, images) = (&mut *self.res, self.sources.images);
+            let mut bitmaps = |id| uploaded(&bctx, res, images, id).ok().map(|(b, _)| b);
+            let out = crate::effects::backdrop(
+                &bctx,
+                ops,
+                under,
+                base,
+                crop,
+                &self.transform,
+                &mut bitmaps,
+            )?;
+            bctx.SetTarget(&bitmap);
+            bctx.BeginDraw();
+            bctx.SetUnitMode(D2D1_UNIT_MODE_PIXELS);
+            bctx.SetTransform(&Matrix3x2::identity());
+            bctx.Clear(Some(&color_f(Color::TRANSPARENT)));
+            bctx.DrawImage(
+                &out,
+                Some(&Vector2 {
+                    X: -region.x,
+                    Y: -region.y,
+                }),
+                None,
+                D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR,
+                D2D1_COMPOSITE_MODE_SOURCE_OVER,
+            );
+            let r = bctx.EndDraw(None, None);
+            bctx.SetTarget(None);
+            r?;
+            Ok(bitmap)
+        })();
+        self.res.record_ctxs.push(bctx);
+        made
     }
 
     /// Pushes a layer that shows nothing.
@@ -2480,10 +2769,25 @@ impl<'a> Painter<'a> {
             self.ctx.FillGeometry(geometry, self.brush(color), None);
             return Ok(());
         }
+        // Only what is shown or read is blurred: the area cut to the needed pixels and as far beyond
+        // them as the blur reaches, so its intermediate is bounded by them and not by the box (a
+        // shadow wholly outside them draws nothing).
+        let reach = (sigma * 3.0 * self.transform.approximate_scale()).ceil() + 2.0;
+        let need = self.need.inflate(reach, reach);
+        let device = self.transform.apply_rect(area);
+        if !device.intersects(&need) {
+            return Ok(());
+        }
+        let area = match self.transform.inverse() {
+            Some(inverse) if !covers(&need, &device) => {
+                inverse.apply_rect(&device.intersect(&need)).intersect(area)
+            }
+            _ => *area,
+        };
         if self.res.blur == BlurPath::Unchecked {
             self.res.blur = check_blur(self.ctx);
         }
-        let blur = Blur::new(area, sigma, &self.transform);
+        let blur = Blur::new(&area, sigma, &self.transform);
         if self.res.blur == BlurPath::Gpu {
             match blur.gpu(self.ctx, geometry, color) {
                 Ok(()) => return Ok(()),
@@ -3208,7 +3512,11 @@ impl HeadlessRenderer {
                     Matrix::scale(view.scale, view.scale),
                     opaque && !self.grayscale_text,
                 )
-                .over_canvas(view.background);
+                .over_canvas(view.background)
+                .within(
+                    Rect::new(0.0, 0.0, w as f32, h as f32),
+                    Point::new(0.0, 0.0),
+                );
                 painter.paint(list, None);
             }
             target.ctx.EndDraw(None, None)?;
