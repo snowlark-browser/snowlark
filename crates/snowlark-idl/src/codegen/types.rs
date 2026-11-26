@@ -16,11 +16,17 @@ impl Plan<'_> {
         matches!(self.prune(ty).kind, TypeKind::Prim(Prim::Any))
     }
 
+    /// Whether a nullable member's field tells null from absent (`Option<Option<T>>`): its
+    /// dictionary is in [`NULL_PRESENT`] for it.
+    pub fn null_present(&self, m: &DictMember) -> bool {
+        NULL_PRESENT.contains(&m.name.as_str()) && !m.required && m.default.is_none()
+    }
+
     /// The Rust type of a dictionary member field.
     pub fn member_type(&self, m: &DictMember) -> String {
         let t = self.rust_arg(&m.ty, true);
         let optional = !m.required && (m.default.is_none() || self.is_any(&m.ty));
-        if optional && !t.starts_with("Option<") {
+        if optional && (!t.starts_with("Option<") || self.null_present(m)) {
             format!("Option<{t}>")
         } else {
             t
@@ -198,7 +204,7 @@ impl Plan<'_> {
             let field = snake(&m.name);
             let conv = self.conv(&m.ty, "v", &format!("{name}.{}", m.name));
             let optional_field = self.member_type(m).starts_with("Option<")
-                && !self.rust_arg(&m.ty, true).starts_with("Option<");
+                && (!self.rust_arg(&m.ty, true).starts_with("Option<") || self.null_present(m));
             let present = if optional_field {
                 format!("Some({conv}?)")
             } else {

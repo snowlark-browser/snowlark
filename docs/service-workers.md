@@ -1,6 +1,6 @@
 # Service Workers: a staged plan
 
-Status: **planned, not started** (2026-11-13). Specs: W3C Service Workers
+Status: **stages 0 and 1 done** (2026-11-25: the WPT runner's `--variants` runs the `.https.` files and every `.any.js` global; the Cache API is in `snowlark-sw` and `engine/cache.rs`); stages 2 to 5 open. Planned 2026-11-13. Specs: W3C Service Workers
 (Nightly, the "Service Worker" and "Cache" parts), Fetch ("handle fetch" hook, request `service-workers mode`),
 HTML (environment settings objects, reserved clients, `execution ready`), Storage (storage keys).
 
@@ -135,6 +135,8 @@ Most failures read `navigator.serviceWorker` (`register`, `getRegistration`) or 
 passing ones are mostly IDL checks of interfaces that exist and tests that need no worker.
 
 The `.serviceworker.` variants of other areas are not counted (the runner skips them, stage 0).
+
+After stage 1 (2026-11-25, `--variants`): `service-workers` 555 / 2,236 (150 before); `cache-storage` 284 / 335.  What is left there needs stage 2 (the `.serviceworker.` variants), shared workers, storage partitioned by top-level site, or cache names with unpaired surrogates.
 
 ## Order and risks
 

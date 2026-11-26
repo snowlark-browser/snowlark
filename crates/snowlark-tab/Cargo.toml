@@ -8,6 +8,7 @@ description = "The renderer half of a tab: the page driver, the raster thread an
 [dependencies]
 snowlark-dom = { path = "../snowlark-dom" }
 snowlark-idb = { path = "../snowlark-idb" }
+snowlark-sw = { path = "../snowlark-sw" }
 snowlark-ipc = { path = "../snowlark-ipc" }
 snowlark-js = { path = "../snowlark-js" }
 snowlark-layout = { path = "../snowlark-layout" }

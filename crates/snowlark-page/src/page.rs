@@ -33,6 +33,9 @@ pub struct PageOptions {
     /// The IndexedDB backend the page shares with others (a browser's tabs, persisted in its
     /// profile); `None`: one of its own, in memory (its frames and workers share it).
     pub idb: Option<crate::IdbBackend>,
+    /// The Cache API's storage the page shares with others (a browser's tabs, persisted in its
+    /// profile); `None`: one of its own, in memory (its frames and workers share it).
+    pub caches: Option<crate::CacheBackend>,
     /// The `localStorage` service the page shares with others (a browser's tabs, persisted in its
     /// profile); `None`: one of its own, in memory (its frames share it).
     pub web_storage: Option<std::sync::Arc<dyn crate::web_storage::WebStorage>>,
@@ -61,6 +64,7 @@ impl Default for PageOptions {
             content_filter: None,
             broadcast: None,
             idb: None,
+            caches: None,
             web_storage: None,
             input: snowlark_style::InputDevices::MOUSE,
             password_forms: std::env::var("SNOWLARK_PASSWORD_FORMS").is_ok_and(|v| v == "1"),
@@ -208,6 +212,9 @@ impl Page {
         }
         if let Some(idb) = options.idb {
             engine.set_idb_backend(idb);
+        }
+        if let Some(caches) = options.caches {
+            engine.set_cache_backend(caches);
         }
         {
             let mut st = engine.render.borrow_mut();
@@ -379,6 +386,7 @@ impl Page {
         engine.doc_state(doc, |s| s.has_browsing_context = true);
         engine.set_broadcast_hub(init.broadcast.clone());
         engine.set_idb_backend(init.idb.clone());
+        engine.set_cache_backend(init.caches.clone());
         let global = engine.create_worker_global(doc, &init.name, init.url.clone());
         engine.event_loop.borrow_mut().waker = init.waker.clone();
         *engine.worker_scope.borrow_mut() = Some(crate::worker::WorkerScope {
@@ -429,6 +437,17 @@ impl Page {
                 snowlark_bindings::generated::GlobalKind::DedicatedWorker,
                 None,
             );
+            // (a worker that is not a secure context has none of its global's `[SecureContext]`
+            // constructs)
+            use snowlark_bindings::generated::WindowOrWorkerGlobalScopeImpl;
+            if !WindowOrWorkerGlobalScopeImpl::is_secure_context(&*engine, global) {
+                let context = v8::Local::new(scope, &realm);
+                let scope = &mut v8::ContextScope::new(scope, context);
+                snowlark_bindings::generated::hide_secure_context(
+                    scope,
+                    snowlark_bindings::generated::GlobalKind::DedicatedWorker,
+                );
+            }
             engine.set_top_realm(realm);
         }
         Page {

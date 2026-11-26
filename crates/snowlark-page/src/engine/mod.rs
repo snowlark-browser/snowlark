@@ -25,6 +25,7 @@ pub(crate) mod audio;
 mod auxiliary;
 pub(crate) mod blob;
 pub mod broadcast;
+pub(crate) mod cache;
 pub(crate) mod canvas;
 pub(crate) mod channel;
 mod chardata;
@@ -200,6 +201,15 @@ pub enum Object {
     /// The Storage Standard: a global's StorageManager (`navigator.storage`).
     StorageManager {
         global: Handle,
+    },
+    /// Service Workers §5.5: a global's CacheStorage (`caches`).
+    CacheStorage {
+        global: Handle,
+    },
+    /// Service Workers §5.4: a Cache, naming its request-response list in the storage.
+    Cache {
+        global: Handle,
+        id: snowlark_sw::CacheId,
     },
     /// Media Capabilities: a global's MediaCapabilities (`navigator.mediaCapabilities`).
     MediaCapabilities {
@@ -677,6 +687,8 @@ pub struct Engine {
     pub(crate) svg: RefCell<svg::SvgState>,
     /// IndexedDB: the backend, this loop's inbox, the live connections and transactions ([`idb`]).
     pub(crate) idb: RefCell<idb::IdbState>,
+    /// The Cache API's storage (the embedder's, shared by its pages; a worker shares its parent's).
+    pub(crate) caches: RefCell<Option<snowlark_sw::CacheBackend>>,
     pub(crate) audio: RefCell<audio::AudioState>,
     /// Set when an event listener threw (DOM's "legacyOutputDidListenersThrowFlag", which
     /// IndexedDB reads around its dispatches).
@@ -812,6 +824,7 @@ impl Engine {
             transferring: RefCell::new(Vec::new()),
             svg: RefCell::default(),
             idb: RefCell::default(),
+            caches: RefCell::default(),
             audio: RefCell::default(),
             listener_threw: Cell::new(false),
             images: RefCell::new(img::Images::default()),
@@ -1114,6 +1127,8 @@ impl Engine {
             Object::MimeType { .. } => InterfaceId::MimeType,
             Object::BatteryManager { .. } => InterfaceId::BatteryManager,
             Object::StorageManager { .. } => InterfaceId::StorageManager,
+            Object::CacheStorage { .. } => InterfaceId::CacheStorage,
+            Object::Cache { .. } => InterfaceId::Cache,
             Object::MediaCapabilities { .. } => InterfaceId::MediaCapabilities,
             Object::Notification(_) => InterfaceId::Notification,
             Object::CredentialsContainer => InterfaceId::CredentialsContainer,

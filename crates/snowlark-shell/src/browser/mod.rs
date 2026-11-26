@@ -507,6 +507,7 @@ impl Browser {
             broadcast: partition.broadcast.clone(),
             web_storage: partition.local_storage.host(),
             idb: partition.idb.clone(),
+            caches: snowlark_page::CacheBackend::new(partition.caches.clone()),
             // (the partition's key systems: each origin's state in its store)
             cdm: Some(partition.cdm.clone() as Arc<dyn snowlark_page::media::cdm::Cdm>),
         };

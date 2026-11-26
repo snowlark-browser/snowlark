@@ -709,6 +709,18 @@ pub(crate) fn template<'s, D: Dom>(
         ));
         rt::accessor(scope, proto, "scheduler", g, s, false);
     }
+    if options.secure_context {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::window_or_worker_global_scope::attr_caches_get::<D, LO, HI>),
+            "caches",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = None;
+        rt::accessor(scope, proto, "caches", g, s, false);
+    }
     {
         let g = rt::getter(
             scope,

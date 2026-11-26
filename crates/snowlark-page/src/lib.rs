@@ -73,4 +73,6 @@ pub use page::{Page, PageMemory, PageOptions, Terminator};
 pub use render::{RenderSetup, RenderState};
 /// The IndexedDB backend a browser's pages share (`snowlark_idb::Backend`).
 pub use snowlark_idb::Backend as IdbBackend;
+/// The Cache API's storage a browser's pages share (`snowlark_sw::CacheBackend`).
+pub use snowlark_sw::CacheBackend;
 pub use speculative::EarlyStats;

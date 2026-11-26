@@ -279,6 +279,18 @@ fn child_main() {
             .unwrap();
             linger()
         }
+        "caches" => caches_child(&port),
+        "caches-as" => {
+            let caches = cache::RemoteCaches::new(port.clone());
+            match snowlark_sw::CacheStorageService::call(
+                &caches,
+                &std::env::var(ARG).unwrap(),
+                snowlark_sw::Op::Names,
+            ) {
+                snowlark_sw::Reply::Names(_) => 7,
+                _ => linger(),
+            }
+        }
         "code-cache-as" => {
             let message = Up::CodeCache(code_cache::Up::Has {
                 url: std::env::var(ARG).unwrap(),
@@ -469,6 +481,7 @@ pub(crate) fn local() -> Local {
             net: net.client().backend().clone(),
             request_filter: Some(Arc::new(TestRequestFilter)),
             idb: Arc::new(idb.clone()),
+            caches: Arc::new(snowlark_sw::LocalCacheStorage::in_memory()),
             audible: Arc::new(|_| {}),
             muted: false,
             audio_out: None,
@@ -689,6 +702,7 @@ fn a_renderer_locked_to_a_site_keeps_to_its_own_keys() {
     };
     for (role, forged, honest, answered) in [
         ("idb-as", "https://b.test", "https://a.test", None),
+        ("caches-as", "https://b.test", "https://a.test", Some(7)),
         ("broadcast-as", "https://b.test", "https://sub.a.test", None),
         (
             "code-cache-as",
@@ -3022,5 +3036,65 @@ fn a_renderers_protected_players_cross_in_its_own_ids() {
             "stop 6001",
             "release 1001",
         ]
+    );
+}
+
+/// The Cache API's child: opens a cache of `https://a.test`, puts a response whose body is too big
+/// for one message, matches it back and checks the bytes (7: they came back whole).
+fn caches_child(port: &RendererPort) -> i32 {
+    use snowlark_sw::{BatchOp, CacheStorageService, CachedRequest, CachedResponse, Op, Reply};
+    let caches = cache::RemoteCaches::new(port.clone());
+    let key = "https://a.test";
+    let Reply::Cache(id) = caches.call(key, Op::Open { name: "v1".into() }) else {
+        return 1;
+    };
+    let request = CachedRequest {
+        method: "GET".into(),
+        url: "https://a.test/big".into(),
+        ..Default::default()
+    };
+    let body = big_text().into_bytes();
+    let put = Op::Batch {
+        cache: id,
+        ops: vec![BatchOp::Put {
+            request: request.clone(),
+            response: CachedResponse {
+                type_: "basic".into(),
+                status: 200,
+                body: Some(body.clone()),
+                ..Default::default()
+            },
+        }],
+    };
+    if caches.call(key, put) != Reply::Batch(vec![0]) {
+        return 2;
+    }
+    let found = caches.call(
+        key,
+        Op::Match {
+            cache: id,
+            request: Some(request),
+            options: Default::default(),
+            first: true,
+        },
+    );
+    match found {
+        Reply::Responses(r) if r.len() == 1 && r[0].body.as_deref() == Some(&body[..]) => 7,
+        _ => 3,
+    }
+}
+
+#[test]
+fn caches_reach_a_renderer_and_back() {
+    use snowlark_sw::{CacheStorageService, Op, Reply};
+    let (_, mut services) = broadcast_local();
+    let storage = Arc::new(snowlark_sw::LocalCacheStorage::in_memory());
+    services.caches = storage.clone();
+    let child = start("caches", &services);
+    assert_eq!(child.process.wait(WAIT), Some(7));
+    assert_eq!(
+        storage.call("https://a.test", Op::Names),
+        Reply::Names(vec!["v1".into()]),
+        "the renderer's cache is the browser's"
     );
 }

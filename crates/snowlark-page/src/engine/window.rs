@@ -2531,6 +2531,10 @@ impl WindowOrWorkerGlobalScopeImpl for Engine {
     fn indexed_db(&self, this: Handle) -> Handle {
         self.idb_factory(this)
     }
+    /// Service Workers §5.5: the global's `CacheStorage`.
+    fn caches(&self, this: Handle) -> Handle {
+        self.cache_storage(this)
+    }
     fn trusted_types(&self, this: Handle) -> Handle {
         self.trusted_types_of(this)
     }

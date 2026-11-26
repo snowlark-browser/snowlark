@@ -14,7 +14,7 @@ mod types;
 use crate::ast::Literal;
 use names::*;
 use plan::*;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 use types::HEADER;
 
@@ -382,6 +382,47 @@ impl Plan<'_> {
         }
         o.push_str("    Some(())\n}\n\n");
         o.push_str("/// [`init_isolate`] and [`install_context`] in one, for a context made without the global template\n/// (tests, tools): the interface objects are exposed on whatever global the context has.\npub fn install<D: Dom>(scope: &mut v8::PinScope<'_, '_>, engine: Rc<D>, options: rt::InstallOptions) -> Option<()> {\n    init_isolate(scope, engine, options);\n    install_context::<D>(scope, None)\n}\n");
+        self.hide_secure_context(&mut o);
         o
+    }
+
+    /// `hide_secure_context`: what a realm that is not a secure context must not have of its global's
+    /// `[SecureContext]` constructs (Web IDL §3.3.20, "exposed": a construct with `[SecureContext]` is
+    /// exposed only where the realm's settings object is a secure context). Templates belong to the
+    /// isolate, whose realms may differ, so the global's own ones go once the realm is known: the
+    /// interface objects, and the members of the global's interface and its inherited ones (those live
+    /// on the global object or its prototype chain).
+    fn hide_secure_context(&self, o: &mut String) {
+        o.push_str("\n/// Removes from the current context's global the `[SecureContext]` interface objects exposed in `kind`\n/// and the `[SecureContext]` members of its global interface (Web IDL §3.3.20): for a realm that is not a\n/// secure context. Members of other interfaces' prototypes stay.\npub fn hide_secure_context(scope: &mut v8::PinScope<'_, '_>, kind: GlobalKind) {\n    let global = scope.get_current_context().global(scope);\n    let interfaces: &[(&str, &[&str])] = &[\n");
+        for ip in &self.ifaces {
+            if !ip.secure || ip.no_interface_object || ip.namespace {
+                continue;
+            }
+            let names: Vec<String> = ip.exposure.iter().map(|n| lit(n)).collect();
+            writeln!(o, "        ({}, &[{}]),", lit(&ip.name), names.join(", ")).unwrap();
+        }
+        o.push_str("    ];\n    for (name, exposure) in interfaces {\n        if kind.exposes(exposure) {\n            let key = rt::name(scope, name);\n            global.delete(scope, key.into());\n        }\n    }\n    let members: &[&str] = match kind {\n");
+        for (kind, global_name) in [
+            ("Window", "Window"),
+            ("DedicatedWorker", "DedicatedWorkerGlobalScope"),
+        ] {
+            let mut names = BTreeSet::new();
+            let mut at = Some(global_name.to_string());
+            while let Some(name) = at {
+                let Some(ip) = self.ifaces.iter().find(|i| i.name == name) else {
+                    break;
+                };
+                for a in ip.attrs.iter().filter(|a| a.secure && !a.is_static) {
+                    names.insert(a.name.clone());
+                }
+                for op in ip.ops.iter().filter(|op| op.secure && !op.is_static) {
+                    names.insert(op.name.clone());
+                }
+                at = ip.parent.clone();
+            }
+            let names: Vec<String> = names.iter().map(|n| lit(n)).collect();
+            writeln!(o, "        GlobalKind::{kind} => &[{}],", names.join(", ")).unwrap();
+        }
+        o.push_str("    };\n    for name in members {\n        // (the nearest object of the global's prototype chain that has it)\n        let key = rt::name(scope, name);\n        let mut at = Some(global);\n        while let Some(object) = at {\n            if object.has_own_property(scope, key.into()) == Some(true) {\n                object.delete(scope, key.into());\n                break;\n            }\n            at = object.get_prototype(scope).and_then(|p| v8::Local::<v8::Object>::try_from(p).ok());\n        }\n    }\n}\n");
     }
 }

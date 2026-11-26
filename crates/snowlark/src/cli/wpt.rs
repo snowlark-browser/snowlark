@@ -253,6 +253,9 @@ pub fn run(args: &[String]) -> i32 {
                     idb: session
                         .as_ref()
                         .map(|s| snowlark_page::IdbBackend::new(s.services.idb.clone())),
+                    caches: session
+                        .as_ref()
+                        .map(|s| snowlark_page::CacheBackend::new(s.services.caches.clone())),
                     content_filter: snowlark_blocker::content_filter(blocker.as_ref()),
                     console: if log {
                         ConsoleOutput::Stderr

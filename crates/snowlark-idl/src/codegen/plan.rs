@@ -47,6 +47,12 @@ pub const CROSS_ORIGIN_PROPERTIES: &[(&str, CrossOriginMembers)] = &[
 /// (Web IDL §3.7.6, HTML §7.2.1.3.5), also the members of Window's mixins.
 pub const SECURITY_CHECKED: &[&str] = &["Window", "Location", "EventTarget"];
 
+/// Nullable dictionary members, by name, whose algorithm asks whether the member exists, so null
+/// (present) and absent differ: their fields are `Option<Option<T>>`, `Some(None)` for null.
+/// Fetch §5.4 `new Request(input, init)`: "If init["signal"] exists, then set signal to it" (a
+/// null signal drops the input Request's).
+pub const NULL_PRESENT: &[&str] = &["signal"];
+
 /// The global names whose realms the bindings serve: a Window, and a dedicated worker's global scope
 /// (`[Global=(Worker,DedicatedWorker)]`). Interfaces and members exposed in any of them are generated;
 /// each realm exposes the interface objects of its own globals.
@@ -444,6 +450,9 @@ pub const SCOPE: &[&str] = &[
     "IDBRecord",
     "IDBCursor",
     "IDBCursorWithValue",
+    // Service Workers §5: the Cache API, which windows and workers use directly.
+    "Cache",
+    "CacheStorage",
     "IDBTransaction",
     // Intersection Observer.
     "IntersectionObserver",
@@ -1070,6 +1079,8 @@ pub struct IfacePlan {
     /// `[LegacyNoInterfaceObject]` (Web IDL §3.4.6): no interface object on the global, and no
     /// `constructor` property on the interface prototype object.
     pub no_interface_object: bool,
+    /// `[SecureContext]` (Web IDL §3.3.20): the interface is exposed only in secure contexts.
+    pub secure: bool,
     /// A namespace (Web IDL §3.13): a plain object with operations, no prototype id.
     pub namespace: bool,
     /// Owners (this interface and mixins) whose traits the members use.
@@ -1982,6 +1993,7 @@ impl<'m> Plan<'m> {
             setlike: None,
             global: iface.has_ext("Global"),
             no_interface_object: iface.has_ext("LegacyNoInterfaceObject"),
+            secure: iface.has_ext("SecureContext"),
             namespace,
             uses: BTreeSet::new(),
             exposure: iface.exposed.clone(),

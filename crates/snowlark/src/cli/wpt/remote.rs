@@ -57,6 +57,7 @@ impl Remote {
             net: net.backend().clone(),
             request_filter: None,
             idb: Arc::new(snowlark_idb::LocalIdb::in_memory()),
+            caches: Arc::new(snowlark_sw::LocalCacheStorage::in_memory()),
             site_lock: site_lock::Mode::from_env(),
             audible: Arc::new(|_| {}),
             muted: true,

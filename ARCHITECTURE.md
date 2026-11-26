@@ -75,6 +75,9 @@ crates/
                    indexes, the backend a browser's event loops share (connection queues, versionchange,
                    transaction scheduling) and the per-database append-only log files on a disk thread.
                    snowlark-page has the IDB* interfaces over it.
+  snowlark-sw        Service Workers' browser half, free of V8: the Cache API's storage per storage key
+                   (matching, Vary, all-or-nothing batches, an index and body files per key on disk),
+                   behind a message-shaped trait. snowlark-page has Cache and CacheStorage over it.
   snowlark-audio     Web Audio's rendering, free of V8 and unsafe code: the render quantum, channel up- and
                    down-mixing, the AudioParam automation timeline, the graph of nodes by id driven by
                    control messages, and the OfflineAudioContext's rendering thread. snowlark-page has the

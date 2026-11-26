@@ -14,6 +14,7 @@
 //! | `localStorage` | `local-storage\` | memory |
 //! | `sessionStorage` | each tab's, memory | the same |
 //! | IndexedDB | `IndexedDB\`, quota from the volume | memory, quota from the machine's memory |
+//! | Cache API (`caches`) | `CacheStorage\` | memory |
 //! | script code cache | `code-cache\` | none |
 //! | `BroadcastChannel` | its own hub | its own hub |
 //! | history | `history.json` | none kept |
@@ -39,6 +40,8 @@ pub struct Partition {
     pub net: NetClient,
     pub local_storage: LocalStorage,
     pub idb: snowlark_page::IdbBackend,
+    /// The Cache API's caches: a folder per storage key in the profile's `CacheStorage`, or memory.
+    pub caches: Arc<snowlark_sw::LocalCacheStorage>,
     pub broadcast: snowlark_page::BroadcastHub,
     /// The pages visited, shared with the history page and the address bar.
     pub history: Arc<Mutex<History>>,
@@ -72,6 +75,9 @@ impl Partition {
                 snowlark_ipc::win::volume_size(&profile.dir)
                     .map_or(snowlark_idb::QUOTA, snowlark_idb::quota_for_volume),
             ),
+            caches: Arc::new(snowlark_sw::LocalCacheStorage::persistent(
+                profile.dir.join("CacheStorage"),
+            )),
             broadcast: snowlark_page::BroadcastHub::default(),
             history: Arc::new(Mutex::new(history)),
             cdm: crate::cdm::BrowserCdm::persistent(profile.dir.join("cdm")),
@@ -92,6 +98,7 @@ impl Partition {
             _net_thread: net_thread,
             local_storage: LocalStorage::in_memory(),
             idb: snowlark_page::IdbBackend::in_memory_with_quota(quota),
+            caches: Arc::new(snowlark_sw::LocalCacheStorage::in_memory()),
             broadcast: snowlark_page::BroadcastHub::default(),
             history: Arc::new(Mutex::new(History::in_memory())),
             cdm: crate::cdm::BrowserCdm::off_the_record(),

@@ -21,6 +21,7 @@
 pub mod audio;
 pub mod audio_out;
 pub mod broadcast;
+pub mod cache;
 pub mod cdm;
 pub mod code_cache;
 pub mod embedder;
@@ -51,6 +52,7 @@ pub enum Up {
     Embedder(embedder::Up),
     Net(net::Up),
     Idb(idb::Up),
+    Cache(cache::Up),
     Audio(audio::Up),
     AudioOut(audio_out::Up),
     Video(video::Up),
@@ -97,6 +99,7 @@ pub struct RemoteServices {
     pub content_filter: Arc<embedder::RemoteContentFilter>,
     pub net: Arc<net::RemoteNet>,
     pub idb: Arc<idb::RemoteIdb>,
+    pub caches: Arc<cache::RemoteCaches>,
     pub audio: Arc<audio::RemoteAudio>,
     pub audio_out: Arc<audio_out::RemoteOutputs>,
     pub video: Arc<video::RemoteVideo>,
@@ -114,6 +117,7 @@ impl RemoteServices {
             content_filter: Arc::new(embedder::RemoteContentFilter(port.clone())),
             net: Arc::new(net::RemoteNet::new(port.clone())),
             idb: Arc::new(idb::RemoteIdb::new(port.clone())),
+            caches: Arc::new(cache::RemoteCaches::new(port.clone())),
             audio: Arc::new(audio::RemoteAudio::new(port.clone())),
             audio_out: Arc::new(audio_out::RemoteOutputs::new(port.clone())),
             video: Arc::new(video::RemoteVideo::new(port.clone())),
@@ -179,6 +183,8 @@ pub struct LocalServices {
     pub request_filter: Option<Arc<dyn snowlark_net::RequestFilter>>,
     /// The profile's IndexedDB backend.
     pub idb: Arc<dyn snowlark_idb::IdbService>,
+    /// The profile's Cache API storage.
+    pub caches: Arc<dyn snowlark_sw::CacheStorageService>,
     /// What a failed site-lock check does ([`site_lock::Mode`]).
     pub site_lock: site_lock::Mode,
     /// What hears when the tab starts or stops making sound, and its mute when the renderer starts.
@@ -204,6 +210,7 @@ pub struct ServiceHost {
     embedder: embedder::EmbedderHost,
     net: Arc<net::NetHost>,
     idb: idb::IdbHost,
+    caches: cache::CacheHost,
     audio: Arc<audio::AudioHost>,
     audio_out: audio_out::AudioOutHost,
     video: video::VideoHost,
@@ -250,6 +257,7 @@ impl ServiceHost {
                 local.site_lock,
             )),
             idb: idb::IdbHost::new(port.clone(), local.idb.clone(), local.site_lock),
+            caches: cache::CacheHost::new(port.clone(), local.caches.clone(), local.site_lock),
             audio: {
                 let audible = local.audible.clone();
                 let notify = Box::new(move |a| audible(a));
@@ -336,6 +344,7 @@ impl ServiceHost {
                 Up::Embedder(m) => self.embedder.serve(m, replier),
                 Up::Net(m) => self.net.serve(m, replier),
                 Up::Idb(m) => self.idb.serve(m, replier),
+                Up::Cache(m) => self.caches.serve(m, replier),
                 Up::Audio(m) => self.audio.serve(m, replier),
                 Up::AudioOut(m) => self.audio_out.serve(m, replier),
                 Up::Video(m) => self.video.serve(m, replier),

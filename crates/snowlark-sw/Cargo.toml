@@ -1,0 +1,14 @@
+[package]
+name = "snowlark-sw"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Service Workers storage for Snowlark: the Cache API's request-response lists per storage key, their matching and batch operations, kept in memory or on disk"
+
+[lib]
+doctest = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+postcard = { version = "1", default-features = false, features = ["use-std"] }
+url = "2.5"

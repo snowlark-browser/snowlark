@@ -23,7 +23,7 @@
 use std::collections::HashMap;
 
 use rustc_hash::FxHashMap;
-use snowlark_bindings::generated::DocumentReadyState;
+use snowlark_bindings::generated::{DocumentReadyState, WindowOrWorkerGlobalScopeImpl};
 use snowlark_bindings::rt::{self, Cx, Handle};
 use snowlark_dom::{local_name, ns, NodeId};
 use snowlark_net::origin::OriginDomain;
@@ -708,6 +708,14 @@ impl Engine {
             if let Some(wrapper) = rt::wrap(scope, node_handle(doc)) {
                 let global = context.global(scope);
                 rt::set_cached_attribute(scope, global, WINDOW_DOCUMENT, wrapper.into());
+            }
+            // (the realm's settings object is known from here: one that is not a secure context
+            // has none of the global's `[SecureContext]` constructs)
+            if !WindowOrWorkerGlobalScopeImpl::is_secure_context(self, window) {
+                snowlark_bindings::generated::hide_secure_context(
+                    scope,
+                    snowlark_bindings::generated::GlobalKind::Window,
+                );
             }
         });
     }

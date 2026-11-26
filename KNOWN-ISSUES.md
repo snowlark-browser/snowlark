@@ -146,6 +146,13 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## Scripting and bindings
 
+- **Service workers.** `navigator.serviceWorker` is missing: no registration, no worker that controls pages, no fetch
+  interception. The Cache API (`caches`) works in windows and dedicated workers, but its storage is per origin (not
+  partitioned by the top-level site), it does not count towards `navigator.storage.estimate()`, and a cache name with
+  an unpaired surrogate is stored with U+FFFD. (ref 770)
+- **Secure contexts.** On plain HTTP pages, secure-context-only members of objects other than the global (such as
+  `navigator.storage`, `navigator.clipboard` and `crypto.subtle`) still exist, and a secure frame inside an insecure
+  page reports `isSecureContext` as true. (ref 771)
 - **A dynamic `import()` of the module that is evaluating crashes the process.** Fifteen ECMAScript test suite files under `dynamic-import` end in a V8 fatal error ("Module in unexpected status Evaluating"). (ref 748)
 - **Cross-origin objects.** `[[SetPrototypeOf]]` and `[[PreventExtensions]]` on a cross-origin object throw a
   `SecurityError` instead of returning false. A receiver that is not the object itself is not detected for

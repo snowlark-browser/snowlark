@@ -188,14 +188,14 @@ impl Engine {
         })
     }
 
-    fn request(&self, h: Handle) -> std::cell::RefMut<'_, RequestData> {
+    pub(crate) fn request(&self, h: Handle) -> std::cell::RefMut<'_, RequestData> {
         std::cell::RefMut::map(self.obj_mut(h), |o| match o {
             Object::Request(r) => &mut **r,
             _ => panic!("not a Request"),
         })
     }
 
-    fn response(&self, h: Handle) -> std::cell::RefMut<'_, ResponseData> {
+    pub(crate) fn response(&self, h: Handle) -> std::cell::RefMut<'_, ResponseData> {
         std::cell::RefMut::map(self.obj_mut(h), |o| match o {
             Object::Response(r) => &mut **r,
             _ => panic!("not a Response"),
@@ -352,7 +352,7 @@ impl Engine {
     }
 
     /// The body and headers of a Request or Response.
-    fn body_parts(&self, h: Handle) -> Option<(BodyData, Handle)> {
+    pub(crate) fn body_parts(&self, h: Handle) -> Option<(BodyData, Handle)> {
         match &*self.obj(h) {
             Object::Request(r) => Some((r.body.clone(), r.headers)),
             Object::Response(r) => Some((r.body.clone(), r.headers)),
@@ -375,7 +375,7 @@ impl Engine {
         snowlark_net::mime::extract_mime_type(&self.headers_of(headers).list).map(|m| m.serialize())
     }
 
-    fn consume(
+    pub(crate) fn consume(
         &self,
         cx: &mut Cx,
         h: Handle,
@@ -504,7 +504,7 @@ impl Engine {
     // ----- Request and Response construction ----------------------------------------------------------
 
     /// Fetch §5.4 `new Request(input, init)`.
-    fn construct_request(
+    pub(crate) fn construct_request(
         &self,
         cx: &mut Cx,
         input: RequestOrString,
@@ -667,8 +667,11 @@ impl Engine {
             }
             r.method = normalize_method(m);
         }
-        // 26-29: signal.
-        let follow = init.signal.or(input_signal);
+        // 26-29: signal ("if init["signal"] exists", null included: then the input's is dropped).
+        let follow = match init.signal {
+            Some(signal) => signal,
+            None => input_signal,
+        };
         if let Some(s) = follow {
             if self.signal_aborted(s) {
                 let reason = match &*self.obj(s) {
@@ -750,10 +753,31 @@ impl Engine {
         Ok(self.alloc(Object::Request(Box::new(r))))
     }
 
-    /// Makes `follower` abort when `parent` does (a dependent signal, DOM §3.2).
+    /// Makes `follower` abort when `parent` does: DOM §3.2 "create a dependent abort signal" from
+    /// « parent ». A parent that is itself dependent is not followed but its sources are, so an
+    /// abort reaches a Request's copy (`fetch(request)`, `new Request(request)`) of a Request whose
+    /// signal follows the page's.
     fn follow_signal(&self, follower: Handle, parent: Handle) {
-        if let Object::AbortSignal(p) = &mut *self.obj_mut(parent) {
-            p.dependents.push(follower);
+        let (dependent, sources) = match &*self.obj(parent) {
+            Object::AbortSignal(p) => (p.dependent, p.sources.clone()),
+            _ => return,
+        };
+        let sources: Vec<Handle> = if dependent {
+            sources
+                .into_iter()
+                .filter(|&s| !self.signal_aborted(s))
+                .collect()
+        } else {
+            vec![parent]
+        };
+        for &s in &sources {
+            if let Object::AbortSignal(p) = &mut *self.obj_mut(s) {
+                p.dependents.push(follower);
+            }
+        }
+        if let Object::AbortSignal(f) = &mut *self.obj_mut(follower) {
+            f.dependent = true;
+            f.sources = sources;
         }
     }
 

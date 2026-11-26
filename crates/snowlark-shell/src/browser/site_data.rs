@@ -187,6 +187,7 @@ impl Browser {
             None => cookies.clear(),
         }
         self.partition.local_storage.clear_site(site.as_deref());
+        self.partition.caches.clear_site(site.as_deref());
         for e in self.tabs.iter().filter(|e| e.crashed.is_none()) {
             e.tab.send(TabCommand::ClearSiteData(site.clone()));
         }

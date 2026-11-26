@@ -17,6 +17,7 @@ mod begin_frames;
 mod bench;
 mod block_formatting;
 mod browser_navigation;
+mod cache_storage;
 mod cached_document;
 mod channel;
 mod clip_path;

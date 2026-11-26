@@ -17,7 +17,8 @@ fn page(idb: &IdbBackend) -> Page {
     });
     page.load_html(
         "<!doctype html>",
-        &url::Url::parse("http://example.test/").unwrap(),
+        // (StorageManager is [SecureContext])
+        &url::Url::parse("https://example.test/").unwrap(),
     );
     page.run_until_settled(Duration::from_secs(5));
     page

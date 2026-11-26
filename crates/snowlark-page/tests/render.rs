@@ -11,13 +11,18 @@ use snowlark_net::{NetConfig, NetThread};
 use snowlark_page::{Page, PageOptions, RenderSetup};
 
 fn rendered(net: &NetThread, html: &str) -> Page {
+    rendered_at(net, html, "http://example.test/")
+}
+
+/// [`rendered`] at `url` (a secure one for `[SecureContext]` APIs).
+fn rendered_at(net: &NetThread, html: &str, url: &str) -> Page {
     let mut page = Page::new(PageOptions {
         net: Some(net.client()),
         viewport: (800, 600),
         render: Some(RenderSetup::new().unwrap()),
         ..Default::default()
     });
-    page.load_html(html, &url::Url::parse("http://example.test/").unwrap());
+    page.load_html(html, &url::Url::parse(url).unwrap());
     assert!(page.run_until_settled(Duration::from_secs(5)), "settles");
     page
 }
@@ -2853,9 +2858,11 @@ fn the_async_clipboard_needs_the_embedders_clipboard_and_an_activation() {
     use snowlark_page::ClipboardAccess;
     use snowlark_paint::Point;
     let net = NetThread::start(NetConfig::default()).unwrap();
-    let mut page = rendered(
+    // (the async clipboard is [SecureContext])
+    let mut page = rendered_at(
         &net,
         "<!doctype html><body style='margin:0'><div style='height:50px'>x</div>",
+        "https://example.test/",
     );
     let js = "window.out = []; navigator.clipboard.readText().then(t => out.push('read:' + t), e => out.push('read:' + e.name));
               navigator.clipboard.writeText('hello').then(() => out.push('wrote'), e => out.push('write:' + e.name)); 'ok'";

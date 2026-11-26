@@ -19,6 +19,7 @@ snowlark-paint = { path = "../snowlark-paint" }
 snowlark-audio = { path = "../snowlark-audio" }
 snowlark-media = { path = "../snowlark-media" }
 snowlark-idb = { path = "../snowlark-idb" }
+snowlark-sw = { path = "../snowlark-sw" }
 v8 = { workspace = true }
 url = "2.5"
 encoding_rs = "0.8"

@@ -10867,6 +10867,125 @@ impl ToJs for CSSStyleSheetInit {
     }
 }
 
+/// `dictionary CacheQueryOptions` (service-workers.idl).
+#[derive(Clone)]
+pub struct CacheQueryOptions {
+    /// `boolean ignoreMethod = false`
+    pub ignore_method: bool,
+    /// `boolean ignoreSearch = false`
+    pub ignore_search: bool,
+    /// `boolean ignoreVary = false`
+    pub ignore_vary: bool,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for CacheQueryOptions {
+    fn default() -> Self {
+        CacheQueryOptions {
+            ignore_method: false,
+            ignore_search: false,
+            ignore_vary: false,
+        }
+    }
+}
+
+impl CacheQueryOptions {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "CacheQueryOptions")?;
+        let m_ignore_method = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("ignoreMethod");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_ignore_search = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("ignoreSearch");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_ignore_vary = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("ignoreVary");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        Some(CacheQueryOptions {
+            ignore_method: m_ignore_method,
+            ignore_search: m_ignore_search,
+            ignore_vary: m_ignore_vary,
+        })
+    }
+}
+
+impl ToJs for CacheQueryOptions {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.ignore_method.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("ignoreMethod");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.ignore_search.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("ignoreSearch");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.ignore_vary.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("ignoreVary");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
 /// `dictionary CanvasRenderingContext2DSettings` (html.idl).
 #[derive(Clone)]
 pub struct CanvasRenderingContext2DSettings {
@@ -35312,6 +35431,155 @@ impl ToJs for MouseEventInit {
     }
 }
 
+/// `dictionary MultiCacheQueryOptions : CacheQueryOptions` (service-workers.idl).
+#[derive(Clone)]
+pub struct MultiCacheQueryOptions {
+    /// `boolean ignoreMethod = false`
+    pub ignore_method: bool,
+    /// `boolean ignoreSearch = false`
+    pub ignore_search: bool,
+    /// `boolean ignoreVary = false`
+    pub ignore_vary: bool,
+    /// `DOMString cacheName`
+    pub cache_name: Option<String>,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for MultiCacheQueryOptions {
+    fn default() -> Self {
+        MultiCacheQueryOptions {
+            ignore_method: false,
+            ignore_search: false,
+            ignore_vary: false,
+            cache_name: None,
+        }
+    }
+}
+
+impl MultiCacheQueryOptions {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "MultiCacheQueryOptions")?;
+        let m_ignore_method = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("ignoreMethod");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_ignore_search = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("ignoreSearch");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_ignore_vary = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("ignoreVary");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_cache_name = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("cacheName");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_dom_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        Some(MultiCacheQueryOptions {
+            ignore_method: m_ignore_method,
+            ignore_search: m_ignore_search,
+            ignore_vary: m_ignore_vary,
+            cache_name: m_cache_name,
+        })
+    }
+}
+
+impl ToJs for MultiCacheQueryOptions {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.ignore_method.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("ignoreMethod");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.ignore_search.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("ignoreSearch");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.ignore_vary.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("ignoreVary");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        if let Some(x) = &self.cache_name {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("cacheName");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
 /// `dictionary MutationObserverInit` (dom.idl).
 #[derive(Clone)]
 pub struct MutationObserverInit {
@@ -43312,7 +43580,7 @@ pub struct RequestInit {
     /// `ReferrerPolicy referrerPolicy`
     pub referrer_policy: Option<ReferrerPolicy>,
     /// `AbortSignal? signal`
-    pub signal: Option<Handle>,
+    pub signal: Option<Option<Handle>>,
     /// `IPAddressSpace targetAddressSpace`
     pub target_address_space: Option<IPAddressSpace>,
     /// `any window`
@@ -43559,7 +43827,7 @@ impl RequestInit {
                 if v.is_undefined() {
                     None
                 } else {
-                    {
+                    Some({
                         if v.is_null_or_undefined() {
                             Some(None)
                         } else {
@@ -43573,7 +43841,7 @@ impl RequestInit {
                             ))
                             .map(Some)
                         }
-                    }?
+                    }?)
                 }
             }
             None => None,
@@ -57764,6 +58032,40 @@ impl ToJs for RequestOrString {
         match self {
             RequestOrString::Request(x) => x.to_js(scope),
             RequestOrString::String(x) => x.to_js(scope),
+        }
+    }
+}
+
+/// `(Response or undefined)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum ResponseOrUndefined {
+    Response(Handle),
+    Undefined(()),
+}
+
+impl ResponseOrUndefined {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(v, ids::RESPONSE, ids::RESPONSE_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::RESPONSE,
+                ids::RESPONSE_END,
+                "The value",
+                "Response",
+            ))
+            .map(ResponseOrUndefined::Response);
+        }
+        rt::type_error(scope, "The value is not of type '(Response or undefined)'")
+    }
+}
+
+impl ToJs for ResponseOrUndefined {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            ResponseOrUndefined::Response(x) => x.to_js(scope),
+            ResponseOrUndefined::Undefined(x) => x.to_js(scope),
         }
     }
 }

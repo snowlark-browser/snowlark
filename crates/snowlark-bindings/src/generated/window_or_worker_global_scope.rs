@@ -64,6 +64,13 @@ pub trait WindowOrWorkerGlobalScopeImpl {
     fn scheduler(&self, this: Handle) -> Handle {
         rt::stub("WindowOrWorkerGlobalScope.scheduler")
     }
+    /// [SecureContext, SameObject] readonly attribute CacheStorage caches;
+    #[cfg(not(feature = "stubs"))]
+    fn caches(&self, this: Handle) -> Handle;
+    #[cfg(feature = "stubs")]
+    fn caches(&self, this: Handle) -> Handle {
+        rt::stub("WindowOrWorkerGlobalScope.caches")
+    }
     /// readonly attribute TrustedTypePolicyFactory trustedTypes;
     #[cfg(not(feature = "stubs"))]
     fn trusted_types(&self, this: Handle) -> Handle;
@@ -429,6 +436,42 @@ pub(crate) fn attr_scheduler_set<D: Dom, const LO: u16, const HI: u16>(
     }
     args.this()
         .create_data_property(scope, rt::name(scope, "scheduler").into(), args.get(0));
+}
+
+/// Getter of `[SecureContext, SameObject] readonly attribute CacheStorage caches;`.
+pub(crate) fn attr_caches_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get WindowOrWorkerGlobalScope.caches");
+    let Some(this) = rt::unwrap(&args.this(), LO, HI) else {
+        return rt::throw_illegal_invocation(scope);
+    };
+    if !security_check::<LO>(scope, args.this()) {
+        return;
+    }
+    if let Some(v) = rt::same_object_get(scope, args.this(), {
+        static K: rt::Name = rt::Name::new("WindowOrWorkerGlobalScope.caches");
+        &K
+    }) {
+        rv.set(v);
+        return;
+    }
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as WindowOrWorkerGlobalScopeImpl>::caches(dom, this);
+    let Some(js) = v.to_js(scope) else { return };
+    rt::same_object_set(
+        scope,
+        args.this(),
+        {
+            static K: rt::Name = rt::Name::new("WindowOrWorkerGlobalScope.caches");
+            &K
+        },
+        js,
+    );
+    rv.set(js);
 }
 
 /// Getter of `readonly attribute TrustedTypePolicyFactory trustedTypes;`.

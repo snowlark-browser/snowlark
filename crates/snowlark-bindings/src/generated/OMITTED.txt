@@ -119,7 +119,6 @@ WebGL2RenderingContext.drawingBufferStorage: sized drawing buffer formats are no
 WebGL2RenderingContext.makeXRCompatible: WebXR is not implemented
 WebGLRenderingContext.drawingBufferStorage: sized drawing buffer formats are not implemented
 WebGLRenderingContext.makeXRCompatible: WebXR is not implemented
-Window.caches: interface CacheStorage is not generated
 Window.cookieStore: interface CookieStore is not generated
 Window.crashReport: interface CrashReportContext is not generated
 Window.documentPictureInPicture: interface DocumentPictureInPicture is not generated
@@ -137,7 +136,6 @@ Window.showOpenFilePicker(options): interface FileSystemFileHandle is not genera
 Window.showSaveFilePicker(options): interface FileSystemFileHandle is not generated
 Window.speechSynthesis: interface SpeechSynthesis is not generated
 Window.viewport: interface Viewport is not generated
-WorkerGlobalScope.caches: interface CacheStorage is not generated
 WorkerNavigator.crossOriginStorage: interface CrossOriginStorageManager is not generated
 WorkerNavigator.gpu: interface GPU is not generated
 WorkerNavigator.hid: interface HID is not generated

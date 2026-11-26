@@ -3076,6 +3076,7 @@ dependencies = [
  "snowlark-render",
  "snowlark-shell",
  "snowlark-style",
+ "snowlark-sw",
  "snowlark-tab",
  "url",
 ]
@@ -3305,6 +3306,7 @@ dependencies = [
  "snowlark-paint",
  "snowlark-render",
  "snowlark-style",
+ "snowlark-sw",
  "spki",
  "subtle",
  "turboshake",
@@ -3381,6 +3383,7 @@ dependencies = [
  "snowlark-net",
  "snowlark-page",
  "snowlark-paint",
+ "snowlark-sw",
  "snowlark-tab",
 ]
 
@@ -3408,6 +3411,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "snowlark-sw"
+version = "0.1.0"
+dependencies = [
+ "postcard",
+ "serde",
+ "url",
+]
+
+[[package]]
 name = "snowlark-tab"
 version = "0.1.0"
 dependencies = [
@@ -3424,6 +3436,7 @@ dependencies = [
  "snowlark-paint",
  "snowlark-render",
  "snowlark-style",
+ "snowlark-sw",
 ]
 
 [[package]]

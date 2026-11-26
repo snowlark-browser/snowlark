@@ -110,6 +110,8 @@ pub struct WorkerInit {
     pub broadcast: crate::BroadcastHub,
     /// The IndexedDB backend of the creator's event loop.
     pub idb: crate::IdbBackend,
+    /// The Cache API's storage of the creator's event loop.
+    pub caches: crate::CacheBackend,
 }
 
 /// The worker thread: its page, the main script, then the event loop until terminated or closed.
@@ -642,6 +644,7 @@ impl WorkerImpl for Engine {
                 parent_waker: self.waker(),
                 broadcast: self.broadcast_hub(),
                 idb: self.idb_backend_for_worker(),
+                caches: self.cache_backend(),
                 to_parent,
                 inbox,
                 creator,

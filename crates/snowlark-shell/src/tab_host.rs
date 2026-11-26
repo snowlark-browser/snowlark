@@ -1302,6 +1302,7 @@ fn start_process(
         net: context.net.backend().clone(),
         request_filter: context.net.filter().cloned(),
         idb: context.idb.service().clone(),
+        caches: context.caches.service().clone(),
         audible: Arc::new(move |audible| events.send(id, TabEvent::Audible(audible))),
         muted: remote.muted,
         audio_out: context.audio_out.clone(),
