@@ -20,7 +20,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   is beneath it (ref 839).
 - Dragging a selection beside an inline `svg` heading extends it to the next line's text (ref 840).
 - A link opened in a new background tab keeps loading until you switch to the tab (ref 842).
-- Opening some pages, such as About Snowlark, shows the busy pointer for a few seconds (ref 843).
 - An image opened on its own shows in the top-left corner instead of centred (ref 853).
 - **Grid gaps.** `display: grid-lanes` (masonry) is not implemented. Subgrids in another writing mode or direction than
   their parent are laid out as ordinary grids, a subgrid's items share baselines only within it, and a subgrid's
