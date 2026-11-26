@@ -1855,6 +1855,15 @@ impl Engine {
         Err(e)
     }
 
+    /// Runs `f`, a serialization, as StructuredSerializeForStorage: with forStorage true, the
+    /// serializable objects that only cross within an agent cluster throw a DataCloneError.
+    pub(crate) fn serializing_for_storage<R>(&self, f: impl FnOnce() -> R) -> R {
+        let prev = self.for_storage.replace(true);
+        let r = f();
+        self.for_storage.set(prev);
+        r
+    }
+
     /// StructuredSerialize to bytes (for a value crossing to another isolate).
     pub(crate) fn serialize_to_bytes(&self, cx: &mut Cx, value: &JsValue) -> rt::Result<Vec<u8>> {
         let scope = cx.scope();
@@ -2084,6 +2093,29 @@ impl v8::ValueSerializerImpl for CloneDelegate {
                 return Some(true);
             }
         }
+        // HTML §8.10 ImageBitmap's serialization steps: a copy of its bitmap data (one in the
+        // transfer list goes the same way, and its transfer steps detach it afterwards).
+        if let Some(h) = rt::unwrap(&object, ids::IMAGE_BITMAP, ids::IMAGE_BITMAP_END) {
+            let made = rt::state(scope).engine::<Engine>().bitmap_serialization(h);
+            match made {
+                Ok((frame, straight)) => {
+                    value_serializer.write_uint32(HOST_IMAGE_BITMAP);
+                    value_serializer.write_uint32(frame.width);
+                    value_serializer.write_uint32(frame.height);
+                    value_serializer.write_uint32(u32::from(straight));
+                    value_serializer.write_uint32(frame.pixels.len() as u32);
+                    value_serializer.write_raw_bytes(&frame.pixels);
+                    return Some(true);
+                }
+                Err(m) => {
+                    rt::throw(
+                        scope,
+                        rt::Error::Dom(ExceptionName::DataCloneError, m.into()),
+                    );
+                    return None;
+                }
+            }
+        }
         rt::throw(
             scope,
             rt::Error::Dom(
@@ -2130,6 +2162,9 @@ const HOST_PORT: u32 = 3;
 const HOST_IMAGE_DATA: u32 = 4;
 /// The tag of a transferred object: its index among those transferred beside the bytes.
 const HOST_TRANSFERRED: u32 = 5;
+/// The tag of a serialized ImageBitmap: width, height, whether its alpha is straight, then its
+/// pixels (premultiplied BGRA unless straight, top row first).
+const HOST_IMAGE_BITMAP: u32 = 6;
 
 /// A serialized Blob or File: (type, (name, last modified) for a File, bytes).
 type BlobRecord = (String, Option<(String, i64)>, Vec<u8>);
@@ -2219,6 +2254,29 @@ impl v8::ValueDeserializerImpl for CloneDelegate {
                     if let Ok(h) = made {
                         return rt::wrap(scope, h);
                     }
+                }
+            }
+        }
+        // HTML §8.10 ImageBitmap's deserialization steps: "Set value's bitmap data to
+        // serialized.[[BitmapData]]" (only an origin-clean bitmap is serialized).
+        if ok && tag == HOST_IMAGE_BITMAP {
+            let (mut width, mut height, mut straight) = (0u32, 0u32, 0u32);
+            if value_deserializer.read_uint32(&mut width)
+                && value_deserializer.read_uint32(&mut height)
+                && value_deserializer.read_uint32(&mut straight)
+                && value_deserializer.read_uint32(&mut len)
+                && len as u64 == width as u64 * height as u64 * 4
+            {
+                if let Some(bytes) = value_deserializer.read_raw_bytes(len as usize) {
+                    let frame = snowlark_paint::image::Frame {
+                        width,
+                        height,
+                        pixels: bytes.to_vec(),
+                        delay_ms: 0,
+                    };
+                    let st = rt::state(scope);
+                    let h = st.engine::<Engine>().new_bitmap(frame, true, straight == 1);
+                    return rt::wrap(scope, h);
                 }
             }
         }

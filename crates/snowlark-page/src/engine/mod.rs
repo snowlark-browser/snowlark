@@ -570,6 +570,9 @@ pub struct Engine {
     /// While a serialization may share WebAssembly modules ([`Engine::sharing_wasm_modules`]): the
     /// index the first one gets beside the bytes, and the compiled modules met so far.
     pub(crate) wasm_out: RefCell<Option<(u32, Vec<v8::CompiledWasmModule>)>>,
+    /// While StructuredSerializeForStorage runs: its forStorage flag
+    /// ([`Engine::serializing_for_storage`]).
+    pub(crate) for_storage: Cell<bool>,
     /// The frames a rendering update asked of the canvas thread before its layout, oldest first,
     /// taken after it or, when they come later, at the next one ([`Engine::flush_canvases`]).
     pub(crate) canvas_frames_pending: RefCell<Vec<(NodeId, snowlark_render::canvas::FrameRequest)>>,
@@ -778,6 +781,7 @@ impl Engine {
             transfer_out: RefCell::new(Vec::new()),
             transfer_in: RefCell::new(Vec::new()),
             wasm_out: RefCell::new(None),
+            for_storage: Cell::new(false),
             canvas_frames_pending: RefCell::new(Vec::new()),
             canvas_frames_async: Cell::new(false),
             canvas_frames_asked_at: Cell::new(None),

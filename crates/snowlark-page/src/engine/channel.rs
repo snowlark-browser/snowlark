@@ -106,6 +106,7 @@ impl Engine {
             }
             ports.push(h);
         }
+        let bitmaps = self.bitmap_transfer_list(cx, transfer)?;
         let map: Vec<(Handle, Handle)> = ports
             .iter()
             .map(|&old| {
@@ -117,6 +118,9 @@ impl Engine {
         let bytes = self.serialize_to_bytes(cx, message);
         self.transferring.borrow_mut().clear();
         let bytes = bytes?;
+        // (the ImageBitmaps are checked and detached first: one that cannot be transferred
+        // throws before anything is detached)
+        self.transfer_bitmaps(&bitmaps)?;
         {
             let scope = cx.scope();
             for b in &buffers {

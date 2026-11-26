@@ -13,8 +13,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Flex items with `aspect-ratio`.** A `max-height` narrows an item's width through its ratio where it should not
   (ref 792), and a stretched item's automatic minimum width does not follow the height it is stretched to (ref 793).
 - **Pages that time out or never finish their content.** Some sites' bot checks stop at a challenge page (ref 776),
-  some build parts of the page in script that never appear (ref 777), and some reveals that wait for a WebGL canvas
-  or an opacity transition never happen (refs 778, 779).
+  some build parts of the page in script that never appear (ref 777), and some reveals never happen: a background
+  video that a lazily loaded player draws into a WebGL canvas, an animated hero that stays hidden (ref 778), and
+  tiles and sections a page's script keeps at opacity 0 (ref 779).
 - **Grid gaps.** `display: grid-lanes` (masonry) is not implemented. Subgrids in another writing mode or direction than
   their parent are laid out as ordinary grids, a subgrid's items share baselines only within it, and a subgrid's
   `repeat(auto-fill, ...)` line names are taken once. Column flex containers compute no baselines, so `last baseline` alignment falls back
@@ -117,8 +118,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **System-font text is not byte-stable between runs.** The same frames can differ by a few bytes from one run to the
   next. The cause is not established. (ref 87)
 - **Canvas 2D.** `ctx.filter` keeps its value but is not applied. (ref 499) Text drawn on an `OffscreenCanvas`
-  inside a worker does not appear; `ImageBitmap` cannot be posted to another thread, and
-  `getContext('bitmaprenderer')` is not supported. (ref 735)
+  inside a worker does not appear, and `getContext('bitmaprenderer')` is not supported. (ref 735)
 - **Pixel snapping inside transforms.** Box edges inside a scale or rotate transform are not snapped to device pixels.
   (ref 34)
 - **Unpainted areas while scrolling fast.** A page whose main thread is busy can show its background where the view

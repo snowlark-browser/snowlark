@@ -154,6 +154,12 @@ pub fn resolved_property(
 ) -> String {
     match property.as_shorthand() {
         Ok(shorthand) => shorthand_value(values, shorthand, used),
+        // CSS Transforms 1 §13: one matrix, over the box's border box, or over an empty
+        // reference box for an element without a box (`display: none` or `contents`).
+        Err(PropertyDeclarationId::Longhand(LonghandId::Transform)) => used
+            .and_then(|u| u.used_value(LonghandId::Transform))
+            .or_else(|| transform_matrix(values, 0.0, 0.0))
+            .unwrap_or_else(|| serialize_longhand(values, LonghandId::Transform)),
         Err(PropertyDeclarationId::Longhand(id)) => longhand_value(values, id, used),
         Err(custom) => values.computed_value_to_string(custom),
     }
@@ -282,6 +288,84 @@ pub fn computed_property_names() -> &'static [&'static str] {
     })
 }
 
+/// A CSS `<number>` as CSSOM serializes it in a matrix: six significant digits at most (as the
+/// engines print them), trailing zeros dropped, no negative zero; what rounding left of a zero
+/// (`cos(90deg)`) is zero.
+pub fn matrix_number(v: f32) -> String {
+    if v.abs() < 1e-6 || !v.is_finite() {
+        return "0".into();
+    }
+    let magnitude = v.abs().log10().floor() as i32;
+    let decimals = (5 - magnitude).clamp(0, 12) as usize;
+    let s = format!("{:.*}", decimals, v);
+    let s = if s.contains('.') {
+        s.trim_end_matches('0').trim_end_matches('.')
+    } else {
+        &s
+    };
+    if s == "-0" {
+        "0".into()
+    } else {
+        s.to_owned()
+    }
+}
+
+/// CSS Transforms 1 §13 "Serialization of the computed value of <transform-list>": the transform
+/// functions multiplied into one matrix over a `width` x `height` reference box (a box's border
+/// box; an empty one for an element without a box), serialized as `matrix()` when that matrix is
+/// 2D and as `matrix3d()` otherwise (CSS Transforms 2 §6: `translateZ(0)` is `matrix(1, 0, 0, 1,
+/// 0, 0)`). `None` for `none`.
+pub fn transform_matrix(values: &ComputedValues, width: f32, height: f32) -> Option<String> {
+    use style::values::computed::Length;
+    let t = &values.get_box().transform;
+    if t.0.is_empty() {
+        return None;
+    }
+    let basis = euclid::default::Rect::new(
+        euclid::default::Point2D::new(Length::new(0.0), Length::new(0.0)),
+        euclid::default::Size2D::new(Length::new(width), Length::new(height)),
+    );
+    let (m, _) = t.to_transform_3d_matrix(Some(&basis)).ok()?;
+    let n = matrix_number;
+    // "a 2D matrix": the 3D components are those of the identity.
+    let is_2d = [m.m13, m.m14, m.m23, m.m24, m.m31, m.m32, m.m34, m.m43]
+        .iter()
+        .all(|v| *v == 0.0)
+        && m.m33 == 1.0
+        && m.m44 == 1.0;
+    Some(if is_2d {
+        format!(
+            "matrix({}, {}, {}, {}, {}, {})",
+            n(m.m11),
+            n(m.m12),
+            n(m.m21),
+            n(m.m22),
+            n(m.m41),
+            n(m.m42)
+        )
+    } else {
+        format!(
+            "matrix3d({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})",
+            n(m.m11),
+            n(m.m12),
+            n(m.m13),
+            n(m.m14),
+            n(m.m21),
+            n(m.m22),
+            n(m.m23),
+            n(m.m24),
+            n(m.m31),
+            n(m.m32),
+            n(m.m33),
+            n(m.m34),
+            n(m.m41),
+            n(m.m42),
+            n(m.m43),
+            n(m.m44)
+        )
+    })
+}
+
 fn longhand_value(
     values: &ComputedValues,
     id: LonghandId,
@@ -364,4 +448,21 @@ pub(crate) fn parse_longhand(longhand: LonghandId, text: &str) -> Option<Propert
     .ok()?;
     let first = declarations.drain().declarations.next();
     first
+}
+
+#[cfg(test)]
+mod matrix_tests {
+    #[test]
+    fn matrix_numbers_have_six_significant_digits() {
+        assert_eq!(
+            super::matrix_number(std::f32::consts::FRAC_1_SQRT_2),
+            "0.707107"
+        );
+        assert_eq!(super::matrix_number(-0.1), "-0.1");
+        assert_eq!(super::matrix_number(-0.0), "0");
+        assert_eq!(super::matrix_number(1.0), "1");
+        assert_eq!(super::matrix_number(-1504.0), "-1504");
+        assert_eq!(super::matrix_number(-50.078125), "-50.0781");
+        assert_eq!(super::matrix_number(1e-9), "0");
+    }
 }

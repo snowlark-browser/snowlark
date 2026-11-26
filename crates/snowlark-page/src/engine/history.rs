@@ -342,7 +342,8 @@ impl Engine {
             ));
         }
         // 3. StructuredSerializeForStorage.
-        let (bytes, _) = self.serialize_with_ports(cx, &data, &[])?;
+        let (bytes, _) =
+            self.serializing_for_storage(|| self.serialize_with_ports(cx, &data, &[]))?;
         let current = url::Url::parse(self.dom().document_url(doc)).ok();
         // 4: a URL that is null or the empty string keeps the document's (its fragment too),
         // whatever the base URL.

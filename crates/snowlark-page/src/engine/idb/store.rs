@@ -140,7 +140,8 @@ impl Engine {
         value: &JsValue,
     ) -> rt::Result<(Vec<u8>, JsValue)> {
         self.txn(t, |t| t.state = TxnState::Inactive);
-        let bytes = self.serialize_to_bytes(cx, value);
+        // (StructuredSerializeForStorage)
+        let bytes = self.serializing_for_storage(|| self.serialize_to_bytes(cx, value));
         self.txn(t, |t| t.state = TxnState::Active);
         let bytes = bytes?;
         let clone = self.deserialize_value(cx, &bytes).map_err(|()| {

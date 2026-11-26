@@ -32,75 +32,6 @@ pub struct NodeUsedValues {
     boxless: bool,
 }
 
-/// A CSS `<number>` as CSSOM serializes it in a matrix: six significant digits at most (as the
-/// engines print them), trailing zeros dropped, no negative zero; what rounding left of a zero
-/// (`cos(90deg)`) is zero.
-pub(crate) fn number(v: f32) -> String {
-    if v.abs() < 1e-6 || !v.is_finite() {
-        return "0".into();
-    }
-    let magnitude = v.abs().log10().floor() as i32;
-    let decimals = (5 - magnitude).clamp(0, 12) as usize;
-    let s = format!("{:.*}", decimals, v);
-    let s = if s.contains('.') {
-        s.trim_end_matches('0').trim_end_matches('.')
-    } else {
-        &s
-    };
-    if s == "-0" {
-        "0".into()
-    } else {
-        s.to_owned()
-    }
-}
-
-/// CSS Transforms 1 §11 / 2 §6: the resolved value of `transform` for a box is its used value, the
-/// matrix of the transform functions over the reference box (the border box), serialized as
-/// `matrix()` or, when 3D, `matrix3d()`; `none` stays `none`.
-pub(crate) fn transform_matrix(values: &ComputedValues, reference: Rect) -> Option<String> {
-    let t = &values.get_box().transform;
-    if t.0.is_empty() {
-        return None;
-    }
-    let basis = euclid::default::Rect::new(
-        euclid::default::Point2D::new(Length::new(0.0), Length::new(0.0)),
-        euclid::default::Size2D::new(Length::new(reference.width), Length::new(reference.height)),
-    );
-    let (m, is_3d) = t.to_transform_3d_matrix(Some(&basis)).ok()?;
-    let n = number;
-    Some(if is_3d {
-        format!(
-            "matrix3d({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})",
-            n(m.m11),
-            n(m.m12),
-            n(m.m13),
-            n(m.m14),
-            n(m.m21),
-            n(m.m22),
-            n(m.m23),
-            n(m.m24),
-            n(m.m31),
-            n(m.m32),
-            n(m.m33),
-            n(m.m34),
-            n(m.m41),
-            n(m.m42),
-            n(m.m43),
-            n(m.m44)
-        )
-    } else {
-        format!(
-            "matrix({}, {}, {}, {}, {}, {})",
-            n(m.m11),
-            n(m.m12),
-            n(m.m21),
-            n(m.m22),
-            n(m.m41),
-            n(m.m42)
-        )
-    })
-}
-
 /// A CSS `<number>` in px the way CSSOM serializes it.
 pub(crate) fn px(v: f32) -> String {
     let v = if v == 0.0 { 0.0 } else { v };
@@ -296,7 +227,14 @@ impl UsedValues for NodeUsedValues {
                 }
                 GenericLineHeight::Length(l) => l.0.px(),
             },
-            LonghandId::Transform => return transform_matrix(&self.values, g.border_box),
+            // (the reference box is the border box)
+            LonghandId::Transform => {
+                return snowlark_style::computed::transform_matrix(
+                    &self.values,
+                    g.border_box.width,
+                    g.border_box.height,
+                )
+            }
             LonghandId::GridTemplateColumns => return self.grid.as_ref().map(|g| g.0.clone()),
             LonghandId::GridTemplateRows => return self.grid.as_ref().map(|g| g.1.clone()),
             LonghandId::TransformOrigin => {
@@ -324,16 +262,5 @@ mod tests {
         assert_eq!(super::px(12.5), "12.5px");
         assert_eq!(super::px(-0.0), "0px");
         assert_eq!(super::px(1.0 / 3.0), "0.333333px");
-    }
-
-    #[test]
-    fn matrix_numbers_have_six_significant_digits() {
-        assert_eq!(super::number(std::f32::consts::FRAC_1_SQRT_2), "0.707107");
-        assert_eq!(super::number(-0.1), "-0.1");
-        assert_eq!(super::number(-0.0), "0");
-        assert_eq!(super::number(1.0), "1");
-        assert_eq!(super::number(-1504.0), "-1504");
-        assert_eq!(super::number(-50.078125), "-50.0781");
-        assert_eq!(super::number(1e-9), "0");
     }
 }

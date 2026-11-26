@@ -633,6 +633,35 @@ fn display_none_subtrees_resolve_on_demand() {
     assert!(p.data.styles(p.q("#h")).is_some());
 }
 
+#[test]
+fn a_transform_resolves_to_one_matrix_without_a_box_too() {
+    let p = Page::new(
+        "<!DOCTYPE html><style>#a { transform: scale(0); } #b { transform: translate(10px, 50%) rotate(90deg); }
+         #c { transform: translateZ(0) translateX(3px); } #d { transform: perspective(100px); }</style>
+         <div id=a></div><div id=b></div><div id=c></div><div id=d></div>",
+    );
+    let id = |n| computed::property_id(n).unwrap();
+    // (no layout: the reference box is empty, so 50% is 0)
+    let resolved = |sel| {
+        let values = p.engine.computed_style(&p.dom, &p.data, p.q(sel)).unwrap();
+        computed::resolved_property(&values, &id("transform"), None)
+    };
+    assert_eq!(resolved("#a"), "matrix(0, 0, 0, 0, 0, 0)");
+    assert_eq!(resolved("#b"), "matrix(0, 1, -1, 0, 10, 0)");
+    // A 3D function whose product is 2D is a matrix(); a real 3D one a matrix3d().
+    assert_eq!(resolved("#c"), "matrix(1, 0, 0, 1, 3, 0)");
+    assert_eq!(
+        resolved("#d"),
+        "matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -0.01, 0, 0, 0, 1)"
+    );
+    // The computed value (Typed OM, animations) keeps the list.
+    let values = p.engine.computed_style(&p.dom, &p.data, p.q("#a")).unwrap();
+    assert_eq!(
+        computed::computed_property(&values, &id("transform")),
+        "scale(0)"
+    );
+}
+
 struct Layout;
 
 impl computed::UsedValues for Layout {

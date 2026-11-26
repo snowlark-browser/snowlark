@@ -245,6 +245,63 @@ fn a_worker_uploads_an_image_bitmap_from_a_blob_to_webgl() {
     assert_eq!(got, "255 0 0 128,128 0 0 128,0");
 }
 
+#[test]
+fn image_bitmaps_are_serializable_and_transferable() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = page(&net, "<!doctype html><body>");
+    // The worker sends one bitmap transferred (its own copy is detached: width 0) and one cloned.
+    let w = worker(
+        "onmessage = async () => {
+             const d = new ImageData(1, 1); d.data.set([0, 0, 255, 255]);
+             const sent = await createImageBitmap(d), kept = await createImageBitmap(d);
+             postMessage({ sent, kept }, [sent]);
+             postMessage([sent.width, kept.width].join());
+         };",
+    );
+    eval(
+        &mut page,
+        &format!(
+            "{PX}
+            window.got = [];
+            const w = {w};
+            w.onmessage = e => window.got.push(typeof e.data == 'string' ? e.data
+                : [e.data.sent.width, px(e.data.sent), px(e.data.kept)].join(' '));
+            w.postMessage(0);
+            window.local = null;
+            (async () => {{
+                const d = new ImageData(1, 1); d.data.set([255, 0, 0, 255]);
+                const b = await createImageBitmap(d);
+                const c = structuredClone(b);
+                const closed = await createImageBitmap(d); closed.close();
+                const name = f => {{ try {{ f(); return 'ok'; }} catch (e) {{ return e.name; }} }};
+                const ch = new MessageChannel();
+                const moved = await createImageBitmap(d);
+                window.local = [c.width, px(c), name(() => structuredClone(closed)),
+                    name(() => history.replaceState(b, '')),
+                    name(() => ch.port1.postMessage(moved, [moved, moved])),
+                    name(() => ch.port1.postMessage(moved, [moved])), moved.width,
+                    name(() => ch.port1.postMessage(closed, [closed]))].join('|');
+            }})(); 0"
+        ),
+    );
+    assert_eq!(
+        wait_for(
+            &mut page,
+            "window.local",
+            "1|255,0,0,255|DataCloneError|DataCloneError|DataCloneError|ok|0|DataCloneError"
+        ),
+        "1|255,0,0,255|DataCloneError|DataCloneError|DataCloneError|ok|0|DataCloneError"
+    );
+    assert_eq!(
+        wait_for(
+            &mut page,
+            "window.got.join('/')",
+            "1 0,0,255,255 0,0,255,255/0,1"
+        ),
+        "1 0,0,255,255 0,0,255,255/0,1"
+    );
+}
+
 /// A worker script from a blob URL.
 fn worker(script: &str) -> String {
     format!(

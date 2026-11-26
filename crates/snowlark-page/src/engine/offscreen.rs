@@ -358,12 +358,16 @@ impl Engine {
     ) -> rt::Result<(Vec<u8>, Vec<Transferred>)> {
         let buffers = transfer_buffers(cx, transfer)?;
         let list = self.offscreen_transfer_list(cx, transfer)?;
+        let bitmaps = self.bitmap_transfer_list(cx, transfer)?;
         let prev = self.transfer_out.replace(list.clone());
         // (a dedicated worker is in its owner's agent cluster: WebAssembly modules go along)
         let (bytes, modules) =
             self.sharing_wasm_modules(list.len() as u32, || self.serialize_value(cx, value));
         self.transfer_out.replace(prev);
         let bytes = bytes?;
+        // (the ImageBitmaps are checked and detached first: one that cannot be transferred
+        // throws before anything is detached)
+        self.transfer_bitmaps(&bitmaps)?;
         // The ArrayBuffers' contents went with the message (serialized by value); the transfer
         // steps detach them here.
         {

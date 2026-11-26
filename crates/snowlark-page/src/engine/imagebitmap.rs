@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use snowlark_bindings::generated::{self as g, ImageBitmapImpl};
-use snowlark_bindings::rt::{self, Cx, ExceptionName, Handle, JsPromise};
+use snowlark_bindings::rt::{self, Cx, ExceptionName, Handle, JsObject, JsPromise};
 use snowlark_paint::image::Frame;
 use snowlark_render::canvas::skia as tiny_skia;
 
@@ -134,6 +134,81 @@ impl Engine {
     /// Whether an ImageBitmap was closed (drawing or uploading it throws InvalidStateError).
     pub(crate) fn bitmap_closed(&self, h: Handle) -> bool {
         self.bitmap(h, |b| b.frame.is_none()).unwrap_or(true)
+    }
+
+    /// HTML §8.10 ImageBitmap's serialization steps: a copy of its bitmap data and whether its
+    /// alpha is straight, or the DataCloneError's message: for storage, once closed (its
+    /// [[Detached]] is true, StructuredSerializeInternal), or when it is not origin-clean.
+    pub(crate) fn bitmap_serialization(
+        &self,
+        h: Handle,
+    ) -> Result<(Arc<Frame>, bool), &'static str> {
+        if self.for_storage.get() {
+            return Err("An ImageBitmap cannot be stored");
+        }
+        match self.bitmap(h, |b| (b.frame.clone(), b.origin_clean, b.straight_alpha)) {
+            Some((Some(_), false, _)) => Err("The ImageBitmap is not origin-clean"),
+            Some((Some(frame), true, straight)) => Ok((frame, straight)),
+            _ => Err("The ImageBitmap is detached"),
+        }
+    }
+
+    /// The ImageBitmaps among a message's transfer list (HTML §2.7.5 StructuredSerializeWithTransfer
+    /// step 4 for them): each once, else a DataCloneError. Their bitmaps go with the message by
+    /// value; once it is serialized, [`Engine::transfer_bitmaps`] checks them and detaches them.
+    pub(crate) fn bitmap_transfer_list(
+        &self,
+        cx: &mut Cx,
+        transfer: &[JsObject],
+    ) -> rt::Result<Vec<Handle>> {
+        use snowlark_bindings::generated::ids;
+        let mut list = Vec::new();
+        for o in transfer {
+            let h = {
+                let scope = cx.scope();
+                let obj = v8::Local::new(scope, o.global());
+                rt::unwrap(&obj, ids::IMAGE_BITMAP, ids::IMAGE_BITMAP_END)
+            };
+            let Some(h) = h else { continue };
+            if list.contains(&h) {
+                return Err(exception(
+                    ExceptionName::DataCloneError,
+                    "An object is in the transfer list twice",
+                ));
+            }
+            list.push(h);
+        }
+        Ok(list)
+    }
+
+    /// HTML §2.7.5 StructuredSerializeWithTransfer steps 6-7 for the ImageBitmaps of the
+    /// transfer list, after the value is serialized (so an exception the serialization throws
+    /// comes first): a detached one throws a DataCloneError, as does one that is not
+    /// origin-clean (§8.10 transfer steps); then each is detached ("Unset value's bitmap data":
+    /// its width and height read 0, and drawing it throws).
+    pub(crate) fn transfer_bitmaps(&self, list: &[Handle]) -> rt::Result<()> {
+        for &h in list {
+            let state = self.bitmap(h, |b| (b.frame.is_some(), b.origin_clean));
+            match state {
+                Some((true, true)) => {}
+                Some((true, false)) => {
+                    return Err(exception(
+                        ExceptionName::DataCloneError,
+                        "The ImageBitmap is not origin-clean",
+                    ))
+                }
+                _ => {
+                    return Err(exception(
+                        ExceptionName::DataCloneError,
+                        "The ImageBitmap is detached",
+                    ))
+                }
+            }
+        }
+        for &h in list {
+            self.bitmap(h, |b| b.frame = None);
+        }
+        Ok(())
     }
 
     /// HTML §4.12.5.3 `transferToImageBitmap()`: the bitmap as it is, and the OffscreenCanvas's
