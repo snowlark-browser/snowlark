@@ -30,6 +30,9 @@ png = "0.18"
 unicode-bidi = "0.3"
 unicode-script = "0.5"
 icu_segmenter = "2"
+# The raster backend (`linux/raster.rs`; Direct2D on Windows): CPU raster for the headless modes, GL for
+# tiles and the compositor (docs/linux.md, "Decisions").
+skia-safe = { version = "0.158", features = ["gl"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-core = "0.62"

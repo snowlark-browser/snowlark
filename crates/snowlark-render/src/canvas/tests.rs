@@ -81,6 +81,10 @@ fn both(w: u32, h: u32, scene: impl Fn(&mut Canvas2D)) -> (Vec<u8>, Vec<u8>) {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "needs the GPU canvas: Windows only until Linux stage 5"
+)]
 fn text_through_a_layer_lands_where_direct_text_does() {
     let fonts = fonts();
     for backend in backends() {
@@ -109,6 +113,10 @@ fn text_through_a_layer_lands_where_direct_text_does() {
 /// scaled, clipped to the source and with negative sizes; drawn into itself, it draws the bitmap as
 /// it was before the call.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "needs the GPU canvas: Windows only until Linux stage 5"
+)]
 fn a_canvas_drawn_on_the_device_lands_as_its_pixels_do() {
     let mut src = Canvas2D::with_backend(16, 12, GPU);
     src.state.fill = color("red");
@@ -219,6 +227,10 @@ fn arcs_and_frames() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "needs the GPU canvas: Windows only until Linux stage 5"
+)]
 fn circles_as_sprites_cover_what_the_circles_do() {
     // Chart.js's points: small filled circles and rings at fractional positions, drawn as sprites.
     // Each pixel's alpha is about the circle's exact area in it (supersampled here): edge pixels are
@@ -358,6 +370,10 @@ fn paths_gradients_patterns_and_strokes_match_the_cpu_rasterization() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "needs the GPU canvas: Windows only until Linux stage 5"
+)]
 fn strokes_transform_with_the_current_matrix() {
     // HTML: a stroke is drawn in user space; under scale(2, 1) a 6-unit line is 6 px tall when
     // horizontal and 12 px wide when vertical.
@@ -378,6 +394,10 @@ fn strokes_transform_with_the_current_matrix() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "needs the GPU canvas: Windows only until Linux stage 5"
+)]
 fn compositing_follows_the_porter_duff_and_blend_equations() {
     // A blue square, then within a circular clip a red square with the operator. Expected values
     // per HTML (the operator applies to the whole clip region, inside the shape or not) and
@@ -525,6 +545,10 @@ fn axis_aligned_images_cover_whole_pixels() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "needs the GPU canvas: Windows only until Linux stage 5"
+)]
 fn images_text_and_shadows_draw_on_the_gpu() {
     let fonts = fonts();
     let mut c = Canvas2D::with_backend(200, 100, GPU);
@@ -607,6 +631,10 @@ fn colours_parse_fast_as_svgtypes_parses_them() {
 /// Canvas text goes through the document's shaping cache: a text measured or drawn before (by any
 /// canvas of the document's origin) is a lookup, with the same result as shaping it again.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "needs the GPU canvas: Windows only until Linux stage 5"
+)]
 fn canvas_text_shaped_before_is_found_in_the_shared_cache() {
     let fonts = fonts();
     // (a character the first font lacks: shaping it needs font fallback)

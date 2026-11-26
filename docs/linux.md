@@ -25,7 +25,8 @@ and `snowlark-net` build natively and pass their tests there (11 test binaries, 
 six AVIF tests, which need the dav1d library (below). `snowlark-js` and `snowlark-bindings` build against the
 Linux V8 library and pass their tests (69, among them the access check, streaming, code cache, object clone and
 inline field tests that drive the mangled-name declarations through V8). `snowlark-paint` has the Linux text
-engine (below) with its tests. `snowlark-layout` and `snowlark-render` build and link with their tests.
+engine (below) with its tests, and the Skia painter with its own. `snowlark-layout` and `snowlark-render` build
+and pass their tests (`snowlark-render`'s GPU canvas tests are ignored there).
 
 ### A Linux machine for building
 
@@ -93,10 +94,20 @@ half; a module with a Linux half has it in `src/linux/<module>.rs` under the sam
   first, as on Windows. `font_data` gives the raster side a face's bytes, index, variation values and
   synthesized bold or oblique. `text_cache`'s per-word cache (whose segments follow DirectWrite's script
   analysis) is not used: whole runs are shaped and cached.
-- `raster`: `HeadlessRenderer`, which cannot be made either; `canvas_thread`: the GPU canvas, which cannot be made,
-  so `snowlark-render` draws canvases on its CPU backend; `gpu`: only the `Driver` choice.
-- `image`: the formats Windows decodes through WIC (BMP, ICO, TIFF) are refused (`Error::Unsupported`); rendered
-  pixmaps are written as PNG with the `png` crate.
+- `raster`: a painter over a Skia canvas (`skia-safe`), and `HeadlessRenderer` on Skia's CPU backend. Each group of
+  the list is a Skia save or layer (an opacity group a layer with that alpha, a filter group a layer whose paint
+  carries the filters as an image filter, a mask a layer the mask is composited onto with destination-in, a
+  backdrop filter a layer with a backdrop filter and mirrored edges); filter functions and SVG filter primitives
+  are Skia's image filters (`raster_filters.rs`, `raster_svg.rs`); box edges snap to device pixels as on Windows;
+  text is drawn with typefaces made from the text engine's `font_data`. Skia links the system's FreeType (no
+  copy of its own), the one fontconfig and HarfBuzz load. `canvas_thread`: the GPU canvas, which cannot be made,
+  so `snowlark-render` draws canvases on its CPU backend (its GPU canvas tests are ignored on Linux); `gpu`: only
+  the `Driver` choice.
+- `image`: of the formats Windows decodes through WIC, BMP, ICO and WBMP go through Skia's codecs and TIFF is
+  refused (`Error::Unsupported`); rendered pixmaps are written as PNG with the `png` crate.
+
+`skia-safe`'s build downloads Skia's prebuilt library for the target and features once (from the project's
+releases; a machine without network access builds it from source, which needs `python3`, `ninja` and `clang`).
 
 The rest of `snowlark-paint` (the compositor, tiles, video, the window, cursors, the clipboard, the PDF viewer, the
 password store's key) is Windows-only and compiled out elsewhere; its integration tests too. Every crate above
@@ -164,7 +175,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 |---|---|---|---|
 | 1 | The map, the Linux check of the platform-free crates, this plan | S | done: `tools/linux/check.ps1` green for eight crates; six of them built and tested on Linux |
 | 2 | **Split `snowlark-paint`**: the platform-free modules (geometry, display list, layer animation, filters, scroll curves, colour profiles, the Rust image decoders, the text types and shape cache, a canvas's operations) into `snowlark-graphics` with its own error type; the Windows half keeps Direct2D, DirectWrite and the window. Linux halves of the text engine, the headless renderer and the GPU canvas with the same methods and nothing behind them | M | done: `snowlark-graphics`, `-paint`, `-layout` and `-render` in `check.ps1`; nothing changes on Windows (WPT gate) |
-| 3 | **Headless on Linux**: V8 for Linux; the Itanium declarations in `snowlark-js`; the Linux text engine (fontconfig, FreeType, HarfBuzz); Skia behind `HeadlessRenderer`; WIC formats in Rust. `--eval`, `--render`, `--wpt` and reftests run on Linux | L | WPT on Linux within a known distance of the Windows counts, read per area. Done so far: V8 for Linux and the Itanium declarations (`snowlark-js` and `snowlark-bindings` tested on Linux) |
+| 3 | **Headless on Linux**: V8 for Linux; the Itanium declarations in `snowlark-js`; the Linux text engine (fontconfig, FreeType, HarfBuzz); Skia behind `HeadlessRenderer`; WIC formats in Rust. `--eval`, `--render`, `--wpt` and reftests run on Linux | L | WPT on Linux within a known distance of the Windows counts, read per area. Done so far: V8 for Linux and the Itanium declarations (`snowlark-js` and `snowlark-bindings` tested on Linux), the text engine, Skia behind `HeadlessRenderer` (`snowlark-render`'s tests pass on Linux but its GPU canvas ones) |
 | 4 | **Processes**: the `posix/` half of `snowlark-ipc` (sockets, descriptor passing, memfd sections, launch, a fork server), crash dumps | M | the renderer process model on Linux; IPC tests green there |
 | 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop |
 | 6 | **WebGL** on ANGLE for Linux | S | the WebGL conformance areas as on Windows |

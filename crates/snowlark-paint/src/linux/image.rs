@@ -3,14 +3,50 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! Images on Linux: the decoding, store and frame types of `snowlark-graphics` (PNG, JPEG, GIF, WebP
-//! and AVIF in Rust); the formats Windows decodes through WIC (BMP, ICO, TIFF) are refused
-//! ([`Error::Unsupported`]) until they are decoded in Rust (docs/linux.md, stage 3). Rendered pixmaps
-//! are encoded as PNG by the `png` crate.
+//! and AVIF in Rust); of the formats Windows decodes through WIC, BMP, ICO and WBMP go through
+//! Skia's codecs, and TIFF is refused ([`Error::Unsupported`]). Rendered pixmaps are encoded as PNG
+//! by the `png` crate.
 
 use std::path::Path;
 
 use crate::geom::Color;
 pub use snowlark_graphics::image::*;
+
+/// Decodes an encoded image held in memory: the formats `snowlark-graphics` decodes in Rust
+/// ([`snowlark_graphics::image::decode`]), and BMP, ICO and WBMP through Skia.
+pub fn decode(bytes: &[u8]) -> Result<DecodedImage, Error> {
+    match snowlark_graphics::image::decode(bytes) {
+        Err(Error::Unsupported) => decode_skia(bytes),
+        decoded => decoded,
+    }
+}
+
+fn decode_skia(bytes: &[u8]) -> Result<DecodedImage, Error> {
+    use skia_safe as sk;
+    let mut codec =
+        sk::codec::Codec::from_data(sk::Data::new_copy(bytes)).ok_or(Error::Unsupported)?;
+    let size = codec.dimensions();
+    if size.width <= 0 || size.height <= 0 {
+        return Err(Error::Invalid);
+    }
+    let (width, height) = (size.width as u32, size.height as u32);
+    // (refused before its pixels are allocated, as the Rust decoders refuse one)
+    if width as u64 * height as u64 > MAX_PIXELS {
+        return Err(Error::TooLarge);
+    }
+    let info = sk::ImageInfo::new(size, sk::ColorType::BGRA8888, sk::AlphaType::Premul, None);
+    let mut pixels = vec![0u8; width as usize * height as usize * 4];
+    match codec.get_pixels_with_options(&info, &mut pixels, width as usize * 4, None) {
+        sk::codec::Result::Success | sk::codec::Result::IncompleteInput => {}
+        _ => return Err(Error::Invalid),
+    }
+    Ok(DecodedImage::still(Frame {
+        width,
+        height,
+        pixels,
+        delay_ms: 0,
+    }))
+}
 
 /// Decodes an image file.
 pub fn decode_file(path: &Path) -> Result<DecodedImage, Error> {
@@ -86,8 +122,21 @@ mod tests {
     }
 
     #[test]
-    fn formats_not_decoded_in_rust_are_refused() {
-        let bmp = bmp_from_rgba(1, 1, &[255, 0, 0, 255]);
-        assert_eq!(decode(&bmp).unwrap_err(), Error::Unsupported);
+    fn bmp_decodes_through_skia() {
+        let bmp = bmp_from_rgba(2, 1, &[255, 0, 0, 255, 0, 0, 255, 128]);
+        assert_eq!(
+            snowlark_graphics::image::decode(&bmp).unwrap_err(),
+            Error::Unsupported
+        );
+        let image = decode(&bmp).unwrap();
+        assert_eq!((image.width(), image.height()), (2, 1));
+        assert_eq!(image.frames[0].pixel(0, 0), Color::rgba(255, 0, 0, 255));
+        let blue = image.frames[0].pixel(1, 0);
+        assert_eq!((blue.b, blue.a), (255, 128), "{blue:?}");
+    }
+
+    #[test]
+    fn what_no_decoder_knows_is_refused() {
+        assert_eq!(decode(b"not an image").unwrap_err(), Error::Unsupported);
     }
 }
