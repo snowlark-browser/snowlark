@@ -28,9 +28,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   to `end` there. (ref 42, 85)
 - **Writing modes.** Vertical modes work in block, inline, float, table, flex, grid and positioned layout, but several
   pieces are missing: ideographic baseline metrics (`text-box-edge`), `text-group-align`, `chws`/`halt` in vertical
-  runs, emphasis marks, collapsed borders in right-to-left tables, `:dir()` in `matches()`, and native form-control
+  runs, emphasis marks, collapsed borders in right-to-left tables, `:dir()` after an ancestor's `dir` changes, and native form-control
   looks under vertical `appearance: none`. (ref 37)
-- **Positioned layout.** Anchor positioning is not implemented. Also missing: bidi reordering of absolutely positioned
+- **Positioned layout.** Missing: bidi reordering of absolutely positioned
   placeholders, single-axis scroll containers (`overflow-x` and `overflow-y` computed to different values),
   sticky positioning inside a split inline, and 3D transforms in client rects. A sticky box with room to move inside
   another sticky box is painted again at each scroll position instead of being moved by the compositor. (ref 48, 645)
@@ -41,7 +41,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   mode and fixed-layout min/max cases, percentage heights of cell content against the final row height, and some
   collapsed-border painting order. (ref 68)
 - **Scroll containers.** Elements use overlay scroll bars, so `scrollbar-gutter` reserves nothing. Also open:
-  `text-overflow` while scrolled and in form controls, scroll markers and buttons, `scrollParent` and `getBoxQuads()`.
+  `text-overflow` while scrolled and in form controls, scroll markers and buttons, and `scrollParent` (it is null).
   (ref 50)
 - **`content-visibility`.** `content-visibility: hidden` and `<details>` work, but `content-visibility: auto` is not
   implemented, skipped content is still laid out eagerly, and find-in-page and `hidden=until-found` do not reveal
@@ -49,8 +49,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Inline-level and block-in-inline details.** `::first-line` and `::first-letter` are not implemented, nor are `ruby`,
   `initial-letter` or `hanging-punctuation`. `alignment-baseline` and `dominant-baseline` values beyond what
   `vertical-align` offers are open. (ref 36)
-- **Buttons.** `ruby-*` and `run-in` displays are not parsed. An absolutely positioned button is not sized as a replaced
-  element, and `align-self: normal` still stretches a button that is a flex or grid item. (ref 216)
+- **Buttons.** `ruby-*` and `run-in` displays are not parsed. (ref 216)
 - **Geometry under transforms.** For Intersection Observer, a frame's container is placed by its untransformed content
   box. (ref 99)
 - **Geometry reads near split inlines.** An inline box split around a block still walks the tree on geometry reads,
@@ -61,7 +60,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 ## CSS and style
 
 - **CSS Shapes.** Lines wrap around `shape-outside` shapes, images and gradients, but an animated `inset()` or
-  `polygon()` reads back in a longer form than other browsers give (all four `inset()` sides, a zero `round`),
+  `polygon()` reads back in a longer form than other browsers give (all four `inset()` sides),
   and text beside a rounded shape can end at a fraction of a pixel and leave a hairline gap. (ref 760)
 - **CSS Typed OM, the rest.** The style property maps and `CSSStyleValue` objects work, but properties the style
   system does not have yet (`text-emphasis-color`, `counter-set`, `page` and a few more) are not
@@ -113,9 +112,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `<clipPath>` in another document names nothing. (ref 63)
 - **Backdrop filter over scrolling content.** Content that scrolls over a fixed layer does not blur that layer with its
   `backdrop-filter`, because the filter only sees its own raster piece. (ref 495)
-- **CSS Scoping details.** `:host-context()`, `:has-slotted`, tree-scoped `@font-face` and `@keyframes` names in
-  shadow trees, `::part()` followed by pseudo-classes, `@import` through `insertRule()`, `<style>` load and error
-  events, and the `CSSScopeRule` interface are not implemented. (ref 45)
+- **CSS Scoping details.** `:host-context()`, tree-scoped `@font-face` and `@keyframes` names in shadow trees,
+  `@import` through `insertRule()`, a `<style>`'s `error` event, and the `CSSScopeRule` interface are not
+  implemented. (ref 45)
 
 
 
@@ -143,8 +142,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Text controls.** A textarea does not scroll its own long text, by script or by the user (ref 65).
 - **Selection across shadow trees.** A selection cannot keep its two ends in different trees, so dragging across a
   shadow boundary and `getComposedRanges()` crossing ranges do not work as in other browsers. (ref 62)
-- **`[SecureContext]` members on insecure pages.** `navigator.credentials`, `navigator.clipboard` and
-  `PasswordCredential` exist on `http://` pages, although `isSecureContext` is false. (ref 82)
 - **Google's sign-in button.** The "Continue with Google" button that Google's sign-in script builds can stay empty
   (seen on reddit). (ref 46)
 
@@ -155,13 +152,13 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   partitioned by the top-level site), it does not count towards `navigator.storage.estimate()`, and a cache name with
   an unpaired surrogate is stored with U+FFFD. (ref 770)
 - **Secure contexts.** On plain HTTP pages, secure-context-only members of objects other than the global (such as
-  `navigator.storage`, `navigator.clipboard` and `crypto.subtle`) still exist, and a secure frame inside an insecure
+  `navigator.credentials`, `navigator.storage`, `navigator.clipboard` and `crypto.subtle`) still exist, and a secure frame inside an insecure
   page reports `isSecureContext` as true. (ref 771)
 - **A dynamic `import()` of the module that is evaluating crashes the process.** Fifteen ECMAScript test suite files under `dynamic-import` end in a V8 fatal error ("Module in unexpected status Evaluating"). (ref 748)
 - **Cross-origin objects.** `[[SetPrototypeOf]]` and `[[PreventExtensions]]` on a cross-origin object throw a
   `SecurityError` instead of returning false. A receiver that is not the object itself is not detected for
   `CrossOriginGet`/`Set`. Same-origin `Location` is an ordinary object (it lacks the specified default properties),
-  `javascript:` URLs do not run, `<iframe csp>` is not implemented, and the `Origin` interface is missing. On
+  `<iframe csp>` is not implemented, and the `Origin` interface is missing. On
   non-Windows-x64 targets V8's token check refuses all cross-origin access. (ref 77)
 - **Cross-origin review findings.** Two documents at the same `file:` URL compare as same origin, an `about:` document
   with no browsing context takes the top-level document's origin, and callbacks other than event listeners (timers,
@@ -181,10 +178,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   EXT_disjoint_timer_query, WEBGL_lose_context or WEBGL_debug_shaders; textures do not load from video, and
   `navigator.gpu` is absent. WebGL 2 does not yet upload compressed textures from a pixel unpack buffer, an
   image source into more than one layer of a 3D texture, or a sub-rectangle of an image source
-  (`UNPACK_ROW_LENGTH`, `UNPACK_SKIP_*`). WebGL objects are freed only with the page. (ref 117, 682, 700,
+  (`UNPACK_ROW_LENGTH`, `UNPACK_SKIP_*`). WebGL objects are freed only with the page. (ref 117, 700,
   732, 734)
-- **Service workers.** `navigator.serviceWorker` and the Cache API are not implemented. Pages that check for service
-  workers print a warning. (ref 33)
 - **IndexedDB.** Names with lone surrogates are not supported, there is no storage partitioning by top-level site,
   no quota and no `close` event, a database's contents are read into memory on first use, and transactions,
   connections and cursors are not garbage collected. (ref 49)
@@ -289,7 +284,5 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `navigation-timing/test-document-open.html` and `fetch/api/abort/general.any.html` vary from run to run
   (ref 60, 563); a headless
   Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py` can read one arm slower than the other for the same binary when the arms share a core (ref 509).
-- **Reftest hangs.** Two reftests, `background-size-near-zero-png` and the flexbox `flex-1-N-N-shrink` pages, hang in
-  the runner in ways its watchdog cannot stop. (ref 39)
 - **Animated images in reftest captures.** A reftest capture shows an animated image's first frame even when the page
   waits for later ones (WPT `avif/animated-avif-timeout.html`). (ref 747)
