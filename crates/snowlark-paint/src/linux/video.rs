@@ -15,6 +15,13 @@ use snowlark_graphics::Result;
 use crate::gpu::Gpu;
 use crate::{Frame, VideoId};
 
+/// Told when a slot has a new frame to show (none do here yet).
+pub type FrameNotify = Arc<dyn Fn(VideoId) + Send + Sync>;
+
+/// A frame to draw ([`VideoStore::front_of`]): none exists here yet, so no value of it can be made.
+#[derive(Clone, Debug)]
+pub enum VideoFront {}
+
 /// The textures shared per video and size, as on Windows (none are made here yet).
 pub const POOL_TEXTURES: usize = 4;
 
@@ -90,6 +97,18 @@ impl VideoStore {
     /// so it never does (false).
     pub fn imported_frame(&self, _id: VideoId, _generation: u32, _index: u32) -> bool {
         false
+    }
+
+    /// Who to tell of new frames: no slot gets one here, so nobody is told.
+    pub fn set_notify(&self, _notify: Option<FrameNotify>) {}
+
+    /// The compositor's thread, between frames: makes an imported video's newest frame the one
+    /// drawn. There are none here.
+    pub fn latch(&self, _id: VideoId) {}
+
+    /// The frame to draw for `id`: none here.
+    pub fn front_of(&self, _id: VideoId) -> Option<VideoFront> {
+        None
     }
 
     /// The device frames are drawn with.

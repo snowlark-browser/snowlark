@@ -355,7 +355,7 @@ mod tests {
 
     fn start(name: &str, at: i64) -> Start {
         Start {
-            target_path: PathBuf::from(format!("C:\\Downloads\\{name}")),
+            target_path: PathBuf::from(crate::downloads::tests::DIR).join(name),
             current_path: PathBuf::new(),
             url_chain: vec![format!("https://files.example/{name}")],
             start_time: at,
@@ -464,7 +464,13 @@ mod tests {
         h.finish(a, State::Complete, None, 0);
         // (what the search leaves out is on the page, hidden, for the search as you type)
         let page = downloads_html(&h, "report", false, 3000, &|_| 0, &|_| true);
-        assert!(page.contains(&format!("id=d{a} data-search='c:\\downloads\\report.pdf\nhttps://files.example/report.pdf\nhttps://files.example/report.pdf'>")));
+        // (the folder as the search folds it: lowercase)
+        let dir = if cfg!(windows) {
+            "c:\\downloads\\"
+        } else {
+            "/downloads/"
+        };
+        assert!(page.contains(&format!("id=d{a} data-search='{dir}report.pdf\nhttps://files.example/report.pdf\nhttps://files.example/report.pdf'>")));
         assert!(page.contains(&format!("id=d{b} data-search='")));
         assert!(page.contains(".jpg' hidden>"));
         assert!(page.contains("value='report'"));
@@ -475,7 +481,7 @@ mod tests {
         let mut cafe = DownloadHistory::in_memory();
         cafe.start(start("Café Crème.pdf", 1000));
         let page = downloads_html(&cafe, "cafe creme", false, 3000, &|_| 0, &|_| true);
-        assert!(page.contains("data-search='c:\\downloads\\cafe creme.pdf\n"));
+        assert!(page.contains(&format!("data-search='{dir}cafe creme.pdf\n")));
         assert!(!page.contains(".pdf' hidden>"));
         let none = downloads_html(&h, "zebra", false, 3000, &|_| 0, &|_| true);
         assert!(none.contains("<section class=day hidden>"));

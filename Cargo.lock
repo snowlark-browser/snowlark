@@ -3718,6 +3718,7 @@ dependencies = [
  "flate2",
  "fontdb",
  "icu_segmenter",
+ "libc",
  "png",
  "rustc-hash",
  "serde",

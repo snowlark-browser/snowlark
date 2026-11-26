@@ -22,7 +22,7 @@ use crate::display_list::{
     MaskComposite, PathRange, PathVerb, Pattern, Stroke, TextRun,
 };
 use crate::filter::FilterOp;
-use crate::image::Pixmap;
+use crate::image::{Pixmap, ShownImage};
 use crate::text::{FontData, TextEngine};
 use crate::{Color, FontId, ImageId, ImageRendering, Matrix, Point, Radii, Rect, Sides, Size};
 use snowlark_graphics::geom::Snap;
@@ -72,12 +72,37 @@ pub(crate) struct Caches {
     typefaces: HashMap<FaceKey, Option<sk::Typeface>>,
     /// Images by id, frame and the pixels' version.
     images: HashMap<(ImageId, usize, u64), sk::Image>,
+    /// Pixels that came ahead of the lists that show them (a tab's raster thread: its table keeps
+    /// no pixels), by id and frame, with their version: the newest of each, kept until replaced.
+    uploads: HashMap<(ImageId, usize), (u64, sk::Image)>,
+}
+
+/// Skia's image of `width` x `height` premultiplied BGRA pixels, rows packed.
+fn bgra_image(width: u32, height: u32, pixels: &[u8]) -> Option<sk::Image> {
+    if width == 0 || height == 0 || pixels.len() as u64 != width as u64 * height as u64 * 4 {
+        return None;
+    }
+    let info = sk::ImageInfo::new(
+        (width as i32, height as i32),
+        sk::ColorType::BGRA8888,
+        sk::AlphaType::Premul,
+        None,
+    );
+    sk::images::raster_from_data(&info, sk::Data::new_copy(pixels), width as usize * 4)
 }
 
 /// Images kept between lists before the cache starts over.
 const MAX_CACHED_IMAGES: usize = 512;
 
 impl Caches {
+    /// Keeps pixels that came ahead of the lists that show them ([`crate::gpu::TileRasterizer::upload`]).
+    pub(crate) fn upload(&mut self, id: ImageId, shown: &ShownImage, pixels: &[u8]) -> Result<()> {
+        let image = bgra_image(shown.width, shown.height, pixels).ok_or(Error::Invalid)?;
+        self.uploads
+            .insert((id, shown.frame), (shown.version, image));
+        Ok(())
+    }
+
     fn typeface(&mut self, data: &FontData) -> Option<sk::Typeface> {
         let key = (
             Arc::as_ptr(&data.bytes) as *const u8 as usize,
@@ -126,22 +151,16 @@ impl Caches {
         if let Some(image) = self.images.get(&key) {
             return Some(image.clone());
         }
-        let decoded = shown.image?;
+        let Some(decoded) = shown.image else {
+            // (no pixels at hand: those uploaded for this version, if they came)
+            return self
+                .uploads
+                .get(&(id, shown.frame))
+                .filter(|(version, _)| *version == shown.version)
+                .map(|(_, image)| image.clone());
+        };
         let frame = decoded.frames.get(shown.frame)?;
-        if frame.width == 0 || frame.height == 0 {
-            return None;
-        }
-        let info = sk::ImageInfo::new(
-            (frame.width as i32, frame.height as i32),
-            sk::ColorType::BGRA8888,
-            sk::AlphaType::Premul,
-            None,
-        );
-        let image = sk::images::raster_from_data(
-            &info,
-            sk::Data::new_copy(&frame.pixels),
-            frame.width as usize * 4,
-        )?;
+        let image = bgra_image(frame.width, frame.height, &frame.pixels)?;
         if self.images.len() >= MAX_CACHED_IMAGES {
             self.images.clear();
         }

@@ -16,6 +16,11 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   some build parts of the page in script that never appear (ref 777), and some reveals never happen: a background
   video that a lazily loaded player draws into a WebGL canvas, an animated hero that stays hidden (ref 778), and
   tiles and sections a page's script keeps at opacity 0 (ref 779).
+- Dragging some draggable elements made by a page's script selects the page's text instead of moving the element
+  (ref 838).
+- On gsap.com the hero's heading shows a swapped-in letter over the final one (ref 841).
+- A link opened in a new background tab keeps loading until you switch to the tab (ref 842).
+- Opening some pages, such as About Snowlark, shows the busy pointer for a few seconds (ref 843).
 - **Grid gaps.** `display: grid-lanes` (masonry) is not implemented. Subgrids in another writing mode or direction than
   their parent are laid out as ordinary grids, a subgrid's items share baselines only within it, and a subgrid's
   `repeat(auto-fill, ...)` line names are taken once. Column flex containers compute no baselines, so `last baseline` alignment falls back

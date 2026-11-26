@@ -36,6 +36,8 @@ skia-safe = { version = "0.158", features = ["gl"] }
 # The window (`linux/window.rs`; Win32 on Windows): a Wayland client, X11 desktops through XWayland
 # (docs/linux.md, "Decisions"); its keyboard through the system's libxkbcommon.
 smithay-client-toolkit = { version = "0.21", default-features = false, features = ["calloop", "xkbcommon"] }
+# The C library's local time (`linux/window.rs` `local_offset_ms`).
+libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 windows-core = "0.62"

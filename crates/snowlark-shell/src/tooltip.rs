@@ -59,7 +59,9 @@ impl Tooltip {
             .fold(0.0f32, f32::max)
             .min(TIP_MAX_WIDTH)
             + 2.0 * TIP_PAD;
-        let h = lines.len() as f32 * line_h + 2.0 * TIP_PAD - 2.0;
+        // (whole pixels before the placement, so the rounded box stays inside)
+        let w = w.ceil();
+        let h = (lines.len() as f32 * line_h + 2.0 * TIP_PAD - 2.0).ceil();
         // Below the pointer's cursor, flipped above it at the bottom edge.
         let mut x = at.x;
         let mut y = at.y + 20.0;
@@ -72,7 +74,7 @@ impl Tooltip {
         Tooltip {
             text,
             lines,
-            rect: Rect::new(x.round(), y.round(), w.ceil(), h.ceil()),
+            rect: Rect::new(x.floor(), y.floor(), w, h),
         }
     }
 

@@ -650,7 +650,7 @@ struct State {
     windows: Windows,
     /// The windows' composition surfaces ([`CompMsg::Surface`]): a window with one is presented
     /// into it, with the chrome in the same swap chain.
-    surfaces: HashMap<WindowId, std::os::windows::io::OwnedHandle>,
+    surfaces: HashMap<WindowId, snowlark_tab::comp::OsHandle>,
 }
 
 impl State {
@@ -2178,6 +2178,7 @@ mod tests {
     }
 
     /// A compositor's state for a hidden window, and that window.
+    #[cfg(windows)]
     fn state_of(window: &snowlark_paint::window::HiddenWindow) -> State {
         let (events, _) = snowlark_ipc::channel();
         State::new(
@@ -2192,6 +2193,7 @@ mod tests {
         )
     }
 
+    #[cfg(windows)]
     fn resize() -> CompInput {
         CompMsg::Resize {
             width: 200,
@@ -2204,6 +2206,7 @@ mod tests {
         .into()
     }
 
+    #[cfg(windows)]
     #[test]
     fn a_window_with_a_surface_gets_one_chain_whose_chrome_changes_draw_frames() {
         let window = snowlark_paint::window::HiddenWindow::new().unwrap();
@@ -2360,6 +2363,7 @@ mod tests {
     /// Nothing is scrolled or told to the tab until that frame, which is placed there (moved by the
     /// wheel turned meanwhile) though it carries no place of its own (one painted before the tab
     /// heard of the new compositor).
+    #[cfg(windows)]
     #[test]
     fn a_scroll_asked_before_a_tabs_first_frame_places_that_frame() {
         let window = snowlark_paint::window::HiddenWindow::new().unwrap();
@@ -2399,6 +2403,7 @@ mod tests {
     }
 
     /// Tab 3's frame `number`: [`frame_data`] of a page `height` px tall, of document `generation`.
+    #[cfg(windows)]
     fn numbered(number: u64, height: f32, generation: u64) -> CompInput {
         let mut data = frame_data(height, generation);
         data.number = number;
@@ -2407,6 +2412,7 @@ mod tests {
 
     /// Tab 3's page scrolled its viewport to `y`, its scroll number `serial`, and what it shows
     /// there is in its frame `frame`.
+    #[cfg(windows)]
     fn page_scroll(y: f32, serial: u64, frame: u64, generation: u64) -> CompInput {
         CompMsg::ScrollTo {
             tab: 3,
@@ -2422,6 +2428,7 @@ mod tests {
     }
 
     /// [`numbered`], painted for the page's scroll number `serial` to `y`.
+    #[cfg(windows)]
     fn scrolled(number: u64, height: f32, generation: u64, y: f32, serial: u64) -> CompInput {
         let mut data = frame_data(height, generation);
         data.number = number;
@@ -2435,6 +2442,7 @@ mod tests {
     /// A frame the page painted for a scroll of its own brings the scroll: it shows there
     /// from its first presentation, in its own scroll range, and the tab is told. A scroll from
     /// before it that comes later as a message is not shown.
+    #[cfg(windows)]
     #[test]
     fn a_frame_painted_for_a_pages_scroll_shows_there() {
         let window = snowlark_paint::window::HiddenWindow::new().unwrap();
@@ -2472,6 +2480,7 @@ mod tests {
     /// moves the view by as much from where it is: what the wheel scrolled since the page last
     /// heard is kept, not undone by the page's idea of the place. One that waited for a frame
     /// before it goes with it.
+    #[cfg(windows)]
     #[test]
     fn a_scroll_anchoring_adjustment_moves_the_view_from_where_it_is() {
         let window = snowlark_paint::window::HiddenWindow::new().unwrap();
@@ -2514,6 +2523,7 @@ mod tests {
     /// has shown, so the tab can tell one of a frame from before its own last scroll: none while
     /// that scroll is on its way, its serial once its frame shows, none again for another
     /// document.
+    #[cfg(windows)]
     #[test]
     fn reports_name_the_last_of_the_pages_scrolls_shown() {
         let window = snowlark_paint::window::HiddenWindow::new().unwrap();
@@ -2557,6 +2567,7 @@ mod tests {
 
     /// Of a scroll that waits for a frame and the scroll that frame was painted for, the one the
     /// page made last shows.
+    #[cfg(windows)]
     #[test]
     fn the_pages_last_scroll_shows_of_a_frames_own_and_one_that_waited() {
         let window = snowlark_paint::window::HiddenWindow::new().unwrap();
@@ -2577,6 +2588,7 @@ mod tests {
     }
 
     /// Where the tab was told its viewport is, since the last call.
+    #[cfg(windows)]
     fn scrolls(told: &Receiver<TabCommand>) -> Vec<f32> {
         let mut at = Vec::new();
         while let Ok(command) = told.try_recv() {
@@ -2590,6 +2602,7 @@ mod tests {
     /// A scroll the page makes itself shows with the frame the page painted for it, not
     /// before: until that frame comes the one on screen stays where it is (and still scrolls by
     /// the wheel), and the scroll lands in the new frame's scroll range, not the old one's.
+    #[cfg(windows)]
     #[test]
     fn a_pages_scroll_waits_for_the_frame_painted_for_it() {
         let window = snowlark_paint::window::HiddenWindow::new().unwrap();
@@ -2629,6 +2642,7 @@ mod tests {
 
     /// A page's scroll whose frame is here already (the paint for it showed nothing new, or the
     /// frame came first) shows at once.
+    #[cfg(windows)]
     #[test]
     fn a_pages_scroll_shows_at_once_with_a_frame_already_here() {
         let window = snowlark_paint::window::HiddenWindow::new().unwrap();
@@ -2646,6 +2660,7 @@ mod tests {
 
     /// The wait is bounded: a frame that does not come was lost on its way, and the scroll shows
     /// with the frame on screen.
+    #[cfg(windows)]
     #[test]
     fn a_pages_scroll_whose_frame_is_lost_shows_after_the_wait() {
         let window = snowlark_paint::window::HiddenWindow::new().unwrap();
@@ -2667,6 +2682,7 @@ mod tests {
 
     /// A page's scroll is its document's: when another document's frame comes instead of the one
     /// it waited for, it is dropped, and the new document shows where its own frame says.
+    #[cfg(windows)]
     #[test]
     fn another_documents_frame_drops_a_pages_scroll_that_waited() {
         let window = snowlark_paint::window::HiddenWindow::new().unwrap();

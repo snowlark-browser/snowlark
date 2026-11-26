@@ -34,11 +34,17 @@ and `snowlark-ipc` build and pass their tests; the page tests that need WebGL (s
 **The binary** builds on Linux with its headless modes: `--eval`, `--render`, `--wpt`, `--reftest`, `--fetch`,
 `--computed`, `--layout-demo`, `--media-types` and `--update-filters`. The window, the renderer and GPU processes
 and the modes that need a GPU device or Windows' CPU counters (`--video`, `--render-demo`, `--bench`,
-`--speedometer`) are compiled out until their stages. `snowlark [<url>]` without a `--` mode opens one page in a
-Wayland window until the browser window is built there (`cli/viewer.rs`: the page's pointer, wheel and keys,
-painted on the CPU at the window's scale; no tabs, toolbar or address bar). `snowlark-tab`
-builds whole there and passes its tests: the tab's threads, the raster thread on the CPU tiles, renderer
-processes with their spare, crashes and crash dumps. `snowlark-shell` is not built yet. What is missing behaves as on a system without it: a media element fails with
+`--speedometer`) are compiled out until their stages. `snowlark [<url>]` without a `--` mode opens the browser
+window (`snowlark-shell`) on Wayland, with its tabs in renderer processes (`--process-model=single` keeps them in
+the browser's process; there is no GPU process there, `--gpu-process` is ignored): tabs, toolbar, address bar,
+menus and the internal pages, composited on the CPU. `snowlark-tab` and `snowlark-shell` build whole there and
+pass their tests but those that need a Windows window, a GPU device, the password store's key or shared video
+textures. Not there yet in the window: a second window (developer tools undocked, popups and Incognito
+windows open in the window there is: `window::open` reports it), file dialogs, the desktop's clipboard (copy
+and paste work within the browser), drag and drop, cursors, IME, the desktop's dark setting, the password
+store (no key: Linux's Secret Service is not used yet, so no password is saved), updates (releases there are
+not signed). The chrome's icons are Unicode symbols where Windows' icon font is missing. The profile is
+`~/.config/snowlark` (`XDG_CONFIG_HOME`). What is missing behaves as on a system without it: a media element fails with
 `MEDIA_ERR_SRC_NOT_SUPPORTED`, `MediaSource` cannot attach, `getContext("webgl")` returns null, canvases draw on
 the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is false and
 `navigator.plugins` empty).
@@ -111,6 +117,16 @@ consuming a code cache on a worker, streamed compilation, object clones, global 
 MSVC names on Windows and their Itanium names on Linux, checked against each library (`docs/v8-upgrade.md`), so
 they work the same on both.
 
+The window can be checked without a desktop on weston's headless backend (`apt-get install weston`), which
+shows nothing on any screen and takes no one's focus; `--debug` lets `weston-screenshooter` save what it shows
+as a PNG in the current folder:
+
+```sh
+weston --backend=headless --renderer=pixman --width=1400 --height=950 --socket=wl-check --debug &
+WAYLAND_DISPLAY=wl-check SNOWLARK_PROFILE_DIR=/tmp/profile target/iter/snowlark https://example.com &
+sleep 10 && WAYLAND_DISPLAY=wl-check weston-screenshooter
+```
+
 `snowlark-js` has two Windows-only pieces, each with a fallback elsewhere:
 
 - The native sampling profiler (`native_profile.rs`, `SNOWLARK_PROFILE=1`) suspends the thread and unwinds with the
@@ -161,8 +177,15 @@ releases; a machine without network access builds it from source, which needs `p
 - `window`: a Wayland client (`smithay-client-toolkit`) with the Windows half's `Window`, `Event`,
   `WindowHandler` and `WindowProxy`: pointer, wheel (high-resolution steps), keys as Windows virtual-key codes
   through xkbcommon (with repeat), focus, timers, maximize, fullscreen and close, and pixels shown from the CPU in
-  `wl_shm` buffers (`Window::present`). Not yet: IME, the clipboard, drag and drop, cursors, fractional scales,
-  the compositor's GPU path.
+  `wl_shm` buffers (`Window::present`). The frame is the owner's (client-side decorations): the client area's
+  outer pixels resize the window and the caption the handler names moves it, both carried out by the desktop
+  (`xdg_toplevel` move and resize). The rest of the Windows half's API is there with what Linux has (sizes and
+  the maximized state kept, no position; the downloads folder from the user directories; local time from the
+  C library) or says what is missing. Not yet: a second window per loop, IME, the desktop's clipboard, drag
+  and drop, cursors, fractional scales, the compositor's GPU path.
+- `vsync`: begin frames from a timer at the refresh interval on a fixed timebase (the window's own frames
+  follow the desktop's frame callbacks); `os_crypt`: nothing can be protected yet (the Secret Service is not
+  used); `drop_target`: the drag types only.
 
 - `compositor`: the window's compositor on the CPU, with the Windows half's `Compositor` and `ContentPass`: each
   frame is the whole client area (the chrome in its top rows), drawn with Skia's CPU backend (tiles copied, tiles
@@ -172,8 +195,8 @@ releases; a machine without network access builds it from source, which needs `p
 - `raster_tables`: the raster side's `FontTable` takes installed font files fontconfig lists, or bytes that pass
   OTS, as on Windows (`TextEngine::font_source` gives a face's path or bytes).
 
-The rest of `snowlark-paint` (video, cursors, the clipboard, the PDF viewer, the password store's
-key) is Windows-only and compiled out elsewhere; its integration tests too. `video` has a
+The rest of `snowlark-paint` (video, cursors, the PDF viewer) is Windows-only and compiled out elsewhere; its
+integration tests too. `video` has a
 Linux half that hands out slots no frame reaches, and `pdf` one that renders nothing (`AVAILABLE` false).
 
 `snowlark-gl` (ANGLE), `snowlark-ipc` (pipes, sections, process launch), `snowlark-media` (Media Foundation,
@@ -240,7 +263,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | 2 | **Split `snowlark-paint`**: the platform-free modules (geometry, display list, layer animation, filters, scroll curves, colour profiles, the Rust image decoders, the text types and shape cache, a canvas's operations) into `snowlark-graphics` with its own error type; the Windows half keeps Direct2D, DirectWrite and the window. Linux halves of the text engine, the headless renderer and the GPU canvas with the same methods and nothing behind them | M | done: `snowlark-graphics`, `-paint`, `-layout` and `-render` in `check.ps1`; nothing changes on Windows (WPT gate) |
 | 3 | **Headless on Linux**: V8 for Linux; the Itanium declarations in `snowlark-js`; the Linux text engine (fontconfig, FreeType, HarfBuzz); Skia behind `HeadlessRenderer`; WIC formats in Rust. `--eval`, `--render`, `--wpt` and reftests run on Linux | L | WPT on Linux within a known distance of the Windows counts, read per area. Done so far: V8 for Linux and the Itanium declarations (`snowlark-js` and `snowlark-bindings` tested on Linux), the text engine, Skia behind `HeadlessRenderer` (`snowlark-render`'s tests pass on Linux but its GPU canvas ones) |
 | 4 | **Processes**: the `posix/` half of `snowlark-ipc` (sockets, descriptor passing, memfd sections, launch, a fork server), crash dumps | M | the renderer process model on Linux; IPC tests green there. Done so far: the `posix/` half of `snowlark-ipc` and crash dumps (no fork server yet), its tests and `snowlark-tab`'s renderer process tests green on Linux |
-| 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop. Done so far: tiles and the compositor on the CPU, the Wayland window (input, keys, integer scale, CPU pixels, frame callbacks), one page in it; `snowlark-tab` on Linux |
+| 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop. Done so far: tiles and the compositor on the CPU, the Wayland window (input, keys, integer scale, CPU pixels, frame callbacks, moves and resizes from its own frame), `snowlark-tab` and the browser window (`snowlark-shell`) on Linux |
 | 6 | **WebGL** on ANGLE for Linux | S | the WebGL conformance areas as on Windows |
 | 7 | **Media**: playback and MSE on FFmpeg, audio output; hardware decoding later | L | `<video>`, `<audio>`, MSE sites play |
 | 8 | **Sandbox**: namespaces and seccomp-bpf for renderers, a font broker | L | a renderer that cannot open a file or a socket |

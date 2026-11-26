@@ -57,8 +57,12 @@ const MAX_FEED: u64 = 4 << 20;
 const MAX_ZIP: u64 = 1 << 30;
 
 /// The release this build is, when it checks for updates at all: [`RELEASE`], or with
-/// `SNOWLARK_UPDATE_FEED` set, `SNOWLARK_UPDATE_RELEASE`.
+/// `SNOWLARK_UPDATE_FEED` set, `SNOWLARK_UPDATE_RELEASE`. Never on Linux: releases there are not
+/// signed yet, so a build cannot check that an update comes from its own signer.
 pub fn own_release() -> Option<String> {
+    if cfg!(not(windows)) {
+        return None;
+    }
     if std::env::var_os("SNOWLARK_UPDATE_FEED").is_some() {
         return std::env::var("SNOWLARK_UPDATE_RELEASE")
             .ok()
@@ -240,6 +244,13 @@ impl Fetch for NetFetch {
 }
 
 /// Checks that `exe` is validly signed by the signer of the running executable.
+#[cfg(not(windows))]
+pub fn verify_signer(_exe: &Path) -> Result<(), String> {
+    Err("updates are not signed on this system".into())
+}
+
+/// Checks that `exe` is validly signed by the signer of the running executable.
+#[cfg(windows)]
 pub fn verify_signer(exe: &Path) -> Result<(), String> {
     use snowlark_ipc::win::signing::signer_of;
     let own = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -502,6 +513,7 @@ impl Updates {
         let _ = std::thread::Builder::new()
             .name("snowlark update check".into())
             .spawn(move || {
+                #[cfg(windows)]
                 snowlark_ipc::win::processes::background_thread();
                 std::thread::sleep(FIRST_CHECK_AFTER);
                 apply::remove_old_copies(&install_dir);

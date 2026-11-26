@@ -540,6 +540,7 @@ fn run(downloads: &Mutex<DownloadHistory>, mut job: Job, path: PathBuf, fetch: F
 }
 
 /// Opens a downloaded file as the system opens it (its default program).
+#[cfg(windows)]
 fn open_file(path: &Path) {
     use std::os::windows::process::CommandExt as _;
     // (a Windows path cannot hold a quote, so quoting it is enough)
@@ -548,7 +549,22 @@ fn open_file(path: &Path) {
         .spawn();
 }
 
+/// Opens a downloaded file with the desktop's program for its type (`xdg-open`).
+#[cfg(not(windows))]
+fn open_file(path: &Path) {
+    let _ = std::process::Command::new("xdg-open").arg(path).spawn();
+}
+
+/// Opens the file's folder (the desktop's file manager; it is not asked to select the file yet).
+#[cfg(not(windows))]
+fn show_in_folder(path: &Path) {
+    if let Some(dir) = path.parent() {
+        let _ = std::process::Command::new("xdg-open").arg(dir).spawn();
+    }
+}
+
 /// Opens the file's folder with the file selected.
+#[cfg(windows)]
 fn show_in_folder(path: &Path) {
     use std::os::windows::process::CommandExt as _;
     let _ = std::process::Command::new("explorer.exe")

@@ -2876,6 +2876,8 @@ fn a_tab_serves_the_windows_its_page_opens_as_views() {
 /// report (no login form) makes it a successful login, which is saved; the login page loaded again
 /// reports its form, the browser's choice fills it, and the page's script sees the values only
 /// after a click.
+// (the store needs its key from the system: Windows' Data Protection API; Linux has none yet)
+#[cfg(windows)]
 #[test]
 fn a_login_saved_after_its_submission_fills_the_form_again() {
     use crate::passwords::*;

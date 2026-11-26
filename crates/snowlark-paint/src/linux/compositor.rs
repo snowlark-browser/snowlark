@@ -352,6 +352,16 @@ impl ContentPass<'_> {
         self.canvas.restore();
     }
 
+    /// Draws a video frame ([`crate::video::VideoStore::front_of`]): there are none here.
+    pub fn video_frame(
+        &mut self,
+        front: &crate::video::VideoFront,
+        _dest: Rect,
+        _clip: Rect,
+    ) -> bool {
+        match *front {}
+    }
+
     /// Clears `rect` to transparent (where a picture under the content would show: none does here).
     pub fn hole(&mut self, r: Rect) {
         let area = self.at(Rect::from_ltrb(

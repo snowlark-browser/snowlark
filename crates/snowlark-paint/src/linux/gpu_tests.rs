@@ -10,7 +10,7 @@ use crate::display_list::DisplayListBuilder;
 use crate::filter::FilterOp;
 use crate::geom::{Color, Radii};
 use crate::image::ImageStore;
-use crate::raster::HeadlessRenderer;
+use crate::raster::{HeadlessRenderer, ImageResolver};
 use crate::text::TextEngine;
 
 const WHITE: Color = Color::rgb(255, 255, 255);
@@ -116,11 +116,72 @@ fn rasterizer() -> TileRasterizer {
     TileRasterizer::new(Gpu::with_driver(Driver::Warp).unwrap()).unwrap()
 }
 
+/// A raster side's table: it says what an image shows but keeps no pixels (they came by upload).
+struct NoPixels;
+
+impl ImageResolver for NoPixels {
+    fn shown(&self, _id: ImageId) -> Option<ShownImage> {
+        Some(ShownImage {
+            frame: 0,
+            version: 7,
+            width: 2,
+            height: 2,
+            image: None,
+        })
+    }
+
+    fn version(&self, _id: ImageId) -> u64 {
+        7
+    }
+}
+
+#[test]
+fn uploaded_pixels_draw_where_the_table_has_none() {
+    let mut b = DisplayListBuilder::new();
+    b.image(
+        ImageId(3),
+        Rect::new(10.0, 10.0, 40.0, 40.0),
+        None,
+        1.0,
+        crate::ImageRendering::Pixelated,
+    );
+    let list = b.build();
+    let text = TextEngine::new().unwrap();
+    let mut r = rasterizer();
+    let shown = NoPixels.shown(ImageId(3)).unwrap();
+    // Opaque blue, premultiplied BGRA.
+    let blue = [255u8, 0, 0, 255].repeat(4);
+    r.upload(&text, ImageId(3), &shown, &blue).unwrap();
+    let sources = Sources {
+        text: &text,
+        images: &NoPixels,
+    };
+    let frame = r.raster(&list, sources, &view(64, 64, 1.0)).unwrap();
+    let p = read_back(&frame);
+    let at = |x: u32, y: u32| p.data[((y * p.width + x) * 4) as usize..][..4].to_vec();
+    assert_eq!(at(30, 30), [255, 0, 0, 255], "the uploaded pixels");
+    assert_eq!(at(5, 5), [255, 255, 255, 255], "the background");
+    // Pixels of another version are not drawn for this one.
+    let older = ShownImage {
+        version: 6,
+        ..shown
+    };
+    let mut r = rasterizer();
+    r.upload(&text, ImageId(3), &older, &blue).unwrap();
+    let p = read_back(&r.raster(&list, sources, &view(64, 64, 1.0)).unwrap());
+    assert_eq!(
+        p.data[((30 * p.width + 30) * 4) as usize..][..4],
+        [255, 255, 255, 255]
+    );
+}
+
 #[test]
 fn only_the_software_device_can_be_made() {
-    assert!(Gpu::new().is_err());
+    assert!(Gpu::with_driver(Driver::Hardware).is_err());
     let gpu = Gpu::with_driver(Driver::Warp).unwrap();
     assert_eq!(gpu.driver(), Driver::Warp);
+    // (the default falls back to it, as on Windows without a usable card)
+    assert_eq!(Gpu::new().unwrap().driver(), Driver::Warp);
 }
 
 #[test]

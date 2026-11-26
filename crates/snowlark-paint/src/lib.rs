@@ -59,7 +59,8 @@ pub mod compositor;
 pub mod cursors;
 #[cfg(windows)]
 pub mod demo;
-#[cfg(windows)]
+mod drag_data;
+#[cfg_attr(not(windows), path = "linux/drop_target.rs")]
 pub mod drop_target;
 #[cfg(windows)]
 mod effects;
@@ -67,7 +68,7 @@ pub mod font_files;
 #[cfg(windows)]
 mod ink;
 pub mod input;
-#[cfg(windows)]
+#[cfg_attr(not(windows), path = "linux/os_crypt.rs")]
 pub mod os_crypt;
 #[cfg_attr(not(windows), path = "linux/pdf.rs")]
 pub mod pdf;
@@ -82,7 +83,7 @@ mod tiling;
 pub mod timer_resolution;
 #[cfg_attr(not(windows), path = "linux/video.rs")]
 pub mod video;
-#[cfg(windows)]
+#[cfg_attr(not(windows), path = "linux/vsync.rs")]
 pub mod vsync;
 pub mod web_font;
 #[cfg_attr(not(windows), path = "linux/window.rs")]

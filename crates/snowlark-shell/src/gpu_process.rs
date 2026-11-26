@@ -885,7 +885,8 @@ fn ended(code: Option<u32>, end: &Error) -> String {
     }
 }
 
-#[cfg(test)]
+// (the GPU process and its windows are Windows': elsewhere the compositor stays in the browser)
+#[cfg(all(test, windows))]
 mod tests {
     use super::*;
 

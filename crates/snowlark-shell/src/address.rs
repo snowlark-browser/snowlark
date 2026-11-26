@@ -52,6 +52,8 @@ pub fn interpret_with(text: &str, search: &str) -> Option<Url> {
         && b[1] == b':'
         && (b[2] == b'\\' || b[2] == b'/'))
         || text.starts_with("\\\\")
+        // (an absolute path elsewhere)
+        || (cfg!(not(windows)) && text.starts_with('/'))
     {
         if let Ok(u) = Url::from_file_path(text) {
             return Some(u);
@@ -590,7 +592,10 @@ mod tests {
         assert_eq!(s("intranet:3000"), "https://intranet:3000/");
         assert_eq!(s("about:blank"), "about:blank");
         assert_eq!(s("data:text/html,hi"), "data:text/html,hi");
+        #[cfg(windows)]
         assert_eq!(s("C:\\pages\\a.html"), "file:///C:/pages/a.html");
+        #[cfg(not(windows))]
+        assert_eq!(s("/pages/a.html"), "file:///pages/a.html");
         assert!(interpret("   ").is_none());
     }
 

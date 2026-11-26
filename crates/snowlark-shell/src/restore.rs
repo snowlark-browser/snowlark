@@ -27,6 +27,7 @@
 
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
+#[cfg(windows)]
 use std::os::windows::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Sender};
@@ -358,6 +359,7 @@ pub fn offer_file(dir: &Path) -> PathBuf {
 
 /// Whether the process that owns `session-<pid>.*` still runs: it holds its lock file open
 /// without sharing.
+#[cfg(windows)]
 fn owner_alive(dir: &Path, pid: u32) -> bool {
     match OpenOptions::new()
         .write(true)
@@ -368,6 +370,28 @@ fn owner_alive(dir: &Path, pid: u32) -> bool {
         // ERROR_SHARING_VIOLATION (32), ERROR_ACCESS_DENIED (5)
         Err(e) => matches!(e.raw_os_error(), Some(32 | 5)),
     }
+}
+
+/// Whether the process that owns `session-<pid>.*` still runs: it holds an exclusive lock on its
+/// lock file (`flock`, released when the process ends however it ends).
+#[cfg(not(windows))]
+fn owner_alive(dir: &Path, pid: u32) -> bool {
+    let Ok(file) = OpenOptions::new().write(true).open(lock_of(dir, pid)) else {
+        return false;
+    };
+    matches!(file.try_lock(), Err(fs::TryLockError::WouldBlock))
+}
+
+/// This process's lock file, held for as long as the process lives ([`owner_alive`]).
+fn take_lock(path: &Path) -> Option<File> {
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(windows)]
+    options.share_mode(0);
+    let file = options.open(path).ok()?;
+    #[cfg(not(windows))]
+    file.try_lock().ok()?;
+    Some(file)
 }
 
 /// Looks for the session of a browser that ended unexpectedly and makes it the offer (or keeps the
@@ -441,13 +465,7 @@ impl Store {
     pub fn open(dir: &Path) -> (Store, Option<SessionFile>) {
         let pid = std::process::id();
         let _ = fs::create_dir_all(dir);
-        let lock = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .share_mode(0)
-            .open(lock_of(dir, pid))
-            .ok();
+        let lock = take_lock(&lock_of(dir, pid));
         let offer = find_offer(dir, pid);
         let (tx, rx) = channel::<Msg>();
         let path = file_of(dir, pid);
@@ -831,13 +849,7 @@ mod tests {
         let s = session(vec![tab(&["https://a.example/"], 0)], 0);
         // Another process of the profile: its lock is held, so its (unclean, as it runs) file is
         // neither offered nor deleted.
-        let held = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .share_mode(0)
-            .open(lock_of(&d, 4_000_010))
-            .unwrap();
+        let held = take_lock(&lock_of(&d, 4_000_010)).unwrap();
         let mut other = s.clone();
         other.pid = 4_000_010;
         fs::write(file_of(&d, 4_000_010), other.to_json()).unwrap();

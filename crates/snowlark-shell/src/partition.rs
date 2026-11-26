@@ -25,6 +25,10 @@
 
 use std::sync::{Arc, Mutex};
 
+#[cfg(unix)]
+use snowlark_ipc::posix as ipc_os;
+#[cfg(windows)]
+use snowlark_ipc::win as ipc_os;
 use snowlark_js::code_cache::CodeCacheStore;
 use snowlark_net::{NetClient, NetConfig, NetThread};
 
@@ -72,7 +76,7 @@ impl Partition {
             // quota is a share of the profile's volume)
             idb: snowlark_page::IdbBackend::persistent_with_quota(
                 profile.dir.join("IndexedDB"),
-                snowlark_ipc::win::volume_size(&profile.dir)
+                ipc_os::volume_size(&profile.dir)
                     .map_or(snowlark_idb::QUOTA, snowlark_idb::quota_for_volume),
             ),
             caches: Arc::new(snowlark_sw::LocalCacheStorage::persistent(
@@ -89,7 +93,7 @@ impl Partition {
         let mut config = NetConfig::from_env();
         config.profile_dir = None;
         let net_thread = snowlark_tab::script_check::start_net(config).expect("network thread");
-        let quota = snowlark_ipc::win::physical_memory().map_or(snowlark_idb::QUOTA, |memory| {
+        let quota = ipc_os::physical_memory().map_or(snowlark_idb::QUOTA, |memory| {
             snowlark_idb::quota_in_memory(memory, random_unit())
         });
         Partition {

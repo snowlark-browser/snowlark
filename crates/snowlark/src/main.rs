@@ -14,8 +14,8 @@
 //! redirect a GUI program's output (`$x = snowlark --eval 1`, `> file`): scripts use `snowlark-cli.exe`,
 //! the console-subsystem build of this same file (`src/bin/snowlark-cli.rs`).
 //!
-//! Elsewhere than Windows only the headless modes are built so far: the window, its processes and
-//! the modes that need a GPU device wait on docs/linux.md stages 4 and 5.
+//! On Linux the window is a Wayland window with its renderer processes; the modes that need a GPU
+//! device or Windows' CPU counters, and the GPU process, wait on docs/linux.md's stages.
 #![windows_subsystem = "windows"]
 
 // Rust's allocations go to mimalloc rather than the Windows heap, which was 9 to 14% of page work,
@@ -25,18 +25,11 @@
 static ALLOCATOR: snowlark_js::rust_heap::Allocator = snowlark_js::rust_heap::Allocator;
 
 /// What the window takes from the command line.
-#[cfg(windows)]
 type WindowSetup = (snowlark_shell::ProcessModel, snowlark_shell::WindowFlags);
-#[cfg(not(windows))]
-type WindowSetup = ();
 
 pub fn main() {
-    #[allow(unused_mut)]
     let mut args: Vec<String> = std::env::args().collect();
-    #[cfg(windows)]
     let setup = window_setup(&mut args);
-    #[cfg(not(windows))]
-    let setup = ();
     // The headless modes run their page on a thread with a page thread's stack (layout recurses
     // over the box tree, and the main thread's stack is 1 MiB on Windows); the window runs its pages
     // on tab threads of that size.
@@ -57,12 +50,12 @@ pub fn main() {
 }
 
 /// Takes the window's flags out of `args`.
-#[cfg(windows)]
 fn window_setup(args: &mut Vec<String>) -> WindowSetup {
     // The window's process model: `--process-model=tab|single`, else `SNOWLARK_PROCESS_MODEL`.
     let model = match take_process_model(args) {
         Ok(m) => m,
         Err(bad) => {
+            #[cfg(windows)]
             snowlark_paint::window::attach_parent_console();
             eprintln!("--process-model takes tab or single, not {bad:?}");
             std::process::exit(2);
@@ -70,6 +63,14 @@ fn window_setup(args: &mut Vec<String>) -> WindowSetup {
     };
     // `--gpu-process`: the window composites in a GPU process (with `--process-model=tab`).
     let gpu_process = take_flag(args, "--gpu-process");
+    // (the GPU process composites on a Direct3D device: Windows only so far)
+    #[cfg(not(windows))]
+    let gpu_process = {
+        if gpu_process {
+            eprintln!("--gpu-process: not on this system; the window composites in the browser");
+        }
+        false
+    };
     // `--incognito`: the window opens as an Incognito window.
     let flags = snowlark_shell::WindowFlags {
         gpu_process,
@@ -79,7 +80,6 @@ fn window_setup(args: &mut Vec<String>) -> WindowSetup {
 }
 
 /// Takes `flag` out of `args`: whether it was there.
-#[cfg(windows)]
 fn take_flag(args: &mut Vec<String>, flag: &str) -> bool {
     match args.iter().position(|a| a == flag) {
         Some(i) => {
@@ -93,7 +93,6 @@ fn take_flag(args: &mut Vec<String>, flag: &str) -> bool {
 /// Takes `--process-model=<model>` out of `args`; without it, `SNOWLARK_PROCESS_MODEL` says, and
 /// without that, the default (`snowlark_shell::ProcessModel::choose`). An unknown model is the error.
 /// Only the window has a process model: the headless modes run their page in this process.
-#[cfg(windows)]
 fn take_process_model(args: &mut Vec<String>) -> Result<snowlark_shell::ProcessModel, String> {
     const FLAG: &str = "--process-model=";
     let flag = args
@@ -120,13 +119,11 @@ fn run(args: Vec<String>, setup: WindowSetup) -> i32 {
     }
     // The window processes leave the folder they were started in (a graphics driver writes a folder
     // of its own to the current directory); the command line's file is made absolute first.
-    #[cfg(windows)]
     let start = args.get(1).filter(|a| !a.starts_with("--")).map(|a| {
         snowlark_shell::working_dir::absolute_start(a)
             .to_string_lossy()
             .into_owned()
     });
-    #[cfg(windows)]
     if window
         || matches!(
             args.get(1).map(String::as_str),
@@ -200,7 +197,6 @@ fn run(args: Vec<String>, setup: WindowSetup) -> i32 {
             mod video;
             video::run(&args[2..])
         }
-        #[cfg(windows)]
         Some("--type=renderer") => {
             #[path = "cli/renderer.rs"]
             mod renderer;
@@ -218,18 +214,8 @@ fn run(args: Vec<String>, setup: WindowSetup) -> i32 {
             media_types::run()
         }
         // The browser window: no arguments (the home page) or an address.
-        #[cfg(windows)]
         None => snowlark_shell::run(None, setup.0, setup.1),
-        #[cfg(windows)]
         Some(a) if !a.starts_with("--") => snowlark_shell::run(start.as_deref(), setup.0, setup.1),
-        // Elsewhere, until the browser window is built there: one page in a window.
-        #[cfg(not(windows))]
-        _ if window => {
-            let () = setup;
-            #[path = "cli/viewer.rs"]
-            mod viewer;
-            viewer::run(args.get(1).map(String::as_str))
-        }
         _ => {
             eprintln!("usage: snowlark [--process-model=tab|single] [--gpu-process] [--incognito] [<url>] | --eval <js> | --render <url> <png> [width] | --reftest <list> <outdir> | --video <url> <png> [--time T] [--wait S] | --media-types");
             2

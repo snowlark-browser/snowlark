@@ -45,9 +45,10 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    /// The hardware device: none can be made on Linux yet (an error here).
+    /// The hardware device, or the software one when there is none (as on Windows): on Linux
+    /// always the software one so far.
     pub fn new() -> Result<Arc<Gpu>> {
-        Gpu::with_driver(Driver::Hardware)
+        Gpu::with_driver(Driver::Hardware).or_else(|_| Gpu::with_driver(Driver::Warp))
     }
 
     pub fn with_driver(driver: Driver) -> Result<Arc<Gpu>> {
@@ -224,16 +225,17 @@ impl TileRasterizer {
         self.work
     }
 
-    /// Pixels that came ahead of the lists that show them: nothing to put on a CPU device, which
-    /// draws images straight from the store.
+    /// Keeps pixels that came ahead of the lists that show them, for a
+    /// [`crate::raster_tables::ImageTable`] (which keeps none) to resolve to: what `shown` says, of
+    /// `pixels`, which the table has checked.
     pub fn upload(
         &mut self,
         _fonts: &dyn FontResolver,
-        _id: ImageId,
-        _shown: &ShownImage,
-        _pixels: &[u8],
+        id: ImageId,
+        shown: &ShownImage,
+        pixels: &[u8],
     ) -> Result<()> {
-        Ok(())
+        self.caches.upload(id, shown, pixels)
     }
 
     /// [`TileRasterizer::raster`] for the part of `list` whose top-left corner is at device pixel

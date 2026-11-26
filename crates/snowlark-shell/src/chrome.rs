@@ -98,6 +98,120 @@ pub(crate) mod glyph {
     /// expand buttons).
     pub const PANE_ARROW_LEFT: char = '\u{E8A0}';
     pub const PANE_ARROW_RIGHT: char = '\u{E89F}';
+
+    /// The Unicode symbol drawn for an icon where the icon font is missing (on Linux), found by the
+    /// text engine's fallback among the system's fonts (the lock and the shield only in colour
+    /// emoji fonts). A code point without one stays as it is. Vector icons of our own are to
+    /// replace both.
+    pub fn symbol(c: char) -> char {
+        match c {
+            BACK => '\u{2190}',
+            FORWARD => '\u{2192}',
+            REFRESH => '\u{21BB}',
+            STOP | CLOSE => '\u{2715}',
+            HOME => '\u{2302}',
+            ADD => '+',
+            MINIMIZE => '\u{2013}',
+            MAXIMIZE => '\u{25A1}',
+            RESTORE => '\u{2750}',
+            GLOBE => '\u{25CE}',
+            LOCK => '\u{1F512}',
+            INFO => '\u{2139}',
+            // (the blocker's shield, the task manager's monitor)
+            '\u{EA18}' => '\u{1F6E1}',
+            '\u{E7F4}' => '\u{2395}',
+            SEARCH => '\u{2315}',
+            HISTORY => '\u{21BA}',
+            SAD => '\u{2639}',
+            CHECK => '\u{2713}',
+            CHEVRON_RIGHT => '\u{203A}',
+            CHEVRON_DOWN => '\u{2304}',
+            CHEVRON_UP => '\u{2303}',
+            STAR => '\u{2606}',
+            STAR_FILL => '\u{2605}',
+            MORE => '\u{22EF}',
+            DOWNLOAD => '\u{2913}',
+            FOLDER => '\u{25AD}',
+            SETTINGS => '\u{2699}',
+            CODE => '\u{2039}',
+            COPY => '\u{2398}',
+            SAVE => '\u{2913}',
+            DELETE => '\u{232B}',
+            EDIT => '\u{270E}',
+            PICKER => '\u{2316}',
+            CLEAR => '\u{2327}',
+            GAUGE => '\u{25D4}',
+            DOCK_LEFT => '\u{25E7}',
+            DOCK_BOTTOM => '\u{2B13}',
+            DOCK_RIGHT => '\u{25E8}',
+            UNDOCK => '\u{2197}',
+            WARNING => '\u{26A0}',
+            ERROR => '\u{2297}',
+            VOLUME => '\u{266A}',
+            MUTE => '\u{2298}',
+            PANE_ARROW_LEFT => '\u{21E4}',
+            PANE_ARROW_RIGHT => '\u{21E5}',
+            other => other,
+        }
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn every_icon_has_a_symbol_outside_the_private_use_area() {
+        let all = [
+            BACK,
+            FORWARD,
+            REFRESH,
+            STOP,
+            HOME,
+            ADD,
+            CLOSE,
+            MINIMIZE,
+            MAXIMIZE,
+            RESTORE,
+            GLOBE,
+            LOCK,
+            INFO,
+            SEARCH,
+            HISTORY,
+            SAD,
+            CHECK,
+            CHEVRON_RIGHT,
+            CHEVRON_DOWN,
+            CHEVRON_UP,
+            STAR,
+            STAR_FILL,
+            MORE,
+            DOWNLOAD,
+            FOLDER,
+            SETTINGS,
+            CODE,
+            COPY,
+            SAVE,
+            DELETE,
+            EDIT,
+            PICKER,
+            CLEAR,
+            GAUGE,
+            DOCK_LEFT,
+            DOCK_BOTTOM,
+            DOCK_RIGHT,
+            UNDOCK,
+            WARNING,
+            ERROR,
+            VOLUME,
+            MUTE,
+            PANE_ARROW_LEFT,
+            PANE_ARROW_RIGHT,
+        ];
+        for c in all {
+            assert!(
+                !('\u{E000}'..='\u{F8FF}').contains(&symbol(c)),
+                "{:X}",
+                c as u32
+            );
+        }
+    }
 }
 
 /// The chrome's colors.
@@ -838,6 +952,9 @@ pub struct Fonts {
     text: Arc<TextEngine>,
     ui: FontListId,
     icons: FontListId,
+    /// The icon font is there: its code points are drawn as they are, else as the symbols
+    /// [`glyph::symbol`] maps them to.
+    icon_font: bool,
     /// Monospaced (the developer tools' code, view-source).
     mono: FontListId,
     /// Monospaced bold, italic, bold italic (the console's `%c` styles).
@@ -886,6 +1003,10 @@ impl Fonts {
             ]))
             .or_else(|_| text.font_list(&query(&["sans-serif"])))
             .expect("a UI font");
+        // (a missing family still gives a list, of the fallback faces)
+        let icon_font = ["Segoe Fluent Icons", "Segoe MDL2 Assets"]
+            .iter()
+            .any(|f| text.has_family(f));
         let icons = text
             .font_list(&query(&["Segoe Fluent Icons", "Segoe MDL2 Assets"]))
             .unwrap_or(ui);
@@ -914,6 +1035,7 @@ impl Fonts {
             text,
             ui,
             icons,
+            icon_font,
             mono,
             mono_styled,
             bold,
@@ -1077,6 +1199,7 @@ impl Fonts {
         size: f32,
         color: Color,
     ) {
+        let c = if self.icon_font { c } else { glyph::symbol(c) };
         let mut buf = [0u8; 4];
         let shaped = self.shape_with(c.encode_utf8(&mut buf), self.icons, size);
         let y = (center.y + size / 2.0).round();

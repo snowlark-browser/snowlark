@@ -27,28 +27,7 @@ use windows_core::Ref;
 use crate::input::Modifiers;
 use crate::window::{Event, State};
 
-/// A drag operation, as the drop target answers it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum DropEffect {
-    #[default]
-    None,
-    Copy,
-    Move,
-    Link,
-}
-
-/// What a drag from another program carries.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct DragData {
-    /// The files (and folders) dragged (`CF_HDROP`).
-    pub files: Vec<PathBuf>,
-    /// The text (`CF_UNICODETEXT`).
-    pub text: Option<String>,
-    /// The operations the source allows.
-    pub copy: bool,
-    pub moves: bool,
-    pub link: bool,
-}
+pub use crate::drag_data::{DragData, DropEffect};
 
 /// Registers `hwnd` as a drop target (OLE is set up for the window's thread first).
 pub(crate) fn register(hwnd: HWND) {

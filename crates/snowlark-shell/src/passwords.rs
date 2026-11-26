@@ -751,6 +751,7 @@ mod tests {
         assert!(pending_login(SITE, &login_form("alice", "")).is_none());
     }
 
+    #[cfg(windows)]
     #[test]
     fn the_windows_data_protection_api_round_trips() {
         let wrapped = Dpapi.wrap(b"0123456789abcdef0123456789abcdef").unwrap();

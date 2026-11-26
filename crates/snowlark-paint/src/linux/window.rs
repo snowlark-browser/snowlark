@@ -12,15 +12,19 @@
 //! [`Window::dpi`] is 96 times that scale. Methods that change the window are carried out after
 //! the handler returns, as on Windows.
 //!
-//! What is here so far: the window with the frame the desktop draws (server-side decorations where
-//! the compositor offers them), pointer (moves, buttons, wheels with high-resolution steps),
-//! keyboard through xkbcommon (keys as Windows virtual-key codes and characters, with repeat),
+//! What is here so far: the window with the frame its owner draws (client-side decorations), moved
+//! and resized from the client area's outer pixels and the caption its handler names
+//! ([`WindowHandler::hit_test`]): the desktop carries out the move or resize, a double click on the
+//! caption maximizes, a right click opens the desktop's window menu, and caption buttons are
+//! reported as on Windows (a desktop that draws its own frame anyway moves and resizes from that);
+//! pointer (moves, buttons, wheels with high-resolution steps), keyboard through xkbcommon (keys as Windows virtual-key codes and characters, with repeat),
 //! focus, timers, close, maximize and fullscreen, and showing pixels from the CPU
 //! ([`Window::present`], `wl_shm` buffers). Not yet: the compositor's GPU path, IME
 //! (`zwp_text_input_v3`), the clipboard, drag and drop, cursors, fractional scales.
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
@@ -39,6 +43,7 @@ use sctk::reexports::client::protocol::{
 };
 use sctk::reexports::client::{Connection, QueueHandle};
 use sctk::reexports::csd_frame::WindowState;
+use sctk::reexports::protocols::xdg::shell::client::xdg_toplevel::ResizeEdge;
 use sctk::registry::{ProvidesRegistryState, RegistryState};
 use sctk::seat::keyboard::{
     KeyEvent, KeyboardHandler, Keysym, Modifiers as XkbModifiers, RawModifiers,
@@ -46,7 +51,8 @@ use sctk::seat::keyboard::{
 use sctk::seat::pointer::{PointerEvent, PointerEventKind, PointerHandler};
 use sctk::seat::{Capability, SeatHandler, SeatState};
 use sctk::shell::xdg::window::{
-    Window as XdgWindow, WindowConfigure, WindowDecorations, WindowHandler as XdgWindowHandler,
+    DecorationMode, Window as XdgWindow, WindowConfigure, WindowDecorations,
+    WindowHandler as XdgWindowHandler,
 };
 use sctk::shell::xdg::XdgShell;
 use sctk::shell::WaylandSurface;
@@ -143,6 +149,29 @@ pub enum Event {
     },
     /// The window's scale changed (96 × the output's scale); it has been resized for it already.
     DpiChanged(u32),
+    /// The window moved on the screen (never sent: a Wayland client does not know its position).
+    Moved {
+        x: i32,
+        y: i32,
+    },
+    /// A drag from another program entered the client area ([`crate::drop_target`]; not sent yet).
+    DragEnter {
+        x: i32,
+        y: i32,
+        data: Box<crate::drop_target::DragData>,
+        mods: Modifiers,
+    },
+    DragOver {
+        x: i32,
+        y: i32,
+        mods: Modifiers,
+    },
+    DragLeave,
+    Drop {
+        x: i32,
+        y: i32,
+        mods: Modifiers,
+    },
     MouseMove {
         x: i32,
         y: i32,
@@ -224,6 +253,10 @@ pub struct WindowOptions {
     pub width: u32,
     pub height: u32,
     pub maximized: bool,
+    /// Where the last run left the window: its size and maximized state are used.
+    pub placement: Option<crate::placement::Placement>,
+    /// A window its page places (a popup window): its size is used, before `placement`.
+    pub at: Option<WindowAt>,
 }
 
 impl Default for WindowOptions {
@@ -233,6 +266,8 @@ impl Default for WindowOptions {
             width: 1280,
             height: 860,
             maximized: false,
+            placement: None,
+            at: None,
         }
     }
 }
@@ -271,6 +306,91 @@ impl ClickCount {
     }
 }
 
+/// The band along the window's edges that resizes it, and how far a corner reaches along an edge,
+/// in surface pixels. The desktop draws no frame around the window (as on Windows, the chrome is
+/// the owner's), so the edges are the client area's own outer pixels.
+const RESIZE_BORDER: i32 = 5;
+const RESIZE_CORNER: i32 = 16;
+
+/// The edge or corner of a `width` x `height` client area (device pixels, `scale` per surface
+/// pixel) that the point `(x, y)` resizes from, if any.
+fn frame_edge(x: i32, y: i32, width: u32, height: u32, scale: u32) -> Option<ResizeEdge> {
+    let s = scale.max(1) as i32;
+    let (w, h) = (width as i32, height as i32);
+    let (border, corner) = (RESIZE_BORDER * s, RESIZE_CORNER * s);
+    let (l, r, t, b) = (x < border, x >= w - border, y < border, y >= h - border);
+    if !(l || r || t || b) {
+        return None;
+    }
+    let horizontal = if l || ((t || b) && x < corner) {
+        -1
+    } else if r || ((t || b) && x >= w - corner) {
+        1
+    } else {
+        0
+    };
+    let vertical = if t || ((l || r) && y < corner) {
+        -1
+    } else if b || ((l || r) && y >= h - corner) {
+        1
+    } else {
+        0
+    };
+    Some(match (horizontal, vertical) {
+        (-1, -1) => ResizeEdge::TopLeft,
+        (1, -1) => ResizeEdge::TopRight,
+        (-1, 1) => ResizeEdge::BottomLeft,
+        (1, 1) => ResizeEdge::BottomRight,
+        (-1, _) => ResizeEdge::Left,
+        (1, _) => ResizeEdge::Right,
+        (_, -1) => ResizeEdge::Top,
+        _ => ResizeEdge::Bottom,
+    })
+}
+
+/// What a point of the window is to the pointer.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Area {
+    Client,
+    Edge(ResizeEdge),
+    /// The caption or one of its buttons, as the handler's [`WindowHandler::hit_test`] says.
+    Frame(HitArea),
+}
+
+impl Area {
+    fn button(self) -> Option<CaptionButton> {
+        match self {
+            Area::Frame(HitArea::Minimize) => Some(CaptionButton::Minimize),
+            Area::Frame(HitArea::Maximize) => Some(CaptionButton::Maximize),
+            Area::Frame(HitArea::Close) => Some(CaptionButton::Close),
+            _ => None,
+        }
+    }
+}
+
+/// The pointer over the frame: what Windows' non-client messages track there.
+#[derive(Debug, Default)]
+struct FramePointer {
+    /// The caption button under the pointer, and the one pressed.
+    hover: Option<CaptionButton>,
+    pressed: Option<CaptionButton>,
+    /// The client area has the pointer (it was told of a move and not yet of a leave).
+    in_client: bool,
+    /// Buttons pressed in the client area, by bit: their moves and release go to the client
+    /// wherever the pointer is (as Windows' capture of a pressed button).
+    client_buttons: u8,
+}
+
+fn button_bit(b: MouseButton) -> u8 {
+    1 << match b {
+        MouseButton::Left => 0,
+        MouseButton::Middle => 1,
+        MouseButton::Right => 2,
+        MouseButton::Back => 3,
+        MouseButton::Forward => 4,
+    }
+}
+
 /// The pixels shown, kept on the window's thread: shared memory the buffers are cut from (it grows
 /// as the window does) and the buffer shown last.
 struct Presenter {
@@ -295,11 +415,11 @@ pub struct Window {
     xdg: XdgWindow,
     ping: Ping,
     presenter: RefCell<Presenter>,
-    ops: RefCell<Vec<Op>>,
+    ops: Rc<RefCell<Vec<Op>>>,
     /// Logical size (surface pixels) and the integer scale.
-    size: Cell<(u32, u32)>,
-    scale: Cell<u32>,
-    maximized: Cell<bool>,
+    size: Rc<Cell<(u32, u32)>>,
+    scale: Rc<Cell<u32>>,
+    maximized: Rc<Cell<bool>>,
     fullscreen: Cell<bool>,
     cursor: Cell<Cursor>,
     /// The last pointer position, in device pixels.
@@ -378,6 +498,48 @@ impl Window {
         self.ops.borrow_mut().push(Op::KillTimer(id));
     }
 
+    /// Whether the window fell back to a slower way of showing its frames: it has only one.
+    pub fn degraded(&self) -> bool {
+        false
+    }
+
+    /// Panics its handler raised and the window caught: none are caught here.
+    pub fn caught_panics(&self) -> u32 {
+        0
+    }
+
+    /// Where the window is on the screen ([`WindowHandle::screen_placement`]).
+    pub fn screen_placement(&self) -> WindowPlacement {
+        self.handle.screen_placement()
+    }
+
+    /// Where the window is now, to open there next time ([`WindowHandle::placement`]).
+    pub fn placement(&self) -> Option<crate::placement::Placement> {
+        self.handle.placement()
+    }
+
+    /// What the window answers a drag over it: it takes no drops yet.
+    pub fn set_drop_effect(&self, _effect: crate::drop_target::DropEffect) {}
+
+    /// Brings a minimized window back: a Wayland client cannot (the desktop restores it when the
+    /// user picks it).
+    pub fn unminimize(&self) {}
+
+    /// Moves and sizes the window's frame: a Wayland client chooses neither its position nor,
+    /// once the desktop has configured it, its size.
+    pub fn set_outer_rect(&self, _rect: (i32, i32, i32, i32)) {}
+
+    /// The frame's light or dark look: the frame is the owner's own drawing here.
+    pub fn set_dark_frame(&self, _dark: bool) {}
+
+    pub fn clipboard_text(&self) -> Option<String> {
+        clipboard_text(self.handle)
+    }
+
+    pub fn set_clipboard_text(&self, text: &str) {
+        set_clipboard_text(self.handle, text)
+    }
+
     /// The pointer stays the window's while a button is held (the protocol's implicit grab).
     pub fn capture_mouse(&self) {}
 
@@ -438,6 +600,290 @@ pub fn double_click_ms() -> u32 {
 /// Lines a wheel notch scrolls.
 pub fn wheel_scroll_lines() -> u32 {
     3
+}
+
+/// The client size (surface pixels) and maximized state a new window starts with.
+fn initial_size(options: &WindowOptions) -> ((u32, u32), bool) {
+    if let Some(at) = options.at {
+        let size = (
+            at.client_width.max(1) as u32,
+            at.client_height.max(1) as u32,
+        );
+        return (size, false);
+    }
+    if let Some(p) = options.placement.filter(|p| p.width > 0 && p.height > 0) {
+        let dpi = p.dpi.max(96) as i64;
+        let logical = |v: i32| ((v as i64 * 96 / dpi) as u32).max(1);
+        return ((logical(p.width), logical(p.height)), p.maximized);
+    }
+    (
+        (options.width.max(1), options.height.max(1)),
+        options.maximized,
+    )
+}
+
+/// Why [`open`] fails: the loop serves one window.
+fn single_window() -> Error {
+    Error::Platform("a second window is not supported on Linux yet".into())
+}
+
+/// Makes another top-level window on the thread running [`run`]'s loop: not yet on Linux (the
+/// loop serves one window), so this fails and the caller keeps its content in the window it has.
+pub fn open(
+    _options: WindowOptions,
+    _make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
+) -> Result<WindowHandle> {
+    Err(single_window())
+}
+
+/// Makes another browser window on the thread running [`run`]'s loop: not yet on Linux ([`open`]).
+pub fn open_browser_window(
+    _options: WindowOptions,
+    _make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
+) -> Result<WindowHandle> {
+    Err(single_window())
+}
+
+/// The user's downloads folder: `XDG_DOWNLOAD_DIR` of `user-dirs.dirs` in the configuration
+/// folder (the freedesktop user directories), else `Downloads` in the home folder.
+pub fn downloads_folder() -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+    let home = PathBuf::from(std::env::var_os("HOME")?);
+    let config = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .unwrap_or_else(|| home.join(".config"));
+    let named = std::fs::read_to_string(config.join("user-dirs.dirs"))
+        .ok()
+        .and_then(|text| user_dir(&text, "DOWNLOAD", &home));
+    Some(named.unwrap_or_else(|| home.join("Downloads")))
+}
+
+/// The folder `user-dirs.dirs` names for `XDG_<name>_DIR`: a quoted path, absolute or starting
+/// with `$HOME/`.
+fn user_dir(text: &str, name: &str, home: &std::path::Path) -> Option<std::path::PathBuf> {
+    let key = format!("XDG_{name}_DIR=");
+    let line = text.lines().map(str::trim).find(|l| l.starts_with(&key))?;
+    let value = line[key.len()..]
+        .trim()
+        .strip_prefix('"')?
+        .strip_suffix('"')?;
+    if let Some(rest) = value.strip_prefix("$HOME") {
+        let rest = rest.trim_start_matches('/');
+        // (`$HOME/` alone means the feature is off: the home folder itself)
+        return Some(if rest.is_empty() {
+            home.to_path_buf()
+        } else {
+            home.join(rest)
+        });
+    }
+    let path = std::path::PathBuf::from(value);
+    path.is_absolute().then_some(path)
+}
+
+/// A folder the user picks: there is no file chooser on Linux yet (the desktop portal's), so
+/// none is picked.
+pub fn pick_folder_dialog(
+    _owner: WindowHandle,
+    _start: Option<&std::path::Path>,
+) -> Option<std::path::PathBuf> {
+    None
+}
+
+/// A file name to save to that the user picks: none yet ([`pick_folder_dialog`]).
+pub fn save_file_dialog(
+    _owner: WindowHandle,
+    _suggested: &str,
+    _filters: &[(&str, &str)],
+    _dir: Option<&std::path::Path>,
+) -> Option<std::path::PathBuf> {
+    None
+}
+
+/// How asking the system to confirm the user ended ([`verify_user`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UserVerification {
+    Verified,
+    /// The user canceled, or the check failed.
+    Refused,
+    /// The system has no way to confirm the user.
+    Unavailable,
+}
+
+/// Asks the system to confirm the signed-in user: Linux desktops have no common prompt for it
+/// (polkit's asks for an administrator's rights), so it is unavailable.
+pub fn verify_user(_owner: WindowHandle, _message: &str) -> UserVerification {
+    UserVerification::Unavailable
+}
+
+/// Asks for the user's sign-in password: unavailable ([`verify_user`]).
+pub fn verify_sign_in(_owner: WindowHandle, _caption: &str, _message: &str) -> UserVerification {
+    UserVerification::Unavailable
+}
+
+/// Whether the machine is joined to a domain (Windows only).
+pub fn domain_joined() -> bool {
+    false
+}
+
+/// When the user's sign-in password last changed: not known here.
+pub fn password_changed_ms() -> Option<i64> {
+    None
+}
+
+/// Whether the user signs in without a password: not known here, so taken as no.
+pub fn password_blank() -> bool {
+    false
+}
+
+/// The text the browser last put on the clipboard. The desktop's clipboard (`wl_data_device`) is
+/// not used yet, so copying and pasting work within the browser only.
+static CLIPBOARD: Mutex<Option<(String, Option<String>)>> = Mutex::new(None);
+
+pub fn clipboard_text(_owner: WindowHandle) -> Option<String> {
+    CLIPBOARD.lock().unwrap().as_ref().map(|(t, _)| t.clone())
+}
+
+pub fn set_clipboard_text(owner: WindowHandle, text: &str) {
+    set_clipboard_text_and_html(owner, text, None)
+}
+
+pub fn set_clipboard_text_and_html(_owner: WindowHandle, text: &str, html: Option<&str>) {
+    *CLIPBOARD.lock().unwrap() = Some((text.to_owned(), html.map(str::to_owned)));
+}
+
+pub fn clipboard_html(_owner: WindowHandle) -> Option<String> {
+    CLIPBOARD
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|(_, h)| h.clone())
+}
+
+/// A thread that paces frames: raising its priority needs a privilege the browser may lack on
+/// Linux, so it keeps its own.
+pub fn raise_thread_priority() {}
+
+/// Local time's offset from UTC at `utc_ms` (milliseconds since 1970), by the C library's time
+/// zone (`TZ`, else `/etc/localtime`) for that date; 0 when it can't say.
+pub fn local_offset_ms(utc_ms: i64) -> i64 {
+    let secs = utc_ms.div_euclid(1000) as libc::time_t;
+    // SAFETY: `localtime_r` reads the time and writes the `tm` local, both of the types it takes;
+    // the zone name it may point to is not read.
+    unsafe {
+        let mut tm: libc::tm = std::mem::zeroed();
+        if libc::localtime_r(&secs, &mut tm).is_null() {
+            return 0;
+        }
+        tm.tm_gmtoff as i64 * 1000
+    }
+}
+
+/// Whether the desktop prefers dark: its setting (the desktop portal's `color-scheme`) is not read
+/// yet, so light.
+pub fn system_uses_dark_theme() -> bool {
+    false
+}
+
+/// The caret's blink interval: the toolkits' default (GTK's `gtk-cursor-blink-time`, 1200 ms for a
+/// whole on-off cycle).
+pub fn caret_blink_ms() -> u32 {
+    600
+}
+
+/// The display's refresh rate: not read yet.
+pub fn display_refresh_hz() -> Option<f64> {
+    None
+}
+
+/// Where a window is on the screen, in device pixels: its rectangle (left, top, width, height,
+/// frame included) and its client area's origin.
+pub type WindowPlacement = ((i32, i32, i32, i32), (i32, i32));
+
+/// Where a window its page places goes (a popup window), in physical px: on Linux only its size
+/// is used (a Wayland client does not choose its position).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WindowAt {
+    pub left: i32,
+    pub top: i32,
+    pub client_width: i32,
+    pub client_height: i32,
+}
+
+/// What a [`WindowHandle`] reaches of its window on the window's own thread.
+struct HandleState {
+    ops: Rc<RefCell<Vec<Op>>>,
+    size: Rc<Cell<(u32, u32)>>,
+    scale: Rc<Cell<u32>>,
+    maximized: Rc<Cell<bool>>,
+    ping: Ping,
+}
+
+thread_local! {
+    /// The windows of this thread, by handle.
+    static HANDLES: RefCell<HashMap<u64, HandleState>> = RefCell::new(HashMap::new());
+}
+
+// The calls below are for the window's own thread, on a window that is still open; elsewhere they
+// do nothing (and report an empty window).
+impl WindowHandle {
+    fn with<R>(self, f: impl FnOnce(&HandleState) -> R) -> Option<R> {
+        HANDLES.with(|h| h.borrow().get(&self.0).map(f))
+    }
+
+    /// Queues `op` for the window's loop, which carries it out once it wakes.
+    fn push(self, op: Op) {
+        self.with(|s| {
+            s.ops.borrow_mut().push(op);
+            s.ping.ping();
+        });
+    }
+
+    /// The client area's size in device pixels.
+    pub fn client_size(self) -> (u32, u32) {
+        self.with(|s| {
+            let ((w, h), k) = (s.size.get(), s.scale.get());
+            (w * k, h * k)
+        })
+        .unwrap_or((0, 0))
+    }
+
+    /// Where the window is: a Wayland client does not know its position, so at the origin.
+    pub fn screen_placement(self) -> WindowPlacement {
+        let (w, h) = self.client_size();
+        ((0, 0, w as i32, h as i32), (0, 0))
+    }
+
+    pub fn dpi(self) -> u32 {
+        self.with(|s| 96 * s.scale.get()).unwrap_or(96)
+    }
+
+    pub fn set_title(self, title: &str) {
+        self.push(Op::Title(title.to_owned()));
+    }
+
+    /// The frame's light or dark look: the owner draws the frame here.
+    pub fn set_dark_frame(self, _dark: bool) {}
+
+    /// The window's size and maximized state, to open that way next time (no position:
+    /// [`WindowHandle::screen_placement`]).
+    pub fn placement(self) -> Option<crate::placement::Placement> {
+        let maximized = self.with(|s| s.maximized.get())?;
+        let (w, h) = self.client_size();
+        Some(crate::placement::Placement {
+            x: 0,
+            y: 0,
+            width: w as i32,
+            height: h as i32,
+            maximized,
+            dpi: self.dpi(),
+        })
+    }
+
+    /// Destroys the window once its loop gets to it ([`Event::Destroyed`] follows).
+    pub fn destroy(self) {
+        self.push(Op::Close);
+    }
 }
 
 static NEXT_WINDOW: AtomicU64 = AtomicU64::new(1);
@@ -557,6 +1003,11 @@ struct State {
     timers: HashMap<usize, RegistrationToken>,
     keyboard: Option<wl_keyboard::WlKeyboard>,
     pointer: Option<wl_pointer::WlPointer>,
+    /// The seat of the pointer, for moves and resizes the desktop carries out.
+    seat: Option<wl_seat::WlSeat>,
+    frame: FramePointer,
+    /// The desktop draws the frame (and moves and resizes the window from it).
+    server_frame: bool,
     mods: Modifiers,
     clicks: ClickCount,
     configured: bool,
@@ -648,6 +1099,73 @@ impl State {
                     }
                 }
             }
+        }
+    }
+
+    /// What the point is: an edge that resizes the window (not while it is maximized or full
+    /// screen), else what the handler says.
+    fn area(&mut self, x: i32, y: i32) -> Area {
+        if self.server_frame {
+            return Area::Client;
+        }
+        if !self.window.maximized.get() && !self.window.fullscreen.get() {
+            let (w, h) = self.window.client_size();
+            if let Some(edge) = frame_edge(x, y, w, h, self.window.scale.get()) {
+                return Area::Edge(edge);
+            }
+        }
+        match self.handler.hit_test(&self.window, x, y) {
+            HitArea::Client => Area::Client,
+            a => Area::Frame(a),
+        }
+    }
+
+    /// The pointer is over `area` (or has left the window): tells the handler which caption button
+    /// it hovers, and that it left the client area.
+    fn hover(&mut self, area: Option<Area>) {
+        let button = area.and_then(Area::button);
+        if button != self.frame.hover {
+            self.frame.hover = button;
+            self.send(Event::CaptionButton {
+                button,
+                action: CaptionAction::Hover,
+            });
+        }
+        if area != Some(Area::Client) && self.frame.in_client && self.frame.client_buttons == 0 {
+            self.frame.in_client = false;
+            self.send(Event::MouseLeave);
+        }
+    }
+
+    /// A press outside the client area: the desktop moves or resizes the window, a double click on
+    /// the caption maximizes it, a right click there opens the desktop's window menu.
+    fn frame_press(&mut self, area: Area, button: MouseButton, serial: u32, clicks: u32) {
+        let Some(seat) = self.seat.clone() else {
+            return;
+        };
+        let xdg = &self.window.xdg;
+        match (area, button) {
+            (Area::Edge(edge), MouseButton::Left) => xdg.resize(&seat, serial, edge),
+            (Area::Frame(HitArea::Caption), MouseButton::Left) if clicks == 2 => {
+                self.window.ops.borrow_mut().push(Op::ToggleMaximize);
+                self.apply();
+            }
+            (Area::Frame(HitArea::Caption), MouseButton::Left) => xdg.move_(&seat, serial),
+            (Area::Frame(HitArea::Caption), MouseButton::Right) => {
+                let s = self.window.scale.get().max(1) as i32;
+                let (x, y) = self.window.pointer.get();
+                xdg.show_window_menu(&seat, serial, (x / s, y / s));
+            }
+            (area, MouseButton::Left) => {
+                if let Some(b) = area.button() {
+                    self.frame.pressed = Some(b);
+                    self.send(Event::CaptionButton {
+                        button: Some(b),
+                        action: CaptionAction::Press,
+                    });
+                }
+            }
+            _ => {}
         }
     }
 
@@ -816,11 +1334,17 @@ fn run_on(
     let xdg_shell = XdgShell::bind(&globals, &qh).map_err(|e| platform(&e))?;
     let shm = Shm::bind(&globals, &qh).map_err(|e| platform(&e))?;
     let surface = compositor.create_surface(&qh);
-    let xdg = xdg_shell.create_window(surface, WindowDecorations::RequestServer, &qh);
+    // (the frame is the owner's, as with Windows' custom frame; a desktop that insists on its own
+    // frame says so in the configure)
+    let xdg = xdg_shell.create_window(surface, WindowDecorations::RequestClient, &qh);
     xdg.set_title(options.title.clone());
     xdg.set_app_id("org.snowlark.Snowlark");
     xdg.set_min_size(Some((200, 150)));
-    if options.maximized {
+    // The size: a page's popup window asks for its own; else where the last run left the window
+    // (a Wayland client neither knows nor chooses its position, so only the size and maximized
+    // state are kept), else the default.
+    let (size, maximized) = initial_size(&options);
+    if maximized {
         xdg.set_maximized();
     }
     // (the first commit, with no buffer, asks for the first configure)
@@ -850,21 +1374,30 @@ fn run_on(
         xdg,
         ping,
         presenter: RefCell::new(Presenter {
-            pool: SlotPool::new(
-                options.width.max(1) as usize * options.height.max(1) as usize * 4,
-                &shm,
-            )
-            .map_err(|e| platform(&e))?,
+            pool: SlotPool::new(size.0 as usize * size.1 as usize * 4, &shm)
+                .map_err(|e| platform(&e))?,
             buffer: None,
         }),
-        ops: RefCell::new(Vec::new()),
-        size: Cell::new((options.width.max(1), options.height.max(1))),
-        scale: Cell::new(1),
-        maximized: Cell::new(false),
+        ops: Rc::new(RefCell::new(Vec::new())),
+        size: Rc::new(Cell::new(size)),
+        scale: Rc::new(Cell::new(1)),
+        maximized: Rc::new(Cell::new(false)),
         fullscreen: Cell::new(false),
         cursor: Cell::new(Cursor::Arrow),
         pointer: Cell::new((0, 0)),
     };
+    HANDLES.with(|h| {
+        h.borrow_mut().insert(
+            handle.0,
+            HandleState {
+                ops: window.ops.clone(),
+                size: window.size.clone(),
+                scale: window.scale.clone(),
+                maximized: window.maximized.clone(),
+                ping: window.ping.clone(),
+            },
+        )
+    });
     let handler = make(&window);
     let done = Arc::new(AtomicBool::new(false));
     let mut state = State {
@@ -878,6 +1411,9 @@ fn run_on(
         timers: HashMap::new(),
         keyboard: None,
         pointer: None,
+        seat: None,
+        frame: FramePointer::default(),
+        server_frame: false,
         mods: Modifiers::default(),
         clicks: ClickCount::default(),
         configured: false,
@@ -894,6 +1430,7 @@ fn run_on(
         }
     }
     FRAME_SLOTS.lock().unwrap().remove(&handle.0);
+    HANDLES.with(|h| h.borrow_mut().remove(&handle.0));
     slot.close();
     result
 }
@@ -1098,6 +1635,7 @@ impl XdgWindowHandler for State {
             || maximized != self.window.maximized.get()
             || fullscreen != self.window.fullscreen.get();
         self.configured = true;
+        self.server_frame = configure.decoration_mode == DecorationMode::Server;
         self.watch.shown();
         self.window.size.set(size);
         self.window.maximized.set(maximized);
@@ -1136,6 +1674,7 @@ impl SeatHandler for State {
         }
         if capability == Capability::Pointer && self.pointer.is_none() {
             self.pointer = self.seats.get_pointer(qh, &seat).ok();
+            self.seat = Some(seat);
         }
     }
 
@@ -1255,27 +1794,63 @@ impl PointerHandler for State {
             let mods = self.mods;
             match event.kind {
                 PointerEventKind::Enter { .. } | PointerEventKind::Motion { .. } => {
-                    self.send(Event::MouseMove { x, y, mods });
-                }
-                PointerEventKind::Leave { .. } => {
-                    self.send(Event::MouseLeave);
-                }
-                PointerEventKind::Press { button, time, .. } => {
-                    if let Some(button) = button_of(button) {
-                        let slop = 4 * self.window.scale.get() as i32;
-                        let clicks = self.clicks.press(time, x, y, button, slop);
-                        self.send(Event::MouseDown {
-                            x,
-                            y,
-                            button,
-                            mods,
-                            clicks,
-                        });
+                    let area = self.area(x, y);
+                    self.hover(Some(area));
+                    if area == Area::Client || self.frame.client_buttons != 0 {
+                        self.frame.in_client = true;
+                        self.send(Event::MouseMove { x, y, mods });
                     }
                 }
+                PointerEventKind::Leave { .. } => {
+                    self.hover(None);
+                    if self.frame.in_client {
+                        self.frame.in_client = false;
+                        self.send(Event::MouseLeave);
+                    }
+                }
+                PointerEventKind::Press {
+                    button,
+                    time,
+                    serial,
+                } => {
+                    let Some(button) = button_of(button) else {
+                        continue;
+                    };
+                    let slop = 4 * self.window.scale.get() as i32;
+                    let clicks = self.clicks.press(time, x, y, button, slop);
+                    let area = if self.frame.client_buttons != 0 {
+                        Area::Client
+                    } else {
+                        self.area(x, y)
+                    };
+                    if area != Area::Client {
+                        self.frame_press(area, button, serial, clicks);
+                        continue;
+                    }
+                    self.frame.client_buttons |= button_bit(button);
+                    self.send(Event::MouseDown {
+                        x,
+                        y,
+                        button,
+                        mods,
+                        clicks,
+                    });
+                }
                 PointerEventKind::Release { button, .. } => {
-                    if let Some(button) = button_of(button) {
+                    let Some(button) = button_of(button) else {
+                        continue;
+                    };
+                    if self.frame.client_buttons & button_bit(button) != 0 {
+                        self.frame.client_buttons &= !button_bit(button);
                         self.send(Event::MouseUp { x, y, button, mods });
+                    } else if button == MouseButton::Left {
+                        let pressed = self.frame.pressed.take();
+                        if pressed.is_some() && pressed == self.frame.hover {
+                            self.send(Event::CaptionButton {
+                                button: pressed,
+                                action: CaptionAction::Click,
+                            });
+                        }
                     }
                 }
                 PointerEventKind::Axis {
@@ -1284,7 +1859,7 @@ impl PointerHandler for State {
                     ..
                 } => {
                     let (delta_x, delta_y) = (-wheel_units(&horizontal), wheel_units(&vertical));
-                    if delta_x != 0 || delta_y != 0 {
+                    if (delta_x != 0 || delta_y != 0) && self.frame.in_client {
                         self.send(Event::Wheel {
                             x,
                             y,
@@ -1330,6 +1905,83 @@ mod tests {
         assert_eq!(virtual_key(59, Keysym::from(0xffbe)), (0x70, 59));
         // A layout that types 'z' where a US keyboard has 'y': the letter decides.
         assert_eq!(virtual_key(21, Keysym::from(0x7a)), (0x5A, 21));
+    }
+
+    #[test]
+    fn the_downloads_folder_is_the_users_named_one() {
+        let home = std::path::Path::new("/home/a");
+        let text =
+            "# comment\nXDG_DESKTOP_DIR=\"$HOME/Desktop\"\nXDG_DOWNLOAD_DIR=\"$HOME/Hämtningar\"\n";
+        assert_eq!(
+            user_dir(text, "DOWNLOAD", home),
+            Some(home.join("Hämtningar"))
+        );
+        assert_eq!(
+            user_dir("XDG_DOWNLOAD_DIR=\"/data/dl\"", "DOWNLOAD", home),
+            Some("/data/dl".into())
+        );
+        assert_eq!(
+            user_dir("XDG_DOWNLOAD_DIR=\"$HOME/\"", "DOWNLOAD", home),
+            Some(home.into())
+        );
+        assert_eq!(user_dir("XDG_DOWNLOAD_DIR=\"rel\"", "DOWNLOAD", home), None);
+        assert_eq!(user_dir(text, "MUSIC", home), None);
+    }
+
+    #[test]
+    fn a_window_opens_at_its_last_size() {
+        let mut o = WindowOptions::default();
+        assert_eq!(initial_size(&o), ((1280, 860), false));
+        // A placement saved at 192 DPI: its size in surface pixels.
+        o.placement = Some(crate::placement::Placement {
+            x: 10,
+            y: 20,
+            width: 2000,
+            height: 1600,
+            maximized: true,
+            dpi: 192,
+        });
+        assert_eq!(initial_size(&o), ((1000, 800), true));
+        o.at = Some(WindowAt {
+            left: 5,
+            top: 5,
+            client_width: 400,
+            client_height: 300,
+        });
+        assert_eq!(initial_size(&o), ((400, 300), false));
+    }
+
+    #[test]
+    fn local_time_offsets_are_whole_quarter_hours_of_a_real_zone() {
+        // (whatever zone the machine has: offsets run from -12 to +14 hours in quarter hours)
+        for utc_ms in [0, 1_768_478_400_000, 1_784_116_800_000, -86_400_000] {
+            let offset = local_offset_ms(utc_ms);
+            assert_eq!(offset % (15 * 60_000), 0, "{offset}");
+            assert!(
+                (-12 * 3_600_000..=14 * 3_600_000).contains(&offset),
+                "{offset}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_client_areas_outer_pixels_resize_the_window() {
+        // 800x600 device pixels at scale 2: a 10 px band, corners 32 px along each edge.
+        let e = |x, y| frame_edge(x, y, 800, 600, 2);
+        assert_eq!(e(400, 300), None);
+        assert_eq!(e(10, 300), None);
+        assert_eq!(e(9, 300), Some(ResizeEdge::Left));
+        assert_eq!(e(790, 300), Some(ResizeEdge::Right));
+        assert_eq!(e(789, 300), None);
+        assert_eq!(e(400, 0), Some(ResizeEdge::Top));
+        assert_eq!(e(400, 599), Some(ResizeEdge::Bottom));
+        assert_eq!(e(0, 0), Some(ResizeEdge::TopLeft));
+        // A corner reaches along both edges it joins.
+        assert_eq!(e(31, 2), Some(ResizeEdge::TopLeft));
+        assert_eq!(e(32, 2), Some(ResizeEdge::Top));
+        assert_eq!(e(798, 580), Some(ResizeEdge::BottomRight));
+        assert_eq!(e(2, 570), Some(ResizeEdge::BottomLeft));
+        assert_eq!(e(798, 20), Some(ResizeEdge::TopRight));
     }
 
     #[test]

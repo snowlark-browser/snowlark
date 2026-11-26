@@ -167,6 +167,18 @@ pub fn remove_old_copies(install: &Path) {
 /// The start of the window: moves a staged release in and starts it with this process's
 /// arguments ([`Applied::Started`]: this process ends). Nothing happens in a build that does not
 /// update.
+/// Whether other processes run `exe` (Windows only: there are no updates elsewhere,
+/// [`super::own_release`]).
+fn others_running(exe: &Path) -> bool {
+    #[cfg(windows)]
+    return !snowlark_ipc::win::processes::others_running(exe).is_empty();
+    #[cfg(not(windows))]
+    {
+        let _ = exe;
+        false
+    }
+}
+
 pub fn at_window_start(profile_dir: &Path) -> Applied {
     if super::own_release().is_none() {
         return Applied::No;
@@ -184,7 +196,7 @@ pub fn at_window_start(profile_dir: &Path) -> Applied {
         paths: &paths,
         exe: &exe,
         verify: &super::verify_signer,
-        others_running: &|| !snowlark_ipc::win::processes::others_running(&exe).is_empty(),
+        others_running: &|| others_running(&exe),
         launch: &|new| {
             std::process::Command::new(new)
                 .args(&args)

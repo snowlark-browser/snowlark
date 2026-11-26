@@ -299,7 +299,13 @@ impl Replay {
         };
         port.send(&GpuDown::Window { window })?;
         for (shown, tree) in &self.surfaces {
+            #[cfg(windows)]
             let handle = tree.renew().map_err(snowlark_ipc::Error::Os)?;
+            // (no window has a composition surface there: `renew` cannot make one)
+            #[cfg(not(windows))]
+            let Ok(handle) = tree.renew() else {
+                continue;
+            };
             let surface = port.duplicate_to_child(&handle)?;
             port.send(&GpuDown::Surface {
                 to: window,
@@ -438,6 +444,7 @@ impl Routes {
     }
 
     /// Why window `window` has no compositor in the GPU process now, if it has none.
+    #[cfg_attr(not(all(test, windows)), allow(dead_code))]
     pub(crate) fn no_compositor(&self, window: WindowId) -> Option<String> {
         self.table().windows.get(&window)?.no_compositor.clone()
     }
@@ -1271,14 +1278,25 @@ impl Child {
                     })
                 };
                 match self.videos.make_pool(video, width, height) {
-                    Ok(pool) => Some(MadePool {
-                        generation: pool.generation,
-                        handles: pool
+                    Ok(pool) => {
+                        #[cfg(windows)]
+                        let handles = Some(
+                            pool.handles
+                                .into_iter()
+                                .map(|h| self.port.give_handle(h))
+                                .collect(),
+                        );
+                        #[cfg(not(windows))]
+                        let handles = pool
                             .handles
                             .into_iter()
-                            .map(|h| self.port.give_handle(h))
-                            .collect(),
-                    }),
+                            .map(|h| self.port.give_handle(h).ok())
+                            .collect::<Option<Vec<_>>>();
+                        handles.map(|handles| MadePool {
+                            generation: pool.generation,
+                            handles,
+                        })
+                    }
                     Err(e) => {
                         eprintln!("[gpu] no shared textures for a {width}x{height} video: {e}");
                         None
@@ -1379,8 +1397,13 @@ impl Child {
                 window,
                 surface,
             } => {
-                let handle = self.port.take_handle(surface);
-                let _ = self.input(to).send(CompInput::surface(window, handle));
+                #[cfg(windows)]
+                let handle = Some(self.port.take_handle(surface));
+                #[cfg(not(windows))]
+                let handle = self.port.take_handle(surface).ok();
+                if let Some(handle) = handle {
+                    let _ = self.input(to).send(CompInput::surface(window, handle));
+                }
             }
             GpuDown::Comp { window, msg } => {
                 let msg = self
@@ -1983,6 +2006,8 @@ mod tests {
     /// handles for the browser to take out. A frame must name a texture of a pool made for that
     /// renderer's video (another renderer's id, or a pool it was not given, is refused for the tab
     /// that sent it), and a list names its own renderer's videos only: another's id draws nothing.
+    /// (Shared video textures need a GPU device: Windows only so far.)
+    #[cfg(windows)]
     #[test]
     fn a_renderers_videos_are_made_here_and_its_own_only() {
         use snowlark_paint::{DisplayListBuilder, Rect};

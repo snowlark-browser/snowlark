@@ -31,6 +31,7 @@ pub mod blocker_panel;
 pub mod bookmarks;
 pub mod bookmarks_page;
 pub mod browser;
+#[cfg_attr(not(windows), path = "cdm_none.rs")]
 pub mod cdm;
 pub mod chrome;
 pub mod clear_data;

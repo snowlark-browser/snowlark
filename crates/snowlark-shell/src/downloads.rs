@@ -463,13 +463,20 @@ pub fn mark_from_internet(path: &Path, url: &str, referrer: &str) -> std::io::Re
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    /// A downloads folder of the system the tests run on.
+    pub(crate) const DIR: &str = if cfg!(windows) {
+        "C:\\Downloads"
+    } else {
+        "/Downloads"
+    };
 
     fn start(name: &str, url: &str, at: i64) -> Start {
         Start {
-            target_path: PathBuf::from(format!("C:\\Downloads\\{name}")),
-            current_path: PathBuf::from(format!("C:\\Downloads\\{name}.part")),
+            target_path: PathBuf::from(DIR).join(name),
+            current_path: PathBuf::from(DIR).join(format!("{name}.part")),
             url_chain: vec![url.into(), format!("{url}?served")],
             referrer: "https://ref.example/".into(),
             tab_url: "https://tab.example/".into(),

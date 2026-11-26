@@ -19,7 +19,7 @@ $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $crates = @(
     'snowlark-dom', 'snowlark-idl', 'snowlark-audio', 'snowlark-idb', 'snowlark-style',
     'snowlark-net', 'snowlark-js', 'snowlark-bindings', 'snowlark-graphics', 'snowlark-paint',
-    'snowlark-layout', 'snowlark-render', 'snowlark-ipc', 'snowlark-tab'
+    'snowlark-layout', 'snowlark-render', 'snowlark-ipc', 'snowlark-tab', 'snowlark-shell', 'snowlark'
 )
 
 $python = (Get-Command python -ErrorAction Stop).Source

@@ -4,7 +4,8 @@
 
 //! The profile folder: history, settings and the network's cookies and HSTS hosts.
 //!
-//! It is `%LOCALAPPDATA%\Snowlark\` (or `SNOWLARK_PROFILE_DIR`). Before the browser was renamed it was
+//! It is `%LOCALAPPDATA%\Snowlark\` (or `SNOWLARK_PROFILE_DIR`; on Linux `~/.config/snowlark/`,
+//! following `XDG_CONFIG_HOME`). Before the browser was renamed it was
 //! `%LOCALAPPDATA%\Osmium\rust\`: the first start that finds that folder and no new one moves it
 //! ([`adopt_old_profile`]), so bookmarks, history, settings, cookies and filter lists carry over.
 //! `%LOCALAPPDATA%\Osmium\` itself is the C# engine's folder (its `cookies.json` and `hsts.json` are in
@@ -24,6 +25,7 @@ pub struct Profile {
     imports_legacy: bool,
 }
 
+#[cfg(windows)]
 fn local_app_data() -> PathBuf {
     std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
@@ -31,12 +33,41 @@ fn local_app_data() -> PathBuf {
 }
 
 /// The profile folder's place today, and before the browser was renamed.
+#[cfg(windows)]
 fn new_location() -> PathBuf {
     local_app_data().join("Snowlark")
 }
 
+#[cfg(windows)]
 fn old_location() -> PathBuf {
     local_app_data().join("Osmium").join("rust")
+}
+
+/// The C# engine's folder, whose history and bookmarks the user's own profile imports once
+/// (Windows only: it never ran elsewhere).
+fn legacy_dir() -> Option<PathBuf> {
+    #[cfg(windows)]
+    return Some(local_app_data().join("Osmium"));
+    #[cfg(not(windows))]
+    None
+}
+
+/// The profile folder elsewhere: `snowlark` in the user's configuration folder
+/// (`$XDG_CONFIG_HOME`, else `~/.config`), as other browsers keep theirs on Linux.
+#[cfg(not(windows))]
+fn new_location() -> PathBuf {
+    std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+        .unwrap_or_else(std::env::temp_dir)
+        .join("snowlark")
+}
+
+/// No browser before the rename ran there: nothing to move (a folder that is never made).
+#[cfg(not(windows))]
+fn old_location() -> PathBuf {
+    new_location().join("no-profile-before-the-rename")
 }
 
 /// What [`adopt`] did.
@@ -153,7 +184,7 @@ impl Profile {
 
     /// The C# engine's history, imported when the user's own profile has none yet.
     pub fn legacy_history(&self) -> Option<PathBuf> {
-        let p = local_app_data().join("Osmium").join("history.json");
+        let p = legacy_dir()?.join("history.json");
         (self.imports_legacy && p != self.history_file()).then_some(p)
     }
 
@@ -192,7 +223,7 @@ impl Profile {
 
     /// The C# engine's bookmarks (the same format), imported when the user's own profile has none yet.
     pub fn legacy_bookmarks(&self) -> Option<PathBuf> {
-        let p = local_app_data().join("Osmium").join("bookmarks.json");
+        let p = legacy_dir()?.join("bookmarks.json");
         (self.imports_legacy && p != self.bookmarks_file()).then_some(p)
     }
 
@@ -243,8 +274,9 @@ mod tests {
             dir: dir.clone(),
             imports_legacy: true,
         };
-        assert!(own.legacy_history().is_some());
-        assert!(own.legacy_bookmarks().is_some());
+        // (the C# engine ran on Windows only: elsewhere there is nothing to import)
+        assert_eq!(own.legacy_history().is_some(), cfg!(windows));
+        assert_eq!(own.legacy_bookmarks().is_some(), cfg!(windows));
     }
 
     /// A folder to play the two profile places in, with an old profile of three files in it.
@@ -331,6 +363,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    // (a file held without sharing: Windows' share modes)
+    #[cfg(windows)]
     #[test]
     fn a_profile_that_can_be_neither_moved_nor_copied_stays_in_use_where_it_is() {
         use std::os::windows::fs::OpenOptionsExt;
