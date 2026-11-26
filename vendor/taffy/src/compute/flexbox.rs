@@ -330,7 +330,7 @@ pub fn compute_flexbox_layout(
     });
 
     // The size of the container should be floored by the padding and border
-    let styled_based_known_dimensions =
+    let mut styled_based_known_dimensions =
         known_dimensions.or(min_max_definite_size.or(clamped_style_size).maybe_max(padding_border_sum));
 
     // Short-circuit layout if the container's size is fully determined by the container's size and the run mode
@@ -348,6 +348,65 @@ pub fn compute_flexbox_layout(
         }
     }
 
+    debug_log!("FLEX:", dbg:style.flex_direction());
+    drop(style);
+
+    // Snowlark patch: a container whose width is known and whose height is `auto` (or a percentage that
+    // does not resolve) takes its height from its preferred aspect ratio (CSS Sizing 4 §2.2, applied to
+    // the `box-sizing` box), clamped by its min and max heights. Its automatic minimum height is its
+    // content height unless it is a scroll container or `min-height` is not `auto` (§5.1). The height
+    // is definite when the width is. Upstream left the height to the content, so a flex item that is a
+    // flex container with only out-of-flow children was 0 px tall.
+    let mut ratio_height_is_definite = None;
+    if let (Some(ratio), Size { width: Some(width), height: None }) = (aspect_ratio, styled_based_known_dimensions)
+    {
+        let style = tree.get_flexbox_container_style(node);
+        let height_is_auto =
+            style.size().height.maybe_resolve(parent_size.height, |val, basis| tree.calc(val, basis)).is_none();
+        let overflow = style.overflow();
+        let content_minimum = style.min_size().height.is_auto()
+            && !overflow.x.is_scroll_container()
+            && !overflow.y.is_scroll_container();
+        drop(style);
+        if height_is_auto && ratio > 0.0 && ratio.is_finite() {
+            let inner = (width - box_sizing_adjustment.width).max(0.0) / ratio;
+            let mut height =
+                (inner + box_sizing_adjustment.height).maybe_clamp(min_size.height, max_size.height);
+            if content_minimum {
+                let content = compute_preliminary(
+                    tree,
+                    node,
+                    LayoutInput {
+                        run_mode: RunMode::ComputeSize,
+                        axis: RequestedAxis::Vertical,
+                        known_dimensions: styled_based_known_dimensions,
+                        known_dimensions_are_definite: Size {
+                            width: inputs.known_dimensions_are_definite.width || known_dimensions.width.is_none(),
+                            height: false,
+                        },
+                        available_space: Size {
+                            height: match inputs.available_space.height {
+                                AvailableSpace::MinContent => AvailableSpace::MaxContent,
+                                other => other,
+                            },
+                            ..inputs.available_space
+                        },
+                        ..inputs
+                    },
+                )
+                .size
+                .height;
+                height = height.max(content);
+            }
+            styled_based_known_dimensions.height = Some(height.max(padding_border_sum.height));
+            ratio_height_is_definite =
+                Some(inputs.known_dimensions_are_definite.width || known_dimensions.width.is_none());
+            if run_mode == RunMode::ComputeSize {
+                return LayoutOutput::from_outer_size(Size { width, height: height.max(padding_border_sum.height) });
+            }
+        }
+    }
+
     // Short-circuit layout if the container's size is fully determined by the container's size and the run mode
     // is ComputeSize (and thus the container's size is all that we're interested in)
     if run_mode == RunMode::ComputeSize {
@@ -356,14 +415,14 @@ pub fn compute_flexbox_layout(
         }
     }
 
-    debug_log!("FLEX:", dbg:style.flex_direction());
-    drop(style);
-
     // Normalize the definiteness flags: they only apply to dimensions which were passed in as known
     // by the parent. Dimensions resolved from the node's own style are always definite.
-    let known_dimensions_are_definite = inputs
+    let mut known_dimensions_are_definite = inputs
         .known_dimensions_are_definite
         .zip_map(known_dimensions, |is_definite, known_dimension| is_definite || known_dimension.is_none());
+    if let Some(definite) = ratio_height_is_definite {
+        known_dimensions_are_definite.height = definite;
+    }
 
     // Snowlark patch: the min-content block size of a box is its max-content block size (CSS Sizing 3
     // §5.1: "the min-content block size ... is equivalent to its max-content block size"); Snowlark's

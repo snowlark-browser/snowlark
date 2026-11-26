@@ -1115,8 +1115,12 @@ def main():
     os.makedirs(os.path.join(STATE, 'results'), exist_ok=True)
     os.makedirs(work_root(), exist_ok=True)
     name = args.name or ('all' if args.all else 'gate' if args.gate and not args.areas else '_'.join(a.replace('/', '-') for a in areas))
-    if args.affected:
+    if args.affected and not args.name:
         name = 'gate-affected'
+    if args.gate and not args.name:
+        # Two gates started without --name would share one results file and one work folder and spoil
+        # each other's runs; the process id keeps them apart.
+        name += f'-{os.getpid()}'
     if args.https and not args.variants and not name.endswith('-https'):
         name += '-https'  # never compared with an http-only run of the same name
     baseline = None

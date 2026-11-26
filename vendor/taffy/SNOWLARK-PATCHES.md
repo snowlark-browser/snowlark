@@ -66,6 +66,14 @@ the source; `git log -p vendor/taffy` shows the diff.
     that is not stretched, sized from its contents, css-flexbox-1 §9.8) is not a basis for the items'
     percentage heights and min/max heights, nor the parent size their own layout resolves against; they
     behave as `auto` (CSS2 §10.5). Upstream resolved them against that height.
+14. **A container's height from its aspect ratio and a known width** (`compute/flexbox.rs`
+    `compute_flexbox_layout`, `compute/grid/mod.rs` `compute_grid_layout`): a flex or grid container
+    handed a width but no height, whose own height is `auto`, is the width through its preferred aspect
+    ratio tall (CSS Sizing 4 §2.2, on the `box-sizing` box, clamped by its min/max heights), with its
+    content height as the automatic minimum unless it is a scroll container or `min-height` is not
+    `auto` (§5.1); that height is definite when the width is. Upstream sized it by its content alone,
+    so a flex item that is a flex or grid container measured for its hypothetical cross size (§9.4)
+    took no height from its ratio.
 
 To move to a newer taffy: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `.\dev.ps1 test --release --package snowlark-layout`.

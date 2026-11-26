@@ -603,3 +603,86 @@ fn a_percentage_height_in_a_flex_item_that_is_not_stretched_is_auto() {
     // Stretched, `inner`'s height is definite and the item's 100% resolves against it.
     assert_eq!(case(|_| {}), (50.0, 50.0));
 }
+
+/// A `row wrap` container 358px wide holding one item `flex: 1 1 100%` with `aspect-ratio: 2 / 1`
+/// that is itself a flex or grid container (`display`), styled further by `item`, with one child
+/// styled by `child`; returns the item's and the child's sizes.
+fn ratio_item(
+    display: Display,
+    item: impl FnOnce(&mut TestStyle),
+    child: impl FnOnce(&mut TestStyle),
+) -> ((f32, f32), (f32, f32)) {
+    let mut t = T::new();
+    let r0 = t.root();
+    let flex = t.doc.block(r0, |s| {
+        s.display = Display::FLEX;
+        s.flex_wrap = FlexWrap::Wrap;
+        s.width = SizeValue::px(358.0);
+    });
+    let it = t.doc.block(flex, |s| {
+        s.display = display;
+        s.flex_grow = 1.0;
+        s.flex_basis = FlexBasis::LengthPercentage(LengthPercentage::percent(100.0));
+        s.aspect_ratio = AspectRatio {
+            auto: false,
+            ratio: Some(2.0),
+        };
+        item(s);
+    });
+    let ch = t.doc.block(it, child);
+    let f = t.run(800.0, 600.0);
+    let (a, b) = (rect(&f, it), rect(&f, ch));
+    ((a.width, a.height), (b.width, b.height))
+}
+
+#[test]
+fn container_item_takes_its_height_from_its_aspect_ratio() {
+    // css-sizing-4 §2.2: an item whose height is `auto` and whose width is the flexed 358px is
+    // 358 / 2 tall, whether it is a flex or a grid container, even with only an absolutely
+    // positioned child (it used to be 0px tall).
+    for display in [Display::FLEX, Display::GRID] {
+        let (item, _) = ratio_item(
+            display,
+            |s| s.position = Position::Relative,
+            |s| s.position = Position::Absolute,
+        );
+        assert_eq!(item, (358.0, 179.0), "{display:?}");
+    }
+}
+
+#[test]
+fn container_item_with_aspect_ratio_has_its_content_as_minimum() {
+    // css-sizing-4 §5.1: the content height is the automatic minimum, unless the item is a scroll
+    // container or its `min-height` is not `auto`.
+    let tall = |s: &mut TestStyle| {
+        s.width = SizeValue::px(10.0);
+        s.height = SizeValue::px(300.0);
+    };
+    for display in [Display::FLEX, Display::GRID] {
+        assert_eq!(ratio_item(display, |_| {}, tall).0, (358.0, 300.0));
+        let scroller = |s: &mut TestStyle| {
+            s.overflow_x = Overflow::Hidden;
+            s.overflow_y = Overflow::Hidden;
+        };
+        assert_eq!(ratio_item(display, scroller, tall).0, (358.0, 179.0));
+        let zero_min = |s: &mut TestStyle| s.min_height = SizeValue::px(0.0);
+        assert_eq!(ratio_item(display, zero_min, tall).0, (358.0, 179.0));
+    }
+}
+
+#[test]
+fn height_from_aspect_ratio_is_a_percentage_basis() {
+    // The height the ratio gives a definite width is definite (css-sizing-4 §2.2): a child's
+    // `height: 50%` resolves against it, and a column container's child flexes into it.
+    let half = |s: &mut TestStyle| {
+        s.width = SizeValue::px(10.0);
+        s.height = SizeValue::percent(50.0);
+    };
+    assert_eq!(ratio_item(Display::FLEX, |_| {}, half).1, (10.0, 89.5));
+    let column = |s: &mut TestStyle| s.flex_direction = FlexDirection::Column;
+    let grow = |s: &mut TestStyle| {
+        s.width = SizeValue::px(10.0);
+        s.flex_grow = 1.0;
+    };
+    assert_eq!(ratio_item(Display::FLEX, column, grow).1, (10.0, 179.0));
+}

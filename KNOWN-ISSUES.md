@@ -10,8 +10,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   minimum when the items overflow, and a single-line `flex-wrap: wrap-reverse` container puts its line at the wrong
   cross edge. `flex-wrap: balance` and `flex-line-count` are not implemented. Both layout bugs are in the vendored
   flex algorithm. (ref 42)
-- **Flex items sized by `aspect-ratio`.** A flex item with a preferred aspect ratio and only absolutely positioned
-  children gets no height from its aspect ratio, so it collapses to 0 px (for example cards on stripe.com). (ref 775)
+- **Flex items with `aspect-ratio`.** A `max-height` narrows an item's width through its ratio where it should not
+  (ref 792), and a stretched item's automatic minimum width does not follow the height it is stretched to (ref 793).
 - **Pages that time out or never finish their content.** Some sites' bot checks stop at a challenge page (ref 776),
   some build parts of the page in script that never appear (ref 777), and some reveals that wait for a WebGL canvas
   or an opacity transition never happen (refs 778, 779).

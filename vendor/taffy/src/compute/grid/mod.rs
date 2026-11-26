@@ -222,8 +222,66 @@ fn compute_container_constants<Tree: LayoutGridContainer>(
 pub fn compute_grid_layout<Tree: LayoutGridContainer>(
     tree: &mut Tree,
     node: NodeId,
-    inputs: LayoutInput,
+    mut inputs: LayoutInput,
 ) -> LayoutOutput {
+    // Snowlark patch: a container whose width is known and whose height is `auto` (or a percentage that
+    // does not resolve) takes its height from its preferred aspect ratio (CSS Sizing 4 §2.2, applied to
+    // the `box-sizing` box), clamped by its min and max heights. Its automatic minimum height is its
+    // content height unless it is a scroll container or `min-height` is not `auto` (§5.1). The height
+    // is definite when the width is. (A grid item gets this from its grid; a flex item that is a grid
+    // container was sized by its content alone.)
+    if let Size { width: Some(width), height: None } = inputs.known_dimensions {
+        let style = tree.get_grid_container_style(node);
+        let parent_size = inputs.parent_size;
+        let ratio = style.aspect_ratio().filter(|r| *r > 0.0 && r.is_finite());
+        let height_is_auto =
+            style.size().height.maybe_resolve(parent_size.height, |val, basis| tree.calc(val, basis)).is_none();
+        let padding = style.padding().resolve_or_zero(parent_size.width, |val, basis| tree.calc(val, basis));
+        let border = style.border().resolve_or_zero(parent_size.width, |val, basis| tree.calc(val, basis));
+        let padding_border_size = (padding + border).sum_axes();
+        let box_sizing_adjustment =
+            if style.box_sizing() == BoxSizing::ContentBox { padding_border_size } else { Size::ZERO };
+        let min_height = style
+            .min_size()
+            .height
+            .maybe_resolve(parent_size.height, |val, basis| tree.calc(val, basis))
+            .maybe_add(box_sizing_adjustment.height);
+        let max_height = style
+            .max_size()
+            .height
+            .maybe_resolve(parent_size.height, |val, basis| tree.calc(val, basis))
+            .maybe_add(box_sizing_adjustment.height);
+        let overflow = style.overflow();
+        let content_minimum = style.min_size().height.is_auto()
+            && !overflow.x.is_scroll_container()
+            && !overflow.y.is_scroll_container();
+        drop(style);
+        if let (Some(ratio), true) = (ratio, height_is_auto) {
+            let inner = (width - box_sizing_adjustment.width).max(0.0) / ratio;
+            let mut height = (inner + box_sizing_adjustment.height).maybe_clamp(min_height, max_height);
+            if content_minimum {
+                let content = grid_layout(
+                    tree,
+                    node,
+                    LayoutInput { run_mode: RunMode::ComputeSize, axis: RequestedAxis::Vertical, ..inputs },
+                )
+                .size
+                .height;
+                height = height.max(content);
+            }
+            let height = height.max(padding_border_size.height);
+            if inputs.run_mode == RunMode::ComputeSize {
+                return LayoutOutput::from_outer_size(Size { width, height });
+            }
+            inputs.known_dimensions.height = Some(height);
+            inputs.known_dimensions_are_definite.height = inputs.known_dimensions_are_definite.width;
+        }
+    }
+    grid_layout(tree, node, inputs)
+}
+
+/// The grid layout algorithm, with the container's known sizes settled
+fn grid_layout<Tree: LayoutGridContainer>(tree: &mut Tree, node: NodeId, inputs: LayoutInput) -> LayoutOutput {
     let LayoutInput { known_dimensions, run_mode, .. } = inputs;
 
     let style = tree.get_grid_container_style(node);
