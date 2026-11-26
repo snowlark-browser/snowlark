@@ -25,7 +25,8 @@ The rest has no reusable form outside a whole engine: the DOM, the JavaScript bi
 specifications' Web IDL), block and inline layout, painting, the rendering pipeline, networking, the process
 model and the browser window are Snowlark's own code, written in Rust. Each tab runs its pages in a renderer
 process of its own, one per site; a full sandbox for those processes is in progress
-([process isolation](docs/process-isolation.md)). It runs on Windows 10 and 11 (64-bit).
+([process isolation](docs/process-isolation.md)). It runs on Windows 10 and 11 (64-bit), and on Linux (x86-64, on a Wayland desktop) in a
+first preview.
 
 ## Status
 
