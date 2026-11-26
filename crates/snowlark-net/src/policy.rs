@@ -41,6 +41,12 @@ pub fn is_bad_port_request(url: &Url) -> bool {
 /// A top-level navigation is upgraded only when it stays on the client's own host (the "upgrade insecure
 /// navigations set"); every other request when the client's CSP says so. Returns whether it upgraded.
 pub fn upgrade_insecure_request(request: &mut Request) -> bool {
+    // Step 1: a navigation request says it prefers secure responses when its URL is not potentially
+    // trustworthy or its host is not a preloadable HSTS host (there is no preload list here, so every
+    // host is one that is not). Main fetch runs again at each redirect: the header is sent once.
+    if request.is_navigation_request() && !request.headers.contains("upgrade-insecure-requests") {
+        request.headers.append("Upgrade-Insecure-Requests", "1");
+    }
     let Some(client) = &request.client else {
         return false;
     };
@@ -254,6 +260,38 @@ mod tests {
             client("https://a.example/", None),
         );
         assert!(!upgrade_insecure_request(&mut none));
+    }
+
+    /// Upgrade Insecure Requests §4.1 step 1: every navigation request carries
+    /// `Upgrade-Insecure-Requests: 1` (once, though main fetch runs again at each redirect), with or
+    /// without a client and whatever its policy; other requests do not.
+    #[test]
+    fn upgrade_insecure_requests_header() {
+        let mut top = Request::navigation(Url::parse("https://x.example/").unwrap());
+        upgrade_insecure_request(&mut top);
+        upgrade_insecure_request(&mut top);
+        let values: Vec<_> = top
+            .headers
+            .iter()
+            .filter(|(n, _)| n.eq_ignore_ascii_case("upgrade-insecure-requests"))
+            .map(|(_, v)| v.to_string())
+            .collect();
+        assert_eq!(values, ["1"]);
+        let mut frame = req(
+            "http://b.example/",
+            Destination::Iframe,
+            client("https://a.example/", None),
+        );
+        frame.mode = Mode::Navigate;
+        upgrade_insecure_request(&mut frame);
+        assert!(frame.headers.contains("upgrade-insecure-requests"));
+        let mut script = req(
+            "https://b.example/s.js",
+            Destination::Script,
+            client("https://a.example/", None),
+        );
+        upgrade_insecure_request(&mut script);
+        assert!(!script.headers.contains("upgrade-insecure-requests"));
     }
 
     #[test]

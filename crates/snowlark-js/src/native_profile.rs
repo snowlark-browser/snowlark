@@ -113,15 +113,29 @@ pub struct NativeSampler {
 impl NativeSampler {
     /// Starts sampling the calling thread every `interval`, each sample with the last of `marks`.
     /// `None` when the thread cannot be opened for suspension.
+    pub fn start(interval: Duration, marks: SampleMarks) -> Option<NativeSampler> {
+        Self::start_after(Duration::ZERO, interval, marks)
+    }
+
+    /// As [`NativeSampler::start`], with the first sample `delay` from now: a watchdog's view of
+    /// what a thread still does past a deadline (stopping before then takes no samples).
     #[cfg(not(windows))]
-    pub fn start(_interval: Duration, _marks: SampleMarks) -> Option<NativeSampler> {
+    pub fn start_after(
+        _delay: Duration,
+        _interval: Duration,
+        _marks: SampleMarks,
+    ) -> Option<NativeSampler> {
         None
     }
 
-    /// Starts sampling the calling thread every `interval`, each sample with the last of `marks`.
-    /// `None` when the thread cannot be opened for suspension.
+    /// As [`NativeSampler::start`], with the first sample `delay` from now: a watchdog's view of
+    /// what a thread still does past a deadline (stopping before then takes no samples).
     #[cfg(windows)]
-    pub fn start(interval: Duration, marks: SampleMarks) -> Option<NativeSampler> {
+    pub fn start_after(
+        delay: Duration,
+        interval: Duration,
+        marks: SampleMarks,
+    ) -> Option<NativeSampler> {
         // SAFETY: plain Win32 calls on the current thread's id; the handle is closed by the
         // sampler thread when it ends.
         let handle = unsafe {
@@ -142,6 +156,12 @@ impl NativeSampler {
                 let target = target;
                 let mut stack = vec![0u64; STACK_COPY / 8];
                 let mut local = Vec::new();
+                let first = std::time::Instant::now() + delay;
+                while !s.load(Ordering::Relaxed) && std::time::Instant::now() < first {
+                    std::thread::sleep(
+                        (first - std::time::Instant::now()).min(Duration::from_millis(50)),
+                    );
+                }
                 let started = std::time::Instant::now();
                 while !s.load(Ordering::Relaxed) {
                     std::thread::sleep(interval);
@@ -720,6 +740,40 @@ mod tests {
             &s.functions[..s.functions.len().min(10)]
         );
         assert!(s.report(5, Duration::from_micros(500)).contains("native"));
+    }
+
+    /// A delayed sampler takes nothing before its delay (and stops at once when stopped then), and
+    /// samples what the thread still does after it.
+    #[cfg(windows)]
+    #[test]
+    fn a_delayed_sampler_samples_only_after_its_delay() {
+        let early = NativeSampler::start_after(
+            Duration::from_secs(60),
+            Duration::from_micros(500),
+            SampleMarks::default(),
+        )
+        .expect("a sampler");
+        spin_for(Duration::from_millis(100));
+        let stopped = std::time::Instant::now();
+        assert!(early.stop().0.is_empty());
+        assert!(stopped.elapsed() < Duration::from_secs(5));
+        let late = NativeSampler::start_after(
+            Duration::from_millis(100),
+            Duration::from_micros(500),
+            SampleMarks::default(),
+        )
+        .expect("a sampler");
+        let started = std::time::Instant::now();
+        while started.elapsed() < Duration::from_secs(4) {
+            spin_for(Duration::from_millis(150));
+            if started.elapsed() > Duration::from_millis(600) {
+                break;
+            }
+        }
+        let (samples, _) = late.stop();
+        assert!(!samples.is_empty());
+        let s = summarize(&samples, &SampleMarks::default());
+        assert!(s.functions.iter().any(|f| f.0.contains("spin_for")));
     }
 
     #[cfg(windows)]

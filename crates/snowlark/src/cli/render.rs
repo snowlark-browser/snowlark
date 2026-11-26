@@ -465,6 +465,14 @@ fn render_scripted(url: &Url, png: &std::path::Path, options: &Options) -> Resul
     // A watchdog: a task that never yields (a script that loops, or one so slow that one task
     // outlasts the timeout) is terminated 2 s after the timeout, so the capture still happens, as
     // a browser's screenshot would show what the page painted.
+    // Script stops at once when terminated; a task still running a second after that is in native
+    // code (a binding, the network, layout), which termination cannot stop. Its stack is sampled
+    // from then on, so the report can say where the page thread was.
+    let stuck_sampler = snowlark_js::native_profile::NativeSampler::start_after(
+        (started + timeout + Duration::from_secs(3)).saturating_duration_since(Instant::now()),
+        Duration::from_millis(100),
+        Default::default(),
+    );
     let watch_done = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let watch_fired = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let watchdog = {
@@ -522,8 +530,12 @@ fn render_scripted(url: &Url, png: &std::path::Path, options: &Options) -> Resul
     watch_done.store(true, std::sync::atomic::Ordering::Relaxed);
     watchdog.thread().unpark();
     let _ = watchdog.join();
+    let stuck = stuck_sampler.map(|s| s.stop().0).unwrap_or_default();
     if watch_fired.load(std::sync::atomic::Ordering::Relaxed) {
         eprintln!("[render] a task ran past the timeout: its script was terminated");
+        if !stuck.is_empty() {
+            eprint!("{}", stuck_report(&stuck));
+        }
         page.terminator().resume();
     }
     eprintln!(
@@ -617,4 +629,24 @@ fn print_console_entries(engine: &snowlark_page::Engine) {
 
 fn ms(t: Instant) -> f64 {
     t.elapsed().as_secs_f64() * 1000.0
+}
+
+/// Where a task that outlived its termination was: the page thread's most sampled stack, innermost
+/// frame first (`[render] stuck:` lines, a sample each 100 ms).
+fn stuck_report(samples: &[Vec<u64>]) -> String {
+    use std::fmt::Write;
+    let summary = snowlark_js::native_profile::summarize(samples, &Default::default());
+    let mut o = String::new();
+    let _ = writeln!(
+        o,
+        "[render] stuck: the task went on {} ms in native code after its script was terminated",
+        samples.len() * 100
+    );
+    if let Some((stack, n)) = summary.folded.iter().max_by_key(|(s, n)| (**n, s.len())) {
+        let _ = writeln!(o, "[render] stuck: {n} of {} samples in", samples.len());
+        for frame in stack.rsplit(';').take(24) {
+            let _ = writeln!(o, "[render] stuck:   {frame}");
+        }
+    }
+    o
 }
