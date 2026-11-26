@@ -1,7 +1,7 @@
 # Snowlark
 
-Snowlark is a fast, private web browser for Windows, with Linux in progress, written in Rust and built from the
-web's specifications. More at [snowlark.org](https://snowlark.org).
+Snowlark is a fast, private web browser for Windows and Linux, written in Rust and built from the web's
+specifications. More at [snowlark.org](https://snowlark.org).
 
 Where a proven component exists as a library, Snowlark uses it:
 
@@ -44,6 +44,12 @@ GitHub for the list of releases once a day and downloads a newer one, used after
 but while the signing certificate is new Windows SmartScreen may still warn on first start: choose "More info", then
 "Run anyway".
 
+A first preview for Linux (x86-64) is on the releases page too, as a `.tar.gz`: unpack it anywhere and start
+`./snowlark` in the folder it makes, keeping `libEGL.so` and `libGLESv2.so` beside it. It needs a Wayland desktop and
+glibc 2.43 or newer (for example Ubuntu 26.04, Fedora 44 or Debian testing). It is not signed yet: check it against the
+`.sha256` file beside it (`sha256sum -c`). Linux builds do not check for new versions. Not there yet on Linux: video
+and audio, file dialogs, input methods, saving passwords.
+
 ## Building
 
 You need Windows 10 or 11 (x64), Visual Studio 2022 or its Build Tools with the "Desktop development with C++"
@@ -61,8 +67,9 @@ browser, and `target\iter\snowlark-cli.exe`, the same program for the console.
 
 ### On Linux (in progress)
 
-On Linux, Snowlark builds with its headless modes (`--eval`, `--render`, `--wpt`, `--reftest`); the window,
-media playback and WebGL come in later stages ([docs/linux.md](docs/linux.md) has the plan and where it stands).
+On Linux, Snowlark builds the browser (a Wayland window) and its headless modes (`--eval`, `--render`, `--wpt`,
+`--reftest`); media playback, input methods and a few desktop parts come later ([docs/linux.md](docs/linux.md) has
+the plan, where it stands and the extra packages the window and WebGL need).
 Any recent x86-64 distribution works, as does WSL 2 with Ubuntu. On Debian or Ubuntu:
 
 ```sh
