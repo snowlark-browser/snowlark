@@ -1,6 +1,7 @@
 # Snowlark on Linux
 
-Snowlark runs on Windows only. This document maps every part of it that is tied to Windows, names the Linux
+Snowlark runs on Windows; on Linux it builds with its headless modes, and the window and the rest follow in the
+stages below. This document maps every part of it that is tied to Windows, names the Linux
 counterpart and the Rust options for each, and lays out the order of the port in stages. The engine crates stay
 free of platform code; each platform part sits behind one interface with a Windows and a Linux half.
 

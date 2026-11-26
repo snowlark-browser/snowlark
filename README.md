@@ -1,7 +1,7 @@
 # Snowlark
 
-Snowlark is a fast, private web browser for Windows, written in Rust and built from the web's
-specifications. More at [snowlark.org](https://snowlark.org).
+Snowlark is a fast, private web browser for Windows, with Linux in progress, written in Rust and built from the
+web's specifications. More at [snowlark.org](https://snowlark.org).
 
 Where a proven component exists as a library, Snowlark uses it:
 
@@ -16,7 +16,9 @@ Where a proven component exists as a library, Snowlark uses it:
   [gif](https://crates.io/crates/gif), [image-webp](https://crates.io/crates/image-webp)), AVIF through
   [CrabbyAvif](https://github.com/webmproject/CrabbyAvif) with [dav1d](https://code.videolan.org/videolan/dav1d),
   colour profiles applied with [qcms](https://crates.io/crates/qcms)
-- Drawing, text and media decoding: Windows' Direct2D, DirectWrite and Media Foundation
+- Drawing, text and media decoding: Windows' Direct2D, DirectWrite and Media Foundation; on Linux,
+  [Skia](https://skia.org), [fontconfig](https://www.freedesktop.org/wiki/Software/fontconfig/),
+  [FreeType](https://freetype.org) and [HarfBuzz](https://harfbuzz.github.io)
 - Many smaller Rust crates, listed with their licences on the browser's credits page
 
 The rest has no reusable form outside a whole engine: the DOM, the JavaScript bindings (generated from the
@@ -56,6 +58,27 @@ Python 3 for the tools. From a PowerShell prompt in the repository:
 library built for Snowlark (about 32 MB, checked against a SHA-256; [docs/v8-build.md](docs/v8-build.md) says
 what it is and how to build it yourself), and takes a while. The result is `target\iter\snowlark.exe`, the
 browser, and `target\iter\snowlark-cli.exe`, the same program for the console.
+
+### On Linux (in progress)
+
+On Linux, Snowlark builds with its headless modes (`--eval`, `--render`, `--wpt`, `--reftest`); the window,
+media playback and WebGL come in later stages ([docs/linux.md](docs/linux.md) has the plan and where it stands).
+Any recent x86-64 distribution works, as does WSL 2 with Ubuntu. On Debian or Ubuntu:
+
+```sh
+sudo apt-get install -y build-essential clang lld pkg-config curl ca-certificates git python3 cmake ninja-build \
+    libfontconfig-dev libfreetype-dev libharfbuzz-dev \
+    fonts-liberation fonts-dejavu-core fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
+```
+
+No V8 library is published for Linux yet, so build it once with `tools/linux/build-v8.sh` (it takes a while;
+[docs/v8-build.md](docs/v8-build.md), "Linux", has the steps). Then cargo runs through `tools/linux/cargo.sh`,
+which links that library:
+
+```sh
+tools/linux/cargo.sh build --profile iter -p snowlark
+target/iter/snowlark --render https://example.org page.png 1280
+```
 
 ## Running
 
