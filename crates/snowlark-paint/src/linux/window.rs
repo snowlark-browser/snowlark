@@ -12,20 +12,25 @@
 //! [`Window::dpi`] is 96 times that scale. Methods that change the window are carried out after
 //! the handler returns, as on Windows.
 //!
-//! What is here so far: the window with the frame its owner draws (client-side decorations), moved
-//! and resized from the client area's outer pixels and the caption its handler names
+//! What is here so far: windows with the frame their owner draws (client-side decorations), moved
+//! and resized from the client area's outer pixels and the caption the handler names
 //! ([`WindowHandler::hit_test`]): the desktop carries out the move or resize, a double click on the
 //! caption maximizes, a right click opens the desktop's window menu, and caption buttons are
 //! reported as on Windows (a desktop that draws its own frame anyway moves and resizes from that);
-//! pointer (moves, buttons, wheels with high-resolution steps), keyboard through xkbcommon (keys as Windows virtual-key codes and characters, with repeat),
-//! focus, timers, close, maximize and fullscreen, and showing pixels from the CPU
+//! more windows on the same loop ([`open`], [`open_browser_window`]); pointer (moves, buttons,
+//! wheels with high-resolution steps) with the desktop's cursors, keyboard through xkbcommon (keys
+//! as Windows virtual-key codes and characters, with repeat), focus, timers, close, maximize and
+//! fullscreen, the desktop's clipboard ([`clipboard`]), and showing pixels from the CPU
 //! ([`Window::present`], `wl_shm` buffers). Not yet: the compositor's GPU path, IME
-//! (`zwp_text_input_v3`), the clipboard, drag and drop, cursors, fractional scales.
+//! (`zwp_text_input_v3`), drag and drop, fractional scales.
+
+#[path = "clipboard.rs"]
+mod clipboard;
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
@@ -48,7 +53,9 @@ use sctk::registry::{ProvidesRegistryState, RegistryState};
 use sctk::seat::keyboard::{
     KeyEvent, KeyboardHandler, Keysym, Modifiers as XkbModifiers, RawModifiers,
 };
-use sctk::seat::pointer::{PointerEvent, PointerEventKind, PointerHandler};
+use sctk::seat::pointer::{
+    CursorIcon, PointerEvent, PointerEventKind, PointerHandler, ThemeSpec, ThemedPointer,
+};
 use sctk::seat::{Capability, SeatHandler, SeatState};
 use sctk::shell::xdg::window::{
     DecorationMode, Window as XdgWindow, WindowConfigure, WindowDecorations,
@@ -379,6 +386,8 @@ struct FramePointer {
     /// Buttons pressed in the client area, by bit: their moves and release go to the client
     /// wherever the pointer is (as Windows' capture of a pressed button).
     client_buttons: u8,
+    /// What the pointer is over (none once it left).
+    area: Option<Area>,
 }
 
 fn button_bit(b: MouseButton) -> u8 {
@@ -457,7 +466,8 @@ impl Window {
         self.fullscreen.get()
     }
 
-    /// The cursor over the client area (drawn by the desktop from its theme: not yet).
+    /// The cursor over the client area: the desktop draws it (its cursor shapes, else the cursor
+    /// theme's image of that name), once the handler returns.
     pub fn set_cursor(&self, cursor: Cursor) {
         self.cursor.set(cursor);
     }
@@ -622,26 +632,26 @@ fn initial_size(options: &WindowOptions) -> ((u32, u32), bool) {
     )
 }
 
-/// Why [`open`] fails: the loop serves one window.
-fn single_window() -> Error {
-    Error::Platform("a second window is not supported on Linux yet".into())
-}
-
-/// Makes another top-level window on the thread running [`run`]'s loop: not yet on Linux (the
-/// loop serves one window), so this fails and the caller keeps its content in the window it has.
+/// Makes another top-level window on the calling thread, which must be the one running [`run`]'s
+/// loop (that loop delivers its events): with the desktop's frame where the desktop draws one,
+/// its handler from `make`. Destroying it ([`WindowHandle::destroy`], or the user closing it when
+/// the handler lets it go) does not end the loop. A Wayland client never activates a window by
+/// itself, so [`no_activate`] needs nothing here.
 pub fn open(
-    _options: WindowOptions,
-    _make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
+    options: WindowOptions,
+    make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
 ) -> Result<WindowHandle> {
-    Err(single_window())
+    open_on_loop(options, make, false)
 }
 
-/// Makes another browser window on the thread running [`run`]'s loop: not yet on Linux ([`open`]).
+/// Makes another browser window on the calling thread, which must be the one running [`run`]'s
+/// loop: like [`run`]'s, with the frame its handler draws. The loop ends when the last browser
+/// window is destroyed, whichever was first.
 pub fn open_browser_window(
-    _options: WindowOptions,
-    _make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
+    options: WindowOptions,
+    make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
 ) -> Result<WindowHandle> {
-    Err(single_window())
+    open_on_loop(options, make, true)
 }
 
 /// The user's downloads folder: `XDG_DOWNLOAD_DIR` of `user-dirs.dirs` in the configuration
@@ -736,28 +746,26 @@ pub fn password_blank() -> bool {
     false
 }
 
-/// The text the browser last put on the clipboard. The desktop's clipboard (`wl_data_device`) is
-/// not used yet, so copying and pasting work within the browser only.
-static CLIPBOARD: Mutex<Option<(String, Option<String>)>> = Mutex::new(None);
-
+/// The clipboard's text, if it holds text (from any thread): the desktop's selection
+/// ([`clipboard`]).
 pub fn clipboard_text(_owner: WindowHandle) -> Option<String> {
-    CLIPBOARD.lock().unwrap().as_ref().map(|(t, _)| t.clone())
+    clipboard::text()
 }
 
+/// Puts `text` on the clipboard (from any thread).
 pub fn set_clipboard_text(owner: WindowHandle, text: &str) {
     set_clipboard_text_and_html(owner, text, None)
 }
 
+/// Puts `text`, and `html` (a fragment of markup) as `text/html` with it, on the clipboard (from
+/// any thread).
 pub fn set_clipboard_text_and_html(_owner: WindowHandle, text: &str, html: Option<&str>) {
-    *CLIPBOARD.lock().unwrap() = Some((text.to_owned(), html.map(str::to_owned)));
+    clipboard::set(text, html)
 }
 
+/// The clipboard's markup (`text/html`), if it has some (from any thread).
 pub fn clipboard_html(_owner: WindowHandle) -> Option<String> {
-    CLIPBOARD
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|(_, h)| h.clone())
+    clipboard::html()
 }
 
 /// A thread that paces frames: raising its priority needs a privilege the browser may lack on
@@ -992,47 +1000,100 @@ impl FrameSlot {
     }
 }
 
+/// What making a window needs, kept by the thread running the loop: [`open`] is called from a
+/// handler, while the loop's own state is borrowed.
+struct Globals {
+    qh: QueueHandle<State>,
+    loop_handle: LoopHandle<'static, State>,
+    compositor: CompositorState,
+    xdg_shell: XdgShell,
+    /// (a binding of its own: the loop's state keeps the one shared memory events go to)
+    shm: Shm,
+    /// Windows made while the loop's state was borrowed, for it to take in.
+    made: RefCell<Vec<Win>>,
+}
+
+thread_local! {
+    /// The loop this thread runs, while it runs.
+    static GLOBALS: RefCell<Option<Rc<Globals>>> = const { RefCell::new(None) };
+}
+
+/// One window of the loop: the window, its handler and what the pointer does over its frame.
+struct Win {
+    window: Window,
+    handler: Box<dyn WindowHandler>,
+    frame: FramePointer,
+    /// The desktop draws the frame (and moves and resizes the window from it).
+    server_frame: bool,
+    configured: bool,
+    /// A browser window ([`run`]'s, [`open_browser_window`]'s): the loop ends with the last one.
+    browser: bool,
+    timers: HashMap<usize, RegistrationToken>,
+    /// Frames the window's compositor hands it ([`FrameSlot`]).
+    slot: Arc<FrameSlot>,
+    /// The loop's sources of its wake and its frames.
+    sources: [RegistrationToken; 2],
+}
+
+/// What the pointer shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Shape {
+    Icon(CursorIcon),
+    Hidden,
+}
+
 struct State {
     registry: RegistryState,
     seats: SeatState,
     outputs: OutputState,
     shm_state: Shm,
-    window: Window,
-    handler: Box<dyn WindowHandler>,
+    globals: Rc<Globals>,
+    conn: Connection,
+    /// The windows, by handle.
+    wins: HashMap<u64, Win>,
     loop_handle: LoopHandle<'static, State>,
-    timers: HashMap<usize, RegistrationToken>,
     keyboard: Option<wl_keyboard::WlKeyboard>,
-    pointer: Option<wl_pointer::WlPointer>,
+    pointer: Option<ThemedPointer>,
     /// The seat of the pointer, for moves and resizes the desktop carries out.
     seat: Option<wl_seat::WlSeat>,
-    frame: FramePointer,
-    /// The desktop draws the frame (and moves and resizes the window from it).
-    server_frame: bool,
+    /// The window with the keyboard focus, and the one under the pointer.
+    focus: Option<u64>,
+    hovered: Option<u64>,
+    /// What the pointer shows now (none since it entered a window).
+    shape: Option<Shape>,
     mods: Modifiers,
     clicks: ClickCount,
-    configured: bool,
     /// The loop ends.
-    done: Arc<AtomicBool>,
+    done: bool,
     qh: QueueHandle<State>,
-    /// Frames the window's compositor hands it ([`FrameSlot`]).
-    slot: Arc<FrameSlot>,
-    /// Told when the window is first configured ([`ShowWatch`]).
+    /// Told when the first window is first configured ([`ShowWatch`]).
     watch: ShowWatch,
 }
 
 impl State {
-    /// Shows the frame the compositor handed over, if any, and asks the desktop for a frame
+    /// The window whose surface is `surface`.
+    fn win_of(&self, surface: &wl_surface::WlSurface) -> Option<u64> {
+        self.wins
+            .iter()
+            .find(|(_, w)| w.window.xdg.wl_surface() == surface)
+            .map(|(id, _)| *id)
+    }
+
+    /// Shows the frame the compositor handed window `id`, if any, and asks the desktop for a frame
     /// callback with it ([`FrameSlot::wait_ready`]).
-    fn show_frame(&mut self) {
-        let Some((width, height, pixels)) = self.slot.take_frame() else {
+    fn show_frame(&mut self, id: u64) {
+        let Some(win) = self.wins.get(&id) else {
+            return;
+        };
+        let Some((width, height, pixels)) = win.slot.take_frame() else {
             return;
         };
         // (a buffer's size must be a whole number of the buffer scale's units)
-        let s = self.window.scale.get().max(1);
+        let s = win.window.scale.get().max(1);
         let (w, h) = (width - width % s, height - height % s);
-        let surface = self.window.xdg.wl_surface().clone();
+        let surface = win.window.xdg.wl_surface().clone();
         surface.frame(&self.qh, FrameCallbackData(surface.clone()));
-        let shown = self.window.present(w, h, |buf, stride| {
+        let shown = win.window.present(w, h, |buf, stride| {
             let row = w as usize * 4;
             for y in 0..h as usize {
                 let src = y * width as usize * 4;
@@ -1041,154 +1102,264 @@ impl State {
         });
         if let Err(e) = shown {
             eprintln!("[window] present: {e}");
-            self.slot.set_ready();
+            win.slot.set_ready();
         }
-        self.slot.give_back(pixels);
+        win.slot.give_back(pixels);
     }
 
-    fn send(&mut self, event: Event) -> bool {
-        let used = self.handler.event(&self.window, event);
+    /// Hands window `id`'s handler `event`, then carries out what handlers asked.
+    fn send(&mut self, id: u64, event: Event) -> bool {
+        let Some(win) = self.wins.get_mut(&id) else {
+            return false;
+        };
+        let used = win.handler.event(&win.window, event);
         self.apply();
         used
     }
 
-    /// Carries out what the handler asked of the window.
+    /// Takes in the windows [`open`] made, and carries out what the handlers asked of their
+    /// windows.
     fn apply(&mut self) {
         loop {
-            let ops = std::mem::take(&mut *self.window.ops.borrow_mut());
-            if ops.is_empty() {
-                return;
+            let made = std::mem::take(&mut *self.globals.made.borrow_mut());
+            let mut busy = !made.is_empty();
+            for win in made {
+                self.wins.insert(win.window.handle.0, win);
             }
-            for op in ops {
-                match op {
-                    Op::Minimize => self.window.xdg.set_minimized(),
-                    Op::ToggleMaximize => {
-                        if self.window.maximized.get() {
-                            self.window.xdg.unset_maximized();
-                        } else {
-                            self.window.xdg.set_maximized();
-                        }
-                    }
-                    Op::Fullscreen(true) => self.window.xdg.set_fullscreen(None),
-                    Op::Fullscreen(false) => self.window.xdg.unset_fullscreen(),
-                    Op::Title(t) => self.window.xdg.set_title(t),
-                    Op::SetTimer(id, ms) => {
-                        if let Some(t) = self.timers.remove(&id) {
-                            self.loop_handle.remove(t);
-                        }
-                        let every = Duration::from_millis(ms.max(1) as u64);
-                        if let Ok(token) = self.loop_handle.insert_source(
-                            Timer::from_duration(every),
-                            move |_, _, state: &mut State| {
-                                state.send(Event::Timer(id));
-                                TimeoutAction::ToDuration(every)
-                            },
-                        ) {
-                            self.timers.insert(id, token);
-                        }
-                    }
-                    Op::KillTimer(id) => {
-                        if let Some(t) = self.timers.remove(&id) {
-                            self.loop_handle.remove(t);
-                        }
-                    }
-                    Op::Close => {
-                        if !self.done.swap(true, Ordering::Relaxed) {
-                            self.handler.event(&self.window, Event::Destroyed);
-                        }
-                    }
+            let ids: Vec<u64> = self.wins.keys().copied().collect();
+            for id in ids {
+                let Some(win) = self.wins.get(&id) else {
+                    continue;
+                };
+                let ops = std::mem::take(&mut *win.window.ops.borrow_mut());
+                for op in ops {
+                    busy = true;
+                    self.carry_out(id, op);
                 }
+            }
+            if !busy {
+                break;
+            }
+        }
+        self.show_cursor();
+    }
+
+    fn carry_out(&mut self, id: u64, op: Op) {
+        let Some(win) = self.wins.get_mut(&id) else {
+            return;
+        };
+        let xdg = &win.window.xdg;
+        match op {
+            Op::Minimize => xdg.set_minimized(),
+            Op::ToggleMaximize => {
+                if win.window.maximized.get() {
+                    xdg.unset_maximized();
+                } else {
+                    xdg.set_maximized();
+                }
+            }
+            Op::Fullscreen(true) => xdg.set_fullscreen(None),
+            Op::Fullscreen(false) => xdg.unset_fullscreen(),
+            Op::Title(t) => xdg.set_title(t),
+            Op::SetTimer(timer, ms) => {
+                if let Some(t) = win.timers.remove(&timer) {
+                    self.loop_handle.remove(t);
+                }
+                let every = Duration::from_millis(ms.max(1) as u64);
+                if let Ok(token) = self.loop_handle.insert_source(
+                    Timer::from_duration(every),
+                    move |_, _, state: &mut State| {
+                        state.send(id, Event::Timer(timer));
+                        TimeoutAction::ToDuration(every)
+                    },
+                ) {
+                    win.timers.insert(timer, token);
+                }
+            }
+            Op::KillTimer(timer) => {
+                if let Some(t) = win.timers.remove(&timer) {
+                    self.loop_handle.remove(t);
+                }
+            }
+            Op::Close => self.destroy(id),
+        }
+    }
+
+    /// Destroys window `id` (its handler is told first, while its handle still answers); the loop
+    /// ends with the last browser window, and the other windows go with it.
+    fn destroy(&mut self, id: u64) {
+        let Some(mut win) = self.wins.remove(&id) else {
+            return;
+        };
+        win.handler.event(&win.window, Event::Destroyed);
+        for (_, t) in win.timers.drain() {
+            self.loop_handle.remove(t);
+        }
+        for t in win.sources {
+            self.loop_handle.remove(t);
+        }
+        FRAME_SLOTS.lock().unwrap().remove(&id);
+        HANDLES.with(|h| h.borrow_mut().remove(&id));
+        win.slot.close();
+        if self.focus == Some(id) {
+            self.focus = None;
+        }
+        if self.hovered == Some(id) {
+            self.hovered = None;
+        }
+        drop(win);
+        if !self.done && !self.wins.values().any(|w| w.browser) {
+            self.done = true;
+            let rest: Vec<u64> = self.wins.keys().copied().collect();
+            for id in rest {
+                self.destroy(id);
             }
         }
     }
 
-    /// What the point is: an edge that resizes the window (not while it is maximized or full
-    /// screen), else what the handler says.
-    fn area(&mut self, x: i32, y: i32) -> Area {
-        if self.server_frame {
+    /// What the point of window `id` is: an edge that resizes the window (not while it is
+    /// maximized or full screen), else what the handler says.
+    fn area(&mut self, id: u64, x: i32, y: i32) -> Area {
+        let Some(win) = self.wins.get_mut(&id) else {
+            return Area::Client;
+        };
+        if win.server_frame {
             return Area::Client;
         }
-        if !self.window.maximized.get() && !self.window.fullscreen.get() {
-            let (w, h) = self.window.client_size();
-            if let Some(edge) = frame_edge(x, y, w, h, self.window.scale.get()) {
+        let window = &win.window;
+        if !window.maximized.get() && !window.fullscreen.get() {
+            let (w, h) = window.client_size();
+            if let Some(edge) = frame_edge(x, y, w, h, window.scale.get()) {
                 return Area::Edge(edge);
             }
         }
-        match self.handler.hit_test(&self.window, x, y) {
+        match win.handler.hit_test(window, x, y) {
             HitArea::Client => Area::Client,
             a => Area::Frame(a),
         }
     }
 
-    /// The pointer is over `area` (or has left the window): tells the handler which caption button
-    /// it hovers, and that it left the client area.
-    fn hover(&mut self, area: Option<Area>) {
+    /// The pointer is over `area` of window `id` (or has left it): tells the handler which caption
+    /// button it hovers, and that it left the client area.
+    fn hover(&mut self, id: u64, area: Option<Area>) {
+        let Some(win) = self.wins.get_mut(&id) else {
+            return;
+        };
+        win.frame.area = area;
         let button = area.and_then(Area::button);
-        if button != self.frame.hover {
-            self.frame.hover = button;
-            self.send(Event::CaptionButton {
-                button,
-                action: CaptionAction::Hover,
-            });
+        if button != win.frame.hover {
+            win.frame.hover = button;
+            self.send(
+                id,
+                Event::CaptionButton {
+                    button,
+                    action: CaptionAction::Hover,
+                },
+            );
         }
-        if area != Some(Area::Client) && self.frame.in_client && self.frame.client_buttons == 0 {
-            self.frame.in_client = false;
-            self.send(Event::MouseLeave);
+        let Some(win) = self.wins.get_mut(&id) else {
+            return;
+        };
+        if area != Some(Area::Client) && win.frame.in_client && win.frame.client_buttons == 0 {
+            win.frame.in_client = false;
+            self.send(id, Event::MouseLeave);
         }
     }
 
-    /// A press outside the client area: the desktop moves or resizes the window, a double click on
-    /// the caption maximizes it, a right click there opens the desktop's window menu.
-    fn frame_press(&mut self, area: Area, button: MouseButton, serial: u32, clicks: u32) {
-        let Some(seat) = self.seat.clone() else {
+    /// A press outside window `id`'s client area: the desktop moves or resizes the window, a
+    /// double click on the caption maximizes it, a right click there opens the desktop's window
+    /// menu.
+    fn frame_press(&mut self, id: u64, area: Area, button: MouseButton, serial: u32, clicks: u32) {
+        let (Some(seat), Some(win)) = (self.seat.clone(), self.wins.get_mut(&id)) else {
             return;
         };
-        let xdg = &self.window.xdg;
+        let xdg = &win.window.xdg;
         match (area, button) {
             (Area::Edge(edge), MouseButton::Left) => xdg.resize(&seat, serial, edge),
             (Area::Frame(HitArea::Caption), MouseButton::Left) if clicks == 2 => {
-                self.window.ops.borrow_mut().push(Op::ToggleMaximize);
+                win.window.ops.borrow_mut().push(Op::ToggleMaximize);
                 self.apply();
             }
             (Area::Frame(HitArea::Caption), MouseButton::Left) => xdg.move_(&seat, serial),
             (Area::Frame(HitArea::Caption), MouseButton::Right) => {
-                let s = self.window.scale.get().max(1) as i32;
-                let (x, y) = self.window.pointer.get();
+                let s = win.window.scale.get().max(1) as i32;
+                let (x, y) = win.window.pointer.get();
                 xdg.show_window_menu(&seat, serial, (x / s, y / s));
             }
             (area, MouseButton::Left) => {
                 if let Some(b) = area.button() {
-                    self.frame.pressed = Some(b);
-                    self.send(Event::CaptionButton {
-                        button: Some(b),
-                        action: CaptionAction::Press,
-                    });
+                    win.frame.pressed = Some(b);
+                    self.send(
+                        id,
+                        Event::CaptionButton {
+                            button: Some(b),
+                            action: CaptionAction::Press,
+                        },
+                    );
                 }
             }
             _ => {}
         }
     }
 
-    fn device(&self, (x, y): (f64, f64)) -> (i32, i32) {
-        let s = self.window.scale.get() as f64;
-        ((x * s).floor() as i32, (y * s).floor() as i32)
+    /// Shows the cursor the pointer's window wants where the pointer is: a resize arrow on its
+    /// edges, the arrow on its caption, the handler's ([`Window::set_cursor`]) in the client area.
+    fn show_cursor(&mut self) {
+        let (Some(id), Some(pointer)) = (self.hovered, self.pointer.as_ref()) else {
+            return;
+        };
+        let Some(win) = self.wins.get(&id) else {
+            return;
+        };
+        let area = if win.frame.client_buttons != 0 {
+            Some(Area::Client)
+        } else {
+            win.frame.area
+        };
+        let shape = match area {
+            Some(Area::Edge(edge)) => Shape::Icon(edge_icon(edge)),
+            Some(Area::Client) => cursor_shape(win.window.cursor.get()),
+            _ => Shape::Icon(CursorIcon::Default),
+        };
+        if self.shape == Some(shape) {
+            return;
+        }
+        let shown = match shape {
+            Shape::Icon(icon) => pointer.set_cursor(&self.conn, icon),
+            Shape::Hidden => pointer.hide_cursor(),
+        };
+        // (before the pointer's first enter there is no serial to set it with)
+        if shown.is_ok() {
+            self.shape = Some(shape);
+        }
     }
 
-    fn resized(&mut self) {
-        let (width, height) = self.window.client_size();
-        self.send(Event::Resized {
-            width,
-            height,
-            maximized: self.window.maximized.get(),
-            minimized: false,
-        });
+    fn resized(&mut self, id: u64) {
+        let Some(win) = self.wins.get(&id) else {
+            return;
+        };
+        let (width, height) = win.window.client_size();
+        let maximized = win.window.maximized.get();
+        self.send(
+            id,
+            Event::Resized {
+                width,
+                height,
+                maximized,
+                minimized: false,
+            },
+        );
     }
 
+    /// A key for the window with the keyboard focus.
     fn key(&mut self, event: &KeyEvent, down: bool, repeat: bool) {
+        let Some(id) = self.focus else {
+            return;
+        };
         let (key, scan) = virtual_key(event.raw_code, event.keysym);
         let mods = self.mods;
         if !down {
-            self.send(Event::KeyUp { key, scan, mods });
+            self.send(id, Event::KeyUp { key, scan, mods });
             return;
         }
         let text = event
@@ -1196,26 +1367,205 @@ impl State {
             .as_deref()
             .and_then(|s| s.chars().next())
             .filter(|c| !c.is_control());
-        let used = self.send(Event::KeyDown {
-            key,
-            scan,
-            mods,
-            repeat,
-            text,
-        });
+        let used = self.send(
+            id,
+            Event::KeyDown {
+                key,
+                scan,
+                mods,
+                repeat,
+                text,
+            },
+        );
         // Text goes on as characters (Ctrl and Alt combinations are commands, not text).
         if !used && !mods.ctrl && !mods.alt {
             if let Some(s) = event.utf8.clone() {
                 for c in s.chars().filter(|c| !c.is_control()) {
-                    self.send(Event::Char(c));
+                    self.send(id, Event::Char(c));
                 }
             }
         }
     }
 }
 
-/// Makes the window, calls `make` for its handler, shows it and runs its loop until the window is
-/// destroyed.
+/// The cursor a resize from `edge` shows.
+fn edge_icon(edge: ResizeEdge) -> CursorIcon {
+    match edge {
+        ResizeEdge::TopLeft => CursorIcon::NwResize,
+        ResizeEdge::TopRight => CursorIcon::NeResize,
+        ResizeEdge::BottomLeft => CursorIcon::SwResize,
+        ResizeEdge::BottomRight => CursorIcon::SeResize,
+        ResizeEdge::Left => CursorIcon::WResize,
+        ResizeEdge::Right => CursorIcon::EResize,
+        ResizeEdge::Top => CursorIcon::NResize,
+        _ => CursorIcon::SResize,
+    }
+}
+
+/// The desktop's cursor for `cursor` (CSS's cursor names, which the desktop's shapes and cursor
+/// themes are named by). Middle-button autoscroll shows the arrow toward where the page scrolls.
+fn cursor_shape(cursor: Cursor) -> Shape {
+    Shape::Icon(match cursor {
+        Cursor::Arrow => CursorIcon::Default,
+        Cursor::Hand => CursorIcon::Pointer,
+        Cursor::IBeam => CursorIcon::Text,
+        Cursor::Wait => CursorIcon::Wait,
+        Cursor::Progress => CursorIcon::Progress,
+        Cursor::Crosshair => CursorIcon::Crosshair,
+        Cursor::Move => CursorIcon::Move,
+        Cursor::NotAllowed => CursorIcon::NotAllowed,
+        Cursor::ResizeEW => CursorIcon::EwResize,
+        Cursor::ResizeNS => CursorIcon::NsResize,
+        Cursor::ResizeNWSE => CursorIcon::NwseResize,
+        Cursor::ResizeNESW => CursorIcon::NeswResize,
+        Cursor::Help => CursorIcon::Help,
+        Cursor::AutoScroll(dx, dy) => match (dx.signum(), dy.signum()) {
+            (0, 0) => CursorIcon::AllScroll,
+            (1, 0) => CursorIcon::EResize,
+            (-1, 0) => CursorIcon::WResize,
+            (0, -1) => CursorIcon::NResize,
+            (0, _) => CursorIcon::SResize,
+            (1, -1) => CursorIcon::NeResize,
+            (-1, -1) => CursorIcon::NwResize,
+            (1, _) => CursorIcon::SeResize,
+            _ => CursorIcon::SwResize,
+        },
+        Cursor::Hidden => return Shape::Hidden,
+        Cursor::VerticalText => CursorIcon::VerticalText,
+        Cursor::Alias => CursorIcon::Alias,
+        Cursor::Copy => CursorIcon::Copy,
+        Cursor::ContextMenu => CursorIcon::ContextMenu,
+        Cursor::ZoomIn => CursorIcon::ZoomIn,
+        Cursor::ZoomOut => CursorIcon::ZoomOut,
+        Cursor::Grab => CursorIcon::Grab,
+        Cursor::Grabbing => CursorIcon::Grabbing,
+    })
+}
+
+/// Makes a window on the loop `g` with its handler from `make`: a browser window draws its own
+/// frame ([`run`]), another one asks the desktop for its frame (where the desktop draws none, its
+/// edges still resize it).
+fn make_window(
+    g: &Globals,
+    options: &WindowOptions,
+    make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
+    browser: bool,
+) -> Result<Win> {
+    let platform = |e: &dyn std::fmt::Display| Error::Platform(e.to_string());
+    let (size, maximized) = initial_size(options);
+    let pool =
+        SlotPool::new(size.0 as usize * size.1 as usize * 4, &g.shm).map_err(|e| platform(&e))?;
+    let surface = g.compositor.create_surface(&g.qh);
+    // (a browser window's frame is the owner's, as with Windows' custom frame; a desktop that
+    // insists on its own frame says so in the configure)
+    let decorations = if browser {
+        WindowDecorations::RequestClient
+    } else {
+        WindowDecorations::RequestServer
+    };
+    let xdg = g.xdg_shell.create_window(surface, decorations, &g.qh);
+    xdg.set_title(options.title.clone());
+    xdg.set_app_id("org.snowlark.Snowlark");
+    xdg.set_min_size(Some((200, 150)));
+    // The size: a page's popup window asks for its own; else where the last run left the window
+    // (a Wayland client neither knows nor chooses its position, so only the size and maximized
+    // state are kept), else the default.
+    if maximized {
+        xdg.set_maximized();
+    }
+    // (the first commit, with no buffer, asks for the first configure)
+    xdg.commit();
+    let handle = WindowHandle(NEXT_WINDOW.fetch_add(1, Ordering::Relaxed));
+    let id = handle.0;
+    let (ping, ping_source) = make_ping().map_err(|e| platform(&e))?;
+    let (frame_ping, frame_source) = make_ping().map_err(|e| platform(&e))?;
+    let wake = g
+        .loop_handle
+        .insert_source(ping_source, move |_, _, state: &mut State| {
+            state.send(id, Event::Wake);
+        })
+        .map_err(|e| platform(&e))?;
+    let frames = match g
+        .loop_handle
+        .insert_source(frame_source, move |_, _, state: &mut State| {
+            state.show_frame(id)
+        }) {
+        Ok(t) => t,
+        Err(e) => {
+            g.loop_handle.remove(wake);
+            return Err(platform(&e));
+        }
+    };
+    let slot = Arc::new(FrameSlot {
+        state: Mutex::new(SlotState {
+            ready: true,
+            ..SlotState::default()
+        }),
+        changed: Condvar::new(),
+        ping: frame_ping,
+    });
+    FRAME_SLOTS.lock().unwrap().insert(id, slot.clone());
+    let window = Window {
+        handle,
+        xdg,
+        ping,
+        presenter: RefCell::new(Presenter { pool, buffer: None }),
+        ops: Rc::new(RefCell::new(Vec::new())),
+        size: Rc::new(Cell::new(size)),
+        scale: Rc::new(Cell::new(1)),
+        maximized: Rc::new(Cell::new(false)),
+        fullscreen: Cell::new(false),
+        cursor: Cell::new(Cursor::Arrow),
+        pointer: Cell::new((0, 0)),
+    };
+    HANDLES.with(|h| {
+        h.borrow_mut().insert(
+            id,
+            HandleState {
+                ops: window.ops.clone(),
+                size: window.size.clone(),
+                scale: window.scale.clone(),
+                maximized: window.maximized.clone(),
+                ping: window.ping.clone(),
+            },
+        )
+    });
+    let handler = make(&window);
+    Ok(Win {
+        window,
+        handler,
+        frame: FramePointer::default(),
+        server_frame: false,
+        configured: false,
+        browser,
+        timers: HashMap::new(),
+        slot,
+        sources: [wake, frames],
+    })
+}
+
+/// Makes a window on the loop this thread runs, for [`open`] and [`open_browser_window`].
+fn open_on_loop(
+    options: WindowOptions,
+    make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
+    browser: bool,
+) -> Result<WindowHandle> {
+    let Some(g) = GLOBALS.with(|g| g.borrow().clone()) else {
+        return Err(Error::Platform(
+            "a window opens only on the thread running the window loop".into(),
+        ));
+    };
+    let win = make_window(&g, &options, make, browser)?;
+    let handle = win.window.handle;
+    // (the loop's state takes it in once the handler that called this returns; the ping makes
+    // sure the loop gets to it when the call came from elsewhere on its thread)
+    win.window.ping.ping();
+    g.made.borrow_mut().push(win);
+    Ok(handle)
+}
+
+/// Makes the window, calls `make` for its handler, shows it and runs its loop until the last
+/// browser window is destroyed.
 pub fn run(
     options: WindowOptions,
     make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
@@ -1330,108 +1680,53 @@ fn run_on(
     WaylandSource::new(conn.clone(), queue)
         .insert(loop_handle.clone())
         .map_err(|e| platform(&e))?;
-    let compositor = CompositorState::bind(&globals, &qh).map_err(|e| platform(&e))?;
-    let xdg_shell = XdgShell::bind(&globals, &qh).map_err(|e| platform(&e))?;
+    let g = Rc::new(Globals {
+        qh: qh.clone(),
+        loop_handle: loop_handle.clone(),
+        compositor: CompositorState::bind(&globals, &qh).map_err(|e| platform(&e))?,
+        xdg_shell: XdgShell::bind(&globals, &qh).map_err(|e| platform(&e))?,
+        shm: Shm::bind(&globals, &qh).map_err(|e| platform(&e))?,
+        made: RefCell::new(Vec::new()),
+    });
     let shm = Shm::bind(&globals, &qh).map_err(|e| platform(&e))?;
-    let surface = compositor.create_surface(&qh);
-    // (the frame is the owner's, as with Windows' custom frame; a desktop that insists on its own
-    // frame says so in the configure)
-    let xdg = xdg_shell.create_window(surface, WindowDecorations::RequestClient, &qh);
-    xdg.set_title(options.title.clone());
-    xdg.set_app_id("org.snowlark.Snowlark");
-    xdg.set_min_size(Some((200, 150)));
-    // The size: a page's popup window asks for its own; else where the last run left the window
-    // (a Wayland client neither knows nor chooses its position, so only the size and maximized
-    // state are kept), else the default.
-    let (size, maximized) = initial_size(&options);
-    if maximized {
-        xdg.set_maximized();
-    }
-    // (the first commit, with no buffer, asks for the first configure)
-    xdg.commit();
-    let (ping, ping_source) = make_ping().map_err(|e| platform(&e))?;
-    loop_handle
-        .insert_source(ping_source, |_, _, state: &mut State| {
-            state.send(Event::Wake);
-        })
-        .map_err(|e| platform(&e))?;
-    let (frame_ping, frame_source) = make_ping().map_err(|e| platform(&e))?;
-    loop_handle
-        .insert_source(frame_source, |_, _, state: &mut State| state.show_frame())
-        .map_err(|e| platform(&e))?;
-    let slot = Arc::new(FrameSlot {
-        state: Mutex::new(SlotState {
-            ready: true,
-            ..SlotState::default()
-        }),
-        changed: Condvar::new(),
-        ping: frame_ping,
-    });
-    let handle = WindowHandle(NEXT_WINDOW.fetch_add(1, Ordering::Relaxed));
-    FRAME_SLOTS.lock().unwrap().insert(handle.0, slot.clone());
-    let window = Window {
-        handle,
-        xdg,
-        ping,
-        presenter: RefCell::new(Presenter {
-            pool: SlotPool::new(size.0 as usize * size.1 as usize * 4, &shm)
-                .map_err(|e| platform(&e))?,
-            buffer: None,
-        }),
-        ops: Rc::new(RefCell::new(Vec::new())),
-        size: Rc::new(Cell::new(size)),
-        scale: Rc::new(Cell::new(1)),
-        maximized: Rc::new(Cell::new(false)),
-        fullscreen: Cell::new(false),
-        cursor: Cell::new(Cursor::Arrow),
-        pointer: Cell::new((0, 0)),
-    };
-    HANDLES.with(|h| {
-        h.borrow_mut().insert(
-            handle.0,
-            HandleState {
-                ops: window.ops.clone(),
-                size: window.size.clone(),
-                scale: window.scale.clone(),
-                maximized: window.maximized.clone(),
-                ping: window.ping.clone(),
-            },
-        )
-    });
-    let handler = make(&window);
-    let done = Arc::new(AtomicBool::new(false));
+    let first = make_window(&g, &options, make, true)?;
     let mut state = State {
         registry: RegistryState::new(&globals),
         seats: SeatState::new(&globals, &qh),
         outputs: OutputState::new(&globals, &qh),
         shm_state: shm,
-        window,
-        handler,
+        globals: g.clone(),
+        conn: conn.clone(),
+        wins: HashMap::from([(first.window.handle.0, first)]),
         loop_handle,
-        timers: HashMap::new(),
         keyboard: None,
         pointer: None,
         seat: None,
-        frame: FramePointer::default(),
-        server_frame: false,
+        focus: None,
+        hovered: None,
+        shape: None,
         mods: Modifiers::default(),
         clicks: ClickCount::default(),
-        configured: false,
-        done: done.clone(),
-        qh,
-        slot: slot.clone(),
+        done: false,
+        qh: qh.clone(),
         watch,
     };
+    GLOBALS.with(|s| *s.borrow_mut() = Some(g));
+    clipboard::connect(conn, qh, &globals);
     let mut result = Ok(());
-    while !done.load(Ordering::Relaxed) {
+    while !state.done {
         if let Err(e) = event_loop.dispatch(None, &mut state) {
             result = Err(platform(&e));
             break;
         }
     }
-    FRAME_SLOTS.lock().unwrap().remove(&handle.0);
-    HANDLES.with(|h| h.borrow_mut().remove(&handle.0));
-    slot.close();
+    clipboard::disconnect();
+    let rest: Vec<u64> = state.wins.keys().copied().collect();
+    state.done = true;
+    for id in rest {
+        state.destroy(id);
+    }
+    GLOBALS.with(|s| s.borrow_mut().take());
     result
 }
 
@@ -1555,14 +1850,19 @@ impl CompositorHandler for State {
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: &wl_surface::WlSurface,
+        surface: &wl_surface::WlSurface,
         factor: i32,
     ) {
+        // (the cursor's surface is none of the windows')
+        let Some(id) = self.win_of(surface) else {
+            return;
+        };
         let factor = factor.max(1) as u32;
-        if factor != self.window.scale.get() {
-            self.window.scale.set(factor);
-            self.send(Event::DpiChanged(96 * factor));
-            self.resized();
+        let scale = &self.wins[&id].window.scale;
+        if factor != scale.get() {
+            scale.set(factor);
+            self.send(id, Event::DpiChanged(96 * factor));
+            self.resized(id);
         }
     }
 
@@ -1575,8 +1875,16 @@ impl CompositorHandler for State {
     ) {
     }
 
-    fn frame(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: u32) {
-        self.slot.set_ready();
+    fn frame(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        surface: &wl_surface::WlSurface,
+        _: u32,
+    ) {
+        if let Some(id) = self.win_of(surface) {
+            self.wins[&id].slot.set_ready();
+        }
     }
 
     fn surface_enter(
@@ -1611,37 +1919,44 @@ impl OutputHandler for State {
 }
 
 impl XdgWindowHandler for State {
-    fn request_close(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &XdgWindow) {
-        self.send(Event::CloseRequested);
+    fn request_close(&mut self, _: &Connection, _: &QueueHandle<Self>, xdg: &XdgWindow) {
+        if let Some(id) = self.win_of(xdg.wl_surface()) {
+            self.send(id, Event::CloseRequested);
+        }
     }
 
     fn configure(
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: &XdgWindow,
+        xdg: &XdgWindow,
         configure: WindowConfigure,
         _: u32,
     ) {
-        let (w, h) = self.window.size.get();
+        let Some(id) = self.win_of(xdg.wl_surface()) else {
+            return;
+        };
+        let win = self.wins.get_mut(&id).unwrap();
+        let window = &win.window;
+        let (w, h) = window.size.get();
         let size = (
             configure.new_size.0.map_or(w, |v| v.get()),
             configure.new_size.1.map_or(h, |v| v.get()),
         );
         let maximized = configure.state.contains(WindowState::MAXIMIZED);
         let fullscreen = configure.state.contains(WindowState::FULLSCREEN);
-        let changed = !self.configured
+        let changed = !win.configured
             || size != (w, h)
-            || maximized != self.window.maximized.get()
-            || fullscreen != self.window.fullscreen.get();
-        self.configured = true;
-        self.server_frame = configure.decoration_mode == DecorationMode::Server;
+            || maximized != window.maximized.get()
+            || fullscreen != window.fullscreen.get();
+        win.configured = true;
+        win.server_frame = configure.decoration_mode == DecorationMode::Server;
+        window.size.set(size);
+        window.maximized.set(maximized);
+        window.fullscreen.set(fullscreen);
         self.watch.shown();
-        self.window.size.set(size);
-        self.window.maximized.set(maximized);
-        self.window.fullscreen.set(fullscreen);
         if changed {
-            self.resized();
+            self.resized(id);
         }
     }
 }
@@ -1671,9 +1986,24 @@ impl SeatHandler for State {
                     Box::new(|state: &mut State, _, event| state.key(&event, true, true)),
                 )
                 .ok();
+            // (the clipboard is the keyboard's seat's selection)
+            clipboard::seat(qh, &seat);
         }
         if capability == Capability::Pointer && self.pointer.is_none() {
-            self.pointer = self.seats.get_pointer(qh, &seat).ok();
+            // The cursor: the desktop's shapes (cursor-shape-v1) where it has them, else images
+            // from the cursor theme (`XCURSOR_THEME`, `XCURSOR_SIZE`) on a surface of its own.
+            let surface = self.globals.compositor.create_surface(qh);
+            self.pointer = self
+                .seats
+                .get_pointer_with_theme::<State, ()>(
+                    qh,
+                    &seat,
+                    self.shm_state.wl_shm(),
+                    surface,
+                    ThemeSpec::default(),
+                )
+                .ok();
+            self.shape = None;
             self.seat = Some(seat);
         }
     }
@@ -1691,9 +2021,9 @@ impl SeatHandler for State {
             }
         }
         if capability == Capability::Pointer {
-            if let Some(p) = self.pointer.take() {
-                p.release();
-            }
+            // (dropping the themed pointer releases it)
+            self.pointer = None;
+            self.hovered = None;
         }
     }
 
@@ -1706,12 +2036,15 @@ impl KeyboardHandler for State {
         _: &Connection,
         _: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
-        _: &wl_surface::WlSurface,
+        surface: &wl_surface::WlSurface,
         _: u32,
         _: &[u32],
         _: &[Keysym],
     ) {
-        self.send(Event::Focus(true));
+        self.focus = self.win_of(surface);
+        if let Some(id) = self.focus {
+            self.send(id, Event::Focus(true));
+        }
     }
 
     fn leave(
@@ -1719,10 +2052,15 @@ impl KeyboardHandler for State {
         _: &Connection,
         _: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
-        _: &wl_surface::WlSurface,
+        surface: &wl_surface::WlSurface,
         _: u32,
     ) {
-        self.send(Event::Focus(false));
+        if let Some(id) = self.win_of(surface) {
+            if self.focus == Some(id) {
+                self.focus = None;
+            }
+            self.send(id, Event::Focus(false));
+        }
     }
 
     fn press_key(
@@ -1730,9 +2068,10 @@ impl KeyboardHandler for State {
         _: &Connection,
         _: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
-        _: u32,
+        serial: u32,
         event: KeyEvent,
     ) {
+        clipboard::input(serial);
         self.key(&event, true, false);
     }
 
@@ -1786,26 +2125,45 @@ impl PointerHandler for State {
         events: &[PointerEvent],
     ) {
         for event in events {
-            if &event.surface != self.window.xdg.wl_surface() {
+            let Some(id) = self.win_of(&event.surface) else {
                 continue;
-            }
-            let (x, y) = self.device(event.position);
-            self.window.pointer.set((x, y));
+            };
+            let window = &self.wins[&id].window;
+            let s = window.scale.get();
+            let (x, y) = (
+                (event.position.0 * s as f64).floor() as i32,
+                (event.position.1 * s as f64).floor() as i32,
+            );
+            window.pointer.set((x, y));
             let mods = self.mods;
             match event.kind {
                 PointerEventKind::Enter { .. } | PointerEventKind::Motion { .. } => {
-                    let area = self.area(x, y);
-                    self.hover(Some(area));
-                    if area == Area::Client || self.frame.client_buttons != 0 {
-                        self.frame.in_client = true;
-                        self.send(Event::MouseMove { x, y, mods });
+                    if matches!(event.kind, PointerEventKind::Enter { .. }) {
+                        // (a pointer entering a surface shows the cursor that surface sets)
+                        self.hovered = Some(id);
+                        self.shape = None;
+                    }
+                    let area = self.area(id, x, y);
+                    self.hover(id, Some(area));
+                    let Some(win) = self.wins.get_mut(&id) else {
+                        continue;
+                    };
+                    if area == Area::Client || win.frame.client_buttons != 0 {
+                        win.frame.in_client = true;
+                        self.send(id, Event::MouseMove { x, y, mods });
                     }
                 }
                 PointerEventKind::Leave { .. } => {
-                    self.hover(None);
-                    if self.frame.in_client {
-                        self.frame.in_client = false;
-                        self.send(Event::MouseLeave);
+                    if self.hovered == Some(id) {
+                        self.hovered = None;
+                    }
+                    self.hover(id, None);
+                    let Some(win) = self.wins.get_mut(&id) else {
+                        continue;
+                    };
+                    if win.frame.in_client {
+                        win.frame.in_client = false;
+                        self.send(id, Event::MouseLeave);
                     }
                 }
                 PointerEventKind::Press {
@@ -1813,44 +2171,60 @@ impl PointerHandler for State {
                     time,
                     serial,
                 } => {
+                    clipboard::input(serial);
                     let Some(button) = button_of(button) else {
                         continue;
                     };
-                    let slop = 4 * self.window.scale.get() as i32;
+                    let slop = 4 * s as i32;
                     let clicks = self.clicks.press(time, x, y, button, slop);
-                    let area = if self.frame.client_buttons != 0 {
+                    let area = if self.wins[&id].frame.client_buttons != 0 {
                         Area::Client
                     } else {
-                        self.area(x, y)
+                        self.area(id, x, y)
                     };
                     if area != Area::Client {
-                        self.frame_press(area, button, serial, clicks);
+                        self.frame_press(id, area, button, serial, clicks);
                         continue;
                     }
-                    self.frame.client_buttons |= button_bit(button);
-                    self.send(Event::MouseDown {
-                        x,
-                        y,
-                        button,
-                        mods,
-                        clicks,
-                    });
+                    let Some(win) = self.wins.get_mut(&id) else {
+                        continue;
+                    };
+                    win.frame.client_buttons |= button_bit(button);
+                    self.send(
+                        id,
+                        Event::MouseDown {
+                            x,
+                            y,
+                            button,
+                            mods,
+                            clicks,
+                        },
+                    );
                 }
                 PointerEventKind::Release { button, .. } => {
                     let Some(button) = button_of(button) else {
                         continue;
                     };
-                    if self.frame.client_buttons & button_bit(button) != 0 {
-                        self.frame.client_buttons &= !button_bit(button);
-                        self.send(Event::MouseUp { x, y, button, mods });
-                    } else if button == MouseButton::Left {
-                        let pressed = self.frame.pressed.take();
-                        if pressed.is_some() && pressed == self.frame.hover {
-                            self.send(Event::CaptionButton {
-                                button: pressed,
-                                action: CaptionAction::Click,
-                            });
+                    let frame = &mut self.wins.get_mut(&id).unwrap().frame;
+                    let client = frame.client_buttons & button_bit(button) != 0;
+                    frame.client_buttons &= !button_bit(button);
+                    let clicked = match button {
+                        MouseButton::Left if !client => {
+                            let pressed = frame.pressed.take();
+                            pressed.filter(|_| pressed == frame.hover)
                         }
+                        _ => None,
+                    };
+                    if client {
+                        self.send(id, Event::MouseUp { x, y, button, mods });
+                    } else if let Some(b) = clicked {
+                        self.send(
+                            id,
+                            Event::CaptionButton {
+                                button: Some(b),
+                                action: CaptionAction::Click,
+                            },
+                        );
                     }
                 }
                 PointerEventKind::Axis {
@@ -1859,19 +2233,23 @@ impl PointerHandler for State {
                     ..
                 } => {
                     let (delta_x, delta_y) = (-wheel_units(&horizontal), wheel_units(&vertical));
-                    if (delta_x != 0 || delta_y != 0) && self.frame.in_client {
-                        self.send(Event::Wheel {
-                            x,
-                            y,
-                            delta_x,
-                            delta_y,
-                            mods,
-                            time: Ticks::now(),
-                        });
+                    if (delta_x != 0 || delta_y != 0) && self.wins[&id].frame.in_client {
+                        self.send(
+                            id,
+                            Event::Wheel {
+                                x,
+                                y,
+                                delta_x,
+                                delta_y,
+                                mods,
+                                time: Ticks::now(),
+                            },
+                        );
                     }
                 }
             }
         }
+        self.show_cursor();
     }
 }
 
@@ -1982,6 +2360,28 @@ mod tests {
         assert_eq!(e(798, 580), Some(ResizeEdge::BottomRight));
         assert_eq!(e(2, 570), Some(ResizeEdge::BottomLeft));
         assert_eq!(e(798, 20), Some(ResizeEdge::TopRight));
+    }
+
+    #[test]
+    fn cursors_are_the_desktops_shapes_of_their_css_names() {
+        let name = |c| match cursor_shape(c) {
+            Shape::Icon(icon) => icon.name(),
+            Shape::Hidden => "none",
+        };
+        assert_eq!(name(Cursor::Arrow), "default");
+        assert_eq!(name(Cursor::Hand), "pointer");
+        assert_eq!(name(Cursor::IBeam), "text");
+        assert_eq!(name(Cursor::ResizeNWSE), "nwse-resize");
+        assert_eq!(name(Cursor::Grabbing), "grabbing");
+        assert_eq!(name(Cursor::Hidden), "none");
+        // Autoscroll: the arrow toward where the page scrolls (y grows downward).
+        assert_eq!(name(Cursor::AutoScroll(0, 0)), "all-scroll");
+        assert_eq!(name(Cursor::AutoScroll(0, 1)), "s-resize");
+        assert_eq!(name(Cursor::AutoScroll(-1, -1)), "nw-resize");
+        // The frame's edges show the resize from that edge.
+        assert_eq!(edge_icon(ResizeEdge::TopLeft).name(), "nw-resize");
+        assert_eq!(edge_icon(ResizeEdge::Right).name(), "e-resize");
+        assert_eq!(edge_icon(ResizeEdge::Bottom).name(), "s-resize");
     }
 
     #[test]

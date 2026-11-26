@@ -39,11 +39,10 @@ window (`snowlark-shell`) on Wayland, with its tabs in renderer processes (`--pr
 the browser's process; there is no GPU process there, `--gpu-process` is ignored): tabs, toolbar, address bar,
 menus and the internal pages, composited on the CPU. `snowlark-tab` and `snowlark-shell` build whole there and
 pass their tests but those that need a Windows window, a GPU device, the password store's key or shared video
-textures. Not there yet in the window: a second window (developer tools undocked, popups and Incognito
-windows open in the window there is: `window::open` reports it), file dialogs, the desktop's clipboard (copy
-and paste work within the browser), drag and drop, cursors, IME, the desktop's dark setting, the password
-store (no key: Linux's Secret Service is not used yet, so no password is saved), updates (releases there are
-not signed). The chrome's icons are Unicode symbols where Windows' icon font is missing. The profile is
+textures. The window has the desktop's clipboard (text and markup, both ways), the desktop's cursors and more
+windows (new and Incognito windows, undocked developer tools, popups). Not there yet in the window: file
+dialogs, drag and drop, IME, the desktop's dark setting, the password store (no key: Linux's Secret Service is
+not used yet, so no password is saved), updates (releases there are not signed). The chrome's icons are Unicode symbols where Windows' icon font is missing. The profile is
 `~/.config/snowlark` (`XDG_CONFIG_HOME`). What is missing behaves as on a system without it: a media element fails with
 `MEDIA_ERR_SRC_NOT_SUPPORTED`, `MediaSource` cannot attach, `getContext("webgl")` returns null, canvases draw on
 the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is false and
@@ -127,6 +126,14 @@ WAYLAND_DISPLAY=wl-check SNOWLARK_PROFILE_DIR=/tmp/profile target/iter/snowlark 
 sleep 10 && WAYLAND_DISPLAY=wl-check weston-screenshooter
 ```
 
+Input, the clipboard and cursors need a desktop that takes virtual input: a wlroots one such as labwc on its
+headless backend (`WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1 labwc`), where `wtype`
+types, `wlrctl` moves the pointer and lists the windows with their titles, `wl-copy` and `wl-paste` use the
+clipboard and `grim` saves what it shows. Each `wtype` makes a keyboard of its own and the window binds it only
+once the seat announces it, so keys sent in the same run as the first ones can be lost: send a whole sequence
+from one `wtype` (`-s <ms>` waits between keys). `WAYLAND_DEBUG=1` shows the requests the window makes (the
+cursor shapes it sets, its selection).
+
 `snowlark-js` has two Windows-only pieces, each with a fallback elsewhere:
 
 - The native sampling profiler (`native_profile.rs`, `SNOWLARK_PROFILE=1`) suspends the thread and unwinds with the
@@ -179,10 +186,18 @@ releases; a machine without network access builds it from source, which needs `p
   through xkbcommon (with repeat), focus, timers, maximize, fullscreen and close, and pixels shown from the CPU in
   `wl_shm` buffers (`Window::present`). The frame is the owner's (client-side decorations): the client area's
   outer pixels resize the window and the caption the handler names moves it, both carried out by the desktop
-  (`xdg_toplevel` move and resize). The rest of the Windows half's API is there with what Linux has (sizes and
-  the maximized state kept, no position; the downloads folder from the user directories; local time from the
-  C library) or says what is missing. Not yet: a second window per loop, IME, the desktop's clipboard, drag
-  and drop, cursors, fractional scales, the compositor's GPU path.
+  (`xdg_toplevel` move and resize). One loop serves every window of the browser (`open`, `open_browser_window`,
+  as on Windows): events go to the window whose surface they name, keys to the one with the keyboard focus,
+  and the loop ends with the last browser window. A window `open` makes asks the desktop for its frame; on a
+  desktop that draws none, its edges still resize it. Cursors are the desktop's: its cursor shapes
+  (cursor-shape-v1) where it has them, else the cursor theme's images (`XCURSOR_THEME`, `XCURSOR_SIZE`), named
+  as CSS names them; a resize edge shows its resize arrow. The clipboard is the keyboard seat's selection
+  (`wl_data_device`): a copy offers `text/plain;charset=utf-8` (and the other names of text other programs ask
+  for) and `text/html`, set with the newest key or button press's serial; a paste of another program's
+  selection reads its pipe from whichever thread asks, for at most a second, while the browser's own copy is
+  answered from memory. The rest of the Windows half's API is there with what Linux has (sizes and the
+  maximized state kept, no position; the downloads folder from the user directories; local time from the C
+  library) or says what is missing. Not yet: IME, drag and drop, fractional scales, the compositor's GPU path.
 - `vsync`: begin frames from a timer at the refresh interval on a fixed timebase (the window's own frames
   follow the desktop's frame callbacks); `os_crypt`: nothing can be protected yet (the Secret Service is not
   used); `drop_target`: the drag types only.
@@ -263,7 +278,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | 2 | **Split `snowlark-paint`**: the platform-free modules (geometry, display list, layer animation, filters, scroll curves, colour profiles, the Rust image decoders, the text types and shape cache, a canvas's operations) into `snowlark-graphics` with its own error type; the Windows half keeps Direct2D, DirectWrite and the window. Linux halves of the text engine, the headless renderer and the GPU canvas with the same methods and nothing behind them | M | done: `snowlark-graphics`, `-paint`, `-layout` and `-render` in `check.ps1`; nothing changes on Windows (WPT gate) |
 | 3 | **Headless on Linux**: V8 for Linux; the Itanium declarations in `snowlark-js`; the Linux text engine (fontconfig, FreeType, HarfBuzz); Skia behind `HeadlessRenderer`; WIC formats in Rust. `--eval`, `--render`, `--wpt` and reftests run on Linux | L | WPT on Linux within a known distance of the Windows counts, read per area. Done so far: V8 for Linux and the Itanium declarations (`snowlark-js` and `snowlark-bindings` tested on Linux), the text engine, Skia behind `HeadlessRenderer` (`snowlark-render`'s tests pass on Linux but its GPU canvas ones) |
 | 4 | **Processes**: the `posix/` half of `snowlark-ipc` (sockets, descriptor passing, memfd sections, launch, a fork server), crash dumps | M | the renderer process model on Linux; IPC tests green there. Done so far: the `posix/` half of `snowlark-ipc` and crash dumps (no fork server yet), its tests and `snowlark-tab`'s renderer process tests green on Linux |
-| 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop. Done so far: tiles and the compositor on the CPU, the Wayland window (input, keys, integer scale, CPU pixels, frame callbacks, moves and resizes from its own frame), `snowlark-tab` and the browser window (`snowlark-shell`) on Linux |
+| 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop. Done so far: tiles and the compositor on the CPU, the Wayland window (input, keys, integer scale, CPU pixels, frame callbacks, moves and resizes from its own frame, the clipboard, cursors, several windows), `snowlark-tab` and the browser window (`snowlark-shell`) on Linux |
 | 6 | **WebGL** on ANGLE for Linux | S | the WebGL conformance areas as on Windows |
 | 7 | **Media**: playback and MSE on FFmpeg, audio output; hardware decoding later | L | `<video>`, `<audio>`, MSE sites play |
 | 8 | **Sandbox**: namespaces and seccomp-bpf for renderers, a font broker | L | a renderer that cannot open a file or a socket |
