@@ -33,6 +33,10 @@ Set-Content -Encoding ascii $ar "@`"$python`" `"$stub`" ar %*"
 $env:CC_x86_64_unknown_linux_gnu = $cc
 $env:CXX_x86_64_unknown_linux_gnu = $cc
 $env:AR_x86_64_unknown_linux_gnu = $ar
+$pkg = Join-Path $tools 'pkg-config.cmd'
+Set-Content -Encoding ascii $pkg "@`"$python`" `"$stub`" pkg-config %*"
+$env:PKG_CONFIG_x86_64_unknown_linux_gnu = $pkg
+$env:PKG_CONFIG_ALLOW_CROSS = '1'
 
 $cargoArgs = if ($args.Count -gt 0) { @($args) } else { @($crates | ForEach-Object { '-p', $_ }) + '--all-targets' }
 & (Join-Path $root 'dev.ps1') check --target x86_64-unknown-linux-gnu @cargoArgs

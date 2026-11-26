@@ -222,11 +222,13 @@ fn run(args: Vec<String>, setup: WindowSetup) -> i32 {
         None => snowlark_shell::run(None, setup.0, setup.1),
         #[cfg(windows)]
         Some(a) if !a.starts_with("--") => snowlark_shell::run(start.as_deref(), setup.0, setup.1),
+        // Elsewhere, until the browser window is built there: one page in a window.
         #[cfg(not(windows))]
         _ if window => {
             let () = setup;
-            eprintln!("the window is not built for this system yet; the -- modes run headless");
-            2
+            #[path = "cli/viewer.rs"]
+            mod viewer;
+            viewer::run(args.get(1).map(String::as_str))
         }
         _ => {
             eprintln!("usage: snowlark [--process-model=tab|single] [--gpu-process] [--incognito] [<url>] | --eval <js> | --render <url> <png> [width] | --reftest <list> <outdir> | --video <url> <png> [--time T] [--wait S] | --media-types");

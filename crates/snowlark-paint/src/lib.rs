@@ -78,6 +78,7 @@ pub mod raster_tables;
 mod soft_blur;
 #[cfg(windows)]
 mod svg_effects;
+mod tiling;
 #[cfg(windows)]
 pub mod timer_resolution;
 #[cfg_attr(not(windows), path = "linux/video.rs")]
@@ -85,7 +86,7 @@ pub mod video;
 #[cfg(windows)]
 pub mod vsync;
 pub mod web_font;
-#[cfg(windows)]
+#[cfg_attr(not(windows), path = "linux/window.rs")]
 pub mod window;
 
 #[cfg(windows)]
@@ -94,7 +95,6 @@ pub use display_list::*;
 pub use filter::{ColorFilter, ColorFilters, FilterOp, FilterRange};
 pub use geom::*;
 pub use gpu::{Driver, Gpu};
-#[cfg(windows)]
 pub use gpu::{RasterStats, RasterWork, TileRasterizer, TiledFrame, TILE_SIZE};
 pub use image::{DecodedImage, Frame, ImageStore, Pixmap, ShownImage};
 pub use raster::{FontResolver, HeadlessRenderer, ImageResolver, Sources, Viewport};
@@ -107,7 +107,6 @@ pub use text::*;
 pub use text_cache::{ShapeCache, ShapeKey, TextCache, WordCache, WordCacheStats};
 pub use ticks::Ticks;
 pub use video::{VideoSlot, VideoStore};
-#[cfg(windows)]
 pub use window::{WindowHandle, WindowProxy};
 /// The error type of the Windows graphics calls (an HRESULT with its message).
 #[cfg(windows)]

@@ -33,6 +33,9 @@ icu_segmenter = "2"
 # The raster backend (`linux/raster.rs`; Direct2D on Windows): CPU raster for the headless modes, GL for
 # tiles and the compositor (docs/linux.md, "Decisions").
 skia-safe = { version = "0.158", features = ["gl"] }
+# The window (`linux/window.rs`; Win32 on Windows): a Wayland client, X11 desktops through XWayland
+# (docs/linux.md, "Decisions"); its keyboard through the system's libxkbcommon.
+smithay-client-toolkit = { version = "0.21", default-features = false, features = ["calloop", "xkbcommon"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-core = "0.62"
