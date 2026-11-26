@@ -17,9 +17,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::connection::Connection;
 use crate::error::Error;
+use crate::os::handle::RemoteHandle;
 use crate::section::Section;
 use crate::untrusted::{FromBrowser, FromChild};
-use crate::win::handle::RemoteHandle;
 use crate::wire::Wire;
 
 /// The most a [`Bulk`] holds in the message itself. A message may carry a few of them and still fit a
@@ -98,7 +98,7 @@ impl<Out: Wire, In: Wire> Connection<Out, In, FromChild> {
         if !section.write(0, bytes) {
             return Err(Error::Refused);
         }
-        let handle = self.core.peer.duplicate_section(&section)?;
+        let handle = self.core.duplicate_section(&section)?;
         Ok(Bulk::Given {
             handle,
             size: section.size() as u64,
@@ -174,7 +174,7 @@ impl<Out: Wire, In: Wire> Connection<Out, In, FromChild> {
                     )));
                 }
                 // (the browser's handle closes as `section` drops: the other child's keeps it)
-                let handle = to.core.peer.duplicate_section(&section)?;
+                let handle = to.core.duplicate_section(&section)?;
                 Ok(Bulk::Given {
                     handle,
                     size: section.size() as u64,

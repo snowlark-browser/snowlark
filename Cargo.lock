@@ -3226,6 +3226,7 @@ version = "0.1.0"
 name = "snowlark-ipc"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "postcard",
  "serde",
  "windows",

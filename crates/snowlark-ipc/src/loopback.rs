@@ -20,22 +20,17 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, SendError};
 use std::sync::{Arc, OnceLock};
-#[cfg(windows)]
 use std::sync::{Mutex, Weak};
 
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-#[cfg(windows)]
 use crate::connection::{BrowserEnd, ChildEnd, Connection, Core, Flow, Transport};
 use crate::error::Error;
 use crate::frame::{self, FrameReader, Kind};
-#[cfg(windows)]
+use crate::os::handle::Peer;
 use crate::untrusted::{ProcessKind, ProcessPolicy};
-#[cfg(windows)]
-use crate::win::handle::Peer;
 use crate::wire;
-#[cfg(windows)]
 use crate::wire::Wire;
 
 /// Whether `SNOWLARK_IPC=loopback` is set (read once).
@@ -150,13 +145,11 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 }
 
 /// One direction of a [`pair`]: hands frames to the peer's core on the sender's thread.
-#[cfg(windows)]
 struct Direct {
     peer: Weak<Core>,
     reader: Mutex<FrameReader>,
 }
 
-#[cfg(windows)]
 impl Transport for Direct {
     fn write(&self, bytes: Vec<u8>) -> Result<(), Error> {
         let peer = self.peer.upgrade().ok_or(Error::Closed)?;
@@ -185,11 +178,9 @@ impl Transport for Direct {
 }
 
 /// A browser's end and a child's.
-#[cfg(windows)]
 pub type Ends<Down, Up> = (BrowserEnd<Down, Up>, ChildEnd<Up, Down>);
 
 /// Two connected ends in this process.
-#[cfg(windows)]
 pub fn pair<Down: Wire, Up: Wire>(quota: u64) -> Result<Ends<Down, Up>, Error> {
     let build = crate::build_id();
     let browser = Core::new(true, build, Peer::Local, quota);

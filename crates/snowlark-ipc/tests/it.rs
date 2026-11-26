@@ -3,14 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! All of this crate's integration tests in one test binary (one file, one module): `child` runs a
-//! real second process, `loopback` the same code in one. The process boundary is Windows-only so far
-//! (docs/linux.md stage 4).
+//! real second process, `loopback` the same code in one.
 
-#[cfg(windows)]
 mod child;
-#[cfg(windows)]
 mod link;
-#[cfg(windows)]
 mod loopback;
 
 #[test]

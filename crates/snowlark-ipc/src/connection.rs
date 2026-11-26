@@ -21,9 +21,9 @@ use std::time::{Duration, Instant};
 use crate::error::Error;
 use crate::frame::{self, Frame, Kind};
 use crate::link::LinkMemory;
+use crate::os::handle::{Peer, RemoteHandle};
 use crate::section::{Broker, Section};
 use crate::untrusted::{FromBrowser, FromChild, ProcessPolicy, Trust, Untrusted, Validate};
-use crate::win::handle::{Peer, RemoteHandle};
 use crate::wire::{self, BuildId, Control, ControlReply, Hello, Wire, MAGIC};
 
 /// Queued frames past which the transport stops reading.
@@ -40,6 +40,12 @@ pub(crate) trait Transport: Send + Sync {
     fn shut(&self);
     /// Whether everything written has left this process.
     fn flushed(&self) -> bool;
+    /// Writes a [`Kind::Handle`] frame with a copy of `fd` beside it.
+    #[cfg(unix)]
+    fn write_handle(&self, frame: Vec<u8>, fd: std::os::fd::OwnedFd) -> Result<(), Error> {
+        let _ = (frame, fd);
+        Err(Error::Refused)
+    }
 }
 
 enum Inbound {
@@ -82,7 +88,14 @@ pub(crate) struct Core {
     pub(crate) broker: Option<Mutex<Broker>>,
     /// A link's end: its rings.
     pub(crate) link: Option<LinkMemory>,
+    /// The browser's end: descriptors the child gave, by the values it chose.
+    #[cfg(unix)]
+    received: Mutex<HashMap<u64, std::os::fd::OwnedFd>>,
 }
+
+/// Descriptors a child may have given the browser and not had taken, past which it breaks the rules.
+#[cfg(unix)]
+const MAX_GIVEN: usize = 256;
 
 impl Core {
     pub(crate) fn new(browser: bool, build: BuildId, peer: Peer, quota: u64) -> Arc<Core> {
@@ -119,6 +132,8 @@ impl Core {
             peer,
             broker: browser.then(|| Mutex::new(Broker::new(quota))),
             link,
+            #[cfg(unix)]
+            received: Mutex::new(HashMap::new()),
         })
     }
 
@@ -173,6 +188,7 @@ impl Core {
         }
         match frame.kind {
             Kind::Hello => Err("a second hello".into()),
+            Kind::Handle => Err("a handle frame with no descriptor".into()),
             Kind::Message | Kind::Call => {
                 s.bytes += frame.payload.len();
                 s.queue.push_back(match frame.kind {
@@ -220,7 +236,7 @@ impl Core {
             Control::AllocShared { size } => {
                 let mut broker = broker.lock().unwrap();
                 match broker.alloc(size) {
-                    Some((id, section)) => match self.peer.duplicate_section(&section) {
+                    Some((id, section)) => match self.duplicate_section(&section) {
                         Ok(handle) => ControlReply::Allocated {
                             id,
                             handle,
@@ -248,6 +264,82 @@ impl Core {
             let _ = self.write(bytes);
         }
         Ok(())
+    }
+
+    /// A copy of `section` for the peer, which may map it to read and write but not resize it: its
+    /// value there.
+    pub(crate) fn duplicate_section(&self, section: &Section) -> Result<u64, Error> {
+        #[cfg(windows)]
+        return self.peer.duplicate_section(section);
+        #[cfg(unix)]
+        return self.duplicate(section.handle()).map(|h| h.value());
+    }
+
+    /// A copy of `handle` for the peer, a child or this process: its value there.
+    #[cfg(windows)]
+    pub(crate) fn duplicate(
+        &self,
+        handle: &impl std::os::windows::io::AsHandle,
+    ) -> Result<RemoteHandle, Error> {
+        self.peer.duplicate(handle)
+    }
+
+    /// A copy of `fd` for the peer, a child or this process: its value there.
+    #[cfg(unix)]
+    pub(crate) fn duplicate(&self, fd: &impl std::os::fd::AsFd) -> Result<RemoteHandle, Error> {
+        match self.peer {
+            Peer::Child(_) | Peer::Local => crate::posix::handle::give(self, fd.as_fd()),
+            Peer::Browser | Peer::Link => Err(Error::Refused),
+        }
+    }
+
+    /// Sends a [`Kind::Handle`] frame with `fd` beside it, kept as `value` at the other end.
+    #[cfg(unix)]
+    pub(crate) fn write_handle(&self, value: u64, fd: std::os::fd::OwnedFd) -> Result<(), Error> {
+        if self.state.lock().unwrap().closed {
+            return Err(Error::Closed);
+        }
+        let bytes = frame::encode(Kind::Handle, value, &[])?;
+        self.transport
+            .get()
+            .ok_or(Error::Closed)?
+            .write_handle(bytes, fd)
+    }
+
+    /// Takes a descriptor from the transport (the IO thread), kept under `value`: at the browser's
+    /// end with this child's connection, at a child's in its process's table.
+    #[cfg(unix)]
+    pub(crate) fn deliver_handle(&self, value: u64, fd: std::os::fd::OwnedFd) -> Flow {
+        let why = if self.state.lock().unwrap().hello.is_none() {
+            Some("a handle before hello")
+        } else if self.link.is_some() {
+            Some("a handle on a link")
+        } else if self.browser {
+            let mut received = self.received.lock().unwrap();
+            if received.len() >= MAX_GIVEN {
+                Some("too many handles given")
+            } else if received.insert(value, fd).is_some() {
+                Some("a handle value given twice")
+            } else {
+                None
+            }
+        } else {
+            crate::posix::handle::keep(value, fd);
+            None
+        };
+        match why {
+            Some(why) => {
+                self.bad_message(why);
+                Flow::Stop
+            }
+            None => Flow::Go,
+        }
+    }
+
+    /// The descriptor the child gave under `value` ([`Core::deliver_handle`]), taken.
+    #[cfg(unix)]
+    pub(crate) fn take_received(&self, value: u64) -> Option<std::os::fd::OwnedFd> {
+        self.received.lock().unwrap().remove(&value)
     }
 
     /// The stream ended, whatever the reason: everything waiting hears it at once.
@@ -545,17 +637,27 @@ impl<Out: Wire, In: Wire> Connection<Out, In, FromChild> {
     /// Gives the child a handle: only the browser duplicates, into a child, never the other way.
     /// The value travels in a message of the caller's, and the child takes it with
     /// [`Connection::take_handle`].
+    #[cfg(windows)]
     pub fn duplicate_to_child(
         &self,
         handle: &impl std::os::windows::io::AsHandle,
     ) -> Result<RemoteHandle, Error> {
-        self.core.peer.duplicate(handle)
+        self.core.duplicate(handle)
+    }
+
+    /// Gives the child a copy of a descriptor: only the browser gives, to a child, never the other
+    /// way but from the GPU process. The value travels in a message of the caller's, and the child
+    /// takes it with [`Connection::take_handle`].
+    #[cfg(unix)]
+    pub fn duplicate_to_child(&self, fd: &impl std::os::fd::AsFd) -> Result<RemoteHandle, Error> {
+        self.core.duplicate(fd)
     }
 
     /// Takes a handle the GPU process gave ([`Connection::give_handle`]) out of its table into the
     /// browser's: it is closed there. Only a GPU process may give handles (its device's shared
     /// textures, which the browser hands to renderers): from any other child this is refused. The
     /// value can name only a handle of the child's own, never one of the browser's.
+    #[cfg(windows)]
     pub fn take_from_child(
         &self,
         handle: RemoteHandle,
@@ -568,12 +670,28 @@ impl<Out: Wire, In: Wire> Connection<Out, In, FromChild> {
         self.core.peer.take_out(handle)
     }
 
+    /// Takes a descriptor the GPU process gave ([`Connection::give_handle`]). From any other child
+    /// this is refused. The value names only a descriptor this child gave on this connection.
+    #[cfg(unix)]
+    pub fn take_from_child(&self, handle: RemoteHandle) -> Result<std::os::fd::OwnedFd, Error> {
+        // (the loopback's child is this process: what it gave is in this process's table)
+        if matches!(self.core.peer, Peer::Local) {
+            return handle.take_checked();
+        }
+        if self.policy().kind != crate::ProcessKind::Gpu {
+            return Err(Error::Refused);
+        }
+        self.core
+            .take_received(handle.value())
+            .ok_or(Error::Refused)
+    }
+
     /// Gives the child a section the browser made and keeps: it can map it to read and write, not
     /// extend it. The child maps it with [`Connection::map_section`]. What the child writes there is
     /// its word ([`Section::read_once`], [`Section::load_u64`]).
     pub fn share_section(&self, section: &Section) -> Result<RemoteHandle, Error> {
         Ok(RemoteHandle::from_value(
-            self.core.peer.duplicate_section(section)?,
+            self.core.duplicate_section(section)?,
         ))
     }
 
@@ -638,15 +756,35 @@ impl Drop for SharedSection {
 impl<Out: Wire, In: Wire> Connection<Out, In, FromBrowser> {
     /// Takes a handle the browser put in this process's table. There is no way to do this at the
     /// browser's end, whatever a message type says: a child's word never names a browser handle.
+    #[cfg(windows)]
     pub fn take_handle(&self, handle: RemoteHandle) -> std::os::windows::io::OwnedHandle {
         handle.take()
+    }
+
+    /// Takes a descriptor the browser gave this process. A value that names none fails.
+    #[cfg(unix)]
+    pub fn take_handle(&self, handle: RemoteHandle) -> Result<std::os::fd::OwnedFd, Error> {
+        handle.take_checked()
     }
 
     /// Leaves `handle` in this process's table for the browser to take out
     /// ([`Connection::take_from_child`]), which closes it here. The value travels in a message of
     /// the caller's; one the browser never takes stays open here.
+    #[cfg(windows)]
     pub fn give_handle(&self, handle: std::os::windows::io::OwnedHandle) -> RemoteHandle {
         RemoteHandle::give(handle)
+    }
+
+    /// Gives the browser `fd`, for it to take with [`Connection::take_from_child`]; it is closed
+    /// here. The value travels in a message of the caller's.
+    #[cfg(unix)]
+    pub fn give_handle(&self, fd: std::os::fd::OwnedFd) -> Result<RemoteHandle, Error> {
+        match self.core.peer {
+            Peer::Browser | Peer::Local => {
+                crate::posix::handle::give(&self.core, std::os::fd::AsFd::as_fd(&fd))
+            }
+            Peer::Child(_) | Peer::Link => Err(Error::Refused),
+        }
     }
 
     /// Maps a section of `size` bytes the browser shared with [`Connection::share_section`].

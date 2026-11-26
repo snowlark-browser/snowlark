@@ -41,6 +41,20 @@ is not built. What is missing behaves as on a system without it: a media element
 the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is false and
 `navigator.plugins` empty).
 
+**Processes:** `snowlark-ipc`'s `posix/` half gives the process boundary the same names and rules as on
+Windows, and its tests (a real second process, links between children, the loopback) run on both systems. The
+channel to a child is a pair of Unix stream sockets (`socketpair`, never named), read by one epoll thread per
+process. A descriptor crosses as a `Handle` frame whose first byte carries it as `SCM_RIGHTS`; the receiver
+keeps it under the value the sender chose until a message names it (a child in its process's table, the
+browser with that child's connection, so a child can only ever name its own). Sections are `memfd_create`
+files sealed against shrinking and growing, and a mapping is refused for a file that is smaller than asked or
+not sealed. A child starts from one long-lived launcher thread (the parent-death signal follows the thread that
+forked) with its channel as descriptor 3 and every other descriptor marked close-on-exec, the parent-death
+signal set before exec, its environment on an allow-list, and `JobLimits::commit` as its `RLIMIT_DATA`. Not
+there yet: `JobLimits::no_children` (it needs a system call filter), crash dumps, and a fork server (each launch
+forks the browser itself, which copies its page tables); `Process::set_background` lowers every thread's
+priority, and raising it again needs a privilege the browser may lack.
+
 **Identity:** the default User-Agent carries the platform token of the family's reduced strings for Linux,
 `X11; Linux x86_64` (Windows keeps `Windows NT 10.0; Win64; x64`); `navigator.platform` (`Linux x86_64`),
 `navigator.userAgentData.platform` and `Sec-CH-UA-Platform` (`Linux`) follow it. The platform version hint is
@@ -191,7 +205,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | Raster: a display list into pixels | `raster.rs` painter over a Direct2D device context | `linux/raster.rs` has `HeadlessRenderer`'s methods and no backend yet: a painter over Skia, `HeadlessRenderer` first (headless modes and reftests) |
 | Tiles and the compositor | `gpu.rs` `TileRasterizer`, `compositor.rs` `Compositor` | the same over Skia's GPU backend (GL or Vulkan) |
 | Window | `snowlark-paint` `window.rs` `Window`, `Event`, `WindowProxy` | a Wayland half (X11 desktops through XWayland) |
-| Process boundary | `snowlark-ipc`'s `Link`, `Section`, `RemoteHandle`, `launch` (with `win/` as the only half) | a `posix/` half under the same names |
+| Process boundary | `snowlark-ipc`'s `Link`, `Section`, `RemoteHandle`, `launch` | done: the `posix/` half under the same names |
 | Media player | `snowlark-media` `win/` (`Player`, MSE) | an FFmpeg half |
 | ANGLE | `snowlark-gl` `ffi.rs` loads two libraries by name | the `.so` names |
 | OS services | `os_crypt.rs`, shell `profile.rs`, `downloads_ui.rs` | a function each behind `cfg` |
@@ -203,7 +217,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | 1 | The map, the Linux check of the platform-free crates, this plan | S | done: `tools/linux/check.ps1` green for eight crates; six of them built and tested on Linux |
 | 2 | **Split `snowlark-paint`**: the platform-free modules (geometry, display list, layer animation, filters, scroll curves, colour profiles, the Rust image decoders, the text types and shape cache, a canvas's operations) into `snowlark-graphics` with its own error type; the Windows half keeps Direct2D, DirectWrite and the window. Linux halves of the text engine, the headless renderer and the GPU canvas with the same methods and nothing behind them | M | done: `snowlark-graphics`, `-paint`, `-layout` and `-render` in `check.ps1`; nothing changes on Windows (WPT gate) |
 | 3 | **Headless on Linux**: V8 for Linux; the Itanium declarations in `snowlark-js`; the Linux text engine (fontconfig, FreeType, HarfBuzz); Skia behind `HeadlessRenderer`; WIC formats in Rust. `--eval`, `--render`, `--wpt` and reftests run on Linux | L | WPT on Linux within a known distance of the Windows counts, read per area. Done so far: V8 for Linux and the Itanium declarations (`snowlark-js` and `snowlark-bindings` tested on Linux), the text engine, Skia behind `HeadlessRenderer` (`snowlark-render`'s tests pass on Linux but its GPU canvas ones) |
-| 4 | **Processes**: the `posix/` half of `snowlark-ipc` (sockets, descriptor passing, memfd sections, launch, a fork server), crash dumps | M | the renderer process model on Linux; IPC tests green there |
+| 4 | **Processes**: the `posix/` half of `snowlark-ipc` (sockets, descriptor passing, memfd sections, launch, a fork server), crash dumps | M | the renderer process model on Linux; IPC tests green there. Done so far: the `posix/` half of `snowlark-ipc` (no fork server or crash dumps yet), its tests green on Linux |
 | 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop |
 | 6 | **WebGL** on ANGLE for Linux | S | the WebGL conformance areas as on Windows |
 | 7 | **Media**: playback and MSE on FFmpeg, audio output; hardware decoding later | L | `<video>`, `<audio>`, MSE sites play |

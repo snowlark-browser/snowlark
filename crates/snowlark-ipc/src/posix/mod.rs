@@ -2,9 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! The operating system's part on Linux, so far: the build id. The process boundary itself (Unix
-//! domain sockets passing descriptors, memfd sections, launch through a fork server, crash dumps)
-//! is stage 4 of docs/linux.md; until it comes, only the loopback runs here.
+//! What the operating system does on Linux, and nearly all of this crate's `unsafe` there: Unix
+//! stream sockets passing descriptors, memfd sections, the IO thread on epoll, launch.
+
+pub mod handle;
+pub(crate) mod io;
+pub mod launch;
+pub(crate) mod pipe;
 
 use crate::wire::BuildId;
 
@@ -25,9 +29,17 @@ pub fn build_id() -> BuildId {
     BuildId(id)
 }
 
-/// The total size in bytes of the file system that holds `path`: not known here yet.
-pub fn volume_size(_path: &std::path::Path) -> Option<u64> {
-    None
+/// The total size in bytes of the file system that holds `path` (an existing file or folder).
+pub fn volume_size(path: &std::path::Path) -> Option<u64> {
+    use std::os::unix::ffi::OsStrExt;
+    let path = std::ffi::CString::new(path.as_os_str().as_bytes()).ok()?;
+    // SAFETY: statvfs is plain data; all zeroes is a valid value for the call to fill.
+    let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
+    // SAFETY: a NUL-terminated path and a local the call fills.
+    if unsafe { libc::statvfs(path.as_ptr(), &mut stat) } != 0 {
+        return None;
+    }
+    Some((stat.f_blocks as u64).saturating_mul(stat.f_frsize as u64))
 }
 
 /// The machine's physical memory in bytes, from `/proc/meminfo`.
@@ -36,6 +48,17 @@ pub fn physical_memory() -> Option<u64> {
     let line = info.lines().find(|l| l.starts_with("MemTotal:"))?;
     let kb: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
     Some(kb * 1024)
+}
+
+/// Crash dumps: the browser writes none of a Linux child yet.
+pub mod crash_dump {
+    /// How many dumps a folder keeps.
+    pub const KEPT_DUMPS: usize = 10;
+
+    /// There is no crash handler on Linux yet: false.
+    pub fn install_crash_handler() -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
@@ -49,5 +72,15 @@ mod tests {
     fn the_machine_has_physical_memory() {
         let bytes = super::physical_memory().unwrap();
         assert!(bytes > 1 << 30, "{bytes}");
+    }
+
+    #[test]
+    fn the_volume_of_a_folder_has_a_size() {
+        let size = super::volume_size(&std::env::temp_dir()).unwrap();
+        assert!(size > 1 << 20, "{size}");
+        assert_eq!(
+            super::volume_size(std::path::Path::new("/no/such/volume")),
+            None
+        );
     }
 }

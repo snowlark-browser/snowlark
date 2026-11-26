@@ -47,6 +47,11 @@ impl RemoteHandle {
         owned(HANDLE(self.0 as usize as *mut core::ffi::c_void))
     }
 
+    /// [`RemoteHandle::take`], in the form every platform has (a descriptor table can say no).
+    pub(crate) fn take_checked(self) -> Result<OwnedHandle, Error> {
+        Ok(self.take())
+    }
+
     /// A handle of this process's, left in its table for the browser to take out
     /// ([`crate::ChildEnd::give_handle`]).
     pub(crate) fn give(handle: OwnedHandle) -> RemoteHandle {

@@ -10,15 +10,22 @@
 //! [`Section::read_once`] copies to private memory, and only that copy is ever parsed.
 
 use std::collections::HashMap;
+#[cfg(unix)]
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd as OwnedHandle};
+#[cfg(windows)]
 use std::os::windows::io::OwnedHandle;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+#[cfg(windows)]
 use windows::Win32::Foundation::INVALID_HANDLE_VALUE;
+#[cfg(windows)]
 use windows::Win32::System::Memory::*;
 
 use crate::error::Error;
-use crate::win::handle::{owned, raw, RemoteHandle};
+use crate::os::handle::RemoteHandle;
+#[cfg(windows)]
+use crate::win::handle::{owned, raw};
 
 /// The most one section may hold.
 pub const MAX_SECTION: u64 = 1 << 30;
@@ -40,6 +47,7 @@ unsafe impl Sync for Section {}
 
 impl Section {
     /// A new section of `size` bytes (the browser's side).
+    #[cfg(windows)]
     pub fn create(size: usize) -> Result<Section, Error> {
         if size == 0 || size as u64 > MAX_SECTION {
             return Err(Error::Refused);
@@ -61,9 +69,10 @@ impl Section {
 
     /// Maps a section the browser made for this process.
     pub(crate) fn from_remote(handle: RemoteHandle, size: u64) -> Result<Section, Error> {
-        Section::map(handle.take(), size as usize)
+        Section::map(handle.take_checked()?, size as usize)
     }
 
+    #[cfg(windows)]
     fn map(handle: OwnedHandle, size: usize) -> Result<Section, Error> {
         // SAFETY: an open section handle. The mapping fails if the section is smaller than `size`.
         let view =
@@ -151,6 +160,7 @@ impl Section {
     }
 }
 
+#[cfg(windows)]
 impl Drop for Section {
     fn drop(&mut self) {
         // SAFETY: the view this Section mapped; no reference to it exists.
@@ -159,6 +169,94 @@ impl Drop for Section {
                 Value: self.view.cast(),
             })
         };
+    }
+}
+
+#[cfg(unix)]
+fn os_check(r: libc::c_int) -> Result<libc::c_int, Error> {
+    if r < 0 {
+        Err(Error::Os(std::io::Error::last_os_error()))
+    } else {
+        Ok(r)
+    }
+}
+
+#[cfg(unix)]
+impl Section {
+    /// A new section of `size` bytes (the browser's side): an anonymous memory file sealed at its
+    /// size, so that no process holding it can shrink it under a reader (whose access past the end
+    /// would fault) or grow it.
+    pub fn create(size: usize) -> Result<Section, Error> {
+        if size == 0 || size as u64 > MAX_SECTION {
+            return Err(Error::Refused);
+        }
+        // SAFETY: a static NUL-terminated name; the descriptor is owned at once.
+        let fd = os_check(unsafe {
+            libc::memfd_create(
+                c"snowlark-ipc".as_ptr(),
+                libc::MFD_CLOEXEC | libc::MFD_ALLOW_SEALING,
+            )
+        })?;
+        // SAFETY: the new descriptor, ours alone.
+        let handle = unsafe { OwnedHandle::from_raw_fd(fd) };
+        // SAFETY: sizes and seals our own new memory file.
+        unsafe {
+            os_check(libc::ftruncate(handle.as_raw_fd(), size as libc::off_t))?;
+            os_check(libc::fcntl(
+                handle.as_raw_fd(),
+                libc::F_ADD_SEALS,
+                libc::F_SEAL_SHRINK | libc::F_SEAL_GROW | libc::F_SEAL_SEAL,
+            ))?;
+        }
+        Section::map(handle, size)
+    }
+
+    /// Maps `size` bytes of a memory file. One that is smaller, or not sealed against shrinking,
+    /// is refused: a view past a file's end faults.
+    fn map(handle: OwnedHandle, size: usize) -> Result<Section, Error> {
+        if size == 0 || size as u64 > MAX_SECTION {
+            return Err(Error::Refused);
+        }
+        let fd = handle.as_raw_fd();
+        // SAFETY: `stat` is plain data the call fills, for an open descriptor of ours.
+        let stat = unsafe {
+            let mut stat: libc::stat = std::mem::zeroed();
+            os_check(libc::fstat(fd, &mut stat))?;
+            stat
+        };
+        // SAFETY: reads the seals of an open descriptor.
+        let seals = unsafe { libc::fcntl(fd, libc::F_GET_SEALS) };
+        if (stat.st_size as u64) < size as u64 || seals < 0 || seals & libc::F_SEAL_SHRINK == 0 {
+            return Err(Error::Refused);
+        }
+        // SAFETY: a shared mapping of `size` bytes of a file at least that large that cannot
+        // shrink; the view is unmapped when the Section drops.
+        let view = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                size,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_SHARED,
+                fd,
+                0,
+            )
+        };
+        if view == libc::MAP_FAILED {
+            return Err(Error::Os(std::io::Error::last_os_error()));
+        }
+        Ok(Section {
+            handle,
+            view: view.cast(),
+            size,
+        })
+    }
+}
+
+#[cfg(unix)]
+impl Drop for Section {
+    fn drop(&mut self) {
+        // SAFETY: the view this Section mapped, of its size; no reference to it exists.
+        unsafe { libc::munmap(self.view.cast(), self.size) };
     }
 }
 

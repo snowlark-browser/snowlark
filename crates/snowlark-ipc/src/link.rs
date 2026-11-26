@@ -27,11 +27,11 @@ use serde::{Deserialize, Serialize};
 use crate::bulk::{Bulk, INLINE_MAX};
 use crate::connection::{Connection, Core};
 use crate::error::Error;
+use crate::os::handle::RemoteHandle;
+use crate::os::io::{Link as PipeTransport, PipeLink};
+use crate::os::{build_id, pipe};
 use crate::section::{Section, MAX_SECTION};
 use crate::untrusted::{FromChild, ProcessPolicy, Trust, Untrusted, Validate};
-use crate::win::handle::{Peer, RemoteHandle};
-use crate::win::io::{Link as PipeTransport, PipeLink};
-use crate::win::{build_id, pipe};
 use crate::wire::Wire;
 
 /// Where a ring's `written` cell is.
@@ -59,9 +59,9 @@ impl LinkEnd {
     /// Closes this end's handles without joining the link: the other end's join or reads then end.
     /// Only with a [`LinkEnd`] from the browser, as [`connect_link`].
     pub fn close(self) {
-        drop(self.pipe.take());
+        drop(self.pipe.take_checked());
         for ring in [self.out, self.into].into_iter().flatten() {
-            drop(ring.handle.take());
+            drop(ring.handle.take_checked());
         }
     }
 }
@@ -212,19 +212,19 @@ impl<O: Wire, I: Wire> Connection<O, I, FromChild> {
             }
             *slot = Some(Section::create(size as usize)?);
         }
-        let give = |peer: &Peer, section: &Option<Section>| -> Result<_, Error> {
+        let give = |core: &Core, section: &Option<Section>| -> Result<_, Error> {
             section
                 .as_ref()
                 .map(|s| {
                     Ok(RingHandle {
-                        handle: RemoteHandle::from_value(peer.duplicate_section(s)?),
+                        handle: RemoteHandle::from_value(core.duplicate_section(s)?),
                         size: s.size() as u64,
                     })
                 })
                 .transpose()
         };
-        let mine = &self.core.peer;
-        let theirs = &other.core.peer;
+        let mine = &self.core;
+        let theirs = &other.core;
         // (the browser's own handles close as `made` and the pipe's ends drop)
         Ok([
             LinkEnd {
@@ -250,7 +250,7 @@ pub fn connect_link<Out: Wire, In: Wire, Tr: LinkTrust>(
     timeout: Duration,
 ) -> Result<Connection<Out, In, Tr>, Error> {
     // (each handle is taken before anything can fail, so none is left open)
-    let pipe = end.pipe.take();
+    let pipe = end.pipe.take_checked();
     let out = end.out.map(Ring::map);
     let into = end.into.map(Ring::map);
     let memory = LinkMemory {
@@ -261,6 +261,7 @@ pub fn connect_link<Out: Wire, In: Wire, Tr: LinkTrust>(
             .transpose()?
             .map(|ring| Mutex::new(Reader { ring, read: 0 })),
     };
+    let pipe = pipe?;
     let core = Core::linked(build_id(), memory);
     let link = PipeLink::new(pipe, &core)?;
     core.attach(Arc::new(PipeTransport(link.clone())));

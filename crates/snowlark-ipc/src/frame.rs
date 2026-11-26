@@ -29,6 +29,10 @@ pub enum Kind {
     /// The transport's own business (sections), child to browser, with a [`Kind::ControlReply`].
     Control,
     ControlReply,
+    /// A descriptor that came beside the frame's bytes (on Linux, where a handle cannot be put in
+    /// another process's table): the receiver keeps it under the frame's id, the value a later
+    /// message names it by. Empty payload.
+    Handle,
 }
 
 impl Kind {
@@ -40,6 +44,7 @@ impl Kind {
             Kind::Reply => 4,
             Kind::Control => 5,
             Kind::ControlReply => 6,
+            Kind::Handle => 7,
         }
     }
 
@@ -51,6 +56,7 @@ impl Kind {
             4 => Kind::Reply,
             5 => Kind::Control,
             6 => Kind::ControlReply,
+            7 => Kind::Handle,
             _ => return None,
         })
     }

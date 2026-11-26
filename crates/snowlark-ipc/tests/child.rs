@@ -7,27 +7,84 @@
 
 use std::fs::File;
 use std::io::{Read, Seek, Write};
+#[cfg(unix)]
+use std::os::fd::{AsRawFd, OwnedFd as OwnedHandle};
+#[cfg(windows)]
 use std::os::windows::io::OwnedHandle;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use snowlark_ipc::frame::{self, Kind};
+#[cfg(windows)]
+use snowlark_ipc::JobLimits;
 use snowlark_ipc::{
     connect_as, connect_link, connect_to_browser, BadMessage, BuildId, Bulk, ClientEnd, Connection,
-    Error, FromBrowser, FromChild, HostEnd, JobLimits, Launch, LinkEnd, Process, ProcessKind,
-    ProcessPolicy, Received, RemoteHandle, Validate,
+    Error, FromBrowser, FromChild, HostEnd, Launch, LinkEnd, Process, ProcessKind, ProcessPolicy,
+    Received, RemoteHandle, Validate,
 };
+#[cfg(windows)]
 use windows::core::w;
+#[cfg(windows)]
 use windows::Win32::Foundation::{CloseHandle, CompareObjectHandles, HANDLE, WAIT_OBJECT_0};
+#[cfg(windows)]
 use windows::Win32::Security::SECURITY_ATTRIBUTES;
+#[cfg(windows)]
 use windows::Win32::System::Threading::{
-    CreateEventW, GetCurrentProcess, GetProcessHandleCount, OpenEventW, OpenProcess,
-    WaitForSingleObject, EVENT_ALL_ACCESS, PROCESS_SYNCHRONIZE,
+    CreateEventW, OpenEventW, OpenProcess, WaitForSingleObject, EVENT_ALL_ACCESS,
+    PROCESS_SYNCHRONIZE,
 };
 
 const ROLE: &str = "SNOWLARK_IPC_TEST_ROLE";
 const WAIT: Duration = Duration::from_secs(20);
+
+/// A variable every child is given by default.
+#[cfg(windows)]
+const BASE_VAR: &str = "SystemRoot";
+#[cfg(unix)]
+const BASE_VAR: &str = "HOME";
+
+/// Takes a handle the browser gave.
+fn take(c: &Child, handle: RemoteHandle) -> OwnedHandle {
+    #[cfg(windows)]
+    return c.take_handle(handle);
+    #[cfg(unix)]
+    return c.take_handle(handle).unwrap();
+}
+
+/// Gives the browser a handle: its value in this process's table too.
+fn give(c: &Child, file: File) -> (RemoteHandle, u64) {
+    #[cfg(windows)]
+    {
+        let value = std::os::windows::io::AsRawHandle::as_raw_handle(&file) as usize as u64;
+        (c.give_handle(OwnedHandle::from(file)), value)
+    }
+    #[cfg(unix)]
+    {
+        let value = file.as_raw_fd() as u64;
+        (c.give_handle(OwnedHandle::from(file)).unwrap(), value)
+    }
+}
+
+/// Whether a handle value is open in this process.
+fn is_open(value: u64) -> bool {
+    // SAFETY: asks about a handle value, which may name nothing.
+    unsafe {
+        #[cfg(windows)]
+        return windows::Win32::Foundation::GetHandleInformation(
+            HANDLE(value as usize as *mut _),
+            &mut 0,
+        )
+        .is_ok();
+        #[cfg(unix)]
+        return libc::fcntl(value as i32, libc::F_GETFD) != -1;
+    }
+}
+
+/// The descriptors or handles this process holds.
+fn handle_count() -> u32 {
+    snowlark_ipc::own_usage().unwrap().handles
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 enum Down {
@@ -51,6 +108,8 @@ enum Down {
     GiveFile(String),
     /// Whether this handle value is open in the child.
     IsOpen(u64),
+    /// Takes this many bytes of memory and writes them.
+    Eat(u64),
     Stop,
 }
 
@@ -161,6 +220,14 @@ fn run_role(role: &str) -> i32 {
             let _ = other.join();
             4
         }
+        // (connects, starts a grandchild, says its id, and exits without killing it)
+        "middle" => {
+            let c: Child = connect_to_browser(WAIT).unwrap();
+            let (_g, gp) = start("sleep");
+            c.send(&Up::Count(u64::from(gp.pid()))).unwrap();
+            c.flush(WAIT).unwrap();
+            std::process::exit(0);
+        }
         "wrong-build" => {
             let r = connect_as::<Up, Down>(BuildId([9; 16]), WAIT);
             i32::from(!matches!(r, Err(Error::BuildMismatch)))
@@ -197,6 +264,7 @@ fn run_role(role: &str) -> i32 {
                 "raw-free" => frame::encode(Kind::Control, 1, &[1, 77]).unwrap(),
                 "raw-control-reply" => frame::encode(Kind::ControlReply, 1, b"x").unwrap(),
                 "raw-undecodable" => frame::encode(Kind::Message, 0, &[200, 200]).unwrap(),
+                "raw-handle" => frame::encode(Kind::Handle, 1, &[]).unwrap(),
                 other => panic!("{other}"),
             };
             c.write_raw(bytes).unwrap();
@@ -232,7 +300,7 @@ fn serve(c: Child) -> i32 {
                 Err(_) => Up::Refused,
             },
             Down::File(handle) => {
-                let mut file = File::from(c.take_handle(handle));
+                let mut file = File::from(take(&c, handle));
                 file.write_all(b"written by the child").unwrap();
                 Up::Yes(true)
             }
@@ -261,18 +329,13 @@ fn serve(c: Child) -> i32 {
                     .open(path)
                     .unwrap();
                 file.write_all(b"given by the child").unwrap();
-                let value = std::os::windows::io::AsRawHandle::as_raw_handle(&file) as usize as u64;
-                Up::Given(c.give_handle(OwnedHandle::from(file)), value)
+                let (handle, value) = give(&c, file);
+                Up::Given(handle, value)
             }
-            // SAFETY: asks about a handle value, which may name nothing.
-            Down::IsOpen(value) => Up::Yes(unsafe {
-                let mut flags = 0;
-                windows::Win32::Foundation::GetHandleInformation(
-                    HANDLE(value as usize as *mut _),
-                    &mut flags,
-                )
-                .is_ok()
-            }),
+            Down::IsOpen(value) => Up::Yes(is_open(value)),
+            Down::Eat(bytes) => {
+                Up::Yes(std::hint::black_box(vec![1u8; bytes as usize]).len() as u64 == bytes)
+            }
             Down::Stop => {
                 c.flush(WAIT).unwrap();
                 // (a section's drop asks the browser, which has nothing left to say)
@@ -376,7 +439,23 @@ fn forge(c: &Child, n: u8) -> Up {
     }
 }
 
+/// The file whose descriptor `a_child_inherits_only_its_list` leaves open across exec.
+#[cfg(unix)]
+fn inherit_path(browser: u32) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!("snowlark-ipc-test-inherit-{browser}"))
+}
+
+/// Whether `value` here is the test's file, open: a value alone could be anything.
+#[cfg(unix)]
+fn has_handle(value: u64) -> bool {
+    // SAFETY: reads the parent's process id.
+    let browser = unsafe { libc::getppid() } as u32;
+    let open = std::fs::read_link(format!("/proc/self/fd/{value}"));
+    open.is_ok_and(|p| p == inherit_path(browser))
+}
+
 /// Whether `value` here is the test's named event: a value alone could be anything.
+#[cfg(windows)]
 fn has_handle(value: u64) -> bool {
     // SAFETY: opens a named event, and compares two handle values, one possibly invalid.
     unsafe {
@@ -551,6 +630,7 @@ fn a_child_that_breaks_the_rules_dies() {
         "raw-control",
         "raw-free",
         "raw-control-reply",
+        "raw-handle",
     ] {
         let (c, p) = start(role);
         assert_eq!(p.wait(WAIT), Some(9), "{role}");
@@ -700,11 +780,43 @@ fn the_browser_takes_handles_only_out_of_a_gpu_process() {
     let (c, p) = start("serve");
     let (handle, value) = given(&c);
     assert!(matches!(c.take_from_child(handle), Err(Error::Refused)));
-    assert_eq!(call(&c, &Down::IsOpen(value)), Up::Yes(true));
+    // (on Windows the handle stays in the child's table, not taken; on Linux it went with the
+    // message and the child kept no copy)
+    assert_eq!(call(&c, &Down::IsOpen(value)), Up::Yes(cfg!(windows)));
     stop(&c, &p);
     let _ = std::fs::remove_file(path);
 }
 
+/// A descriptor of the browser's left open across exec (no close-on-exec) is still not the child's:
+/// a launch closes everything but its channel.
+#[cfg(unix)]
+#[test]
+fn a_child_inherits_only_its_list() {
+    let path = inherit_path(std::process::id());
+    let file = File::create(&path).unwrap();
+    // SAFETY: clears close-on-exec on our own open file.
+    assert_eq!(
+        unsafe { libc::fcntl(file.as_raw_fd(), libc::F_SETFD, 0) },
+        0
+    );
+    let (c, p) = start("serve");
+    assert!(has_handle_here(file.as_raw_fd() as u64, &path));
+    assert_eq!(
+        call(&c, &Down::HasHandle(file.as_raw_fd() as u64)),
+        Up::Yes(false)
+    );
+    stop(&c, &p);
+    drop(file);
+    let _ = std::fs::remove_file(path);
+}
+
+/// `has_handle`'s check, in this process (that the check can see the file at all).
+#[cfg(unix)]
+fn has_handle_here(value: u64, path: &std::path::Path) -> bool {
+    std::fs::read_link(format!("/proc/self/fd/{value}")).is_ok_and(|p| p == path)
+}
+
+#[cfg(windows)]
 #[test]
 fn a_child_inherits_only_its_list() {
     let attributes = SECURITY_ATTRIBUTES {
@@ -736,12 +848,13 @@ fn a_child_sees_only_the_environment_it_is_given() {
     let (c, p) = start("serve");
     assert_eq!(call(&c, &Down::Env("PATH".into())), Up::Text(None));
     assert!(matches!(
-        call(&c, &Down::Env("SystemRoot".into())),
+        call(&c, &Down::Env(BASE_VAR.into())),
         Up::Text(Some(_))
     ));
     stop(&c, &p);
 }
 
+#[cfg(windows)]
 #[test]
 fn the_job_can_refuse_child_processes() {
     let (c, p) = launch("serve")
@@ -757,6 +870,69 @@ fn the_job_can_refuse_child_processes() {
     stop(&c, &p);
 }
 
+/// The commit limit holds: a child that asks for more private memory than it may have fails to get
+/// it (and aborts), while one within the limit goes on.
+#[cfg(unix)]
+#[test]
+fn the_commit_limit_holds() {
+    let limits = snowlark_ipc::JobLimits {
+        no_children: false,
+        commit: Some(1 << 30),
+    };
+    let (c, p) = launch("serve")
+        .limits(limits)
+        .spawn()
+        .unwrap()
+        .connect::<Down, Up>(policy(), 64 << 20, WAIT)
+        .unwrap();
+    assert_eq!(call(&c, &Down::Eat(64 << 20)), Up::Yes(true));
+    c.send(&Down::Eat(2 << 30)).unwrap();
+    // (SIGABRT: the allocation failed)
+    assert_eq!(p.wait(WAIT), Some(libc::SIGABRT as u32));
+}
+
+/// A child dies with the browser: the kernel kills it when the browser's launcher goes.
+#[cfg(unix)]
+#[test]
+fn a_child_dies_with_its_browser() {
+    let (c, p) = start("middle");
+    let Ok(Received::Message(m)) = c.recv_timeout(WAIT) else {
+        panic!("no grandchild");
+    };
+    let Up::Count(grandchild) = c.check(m).unwrap() else {
+        panic!();
+    };
+    assert_eq!(p.wait(WAIT), Some(0));
+    let t = Instant::now();
+    let alive = || {
+        std::fs::read_to_string(format!("/proc/{grandchild}/stat")).is_ok_and(|s| {
+            !s.rsplit(')')
+                .next()
+                .unwrap_or("")
+                .trim_start()
+                .starts_with('Z')
+        })
+    };
+    while alive() && t.elapsed() < WAIT {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(!alive(), "the grandchild outlived its browser");
+}
+
+/// Dropping a child's `Process` kills it, and nothing of it is left.
+#[cfg(unix)]
+#[test]
+fn closing_the_job_kills_the_child() {
+    let (c, p) = start("sleep");
+    let pid = p.pid();
+    drop(c);
+    drop(p);
+    // (reaped by the drop: the id names no process now, unless a new one already took it)
+    let command = std::fs::read(format!("/proc/{pid}/cmdline")).unwrap_or_default();
+    assert!(!String::from_utf8_lossy(&command).contains("child::child_main"));
+}
+
+#[cfg(windows)]
 #[test]
 fn closing_the_job_kills_the_child() {
     let (c, p) = start("sleep");
@@ -772,6 +948,7 @@ fn closing_the_job_kills_the_child() {
 }
 
 /// A crash dump folder of its own for one test.
+#[cfg(windows)]
 fn dump_dir(name: &str) -> std::path::PathBuf {
     let dir =
         std::env::temp_dir().join(format!("snowlark-ipc-dumps-{}-{name}", std::process::id()));
@@ -780,6 +957,7 @@ fn dump_dir(name: &str) -> std::path::PathBuf {
 }
 
 /// Spawns `role` with crash dumps into `dir`, without saying hello (it crashes before).
+#[cfg(windows)]
 fn spawn_crashing(role: &str, dir: &std::path::Path) -> Arc<Process> {
     launch(role)
         .crash_dumps(dir)
@@ -791,6 +969,7 @@ fn spawn_crashing(role: &str, dir: &std::path::Path) -> Arc<Process> {
 
 /// The minidump of a crashed child (crashpad's model, `crash_dump`): the child's filter has the
 /// browser write it, then the browser ends the child with the exception's code.
+#[cfg(windows)]
 #[test]
 fn a_crashed_child_leaves_a_minidump_and_its_exception_code() {
     for (role, code) in [("crash-av", 0xC000_0005u32), ("crash-stack", 0xC000_00FD)] {
@@ -808,6 +987,7 @@ fn a_crashed_child_leaves_a_minidump_and_its_exception_code() {
 }
 
 /// Without the child's handler there is nothing to write: the child ends as before, with its code.
+#[cfg(windows)]
 #[test]
 fn a_child_without_the_handler_leaves_no_dump() {
     let dir = dump_dir("none");
@@ -819,6 +999,7 @@ fn a_child_without_the_handler_leaves_no_dump() {
 
 /// Two threads that crash together give one dump; the second waits in the filter until the browser
 /// ends the process.
+#[cfg(windows)]
 #[test]
 fn two_threads_crashing_give_one_dump() {
     let dir = dump_dir("two");
@@ -830,6 +1011,7 @@ fn two_threads_crashing_give_one_dump() {
 }
 
 /// A folder keeps the newest few dumps only.
+#[cfg(windows)]
 #[test]
 fn a_dump_folder_keeps_the_newest_dumps() {
     let dir = dump_dir("keep");
@@ -873,13 +1055,6 @@ fn a_full_queue_stops_reading_and_nothing_is_lost() {
         }
     }
     p.kill();
-}
-
-fn handle_count() -> u32 {
-    let mut n = 0;
-    // SAFETY: an out value on the pseudo handle of this process.
-    unsafe { GetProcessHandleCount(GetCurrentProcess(), &mut n).unwrap() };
-    n
 }
 
 /// One child: start, one call, kill. Everything of it is gone when this returns.
