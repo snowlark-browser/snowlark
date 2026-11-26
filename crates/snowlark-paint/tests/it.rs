@@ -2,11 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+//! They paint and shape through the Windows half (Direct2D, DirectWrite), so they build on Windows
+//! only until the other platforms have those halves.
+//!
 //! All of this crate's integration tests in one test binary (one link instead of 2; each file
 //! below is a module, so a test's name is `<file>::<test>`: `--test it csp::` runs one file's tests).
 //! A new file in `tests/` needs one `mod` line here; `every_test_file_is_listed` fails if it is missing.
 //! A test that needs a process of its own (process-wide state it changes) gets its own `[[test]]`
 //! target in Cargo.toml instead.
+#![cfg(windows)]
 
 mod backdrop;
 mod bench;

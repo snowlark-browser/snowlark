@@ -27,7 +27,7 @@ use crate::com;
 use crate::display_list::*;
 use crate::filter::FilterRange;
 use crate::geom::{Color, Matrix, Point, Radii, Rect, Sides, Size, Snap};
-use crate::image::{DecodedImage, ImageStore, Pixmap, ShownImage};
+use crate::image::{DecodedImage, Pixmap, ShownImage};
 
 /// Where a list's [`FontId`]s resolve: the [`crate::TextEngine`] that shaped its glyphs, or, on the
 /// far side of the raster seam, a [`crate::raster_tables::FontTable`].
@@ -47,52 +47,13 @@ impl<T: FontResolver + ?Sized> FontResolver for Arc<T> {
     }
 }
 
-/// Where a list's [`ImageId`]s resolve: the page's [`ImageStore`], or, on the far side of the raster
-/// seam, a [`crate::raster_tables::ImageTable`].
-pub trait ImageResolver {
-    /// What `id` shows now.
-    fn shown(&self, id: ImageId) -> Option<ShownImage>;
-    /// [`ImageStore::version`].
-    fn version(&self, id: ImageId) -> u64;
-}
-
-impl ImageResolver for ImageStore {
-    fn shown(&self, id: ImageId) -> Option<ShownImage> {
-        self.shown(id)
-    }
-
-    fn version(&self, id: ImageId) -> u64 {
-        self.version(id)
-    }
-}
-
-impl<T: ImageResolver + ?Sized> ImageResolver for Arc<T> {
-    fn shown(&self, id: ImageId) -> Option<ShownImage> {
-        (**self).shown(id)
-    }
-
-    fn version(&self, id: ImageId) -> u64 {
-        (**self).version(id)
-    }
-}
+pub use snowlark_graphics::raster::{ImageResolver, Viewport};
 
 /// What a display list refers to: the fonts that shaped its glyphs and the images it shows.
 #[derive(Clone, Copy)]
 pub struct Sources<'a> {
     pub text: &'a dyn FontResolver,
     pub images: &'a dyn ImageResolver,
-}
-
-/// The output size and how CSS pixels map onto it.
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Viewport {
-    /// Device pixels.
-    pub width: u32,
-    pub height: u32,
-    /// Device pixels per CSS pixel.
-    pub scale: f32,
-    /// Filled first. An opaque background makes the target opaque (24-bit, ClearType text).
-    pub background: Color,
 }
 
 pub(crate) fn rect_f(r: &Rect) -> D2D_RECT_F {

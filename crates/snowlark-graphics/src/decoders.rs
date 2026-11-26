@@ -12,11 +12,9 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
-use windows::core::Result;
-use windows::Win32::Foundation::{E_INVALIDARG, E_OUTOFMEMORY};
-
 use crate::color_profile::{transform_for, ColorInfo, ColorTransform};
 use crate::image::{Frame, MAX_PIXELS};
+use crate::{Error, Result};
 
 /// The formats decoded here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,8 +45,8 @@ pub(crate) fn sniff(bytes: &[u8]) -> Option<Format> {
     }
 }
 
-pub(crate) fn invalid() -> windows::core::Error {
-    E_INVALIDARG.into()
+pub(crate) fn invalid() -> Error {
+    Error::Invalid
 }
 
 /// An image's size, refused when it is empty or larger than [`MAX_PIXELS`].
@@ -57,7 +55,7 @@ pub(crate) fn check_size(width: u32, height: u32) -> Result<()> {
         return Err(invalid());
     }
     if width as u64 * height as u64 > MAX_PIXELS {
-        return Err(E_OUTOFMEMORY.into());
+        return Err(Error::TooLarge);
     }
     Ok(())
 }
@@ -446,9 +444,9 @@ pub(crate) fn webp(bytes: &[u8]) -> Result<Frame> {
 /// it AVIF goes to WIC.
 pub(crate) const AVIF: bool = dav1d_sys::LINKED;
 
-fn avif_error(e: crabby_avif::AvifError) -> windows::core::Error {
+fn avif_error(e: crabby_avif::AvifError) -> Error {
     match e {
-        crabby_avif::AvifError::OutOfMemory => E_OUTOFMEMORY.into(),
+        crabby_avif::AvifError::OutOfMemory => Error::TooLarge,
         _ => invalid(),
     }
 }

@@ -36,7 +36,8 @@ Two native libraries are built once from their official source and found by `dev
 ANGLE, for WebGL (`tools\angle\build.ps1`, `docs/webgl.md`), and dav1d, the AV1 decoder of AVIF images
 (`.\tools\dav1d\build.ps1`: a static library of the release `tools\dav1d\pin.txt` names, about two minutes; it
 fetches NASM, meson and ninja for itself). Without ANGLE the build has no WebGL; without dav1d it decodes AVIF
-through Windows' codec instead, and the AVIF tests in `snowlark-paint` fail.
+through Windows' codec instead, and the AVIF tests in `snowlark-graphics` fail. (For Linux, the folder holds
+`libdav1d.a` in place of `dav1d.lib`.)
 
 `snowlark.exe` is a Windows-subsystem program: the window opens without a console, and PowerShell neither waits
 for it nor captures its output. Scripts use `snowlark-cli.exe`, the same program built for the console
@@ -191,7 +192,7 @@ describes the micro benchmarks (`bench/micro`, `tools/micro-bench/run.py`), the 
   `idl/`. If an interface or member is missing, add its implementation; never add an ad-hoc V8 property.
 - **Dependency direction** is as `ARCHITECTURE.md` draws it. `snowlark-dom` must not depend on V8, style or
   layout. A lower crate that needs something from above gets a trait or a callback.
-- **`unsafe`** only in `snowlark-js`, `snowlark-paint`, `snowlark-media/src/win`, `snowlark-ipc`, `snowlark-gl` and generated
+- **`unsafe`** only in `snowlark-js`, `snowlark-paint`, `snowlark-graphics/src/ticks.rs` (the Windows clock), `snowlark-media/src/win`, `snowlark-ipc`, `snowlark-gl` and generated
   code, each block with a `// SAFETY:` comment.
 - **Process isolation** ([docs/process-isolation.md](docs/process-isolation.md)): no new shared object in
   `TabContext`, `DriverContext` or `PageOptions` without a message-shaped trait. No `std::fs` or OS calls in

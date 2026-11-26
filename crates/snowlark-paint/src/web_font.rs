@@ -20,7 +20,10 @@ use std::ffi::c_int;
 
 use snowlark_ots_sys as ffi;
 
-use crate::raster_tables::MAX_FONT_BYTES;
+use crate::text::TextEngineError;
+
+/// The largest font file: a web font OTS reads or writes, a font file the raster side takes.
+pub const MAX_FONT_BYTES: usize = 64 << 20;
 
 /// Why a web font file was refused: OTS's messages (one per line), or that it is too large.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,12 +42,12 @@ impl std::error::Error for FontRejected {}
 pub enum FontLoadError {
     /// OTS refused the file.
     Rejected(FontRejected),
-    /// DirectWrite refused what OTS made of it.
-    TextEngine(windows::core::Error),
+    /// The text engine (DirectWrite) refused what OTS made of it.
+    TextEngine(TextEngineError),
 }
 
-impl From<windows::core::Error> for FontLoadError {
-    fn from(e: windows::core::Error) -> Self {
+impl From<TextEngineError> for FontLoadError {
+    fn from(e: TextEngineError) -> Self {
         FontLoadError::TextEngine(e)
     }
 }

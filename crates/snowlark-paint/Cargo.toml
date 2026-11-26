@@ -6,17 +6,13 @@ license.workspace = true
 autotests = false
 
 [dependencies]
+# The platform-free types (geometry, display list, filters, layer animations), re-exported here.
+snowlark-graphics = { path = "../snowlark-graphics" }
 serde = { version = "1", features = ["derive"] }
-windows-core = "0.62"
-windows-numerics = "0.3"
-# `IAsyncOperation::join` for the PDF renderer's asynchronous calls (`pdf`).
-windows-future = "0.3"
 # The system font database resvg draws SVG and canvas text with (snowlark-render); here only to map
 # its files once ([`font_files::map_all`]), which takes `unsafe`.
 fontdb = "0.24"
 rustc-hash = "2"
-# CRCs of the PNG files made of APNG frames for the PNG decoder (`animation::Apng::frame_png`).
-crc32fast = "1"
 smallvec = { version = "1.13", features = ["union", "const_generics"] }
 # UAX #50 Vertical_Orientation (`text-orientation: mixed`).
 unicode-vo = "0.1"
@@ -25,19 +21,18 @@ unicode-vo = "0.1"
 snowlark-ots-sys = { path = "../snowlark-ots-sys" }
 flate2 = "1"
 brotli-decompressor = "5"
-# Image decoders (`decoders`) and colour management (`color_profile`).
-gif = "0.14"
-image-webp = "0.2"
-png = "0.18"
-qcms = "0.3"
-zune-core = "0.5"
-zune-jpeg = "0.5"
-# AVIF (`decoders::avif`): CrabbyAvif, with dav1d decoding the AV1 frames. `dav1d_sys::LINKED` says whether the
-# build has the library (tools/dav1d/build.ps1); without it AVIF goes through WIC.
-crabby-avif = { git = "https://github.com/webmproject/CrabbyAvif", rev = "193e354e10f6a9f82217dfdbae836c4310ea3992", default-features = false, features = ["dav1d"] }
-dav1d-sys = { path = "../../vendor/dav1d-sys" }
 
-[dependencies.windows]
+[target.'cfg(not(windows))'.dependencies]
+# PNG encoding of rendered pixmaps (`image`; Windows' goes through WIC).
+png = "0.18"
+
+[target.'cfg(windows)'.dependencies]
+windows-core = "0.62"
+windows-numerics = "0.3"
+# `IAsyncOperation::join` for the PDF renderer's asynchronous calls (`pdf`).
+windows-future = "0.3"
+
+[target.'cfg(windows)'.dependencies.windows]
 version = "0.62"
 features = [
     # The PDF viewer's rasterizer (`pdf`).

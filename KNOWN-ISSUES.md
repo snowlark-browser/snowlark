@@ -10,6 +10,11 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   minimum when the items overflow, and a single-line `flex-wrap: wrap-reverse` container puts its line at the wrong
   cross edge. `flex-wrap: balance` and `flex-line-count` are not implemented. Both layout bugs are in the vendored
   flex algorithm. (ref 42)
+- **Flex items sized by `aspect-ratio`.** A flex item with a preferred aspect ratio and only absolutely positioned
+  children gets no height from its aspect ratio, so it collapses to 0 px (for example cards on stripe.com). (ref 775)
+- **Pages that time out or never finish their content.** Some sites' bot checks stop at a challenge page (ref 776),
+  some build parts of the page in script that never appear (ref 777), and some reveals that wait for a WebGL canvas
+  or an opacity transition never happen (refs 778, 779).
 - **Grid gaps.** `display: grid-lanes` (masonry) is not implemented. Subgrids in another writing mode or direction than
   their parent are laid out as ordinary grids, a subgrid's items share baselines only within it, and a subgrid's
   `repeat(auto-fill, ...)` line names are taken once. Column flex containers compute no baselines, so `last baseline` alignment falls back

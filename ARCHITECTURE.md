@@ -53,13 +53,16 @@ crates/
   snowlark-layout    Box tree from the styled DOM; block, inline, table and positioned layout ours; flex and
                    grid through taffy's tree traits; fragment tree output; text shaping through DirectWrite
                    (ClearType, system fonts).
-  snowlark-paint     Display list → Direct2D on a per-tab raster thread, tiles, compositor with
-                   DirectComposition; the DirectWrite TextEngine (shaping lives here, not in layout, so
-                   layout → paint is the dependency and painting a fragment tree is layout's job). Images
-                   decoded in Rust (PNG, JPEG, GIF, WebP) with their colour profiles applied (qcms); WIC for
-                   BMP, ICO, TIFF and the other formats Windows has a codec for.
+  snowlark-graphics  What no platform API is behind: geometry, the display list, filters, layer animations,
+                   a canvas's operations as data, the text types every text engine fills in and the cache
+                   of shaped runs, images decoded in Rust (PNG, JPEG, GIF, WebP, AVIF) with their colour
+                   profiles applied (qcms), with an error type of its own. snowlark-paint re-exports it.
+  snowlark-paint     The platform's half of drawing: display list → Direct2D on a per-tab raster thread,
+                   tiles, compositor with DirectComposition; the DirectWrite TextEngine (shaping lives here,
+                   not in layout, so layout → paint is the dependency and painting a fragment tree is
+                   layout's job); WIC for BMP, ICO, TIFF and the other formats Windows has a codec for.
                    Every web font goes through OTS (`web_font`) before DirectWrite reads it, in the renderer
-                   and again on the raster side.
+                   and again on the raster side. A module with a Linux half keeps it in `src/linux/`.
   snowlark-ots-sys   OTS, the OpenType Sanitizer, and the WOFF 2.0 decoder it uses, compiled from vendor/ots and
                    vendor/woff2 with a small C interface; declarations only, the calls are snowlark-paint's.
   snowlark-net       Fetch: HTTP/1.1 and 2 with TLS, cookies, cache, HSTS, mixed-content and CSP checks,
@@ -170,7 +173,7 @@ proxy) across its navigations. They share the address space all the same. The mo
 `docs/process-isolation.md`.
 
 **Security defaults.** Mixed content blocked, HSTS persisted, file:// isolated, CSP enforced from the start,
-`unsafe` only in snowlark-js, snowlark-paint, snowlark-media's Windows half, snowlark-ipc, snowlark-gl (its calls into ANGLE) and the generated
+`unsafe` only in snowlark-js, snowlark-paint, snowlark-graphics's Windows clock (`ticks`), snowlark-media's Windows half, snowlark-ipc, snowlark-gl (its calls into ANGLE) and the generated
 bindings, each `unsafe` block with a comment saying what invariant makes it sound.
 
 **Testing from day one.** `snowlark --wpt <list> <outdir>` runs web-platform-tests headless; `tools/wpt/run.py`
@@ -203,8 +206,8 @@ Snowlark runs only on Windows today. The platform parts (painting and text, GPU 
 window and input, IPC and the process sandbox, the OS calls in `snowlark-shell`) each get a Linux and later a macOS
 half behind one interface, chosen at compile time, so that the engine crates stay platform-free.
 `docs/linux.md` maps every Windows-only part with its Linux counterpart and the Rust options, and lays out the port
-in stages: the platform-free crates check for Linux (`tools/linux/check.ps1`); next, `snowlark-paint` splits into
-a platform-free crate (geometry, the display list, the text types) and its Windows half, so that layout and render
-check too; then the headless modes on Linux, processes, the window, WebGL, media, the sandbox and packaging. The
+in stages: the platform-free crates check for Linux (`tools/linux/check.ps1`); `snowlark-paint` is split into a
+platform-free crate (`snowlark-graphics`: geometry, the display list, the text types, the Rust image decoders) and
+its platform half, so that layout and render check too; next, the headless modes on Linux, processes, the window, WebGL, media, the sandbox and packaging. The
 painting backend, the text stack, the window toolkit, the media stack and the Linux test machine are open
 decisions listed there.

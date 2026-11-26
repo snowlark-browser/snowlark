@@ -446,7 +446,9 @@ def recheck(losses, exe, base_exe, times, jobs=4, have_slot=False):
     either, though the baseline run did. Both failing proves nothing, so it fails the gate like a real loss."""
     sys.path.insert(0, HERE)
     import run as runner
-    work = os.path.join(runner.work_root(), 'work-recheck')
+    # One folder per process: two gates rechecking at once would otherwise read and delete each other's
+    # result files (the part, list and chunk names repeat from run to run).
+    work = os.path.join(runner.work_root(), f'work-recheck-{os.getpid()}')
     os.makedirs(work, exist_ok=True)
     slot = None if have_slot else runner.acquire_slot()  # (held until the process ends)
     server = runner.start_server()

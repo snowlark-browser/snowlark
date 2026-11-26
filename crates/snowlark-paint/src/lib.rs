@@ -2,18 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Snowlark painting: the display list layout produces, and its rasterization with Direct2D.
+//! Snowlark painting: the platform's half of drawing. The display list layout produces, the
+//! geometry, filters, layer animations, the image decoders written in Rust and the text types are
+//! `snowlark-graphics`, re-exported here under the same paths ([`display_list`], [`geom`],
+//! [`filter`], [`layer_animation`], [`color_profile`], [`animation`], ...); this crate has what
+//! sits on the platform's APIs:
 //!
-//! - [`display_list`]: [`DisplayListBuilder`] builds a [`DisplayList`] (plain vectors, items in paint
-//!   order, balanced clip/transform/opacity groups); it can be encoded and validated-decoded.
 //! - [`text`]: [`TextEngine`] on DirectWrite: font lists from CSS family lists, web fonts from memory,
 //!   shaping to glyphs with clusters and break opportunities, fallback, metrics.
 //! - [`text_cache`]: [`TextCache`]: shaped runs, and shaping per word, for text shaped again.
-//! - [`image`]: decoding (PNG, JPEG, GIF and WebP in Rust, `decoders`; the other formats through
-//!   WIC) into an [`ImageStore`] that display lists refer to by [`ImageId`].
-//! - [`color_profile`]: images' colour spaces (ICC profiles, PNG `cICP`, `gAMA` and `cHRM`)
-//!   converted to sRGB.
-//! - [`animation`]: animated images' frame timeline, container parsing and frame composition.
+//! - [`image`]: the formats not decoded in Rust (BMP, ICO, TIFF and others) through WIC, and PNG
+//!   encoding of rendered [`Pixmap`]s.
 //! - [`raster`]: [`HeadlessRenderer`] (software, WIC bitmap) and the painter both paths share.
 //! - [`gpu`]: the shared [`Gpu`] device and per-thread [`TileRasterizer`]s painting 512 px tiles.
 //! - [`canvas`]: [`GpuCanvas`](canvas::GpuCanvas), a `<canvas>` 2D context's bitmap drawn by Direct2D.
@@ -27,52 +26,79 @@
 //! made them. COM objects returned by getters are released by their Rust owners on drop, so nothing
 //! here leaks the references that cost the C# engine 70 MB/s.
 
-pub mod animation;
-pub mod autoscroll_cursor;
+// The platform-free modules live in `snowlark-graphics`; they are re-exported under the same paths.
+// (`image`, `text` and `text_cache` are modules of this crate that re-export theirs.)
+pub use snowlark_graphics::{
+    animation, color_profile, display_list, filter, geom, layer_animation, scroll_curve,
+    svg_filter, ticks,
+};
+
+// Modules with a half per platform: Windows' in `<name>.rs`, Linux's in `linux/<name>.rs`, with
+// the same items. The other platform modules are Windows-only for now (docs/linux.md, "Stages").
+#[cfg_attr(not(windows), path = "linux/canvas.rs")]
 pub mod canvas;
+#[cfg_attr(not(windows), path = "linux/canvas_thread.rs")]
 pub mod canvas_thread;
-pub mod color_profile;
-mod com;
-pub mod compositor;
-pub mod cursors;
-mod decoders;
-pub mod demo;
-pub mod display_list;
-pub mod drop_target;
-mod effects;
-pub mod filter;
-pub mod font_files;
-pub mod geom;
+#[cfg_attr(not(windows), path = "linux/gpu.rs")]
 pub mod gpu;
+#[cfg_attr(not(windows), path = "linux/image.rs")]
 pub mod image;
+#[cfg_attr(not(windows), path = "linux/raster.rs")]
+pub mod raster;
+#[cfg_attr(not(windows), path = "linux/text.rs")]
+pub mod text;
+#[cfg_attr(not(windows), path = "linux/text_cache.rs")]
+pub mod text_cache;
+
+pub mod autoscroll_cursor;
+#[cfg(windows)]
+mod com;
+#[cfg(windows)]
+pub mod compositor;
+#[cfg(windows)]
+pub mod cursors;
+#[cfg(windows)]
+pub mod demo;
+#[cfg(windows)]
+pub mod drop_target;
+#[cfg(windows)]
+mod effects;
+pub mod font_files;
+#[cfg(windows)]
 mod ink;
 pub mod input;
-pub mod layer_animation;
+#[cfg(windows)]
 pub mod os_crypt;
+#[cfg(windows)]
 pub mod pdf;
 pub mod placement;
-pub mod raster;
+#[cfg(windows)]
 pub mod raster_tables;
-pub mod scroll_curve;
+#[cfg(windows)]
 mod soft_blur;
+#[cfg(windows)]
 mod svg_effects;
-pub mod svg_filter;
-pub mod text;
-pub mod text_cache;
-pub mod ticks;
+#[cfg(windows)]
 pub mod timer_resolution;
+#[cfg(windows)]
 pub mod video;
+#[cfg(windows)]
 pub mod vsync;
 pub mod web_font;
+#[cfg(windows)]
 pub mod window;
 
+#[cfg(windows)]
 pub use compositor::{Compositor, ContentPass};
 pub use display_list::*;
 pub use filter::{ColorFilter, ColorFilters, FilterOp, FilterRange};
 pub use geom::*;
-pub use gpu::{Driver, Gpu, RasterStats, RasterWork, TileRasterizer, TiledFrame, TILE_SIZE};
+pub use gpu::Driver;
+#[cfg(windows)]
+pub use gpu::{Gpu, RasterStats, RasterWork, TileRasterizer, TiledFrame, TILE_SIZE};
 pub use image::{DecodedImage, Frame, ImageStore, Pixmap, ShownImage};
 pub use raster::{FontResolver, HeadlessRenderer, ImageResolver, Sources, Viewport};
+#[cfg(windows)]
 pub use raster_tables::{
     FileHead, FontFile, FontSource, FontTable, ImageTable, Refused, Resource, ResourceHead,
     SystemFontFiles, MAX_FONT_AXES, MAX_FONT_PATH, MAX_LIST_BYTES, MAX_TILES,
@@ -80,7 +106,10 @@ pub use raster_tables::{
 pub use text::*;
 pub use text_cache::{ShapeCache, ShapeKey, TextCache, WordCache, WordCacheStats};
 pub use ticks::Ticks;
+#[cfg(windows)]
 pub use video::{VideoSlot, VideoStore};
+#[cfg(windows)]
 pub use window::{WindowHandle, WindowProxy};
 /// The error type of the Windows graphics calls (an HRESULT with its message).
+#[cfg(windows)]
 pub use windows::core::{Error as WinError, Result as WinResult};

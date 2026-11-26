@@ -21,7 +21,8 @@ pub fn map_all(db: &mut fontdb::Database) {
         }
         // SAFETY: the mapping is read-only and lives as long as the database. A mapped file must
         // not change under it: Windows refuses writes to a file with a mapped view, and system
-        // fonts are replaced, not edited, by installers.
+        // fonts are replaced, not edited, by installers (Linux package managers write a new file
+        // and rename it over the old one, which leaves the mapped file as it was).
         let _ = unsafe { db.make_shared_face_data(id) };
     }
 }

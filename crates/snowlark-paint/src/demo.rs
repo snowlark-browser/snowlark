@@ -10,7 +10,7 @@ use windows::core::Result;
 
 use crate::display_list::*;
 use crate::geom::{Color, Matrix, Point, Radii, Rect, Sides, Size};
-use crate::image::{bmp_from_rgba, decode, ImageStore};
+use crate::image::{bmp_from_rgba, decode_wic, ImageStore};
 use crate::text::{
     Direction, FontQuery, FontStretch, FontStyle, ShapeOptions, ShapedText, TextEngine,
 };
@@ -420,7 +420,7 @@ pub fn build(text: &TextEngine, images: &ImageStore) -> Result<DisplayList> {
     )?;
 
     // A rotated layer at 75% opacity: a radial gradient card with text and the disc image.
-    let disc_id = images.add(decode(&bmp_from_rgba(128, 128, &disc(128)))?);
+    let disc_id = images.add(decode_wic(&bmp_from_rgba(128, 128, &disc(128)))?);
     let layer = Rect::new(90.0, 600.0, 470.0, 300.0);
     let center = Point::new(layer.x + layer.width / 2.0, layer.y + layer.height / 2.0);
     b.push_transform(Matrix::rotation_about(-8f32.to_radians(), center));
@@ -490,7 +490,7 @@ pub fn build(text: &TextEngine, images: &ImageStore) -> Result<DisplayList> {
     b.pop_transform();
 
     // Decoded images: the disc at its size and larger, and pixel art scaled up crisply.
-    let face_id = images.add(decode(&bmp_from_rgba(12, 12, &face()))?);
+    let face_id = images.add(decode_wic(&bmp_from_rgba(12, 12, &face()))?);
     b.image(
         disc_id,
         Rect::new(690.0, 680.0, 128.0, 128.0),

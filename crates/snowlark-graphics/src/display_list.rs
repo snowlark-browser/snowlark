@@ -7,8 +7,8 @@
 //! vectors that items index by range, so building a list allocates nothing per item: a list that is
 //! cleared and rebuilt every frame reuses its vectors.
 //!
-//! Fonts and images are referenced by id ([`FontId`] from [`crate::TextEngine`], [`ImageId`] from
-//! [`crate::ImageStore`]), so a list is plain data: it can be encoded to bytes ([`DisplayList::encode`])
+//! Fonts and images are referenced by id ([`FontId`] from `TextEngine` (`snowlark-paint`), [`ImageId`] from
+//! `ImageStore`), so a list is plain data: it can be encoded to bytes ([`DisplayList::encode`])
 //! and decoded again ([`DisplayList::decode`]), which checks every range and the push/pop nesting, so a
 //! list from another process can't make the rasterizer read out of bounds.
 
@@ -18,15 +18,15 @@ use crate::filter::{ColorFilters, FilterOp, FilterRange};
 use crate::geom::{Color, Matrix, Point, Radii, Rect, Sides, Size};
 use crate::svg_filter::SvgFilter;
 
-/// A font face registered with the [`crate::TextEngine`] that shaped the glyphs.
+/// A font face registered with the `TextEngine` (`snowlark-paint`) that shaped the glyphs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct FontId(pub u32);
 
-/// A decoded image registered with an [`crate::ImageStore`].
+/// A decoded image registered with an `ImageStore`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ImageId(pub u32);
 
-/// A video element's frames in a [`crate::video::VideoStore`]: the compositor draws the latest one.
+/// A video element's frames in a `VideoStore` (`snowlark-paint`): the compositor draws the latest one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct VideoId(pub u32);
 
@@ -587,7 +587,7 @@ pub enum Item {
     /// A video's current frame drawn into `dest` (its `object-fit` rectangle), clipped to `clip` (the
     /// element's content box). A rasterizer draws `image` (the frame copied to memory, or nothing:
     /// black); a compositor that has the video's frames on the GPU draws the latest one over it, at
-    /// the display's rate (see [`crate::video`]).
+    /// the display's rate (see `snowlark-paint`'s `video`).
     Video {
         video: VideoId,
         image: Option<ImageId>,
@@ -3402,7 +3402,7 @@ impl DisplayListBuilder {
 
 /// A fast 64-bit hash of bytes (FxHash's mixing over 8-byte words): not for adversarial input, only
 /// for telling apart what a page painted from one frame to the next.
-pub(crate) fn hash_bytes(bytes: &[u8]) -> u64 {
+pub fn hash_bytes(bytes: &[u8]) -> u64 {
     const K: u64 = 0x517c_c1b7_2722_0a95;
     let mut h = bytes.len() as u64;
     let (chunks, rest) = bytes.as_chunks::<8>();
@@ -3418,7 +3418,7 @@ pub(crate) fn hash_bytes(bytes: &[u8]) -> u64 {
 }
 
 /// Folds `v` into the running hash `h` (order matters).
-pub(crate) fn hash_combine(h: u64, v: u64) -> u64 {
+pub fn hash_combine(h: u64, v: u64) -> u64 {
     (h.rotate_left(5) ^ v).wrapping_mul(0x517c_c1b7_2722_0a95)
 }
 

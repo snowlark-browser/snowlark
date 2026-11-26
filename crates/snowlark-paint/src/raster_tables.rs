@@ -28,8 +28,8 @@ use crate::raster::{FontResolver, ImageResolver};
 
 /// The most fonts a table holds: ids are small numbers, handed out from zero.
 pub const MAX_FONTS: u32 = 1 << 16;
-/// The largest font file a table takes.
-pub const MAX_FONT_BYTES: usize = 64 << 20;
+/// The largest font file a table takes (the largest web font too).
+pub use crate::web_font::MAX_FONT_BYTES;
 /// The most bytes of lists a frame can have: about a million items, where a long page's band has
 /// tens of thousands.
 pub const MAX_LIST_BYTES: usize = 256 << 20;

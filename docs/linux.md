@@ -8,7 +8,8 @@ free of platform code; each platform part sits behind one interface with a Windo
 
 **These crates check for Linux** (`cargo check --target x86_64-unknown-linux-gnu`, tests included), from
 Windows: `snowlark-dom`, `snowlark-idl`, `snowlark-audio`, `snowlark-idb`, `snowlark-style`, `snowlark-net`,
-`snowlark-js` and `snowlark-bindings`. Keep them so:
+`snowlark-js`, `snowlark-bindings`, `snowlark-graphics`, `snowlark-paint`, `snowlark-layout` and `snowlark-render`.
+Keep them so:
 
 ```powershell
 .\tools\linux\check.ps1
@@ -20,6 +21,9 @@ It needs the target once (`rustup target add x86_64-unknown-linux-gnu`). Build s
 
 **Built and tested on Linux:** `snowlark-dom`, `snowlark-idl`, `snowlark-audio`, `snowlark-idb`, `snowlark-style`
 and `snowlark-net` build natively and pass their tests there (11 test binaries, 588 tests, none failing).
+`snowlark-graphics` and `snowlark-paint` build and pass their tests too (115 tests), except `snowlark-graphics`'s
+six AVIF tests, which need the dav1d library (below). `snowlark-layout` and `snowlark-render` build and link with
+their tests; those tests need a text engine, which Linux does not have yet.
 
 ### A Linux machine for building
 
@@ -35,7 +39,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profil
     --default-toolchain stable -c rustfmt -c clippy
 git clone <the repository> snowlark && cd snowlark
 cargo test --profile iter --no-fail-fast -p snowlark-dom -p snowlark-idl -p snowlark-audio -p snowlark-idb \
-    -p snowlark-style -p snowlark-net
+    -p snowlark-style -p snowlark-net -p snowlark-graphics -p snowlark-paint
 ```
 
 The fontconfig and FreeType headers are for the text engine of stage 3. Add `-j <n>` on a machine other work
@@ -62,15 +66,31 @@ for Linux, as the Windows library is built (`docs/v8-build.md`), is the first st
 - The C runtime's heap on mimalloc (`crt_heap.rs`) is only for the static MSVC runtime; on Linux the allocator is
   set in the binary as on Windows.
 
-**What stops the rest: `snowlark-paint`.** `snowlark-layout` and `snowlark-render` depend on it for platform-free
-things (geometry, the display list, layer animations, filter geometry, the text types) and for one platform
-thing: the `TextEngine`, which is DirectWrite. Every module of `snowlark-paint` sits in one crate whose
-dependencies include `windows` unconditionally, and many platform-free modules use `windows::core::Result` as their
-error type (the Rust image decoders in `decoders.rs`, for example). Every crate above layout (`snowlark-render`,
-`-page`, `-tab`, `-media`, `-shell`, `-blocker`, the binary) waits on stage 2 below.
+**Painting: `snowlark-graphics` and `snowlark-paint`.** What no platform API is behind is in `snowlark-graphics`:
+geometry, the display list, filters, layer animations, scroll curves, a canvas's operations as data, the text types
+every text engine fills in (font queries, shaping options, shaped runs and clusters) and the cache of shaped runs,
+the image decoders written in Rust (PNG, JPEG, GIF, WebP, AVIF) with colour profiles and animation, the image
+store, and `Ticks` (the performance counter on Windows, `CLOCK_MONOTONIC` on Linux). Its errors are its own
+(`snowlark_graphics::Error`). `snowlark-paint` re-exports all of it under the same paths and keeps the platform's
+half; a module with a Linux half has it in `src/linux/<module>.rs` under the same name, with the same items:
+
+- `text`: `TextEngine` with the Windows engine's methods and no fonts. `TextEngine::new` fails, and the type holds
+  an uninhabited value, so its methods provably never run; `text_cache`'s per-word cache (whose segments follow the
+  engine's script analysis) holds nothing.
+- `raster`: `HeadlessRenderer`, which cannot be made either; `canvas_thread`: the GPU canvas, which cannot be made,
+  so `snowlark-render` draws canvases on its CPU backend; `gpu`: only the `Driver` choice.
+- `image`: the formats Windows decodes through WIC (BMP, ICO, TIFF) are refused (`Error::Unsupported`); rendered
+  pixmaps are written as PNG with the `png` crate.
+
+The rest of `snowlark-paint` (the compositor, tiles, video, the window, cursors, the clipboard, the PDF viewer, the
+password store's key) is Windows-only and compiled out elsewhere; its integration tests too. Every crate above
+render (`snowlark-page`, `-tab`, `-media`, `-shell`, `-blocker`, the binary) waits on stage 3 and later.
 
 `snowlark-gl` (ANGLE), `snowlark-ipc` (pipes, sections, process launch), `snowlark-media` (Media Foundation,
 PlayReady, WASAPI) and the window half of `snowlark-paint` are platform halves by nature: each gets a Linux half.
+
+`snowlark-graphics`'s AVIF decoder needs the dav1d library as on Windows (`SNOWLARK_DAV1D_DIR` naming a folder that
+holds `libdav1d.a`); without it AVIF images are refused on Linux, where there is no system decoder to fall back on.
 
 ## The map
 
@@ -113,12 +133,12 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 
 | Interface | Today | Needed |
 |---|---|---|
-| Text engine: font lists, shaping, metrics, outlines | `TextEngine` struct in `snowlark-paint` `text.rs` (its shaped-text types above it are platform-free) | the same methods on a Linux `TextEngine`; the types and the shape cache moved where layout reaches them without the rest of paint |
-| Raster: a display list into pixels | `raster.rs` painter over a Direct2D device context | a painter over the chosen 2D library; `HeadlessRenderer` first (headless modes and reftests) |
-| Tiles and the compositor | `gpu.rs` `TileRasterizer`, `compositor.rs` `Compositor` | the same over GL or Vulkan |
-| Window | `snowlark-paint` `window.rs` `Window`, `Event`, `WindowProxy` | a Wayland half and an X11 half |
+| Text engine: font lists, shaping, metrics, outlines | `TextEngine` in `snowlark-paint` `text.rs`; the text types and the run cache in `snowlark-graphics` | `linux/text.rs` has the methods and no engine yet: fontconfig, FreeType and HarfBuzz behind them |
+| Raster: a display list into pixels | `raster.rs` painter over a Direct2D device context | `linux/raster.rs` has `HeadlessRenderer`'s methods and no backend yet: a painter over Skia, `HeadlessRenderer` first (headless modes and reftests) |
+| Tiles and the compositor | `gpu.rs` `TileRasterizer`, `compositor.rs` `Compositor` | the same over Skia's GPU backend (GL or Vulkan) |
+| Window | `snowlark-paint` `window.rs` `Window`, `Event`, `WindowProxy` | a Wayland half (X11 desktops through XWayland) |
 | Process boundary | `snowlark-ipc`'s `Link`, `Section`, `RemoteHandle`, `launch` (with `win/` as the only half) | a `posix/` half under the same names |
-| Media player | `snowlark-media` `win/` (`Player`, MSE) | an FFmpeg (or GStreamer) half |
+| Media player | `snowlark-media` `win/` (`Player`, MSE) | an FFmpeg half |
 | ANGLE | `snowlark-gl` `ffi.rs` loads two libraries by name | the `.so` names |
 | OS services | `os_crypt.rs`, shell `profile.rs`, `downloads_ui.rs` | a function each behind `cfg` |
 
@@ -127,31 +147,38 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | Stage | What | Size | Ends with |
 |---|---|---|---|
 | 1 | The map, the Linux check of the platform-free crates, this plan | S | done: `tools/linux/check.ps1` green for eight crates; six of them built and tested on Linux |
-| 2 | **Split `snowlark-paint`**: the platform-free modules (geometry, display list, layer animation, filters, scroll curves, colour profiles, the Rust image decoders, the text types and shape cache) into a crate of their own with their own error type; the Windows half keeps Direct2D, DirectWrite and the window. A Linux `TextEngine` stub with the same methods (no fonts) so layout checks | M | `snowlark-layout` and `snowlark-render` in `check.ps1`; nothing changes on Windows (WPT gate) |
-| 3 | **Headless on Linux**: V8 for Linux; the Itanium declarations in `snowlark-js`; the Linux text engine (fontconfig, shaping, outlines); a CPU raster backend for `HeadlessRenderer`; WIC formats in Rust. `--eval`, `--render`, `--wpt` and reftests run on Linux | L | WPT on Linux within a known distance of the Windows counts, read per area |
+| 2 | **Split `snowlark-paint`**: the platform-free modules (geometry, display list, layer animation, filters, scroll curves, colour profiles, the Rust image decoders, the text types and shape cache, a canvas's operations) into `snowlark-graphics` with its own error type; the Windows half keeps Direct2D, DirectWrite and the window. Linux halves of the text engine, the headless renderer and the GPU canvas with the same methods and nothing behind them | M | done: `snowlark-graphics`, `-paint`, `-layout` and `-render` in `check.ps1`; nothing changes on Windows (WPT gate) |
+| 3 | **Headless on Linux**: V8 for Linux; the Itanium declarations in `snowlark-js`; the Linux text engine (fontconfig, FreeType, HarfBuzz); Skia behind `HeadlessRenderer`; WIC formats in Rust. `--eval`, `--render`, `--wpt` and reftests run on Linux | L | WPT on Linux within a known distance of the Windows counts, read per area |
 | 4 | **Processes**: the `posix/` half of `snowlark-ipc` (sockets, descriptor passing, memfd sections, launch, a fork server), crash dumps | M | the renderer process model on Linux; IPC tests green there |
-| 5 | **The window**: Wayland first (X11 after, or through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on GL or Vulkan | L | a usable window on a Linux desktop |
+| 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop |
 | 6 | **WebGL** on ANGLE for Linux | S | the WebGL conformance areas as on Windows |
-| 7 | **Media**: playback and MSE on FFmpeg (or GStreamer), audio output; hardware decoding later | L | `<video>`, `<audio>`, MSE sites play |
+| 7 | **Media**: playback and MSE on FFmpeg, audio output; hardware decoding later | L | `<video>`, `<audio>`, MSE sites play |
 | 8 | **Sandbox**: namespaces and seccomp-bpf for renderers, a font broker | L | a renderer that cannot open a file or a socket |
 | 9 | **OS integration and distribution**: profile folders, the password store's key, PDF, opening downloads, packages and their signing | M | a package a user can install |
 
-Stages 2 and 3 need no window and no decision on the window toolkit; stage 3 needs the painting backend and the
-text stack decided, and a Linux machine. Stages 4 and 5 can go side by side; 6 follows 5. The sandbox (8) comes
+Stages 2 and 3 need no window; stage 3 builds on the painting backend and the text stack decided below. Stages 4
+and 5 can go side by side; 6 follows 5. The sandbox (8) comes
 before Linux builds are offered to users, as on Windows.
 
-## Decisions still open
+## Decisions
 
-1. **The painting backend** (before stage 3): Skia, Vello or tiny-skia, and whether Windows moves to it too (one
-   backend for both, or Direct2D kept on Windows). tiny-skia is enough for headless runs and costs nothing new;
-   the window needs a GPU backend.
-2. **The text stack** (before stage 3): fontconfig with Rust shaping and outlines (harfrust or rustybuzz, skrifa),
-   or the C FreeType and HarfBuzz.
-3. **The window toolkit** (before stage 5): Wayland and X11 directly, or winit.
-4. **The media stack** (before stage 7): FFmpeg or GStreamer, and which codecs ship.
-5. **A Linux desktop machine** (before stage 5): WSL with Ubuntu serves stages 2 to 4 (headless, WPT,
-   processes); the window, the GPU and vsync need a real Linux box or a virtual machine with its own GPU.
-6. **Distribution** (stage 9): deb and rpm repositories, Flatpak, AppImage; how updates reach users.
-7. **DRM on Linux**: none unless a CDM is chosen.
+1. **Painting: Skia on Linux** (through the `skia-safe` bindings). The web's painting model (filters, blend modes,
+   paths, GPU raster) is what Skia was built for; Vello is not complete enough for a browser yet, and tiny-skia
+   draws on the CPU only. **Windows stays on Direct2D** behind the same interface; moving Windows to Skia is a
+   later decision, made with measurements.
+2. **Text: fontconfig, FreeType and HarfBuzz** (the C libraries). Font matching, fallback and shaping must match
+   what pages expect across scripts and OpenType features, and these are the proven libraries for it; Skia
+   already uses FreeType.
+3. **Window: Wayland directly** (`smithay-client-toolkit` or an equivalent), not winit: a browser needs IME, the
+   clipboard, drag and drop, popups and fractional scaling under its own control. X11 desktops run it through
+   XWayland at first; a native X11 half only if measurements show it is needed.
+4. **Media: FFmpeg** from the system's libraries (linked dynamically), with VA-API for hardware decoding later.
+   Snowlark ships no codecs of its own on Linux.
+5. **Test machine: WSL with Ubuntu** for stages 2 to 4 and the first window (WSLg is a Wayland compositor).
+   Performance and real-desktop checks need a Linux machine or a virtual machine with its own GPU.
+6. **Packaging: a `.tar.gz` preview first** (unpack and run, with the same signed update check as the Windows
+   zip), Flatpak after it, distribution packages (deb, rpm) later.
+7. **DRM on Linux: none** for now.
 
-Every new large dependency (Skia, FFmpeg, fontconfig, a toolkit) waits for its decision.
+Each new large dependency these bring (Skia, FreeType, HarfBuzz, fontconfig, FFmpeg) is added in the stage that
+needs it.

@@ -13,7 +13,12 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=SNOWLARK_DAV1D_DIR");
     let dir = std::env::var_os("SNOWLARK_DAV1D_DIR").map(PathBuf::from);
-    let lib = dir.as_ref().map(|d| d.join("dav1d.lib"));
+    // (the library for the target being built: MSVC's name on Windows, the archive's elsewhere)
+    let file = match std::env::var("CARGO_CFG_TARGET_ENV").as_deref() {
+        Ok("msvc") => "dav1d.lib",
+        _ => "libdav1d.a",
+    };
+    let lib = dir.as_ref().map(|d| d.join(file));
     match (&dir, &lib) {
         (Some(dir), Some(lib)) if lib.is_file() => {
             println!("cargo:rerun-if-changed={}", lib.display());

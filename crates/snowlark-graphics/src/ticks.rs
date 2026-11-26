@@ -3,41 +3,68 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! A moment in time that can cross a process boundary. [`std::time::Instant`] means nothing outside
-//! its process and has no value to send, but on Windows it reads the performance counter, whose
-//! ticks are valid system-wide: a time stamp in a message is a [`Ticks`].
+//! its process and has no value to send, but the clock it reads is valid system-wide (Windows'
+//! performance counter, Linux's monotonic clock): a time stamp in a message is a [`Ticks`].
 
-use std::sync::OnceLock;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
 
-/// A reading of the system's performance counter.
+use clock::{frequency, read};
+
+/// A reading of the system's monotonic clock (on Windows, the performance counter).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Ticks(i64);
 
-/// Counter ticks per second (fixed at boot).
-fn frequency() -> i64 {
-    static FREQUENCY: OnceLock<i64> = OnceLock::new();
-    *FREQUENCY.get_or_init(|| {
-        let mut f = 0;
-        // SAFETY: the call writes one i64 to the valid reference it is given, and it cannot fail
-        // from Windows XP on (it is checked anyway: a zero would divide below).
-        let read = unsafe { QueryPerformanceFrequency(&mut f) };
-        if read.is_ok() && f > 0 {
-            f
-        } else {
-            1
-        }
-    })
+#[cfg(windows)]
+mod clock {
+    use std::sync::OnceLock;
+
+    use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
+
+    /// Counter ticks per second (fixed at boot).
+    pub fn frequency() -> i64 {
+        static FREQUENCY: OnceLock<i64> = OnceLock::new();
+        *FREQUENCY.get_or_init(|| {
+            let mut f = 0;
+            // SAFETY: the call writes one i64 to the valid reference it is given, and it cannot fail
+            // from Windows XP on (it is checked anyway: a zero would divide below).
+            let read = unsafe { QueryPerformanceFrequency(&mut f) };
+            if read.is_ok() && f > 0 {
+                f
+            } else {
+                1
+            }
+        })
+    }
+
+    pub fn read() -> i64 {
+        let mut t = 0;
+        // SAFETY: the call writes one i64 to the valid reference it is given.
+        let _ = unsafe { QueryPerformanceCounter(&mut t) };
+        t
+    }
+}
+
+#[cfg(not(windows))]
+mod clock {
+    use rustix::time::{clock_gettime, ClockId};
+
+    /// Nanoseconds per second: readings are `CLOCK_MONOTONIC` in nanoseconds (the clock
+    /// `Instant` reads; one for the whole system).
+    pub fn frequency() -> i64 {
+        1_000_000_000
+    }
+
+    pub fn read() -> i64 {
+        let t = clock_gettime(ClockId::Monotonic);
+        t.tv_sec.saturating_mul(1_000_000_000) + t.tv_nsec
+    }
 }
 
 impl Ticks {
     pub fn now() -> Ticks {
-        let mut t = 0;
-        // SAFETY: the call writes one i64 to the valid reference it is given.
-        let _ = unsafe { QueryPerformanceCounter(&mut t) };
-        Ticks(t)
+        Ticks(read())
     }
 
     /// The time from `earlier` to this reading (none when `earlier` is the later one).

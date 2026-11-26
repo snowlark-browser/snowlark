@@ -18,7 +18,8 @@ $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 # The crates that check on Linux today; a crate joins when it does (docs/linux.md, "Where it stands").
 $crates = @(
     'snowlark-dom', 'snowlark-idl', 'snowlark-audio', 'snowlark-idb', 'snowlark-style',
-    'snowlark-net', 'snowlark-js', 'snowlark-bindings'
+    'snowlark-net', 'snowlark-js', 'snowlark-bindings', 'snowlark-graphics', 'snowlark-paint',
+    'snowlark-layout', 'snowlark-render'
 )
 
 $python = (Get-Command python -ErrorAction Stop).Source

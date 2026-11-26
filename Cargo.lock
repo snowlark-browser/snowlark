@@ -3131,6 +3131,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "snowlark-graphics"
+version = "0.1.0"
+dependencies = [
+ "crabby-avif",
+ "crc32fast",
+ "dav1d-sys",
+ "gif",
+ "image-webp",
+ "png",
+ "qcms",
+ "rustc-hash",
+ "rustix 1.1.6",
+ "serde",
+ "smallvec",
+ "unicode-vo",
+ "windows",
+ "zune-core",
+ "zune-jpeg",
+]
+
+[[package]]
 name = "snowlark-idb"
 version = "0.1.0"
 dependencies = [
@@ -3298,26 +3319,19 @@ name = "snowlark-paint"
 version = "0.1.0"
 dependencies = [
  "brotli-decompressor",
- "crabby-avif",
- "crc32fast",
- "dav1d-sys",
  "flate2",
  "fontdb",
- "gif",
- "image-webp",
  "png",
- "qcms",
  "rustc-hash",
  "serde",
  "smallvec",
+ "snowlark-graphics",
  "snowlark-ots-sys",
  "unicode-vo",
  "windows",
  "windows-core",
  "windows-future",
  "windows-numerics",
- "zune-core",
- "zune-jpeg",
 ]
 
 [[package]]

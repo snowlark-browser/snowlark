@@ -1,0 +1,39 @@
+[package]
+name = "snowlark-graphics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Snowlark's platform-free graphics: geometry, the display list, filters, layer animations, image decoding in Rust, the text types and the shaped-run cache"
+
+[lib]
+doctest = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+# CRCs of the PNG files made of APNG frames for the PNG decoder (`animation::Apng::frame_png`).
+crc32fast = "1"
+# Colour management (`color_profile`).
+qcms = "0.3"
+rustc-hash = "2"
+smallvec = { version = "1.13", features = ["union", "const_generics"] }
+# UAX #50 Vertical_Orientation (`text-orientation: mixed`, `text::orientations`).
+unicode-vo = "0.1"
+# Image decoders (`decoders`).
+gif = "0.14"
+image-webp = "0.2"
+png = "0.18"
+zune-core = "0.5"
+zune-jpeg = "0.5"
+# AVIF (`decoders::avif`): CrabbyAvif, with dav1d decoding the AV1 frames. `dav1d_sys::LINKED` says whether the
+# build has the library (tools/dav1d/build.ps1); without it AVIF is left to the platform's decoders.
+crabby-avif = { git = "https://github.com/webmproject/CrabbyAvif", rev = "193e354e10f6a9f82217dfdbae836c4310ea3992", default-features = false, features = ["dav1d"] }
+dav1d-sys = { path = "../../vendor/dav1d-sys" }
+
+[target.'cfg(windows)'.dependencies.windows]
+version = "0.62"
+# The performance counter (`ticks`).
+features = ["Win32_System_Performance"]
+
+[target.'cfg(not(windows))'.dependencies]
+# The monotonic clock (`ticks`).
+rustix = { version = "1", features = ["time"] }
