@@ -25,6 +25,11 @@ brotli-decompressor = "5"
 [target.'cfg(not(windows))'.dependencies]
 # PNG encoding of rendered pixmaps (`image`; Windows' goes through WIC).
 png = "0.18"
+# The text engine's analyses (`linux/text.rs`; DirectWrite's on Windows): UAX #9 bidi levels,
+# UAX #24 scripts, UAX #14 line-break opportunities.
+unicode-bidi = "0.3"
+unicode-script = "0.5"
+icu_segmenter = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows-core = "0.62"

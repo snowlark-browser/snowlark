@@ -570,6 +570,10 @@ fn isolated_left_to_right_text_is_shaped_from_the_cache() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "the per-word cache follows DirectWrite's script analysis; Linux shapes whole runs"
+)]
 fn an_edit_in_a_paragraph_shapes_only_its_changed_word() {
     let (mut t, [a, ..]) = page();
     t.run(200.0, 400.0);

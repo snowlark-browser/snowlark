@@ -24,8 +24,8 @@ and `snowlark-net` build natively and pass their tests there (11 test binaries, 
 `snowlark-graphics` and `snowlark-paint` build and pass their tests too (115 tests), except `snowlark-graphics`'s
 six AVIF tests, which need the dav1d library (below). `snowlark-js` and `snowlark-bindings` build against the
 Linux V8 library and pass their tests (69, among them the access check, streaming, code cache, object clone and
-inline field tests that drive the mangled-name declarations through V8). `snowlark-layout` and `snowlark-render`
-build and link with their tests; those tests need a text engine, which Linux does not have yet.
+inline field tests that drive the mangled-name declarations through V8). `snowlark-paint` has the Linux text
+engine (below) with its tests. `snowlark-layout` and `snowlark-render` build and link with their tests.
 
 ### A Linux machine for building
 
@@ -36,7 +36,8 @@ slower.
 
 ```sh
 apt-get install -y build-essential clang lld pkg-config curl ca-certificates git python3 cmake ninja-build \
-    libfontconfig-dev libfreetype-dev
+    libfontconfig-dev libfreetype-dev libharfbuzz-dev \
+    fonts-liberation fonts-dejavu-core fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal \
     --default-toolchain stable -c rustfmt -c clippy
 git clone <the repository> snowlark && cd snowlark
@@ -44,7 +45,9 @@ cargo test --profile iter --no-fail-fast -p snowlark-dom -p snowlark-idl -p snow
     -p snowlark-style -p snowlark-net -p snowlark-graphics -p snowlark-paint
 ```
 
-The fontconfig and FreeType headers are for the text engine of stage 3. Add `-j <n>` on a machine other work
+fontconfig and HarfBuzz are the text engine's libraries (FreeType comes with them and is the rasterizer's);
+the fonts are the ones the text engine's tests expect (Liberation for the metric-compatible Arial, Times New
+Roman and Courier New, DejaVu, Noto for other scripts, CJK and color emoji). Add `-j <n>` on a machine other work
 shares. `dev.ps1` is Windows-only; on Linux cargo runs directly.
 
 `snowlark-js`, `snowlark-bindings` and every crate above them need a V8 library to link, and none is published
@@ -79,9 +82,17 @@ store, and `Ticks` (the performance counter on Windows, `CLOCK_MONOTONIC` on Lin
 (`snowlark_graphics::Error`). `snowlark-paint` re-exports all of it under the same paths and keeps the platform's
 half; a module with a Linux half has it in `src/linux/<module>.rs` under the same name, with the same items:
 
-- `text`: `TextEngine` with the Windows engine's methods and no fonts. `TextEngine::new` fails, and the type holds
-  an uninhabited value, so its methods provably never run; `text_cache`'s per-word cache (whose segments follow the
-  engine's script analysis) holds nothing.
+- `text`: `TextEngine` with the Windows engine's methods, on fontconfig and HarfBuzz (both linked dynamically,
+  declared in `linux/ffi.rs`). A family is matched through fontconfig's rules and counts as present only when
+  the face is that family or one fontconfig binds strongly to it (Liberation Sans for Arial), so a CSS family
+  list falls through missing families as on Windows; a character none of the list's faces has falls back to the
+  first font of fontconfig's sorted list for the text's language that has it (cached per language). HarfBuzz
+  shapes each run of one font, script (UAX #24, `unicode-script`), bidi level (UAX #9, `unicode-bidi`) and
+  orientation, gives the metrics (OS/2 and hhea, as HarfBuzz reads them) and the outlines for
+  `text-decoration-skip-ink`; line-break opportunities are UAX #14's (`icu_segmenter`). Web fonts pass OTS
+  first, as on Windows. `font_data` gives the raster side a face's bytes, index, variation values and
+  synthesized bold or oblique. `text_cache`'s per-word cache (whose segments follow DirectWrite's script
+  analysis) is not used: whole runs are shaped and cached.
 - `raster`: `HeadlessRenderer`, which cannot be made either; `canvas_thread`: the GPU canvas, which cannot be made,
   so `snowlark-render` draws canvases on its CPU backend; `gpu`: only the `Driver` choice.
 - `image`: the formats Windows decodes through WIC (BMP, ICO, TIFF) are refused (`Error::Unsupported`); rendered
@@ -138,7 +149,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 
 | Interface | Today | Needed |
 |---|---|---|
-| Text engine: font lists, shaping, metrics, outlines | `TextEngine` in `snowlark-paint` `text.rs`; the text types and the run cache in `snowlark-graphics` | `linux/text.rs` has the methods and no engine yet: fontconfig, FreeType and HarfBuzz behind them |
+| Text engine: font lists, shaping, metrics, outlines | `TextEngine` in `snowlark-paint` `text.rs`; the text types and the run cache in `snowlark-graphics` | done: `linux/text.rs` on fontconfig and HarfBuzz |
 | Raster: a display list into pixels | `raster.rs` painter over a Direct2D device context | `linux/raster.rs` has `HeadlessRenderer`'s methods and no backend yet: a painter over Skia, `HeadlessRenderer` first (headless modes and reftests) |
 | Tiles and the compositor | `gpu.rs` `TileRasterizer`, `compositor.rs` `Compositor` | the same over Skia's GPU backend (GL or Vulkan) |
 | Window | `snowlark-paint` `window.rs` `Window`, `Event`, `WindowProxy` | a Wayland half (X11 desktops through XWayland) |
@@ -173,7 +184,8 @@ before Linux builds are offered to users, as on Windows.
    later decision, made with measurements.
 2. **Text: fontconfig, FreeType and HarfBuzz** (the C libraries). Font matching, fallback and shaping must match
    what pages expect across scripts and OpenType features, and these are the proven libraries for it; Skia
-   already uses FreeType.
+   already uses FreeType. The text engine itself needs only fontconfig and HarfBuzz (HarfBuzz reads metrics and
+   outlines from the font's own tables); FreeType draws the glyphs, under Skia.
 3. **Window: Wayland directly** (`smithay-client-toolkit` or an equivalent), not winit: a browser needs IME, the
    clipboard, drag and drop, popups and fractional scaling under its own control. X11 desktops run it through
    XWayland at first; a native X11 half only if measurements show it is needed.
