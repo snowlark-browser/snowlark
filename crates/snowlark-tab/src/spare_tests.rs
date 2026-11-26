@@ -64,6 +64,24 @@ fn load_until(
     }
 }
 
+/// Whether a process can run below this one's priority: not when this one already runs at the
+/// lowest (Linux, a test run under `nice -n 19`).
+fn can_lower() -> bool {
+    #[cfg(unix)]
+    {
+        // (/proc/self/stat: the nice value is the 19th field, the 17th after the name's ')')
+        let stat = std::fs::read_to_string("/proc/self/stat").unwrap_or_default();
+        let after = stat.rsplit_once(')').map_or("", |(_, rest)| rest);
+        after
+            .split_whitespace()
+            .nth(16)
+            .and_then(|n| n.parse::<i32>().ok())
+            .is_none_or(|nice| nice < 19)
+    }
+    #[cfg(windows)]
+    true
+}
+
 #[test]
 fn a_tab_takes_the_warm_spare_and_another_starts_at_idle_priority() {
     let Some(gpu) = gpu() else { return };
@@ -80,7 +98,7 @@ fn a_tab_takes_the_warm_spare_and_another_starts_at_idle_priority() {
     let second = pool.ready(WAIT).expect("the spare was not replaced");
     assert_ne!(second.pid(), first.pid());
     assert!(
-        second.is_background(),
+        second.is_background() || !can_lower(),
         "the replacement is not at idle priority"
     );
     // Taken in turn, it runs at normal priority and loads a page.

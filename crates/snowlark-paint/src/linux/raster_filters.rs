@@ -51,7 +51,7 @@ pub(super) fn image_filter(
 }
 
 /// A 4x5 color matrix on non-premultiplied colors (offsets in 0..=1) as a color filter.
-pub(super) fn color_matrix(m: &[[f32; 5]; 4]) -> sk::ColorFilter {
+pub(crate) fn color_matrix(m: &[[f32; 5]; 4]) -> sk::ColorFilter {
     let mut values = [0.0f32; 20];
     for (r, row) in m.iter().enumerate() {
         values[r * 5..r * 5 + 5].copy_from_slice(row);

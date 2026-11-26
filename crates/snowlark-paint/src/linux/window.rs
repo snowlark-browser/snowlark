@@ -22,10 +22,10 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-use sctk::compositor::{CompositorHandler, CompositorState};
+use sctk::compositor::{CompositorHandler, CompositorState, FrameCallbackData};
 use sctk::output::{OutputHandler, OutputState};
 use sctk::reexports::calloop::{
     ping::{make_ping, Ping},
@@ -66,6 +66,11 @@ pub struct WindowHandle(u64);
 impl WindowHandle {
     pub fn raw(self) -> u64 {
         self.0
+    }
+
+    /// The handle a [`WindowHandle::raw`] value names (as it crossed a message).
+    pub fn from_raw(raw: isize) -> WindowHandle {
+        WindowHandle(raw as u64)
     }
 }
 
@@ -437,6 +442,110 @@ pub fn wheel_scroll_lines() -> u32 {
 
 static NEXT_WINDOW: AtomicU64 = AtomicU64::new(1);
 
+/// The frame slots of this process's windows, by window: where a compositor on another thread
+/// finds the window it draws for (the role the system's window table plays for a window handle on
+/// Windows). A window's entry goes when its loop ends.
+static FRAME_SLOTS: std::sync::LazyLock<Mutex<HashMap<u64, Arc<FrameSlot>>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Frames another thread draws for a window (its compositor's): the newest one not shown yet, and
+/// whether the display wants the next (a frame callback came since the last one was shown). The
+/// window's thread shows a frame when it is pinged and asks the desktop for a frame callback with
+/// it: the compositor's pace follows the display's, as a swap chain's waitable object makes it on
+/// Windows.
+pub(crate) struct FrameSlot {
+    state: Mutex<SlotState>,
+    changed: Condvar,
+    ping: Ping,
+}
+
+#[derive(Default)]
+struct SlotState {
+    /// Width, height and pixels (premultiplied BGRA, rows packed) of the frame to show.
+    frame: Option<(u32, u32, Vec<u8>)>,
+    /// A frame's pixels shown before, for the compositor to draw the next one into.
+    spare: Option<Vec<u8>>,
+    /// Whether the display asked for a frame since the last one was shown (or none was shown).
+    ready: bool,
+    /// The window is gone: nothing will be shown.
+    gone: bool,
+}
+
+impl FrameSlot {
+    /// The slot of `window`, while it is open.
+    pub(crate) fn of(window: WindowHandle) -> Option<Arc<FrameSlot>> {
+        FRAME_SLOTS.lock().unwrap().get(&window.0).cloned()
+    }
+
+    /// Hands the window `pixels` (`width` × `height`) to show in place of any frame it has not
+    /// shown yet; false once the window has gone.
+    pub(crate) fn show(&self, width: u32, height: u32, pixels: Vec<u8>) -> bool {
+        let mut s = self.state.lock().unwrap();
+        if s.gone {
+            return false;
+        }
+        s.frame = Some((width, height, pixels));
+        s.ready = false;
+        drop(s);
+        self.ping.ping();
+        true
+    }
+
+    /// A buffer of a frame shown before (to draw into, so frames do not allocate).
+    pub(crate) fn take_spare(&self) -> Option<Vec<u8>> {
+        self.state.lock().unwrap().spare.take()
+    }
+
+    /// Waits until the display wants a frame (at most `timeout`); false on timeout or once the
+    /// window has gone.
+    pub(crate) fn wait_ready(&self, timeout: Duration) -> bool {
+        let s = self.state.lock().unwrap();
+        let (s, _) = self
+            .changed
+            .wait_timeout_while(s, timeout, |s| !s.ready && !s.gone)
+            .unwrap();
+        s.ready && !s.gone
+    }
+
+    /// A slot for a window that does not exist (`window`), registered as a window's is, and
+    /// the frames handed to it are taken with [`FrameSlot::take_frame`].
+    #[cfg(test)]
+    pub(crate) fn for_test(window: u64) -> (WindowHandle, Arc<FrameSlot>) {
+        let (ping, _source) = make_ping().unwrap();
+        let slot = Arc::new(FrameSlot {
+            state: Mutex::new(SlotState {
+                ready: true,
+                ..SlotState::default()
+            }),
+            changed: Condvar::new(),
+            ping,
+        });
+        FRAME_SLOTS.lock().unwrap().insert(window, slot.clone());
+        (WindowHandle(window), slot)
+    }
+
+    pub(crate) fn set_ready(&self) {
+        self.state.lock().unwrap().ready = true;
+        self.changed.notify_all();
+    }
+
+    pub(crate) fn take_frame(&self) -> Option<(u32, u32, Vec<u8>)> {
+        self.state.lock().unwrap().frame.take()
+    }
+
+    fn give_back(&self, pixels: Vec<u8>) {
+        self.state.lock().unwrap().spare = Some(pixels);
+    }
+
+    fn close(&self) {
+        let mut s = self.state.lock().unwrap();
+        s.gone = true;
+        s.frame = None;
+        drop(s);
+        self.changed.notify_all();
+    }
+}
+
 struct State {
     registry: RegistryState,
     seats: SeatState,
@@ -453,9 +562,39 @@ struct State {
     configured: bool,
     /// The loop ends.
     done: Arc<AtomicBool>,
+    qh: QueueHandle<State>,
+    /// Frames the window's compositor hands it ([`FrameSlot`]).
+    slot: Arc<FrameSlot>,
+    /// Told when the window is first configured ([`ShowWatch`]).
+    watch: ShowWatch,
 }
 
 impl State {
+    /// Shows the frame the compositor handed over, if any, and asks the desktop for a frame
+    /// callback with it ([`FrameSlot::wait_ready`]).
+    fn show_frame(&mut self) {
+        let Some((width, height, pixels)) = self.slot.take_frame() else {
+            return;
+        };
+        // (a buffer's size must be a whole number of the buffer scale's units)
+        let s = self.window.scale.get().max(1);
+        let (w, h) = (width - width % s, height - height % s);
+        let surface = self.window.xdg.wl_surface().clone();
+        surface.frame(&self.qh, FrameCallbackData(surface.clone()));
+        let shown = self.window.present(w, h, |buf, stride| {
+            let row = w as usize * 4;
+            for y in 0..h as usize {
+                let src = y * width as usize * 4;
+                buf[y * stride..y * stride + row].copy_from_slice(&pixels[src..src + row]);
+            }
+        });
+        if let Err(e) = shown {
+            eprintln!("[window] present: {e}");
+            self.slot.set_ready();
+        }
+        self.slot.give_back(pixels);
+    }
+
     fn send(&mut self, event: Event) -> bool {
         let used = self.handler.event(&self.window, event);
         self.apply();
@@ -563,8 +702,109 @@ pub fn run(
     options: WindowOptions,
     make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
 ) -> Result<()> {
+    let display = display_name();
+    let conn = Connection::connect_to_env().map_err(|e| {
+        Error::Platform(format!(
+            "no Wayland display to open the window on ({display}): {e}{}",
+            wslg_hint()
+        ))
+    })?;
+    let watch = ShowWatch::start(&conn);
+    let late = |e: &dyn std::fmt::Display| {
+        if watch.timed_out() {
+            Error::Platform(format!(
+                "the Wayland display ({display}) did not show the window within {} s{}",
+                SHOW_TIMEOUT.as_secs(),
+                wslg_hint()
+            ))
+        } else {
+            Error::Platform(e.to_string())
+        }
+    };
+    let result = run_on(conn, options, make, watch.clone()).map_err(|e| late(&e));
+    watch.shown();
+    result
+}
+
+/// How long the desktop may take to show a new window before [`run`] gives up.
+const SHOW_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Where the window is opened: the Wayland socket the environment names.
+fn display_name() -> String {
+    let name = std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "wayland-0".into());
+    if name.starts_with('/') {
+        return name;
+    }
+    match std::env::var("XDG_RUNTIME_DIR") {
+        Ok(dir) => format!("{dir}/{name}"),
+        Err(_) => format!("{name}, XDG_RUNTIME_DIR not set"),
+    }
+}
+
+/// Where WSLg's socket is, when the environment names another one and WSLg's is there.
+fn wslg_hint() -> String {
+    const WSLG: &str = "/mnt/wslg/runtime-dir/wayland-0";
+    let named = display_name();
+    if named != WSLG && std::path::Path::new(WSLG).exists() {
+        format!(" (WSLg's display is {WSLG}: run with WAYLAND_DISPLAY={WSLG})")
+    } else {
+        String::new()
+    }
+}
+
+/// Ends a connection whose window the desktop does not show within [`SHOW_TIMEOUT`] (a compositor
+/// that accepts the connection and never answers): a thread shuts the socket down through a copy
+/// of its descriptor, so the loop's blocking calls fail and [`run`] says why.
+#[derive(Clone)]
+struct ShowWatch(Arc<(Mutex<(bool, bool)>, Condvar)>);
+
+impl ShowWatch {
+    fn start(conn: &Connection) -> ShowWatch {
+        let state = Arc::new((Mutex::new((false, false)), Condvar::new()));
+        let copy = conn.backend().poll_fd().try_clone_to_owned().ok();
+        let watched = state.clone();
+        let spawned = std::thread::Builder::new()
+            .name("snowlark window watch".into())
+            .spawn(move || {
+                let (lock, changed) = &*watched;
+                let s = lock.lock().unwrap();
+                let (mut s, _) = changed
+                    .wait_timeout_while(s, SHOW_TIMEOUT, |s| !s.0)
+                    .unwrap();
+                if !s.0 {
+                    s.1 = true;
+                    drop(s);
+                    if let Some(fd) = copy {
+                        let _ = std::os::unix::net::UnixStream::from(fd)
+                            .shutdown(std::net::Shutdown::Both);
+                    }
+                }
+            });
+        if spawned.is_err() {
+            // (no watch: the window opens as it would without one)
+            state.0.lock().unwrap().0 = true;
+        }
+        ShowWatch(state)
+    }
+
+    /// The window was shown (or the loop ended): the watch ends.
+    fn shown(&self) {
+        self.0 .0.lock().unwrap().0 = true;
+        self.0 .1.notify_all();
+    }
+
+    fn timed_out(&self) -> bool {
+        self.0 .0.lock().unwrap().1
+    }
+}
+
+fn run_on(
+    conn: Connection,
+    options: WindowOptions,
+    make: impl FnOnce(&Window) -> Box<dyn WindowHandler>,
+    watch: ShowWatch,
+) -> Result<()> {
     let platform = |e: &dyn std::fmt::Display| Error::Platform(e.to_string());
-    let conn = Connection::connect_to_env().map_err(|e| platform(&e))?;
     let (globals, queue) = registry_queue_init(&conn).map_err(|e| platform(&e))?;
     let qh: QueueHandle<State> = queue.handle();
     let mut event_loop: EventLoop<State> = EventLoop::try_new().map_err(|e| platform(&e))?;
@@ -591,8 +831,22 @@ pub fn run(
             state.send(Event::Wake);
         })
         .map_err(|e| platform(&e))?;
+    let (frame_ping, frame_source) = make_ping().map_err(|e| platform(&e))?;
+    loop_handle
+        .insert_source(frame_source, |_, _, state: &mut State| state.show_frame())
+        .map_err(|e| platform(&e))?;
+    let slot = Arc::new(FrameSlot {
+        state: Mutex::new(SlotState {
+            ready: true,
+            ..SlotState::default()
+        }),
+        changed: Condvar::new(),
+        ping: frame_ping,
+    });
+    let handle = WindowHandle(NEXT_WINDOW.fetch_add(1, Ordering::Relaxed));
+    FRAME_SLOTS.lock().unwrap().insert(handle.0, slot.clone());
     let window = Window {
-        handle: WindowHandle(NEXT_WINDOW.fetch_add(1, Ordering::Relaxed)),
+        handle,
         xdg,
         ping,
         presenter: RefCell::new(Presenter {
@@ -628,13 +882,20 @@ pub fn run(
         clicks: ClickCount::default(),
         configured: false,
         done: done.clone(),
+        qh,
+        slot: slot.clone(),
+        watch,
     };
+    let mut result = Ok(());
     while !done.load(Ordering::Relaxed) {
-        event_loop
-            .dispatch(None, &mut state)
-            .map_err(|e| platform(&e))?;
+        if let Err(e) = event_loop.dispatch(None, &mut state) {
+            result = Err(platform(&e));
+            break;
+        }
     }
-    Ok(())
+    FRAME_SLOTS.lock().unwrap().remove(&handle.0);
+    slot.close();
+    result
 }
 
 /// The Windows virtual-key code and scan code of a key: letters by the layout's character (as
@@ -777,7 +1038,9 @@ impl CompositorHandler for State {
     ) {
     }
 
-    fn frame(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: u32) {}
+    fn frame(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: u32) {
+        self.slot.set_ready();
+    }
 
     fn surface_enter(
         &mut self,
@@ -835,6 +1098,7 @@ impl XdgWindowHandler for State {
             || maximized != self.window.maximized.get()
             || fullscreen != self.window.fullscreen.get();
         self.configured = true;
+        self.watch.shown();
         self.window.size.set(size);
         self.window.maximized.set(maximized);
         self.window.fullscreen.set(fullscreen);

@@ -30,7 +30,7 @@ pub use snowlark_graphics::raster::{ImageResolver, Viewport};
 use snowlark_graphics::{Error, Result};
 
 #[path = "raster_filters.rs"]
-mod filters;
+pub(crate) mod filters;
 #[path = "raster_svg.rs"]
 mod svg;
 #[cfg(test)]
@@ -159,7 +159,7 @@ fn color4f(c: Color) -> sk::Color4f {
     sk::Color4f::from(color(c))
 }
 
-fn rect(r: &Rect) -> sk::Rect {
+pub(crate) fn rect(r: &Rect) -> sk::Rect {
     sk::Rect::from_xywh(r.x, r.y, r.width, r.height)
 }
 
@@ -168,13 +168,13 @@ fn point(p: Point) -> sk::Point {
 }
 
 /// A transform as Skia's (`x' = m11 x + m21 y + dx`, `y' = m12 x + m22 y + dy`).
-fn matrix(m: &Matrix) -> sk::Matrix {
+pub(crate) fn matrix(m: &Matrix) -> sk::Matrix {
     sk::Matrix::new_all(m.m11, m.m21, m.dx, m.m12, m.m22, m.dy, 0.0, 0.0, 1.0)
 }
 
 /// A rounded rectangle with CSS's corner radii (Skia scales overlapping radii down as CSS
 /// Backgrounds 3 §5.5 does).
-fn rrect(r: &Rect, radii: &Radii) -> sk::RRect {
+pub(crate) fn rrect(r: &Rect, radii: &Radii) -> sk::RRect {
     let radii = radii.fitted(r);
     let corner = |s: Size| sk::Vector::new(s.width.max(0.0), s.height.max(0.0));
     sk::RRect::new_rect_radii(

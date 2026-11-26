@@ -306,6 +306,7 @@ enum Link {
     Remote(Arc<RemoteRaster>),
     /// Tests: the GPU process's raster thread, fed each message as its wire form.
     #[cfg(test)]
+    #[cfg_attr(not(windows), allow(dead_code))]
     Seam(Arc<SeamRaster>),
 }
 
@@ -353,6 +354,7 @@ impl RasterThread {
     /// Tests: the encode thread of tab `id` feeding a raster thread as the GPU process runs one
     /// ([`SeamRaster`]), each message split into its head and bytes and checked on the way in.
     #[cfg(test)]
+    #[cfg_attr(not(windows), allow(dead_code))]
     pub(crate) fn through_seam(
         id: TabId,
         gpu: Arc<Gpu>,
@@ -1762,7 +1764,10 @@ pub(crate) mod tests {
         let taken_tx = Mutex::new(taken_tx);
         let raster = SeamRaster::start_marked(
             5,
-            Gpu::new().unwrap(),
+            // (Linux has only the software device so far)
+            Gpu::new()
+                .or_else(|_| Gpu::with_driver(snowlark_paint::Driver::Warp))
+                .unwrap(),
             tx,
             Arc::new(move || {
                 let _ = taken_tx.lock().unwrap().send(());

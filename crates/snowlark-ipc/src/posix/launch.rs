@@ -16,7 +16,7 @@
 //! `no_children` is not enforced here yet: that needs the system call filter of a sandbox.
 
 use std::ffi::{OsStr, OsString};
-use std::os::fd::{AsFd, AsRawFd, FromRawFd, OwnedFd};
+use std::os::fd::{AsFd, AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
@@ -27,6 +27,7 @@ use std::time::{Duration, Instant};
 
 use crate::connection::{BrowserEnd, ChildEnd, Connection, Core};
 use crate::error::Error;
+use crate::posix::crash_dump::{CrashLink, CRASH_FD, CRASH_VAR};
 use crate::posix::handle::Peer;
 use crate::posix::io::{Link, PipeLink};
 use crate::posix::{build_id, pipe};
@@ -67,6 +68,8 @@ pub struct Process {
     /// The exit code once it has been seen.
     exit: Mutex<Option<u32>>,
     pid: u32,
+    /// The dump of its crash, written by its crash watch.
+    dump: Arc<Mutex<Option<PathBuf>>>,
 }
 
 impl Process {
@@ -74,9 +77,9 @@ impl Process {
         self.pid
     }
 
-    /// The minidump of this child's crash: none on Linux yet.
+    /// The minidump of this child's crash, once one was written ([`Launch::crash_dumps`]).
     pub fn crash_dump(&self) -> Option<PathBuf> {
-        None
+        self.dump.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     pub fn kill(&self) {
@@ -118,11 +121,14 @@ impl Process {
         *exit
     }
 
-    /// Lowers the priority of every thread of the process (`background`: work that should wait for
-    /// everything else, such as a spare renderer warming up), or restores it. Raising it again may
-    /// need a privilege the browser lacks ([`Process::is_background`] then stays true).
+    /// Lowers the priority of every thread of the process below the browser's own (`background`:
+    /// work that should wait for everything else, such as a spare renderer warming up), or restores
+    /// it to the browser's. Raising it again may need a privilege the browser lacks
+    /// ([`Process::is_background`] then stays true); a browser already at the lowest priority has
+    /// none lower to give.
     pub fn set_background(&self, background: bool) {
-        let nice = if background { 10 } else { 0 };
+        let own = own_nice();
+        let nice = if background { (own + 10).min(19) } else { own };
         let Ok(tasks) = std::fs::read_dir(format!("/proc/{}/task", self.pid)) else {
             return;
         };
@@ -138,9 +144,9 @@ impl Process {
         }
     }
 
-    /// Whether the process runs at a lowered priority ([`Process::set_background`]).
+    /// Whether the process runs at a priority below the browser's ([`Process::set_background`]).
     pub fn is_background(&self) -> bool {
-        stat_fields(self.pid).is_some_and(|f| f.nice > 0)
+        stat_fields(self.pid).is_some_and(|f| f.nice > own_nice() as i64)
     }
 
     /// The descriptors the process holds and its private memory.
@@ -178,6 +184,11 @@ struct Stat {
 }
 
 /// `/proc/<pid>/stat`'s processor times and nice value.
+/// The browser's own nice value (the main thread's, which its other threads share unless set).
+fn own_nice() -> i32 {
+    stat_fields(std::process::id()).map_or(0, |f| f.nice as i32)
+}
+
 fn stat_fields(pid: impl std::fmt::Display) -> Option<Stat> {
     let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
     // (the name in parentheses may hold spaces: fields count from after its closing one, where the
@@ -246,6 +257,8 @@ pub struct Launch {
     env: Vec<(OsString, OsString)>,
     limits: JobLimits,
     stderr: bool,
+    /// Where a crash of the child is written as a minidump.
+    dumps: Option<PathBuf>,
 }
 
 impl Launch {
@@ -256,6 +269,7 @@ impl Launch {
             env: Vec::new(),
             limits: JobLimits::default(),
             stderr: true,
+            dumps: None,
         };
         for name in BASE_ENV {
             launch = launch.allow_env(name);
@@ -292,8 +306,10 @@ impl Launch {
         self
     }
 
-    /// Where a crash of the child would be written as a minidump: nothing is written on Linux yet.
-    pub fn crash_dumps(self, _dir: impl Into<PathBuf>) -> Launch {
+    /// Writes a crash of the child as a minidump into `dir` (`crash_dump`: a child that calls
+    /// [`crate::install_crash_handler`] reports its crash to the browser, which writes the dump).
+    pub fn crash_dumps(mut self, dir: impl Into<PathBuf>) -> Launch {
+        self.dumps = Some(dir.into());
         self
     }
 
@@ -301,8 +317,19 @@ impl Launch {
     pub fn spawn(self) -> Result<Spawned, Error> {
         let (server, client) = pipe::pair()?;
         let limits = self.limits;
-        let child = on_launcher(move || self.start(&client))??;
+        let crash = match &self.dumps {
+            Some(dir) => Some((CrashLink::new()?, dir.clone())),
+            None => None,
+        };
+        let crash_client = crash.as_ref().map(|(link, _)| link.client.as_raw_fd());
+        let child = on_launcher(move || self.start(&client, crash_client))??;
         let pid = child.id();
+        let dump = Arc::new(Mutex::new(None));
+        if let Some((link, dir)) = crash {
+            // (the child holds its own copy now)
+            drop(link.client);
+            CrashLink::watch(link.server, pid, dir, dump.clone())?;
+        }
         if let Some(commit) = limits.commit {
             let limit = libc::rlimit {
                 rlim_cur: commit,
@@ -330,6 +357,7 @@ impl Launch {
                 child: Mutex::new(child),
                 exit: Mutex::new(None),
                 pid,
+                dump,
             }),
             server,
         })
@@ -339,7 +367,7 @@ impl Launch {
     /// end of the channel as descriptor 3, and every other descriptor above 2 marked to close on
     /// exec, so the child holds exactly its standard streams and its channel whatever this process
     /// has open, and no other launch here can see its channel.
-    fn start(self, client: &OwnedFd) -> Result<Child, Error> {
+    fn start(self, client: &OwnedFd, crash: Option<RawFd>) -> Result<Child, Error> {
         let client = client.as_raw_fd();
         let parent = std::process::id() as libc::pid_t;
         let mut command = Command::new(&self.exe);
@@ -350,6 +378,9 @@ impl Launch {
             .env(PIPE_VAR, CHILD_FD.to_string())
             .env(PARENT_VAR, parent.to_string())
             .stdin(Stdio::null());
+        if crash.is_some() {
+            command.env(CRASH_VAR, CRASH_FD.to_string());
+        }
         if self.stderr {
             let out = std::io::stderr().as_fd().try_clone_to_owned();
             command
@@ -377,6 +408,17 @@ impl Launch {
                 if libc::getppid() != parent {
                     return Err(std::io::Error::from_raw_os_error(libc::ESRCH));
                 }
+                // (the crash socket out of the way first: it may be at the channel's place)
+                let crash = match crash {
+                    Some(fd) => {
+                        let high = libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, CRASH_FD + 1);
+                        if high < 0 {
+                            return fail();
+                        }
+                        Some(high)
+                    }
+                    None => None,
+                };
                 let moved = if client == CHILD_FD {
                     libc::fcntl(CHILD_FD, libc::F_SETFD, 0)
                 } else {
@@ -385,13 +427,17 @@ impl Launch {
                 if moved < 0 {
                     return fail();
                 }
-                if libc::syscall(
-                    libc::SYS_close_range,
-                    CHILD_FD + 1,
-                    u32::MAX,
-                    CLOSE_RANGE_CLOEXEC,
-                ) != 0
-                {
+                if let Some(high) = crash {
+                    if libc::dup2(high, CRASH_FD) < 0 {
+                        return fail();
+                    }
+                }
+                let first = if crash.is_some() {
+                    CRASH_FD + 1
+                } else {
+                    CHILD_FD + 1
+                };
+                if libc::syscall(libc::SYS_close_range, first, u32::MAX, CLOSE_RANGE_CLOEXEC) != 0 {
                     // (before Linux 5.11: one at a time, up to the descriptor limit)
                     let mut limit = libc::rlimit {
                         rlim_cur: 0,
@@ -400,7 +446,7 @@ impl Launch {
                     if libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) != 0 {
                         return fail();
                     }
-                    for fd in CHILD_FD + 1..limit.rlim_cur.min(1 << 20) as libc::c_int {
+                    for fd in first..limit.rlim_cur.min(1 << 20) as libc::c_int {
                         libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC);
                     }
                 }

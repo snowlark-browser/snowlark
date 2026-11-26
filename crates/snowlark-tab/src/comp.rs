@@ -7,6 +7,13 @@
 
 use std::sync::Arc;
 
+/// A handle of the system's that a message carries beside its bytes: a composition surface's
+/// (Windows), a descriptor (Linux).
+#[cfg(windows)]
+pub type OsHandle = std::os::windows::io::OwnedHandle;
+#[cfg(unix)]
+pub type OsHandle = std::os::fd::OwnedFd;
+
 use serde::{Deserialize, Serialize};
 use snowlark_paint::video::VideoStore;
 use snowlark_paint::window::WindowHandle;
@@ -337,7 +344,7 @@ pub enum Handle {
     /// The video frames' textures.
     Videos(Arc<VideoStore>),
     /// A window's composition surface (`snowlark_paint::compositor::WindowSurface::handle`).
-    Surface(std::os::windows::io::OwnedHandle),
+    Surface(OsHandle),
     /// A window's composition surface as the window's process has it, which can give a new
     /// surface ([`snowlark_paint::compositor::WindowSurface::renew`]): for a compositor in the
     /// window's process, or for what passes it on to the GPU process. Never crosses a process.
@@ -378,7 +385,7 @@ pub enum CompInput {
 /// the content.
 pub trait ProtectedPictures: Send + Sync {
     /// Player `player`'s composition surface, once its engine has a picture.
-    fn surface(&self, player: u64) -> Option<Arc<std::os::windows::io::OwnedHandle>>;
+    fn surface(&self, player: u64) -> Option<Arc<OsHandle>>;
     /// Player `player`'s picture shows at this rectangle of the screen (device pixels): where its
     /// output is protected, and the size its engine draws at.
     fn place(&self, player: u64, x: i32, y: i32, width: i32, height: i32);
@@ -398,7 +405,7 @@ impl CompInput {
     }
 
     /// Window `window` shows the composition surface `surface` ([`CompMsg::Surface`]).
-    pub fn surface(window: WindowId, surface: std::os::windows::io::OwnedHandle) -> CompInput {
+    pub fn surface(window: WindowId, surface: OsHandle) -> CompInput {
         let msg = snowlark_ipc::loopback::through(CompMsg::Surface { window, handle: 0 });
         CompInput::Handles(msg, vec![Handle::Surface(surface)])
     }

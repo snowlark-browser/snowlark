@@ -53,7 +53,7 @@ pub mod text_cache;
 pub mod autoscroll_cursor;
 #[cfg(windows)]
 mod com;
-#[cfg(windows)]
+#[cfg_attr(not(windows), path = "linux/compositor.rs")]
 pub mod compositor;
 #[cfg(windows)]
 pub mod cursors;
@@ -72,14 +72,13 @@ pub mod os_crypt;
 #[cfg_attr(not(windows), path = "linux/pdf.rs")]
 pub mod pdf;
 pub mod placement;
-#[cfg(windows)]
 pub mod raster_tables;
 #[cfg(windows)]
 mod soft_blur;
 #[cfg(windows)]
 mod svg_effects;
 mod tiling;
-#[cfg(windows)]
+#[cfg_attr(not(windows), path = "linux/timer_resolution.rs")]
 pub mod timer_resolution;
 #[cfg_attr(not(windows), path = "linux/video.rs")]
 pub mod video;
@@ -89,7 +88,6 @@ pub mod web_font;
 #[cfg_attr(not(windows), path = "linux/window.rs")]
 pub mod window;
 
-#[cfg(windows)]
 pub use compositor::{Compositor, ContentPass};
 pub use display_list::*;
 pub use filter::{ColorFilter, ColorFilters, FilterOp, FilterRange};
@@ -98,7 +96,6 @@ pub use gpu::{Driver, Gpu};
 pub use gpu::{RasterStats, RasterWork, TileRasterizer, TiledFrame, TILE_SIZE};
 pub use image::{DecodedImage, Frame, ImageStore, Pixmap, ShownImage};
 pub use raster::{FontResolver, HeadlessRenderer, ImageResolver, Sources, Viewport};
-#[cfg(windows)]
 pub use raster_tables::{
     FileHead, FontFile, FontSource, FontTable, ImageTable, Refused, Resource, ResourceHead,
     SystemFontFiles, MAX_FONT_AXES, MAX_FONT_PATH, MAX_LIST_BYTES, MAX_TILES,

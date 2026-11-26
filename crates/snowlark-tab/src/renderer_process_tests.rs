@@ -16,6 +16,7 @@ use snowlark_ipc::{connect_to_browser, Bulk, Launch};
 use snowlark_net::Url;
 use snowlark_page::web_storage::{StorageWrite, WebStorage};
 use snowlark_paint::scroll_curve::ScrollKind;
+#[cfg_attr(not(windows), allow(unused_imports))]
 use snowlark_paint::{Driver, Gpu, Point, Size, VideoId};
 
 use super::*;
@@ -1018,6 +1019,7 @@ fn a_renderer_opens_windows_of_a_size_and_closes_none_of_its_own_tab() {
 
 /// Serves `page` at `/` and the media fixture `pattern.mp4` (320 × 180, 4 s, a colour a second) at
 /// `/v.mp4`, on a port of its own.
+#[cfg_attr(not(windows), allow(dead_code))]
 fn serve_video(page: &'static str) -> String {
     let clip = std::fs::read(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1063,6 +1065,7 @@ fn serve_video(page: &'static str) -> String {
 
 /// A `<video>` that plays the fixture in a loop. (Neither class nor id: the harness's content filter
 /// hides every element that has one.)
+#[cfg_attr(not(windows), allow(dead_code))]
 const VIDEO_PAGE: &str = r#"<!doctype html><title>start</title><body style="margin:0">
 <video src="/v.mp4" muted autoplay loop style="width:320px;height:180px"></video>"#;
 
@@ -1070,6 +1073,8 @@ const VIDEO_PAGE: &str = r#"<!doctype html><title>start</title><body style="marg
 /// window's store through the textures the browser made, the compositor takes them, and the tab's
 /// frames name the video by the window's id.
 #[test]
+// (video frames need a GPU device: Windows only so far)
+#[cfg(windows)]
 fn a_video_in_a_renderer_draws_in_the_browser() {
     let Some(gpu) = gpu() else { return };
     let mut l = local();

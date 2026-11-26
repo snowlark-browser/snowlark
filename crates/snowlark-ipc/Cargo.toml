@@ -20,6 +20,12 @@ postcard = { version = "1", default-features = false, features = ["use-std"] }
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+# Crash dumps of children (posix/crash_dump.rs): the child's signal handlers and crash context, and
+# the minidump the browser writes from outside.
+[target.'cfg(target_os = "linux")'.dependencies]
+crash-handler = "0.8"
+minidump-writer = "0.14"
+
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.62"
 features = [

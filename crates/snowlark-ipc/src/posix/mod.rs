@@ -5,6 +5,7 @@
 //! What the operating system does on Linux, and nearly all of this crate's `unsafe` there: Unix
 //! stream sockets passing descriptors, memfd sections, the IO thread on epoll, launch.
 
+pub mod crash_dump;
 pub mod handle;
 pub(crate) mod io;
 pub mod launch;
@@ -48,17 +49,6 @@ pub fn physical_memory() -> Option<u64> {
     let line = info.lines().find(|l| l.starts_with("MemTotal:"))?;
     let kb: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
     Some(kb * 1024)
-}
-
-/// Crash dumps: the browser writes none of a Linux child yet.
-pub mod crash_dump {
-    /// How many dumps a folder keeps.
-    pub const KEPT_DUMPS: usize = 10;
-
-    /// There is no crash handler on Linux yet: false.
-    pub fn install_crash_handler() -> bool {
-        false
-    }
 }
 
 #[cfg(test)]

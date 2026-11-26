@@ -223,14 +223,16 @@ struct Ending {
 /// ends the process (§11).
 pub const KILL_GRACE: Duration = Duration::from_secs(1);
 
-/// What a renderer process's exit code says about how it ended (§11).
+/// What a renderer process's exit code says about how it ended (§11). On Linux a process a signal
+/// ended has the signal's number as its code ([`snowlark_ipc::Process::wait`]); a stack overflow
+/// ends there as an abort (Rust's guard page handler reports it and aborts).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CrashKind {
-    /// `0xC00000FD`.
+    /// `0xC00000FD` (Windows).
     StackOverflow,
-    /// `0xC0000005`.
+    /// `0xC0000005` (Windows); `SIGSEGV` or `SIGBUS` (Linux).
     AccessViolation,
-    /// `0xC0000409`: a fast fail (`abort`, a failed security check).
+    /// `0xC0000409` (Windows): a fast fail (`abort`, a failed security check); `SIGABRT` (Linux).
     FastFail,
     /// 101: a Rust panic that reached the top of the process.
     Panic,
@@ -239,6 +241,7 @@ pub enum CrashKind {
 }
 
 impl CrashKind {
+    #[cfg(windows)]
     pub fn of(code: u32) -> CrashKind {
         match code {
             0xC000_00FD => CrashKind::StackOverflow,
@@ -249,12 +252,29 @@ impl CrashKind {
         }
     }
 
+    #[cfg(unix)]
+    pub fn of(code: u32) -> CrashKind {
+        // (signal numbers of Linux on x86-64)
+        match code {
+            11 | 7 => CrashKind::AccessViolation,
+            6 => CrashKind::FastFail,
+            101 => CrashKind::Panic,
+            other => CrashKind::Other(other),
+        }
+    }
+
     /// The words the crashed tab shows.
     pub fn describe(self) -> String {
         match self {
             CrashKind::StackOverflow => "a stack overflow".into(),
+            #[cfg(windows)]
             CrashKind::AccessViolation => "an access violation".into(),
+            #[cfg(unix)]
+            CrashKind::AccessViolation => "a segmentation fault".into(),
+            #[cfg(windows)]
             CrashKind::FastFail => "a fast fail (abort)".into(),
+            #[cfg(unix)]
+            CrashKind::FastFail => "an abort".into(),
             CrashKind::Panic => "a panic".into(),
             CrashKind::Other(code) => format!("exit code {code:#x}"),
         }

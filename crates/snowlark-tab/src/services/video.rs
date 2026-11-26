@@ -21,6 +21,9 @@
 //! video, pool or texture the renderer was never given, or a video it never had, kills it.
 
 use std::collections::HashMap;
+#[cfg(unix)]
+use std::os::fd::OwnedFd as OwnedHandle;
+#[cfg(windows)]
 use std::os::windows::io::OwnedHandle;
 use std::sync::{Arc, Mutex};
 
@@ -95,11 +98,19 @@ impl VideoExport for RemoteVideo {
             }),
         )?;
         let reply = reply?;
+        #[cfg(windows)]
         let handles: Vec<OwnedHandle> = reply
             .handles
             .into_iter()
             .map(|h| self.port.take_handle(h))
             .collect();
+        #[cfg(unix)]
+        let handles: Vec<OwnedHandle> = reply
+            .handles
+            .into_iter()
+            .map(|h| self.port.take_handle(h))
+            .collect::<Result<_, _>>()
+            .ok()?;
         Some(PoolHandles {
             generation: reply.generation,
             handles,

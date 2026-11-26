@@ -255,6 +255,7 @@ mod tests {
     use std::sync::Mutex;
 
     /// A browser that takes a while to make a video's textures, and says when it is asked.
+    #[cfg_attr(not(windows), allow(dead_code))]
     struct SlowBrowser(Mutex<mpsc::Sender<&'static str>>);
 
     impl VideoExport for SlowBrowser {
@@ -274,6 +275,8 @@ mod tests {
     /// for its new textures: the new process maps a video into the lists it rasters only once it
     /// made them. One without videos makes no device for them and does not.
     #[test]
+    // (video frames need a GPU device: Windows only so far)
+    #[cfg(windows)]
     fn a_repaint_after_a_new_gpu_process_follows_the_videos_textures() {
         let (tx, rx) = mpsc::channel();
         let none = VideoStore::exporting(Arc::new(SlowBrowser(Mutex::new(tx.clone()))));

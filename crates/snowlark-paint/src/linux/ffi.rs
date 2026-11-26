@@ -72,6 +72,8 @@ pub const FC_SLANT: &[u8] = b"slant\0";
 pub const FC_WEIGHT: &[u8] = b"weight\0";
 pub const FC_WIDTH: &[u8] = b"width\0";
 pub const FC_FILE: &[u8] = b"file\0";
+/// `FcSetSystem`: the fonts installed on the system.
+pub const FC_SET_SYSTEM: c_int = 0;
 pub const FC_INDEX: &[u8] = b"index\0";
 pub const FC_CHARSET: &[u8] = b"charset\0";
 pub const FC_LANG: &[u8] = b"lang\0";
@@ -153,6 +155,8 @@ extern "C" {
         result: *mut FcResult,
     ) -> *mut FcFontSet;
     pub fn FcFontSetDestroy(s: *mut FcFontSet);
+    /// The configuration's own set (not to be destroyed): `FC_SET_SYSTEM` or the application's.
+    pub fn FcConfigGetFonts(config: *mut FcConfig, set: c_int) -> *mut FcFontSet;
     pub fn FcCharSetHasChar(c: *const FcCharSet, ucs4: u32) -> FcBool;
     pub fn FcWeightFromOpenTypeDouble(ot: f64) -> f64;
 }

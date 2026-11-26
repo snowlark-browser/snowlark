@@ -15,6 +15,33 @@ use snowlark_graphics::Result;
 use crate::gpu::Gpu;
 use crate::{Frame, VideoId};
 
+/// The textures shared per video and size, as on Windows (none are made here yet).
+pub const POOL_TEXTURES: usize = 4;
+
+/// The largest frame side a renderer's video gets shared textures for.
+pub const MAX_SHARED_SIDE: u32 = 16384;
+
+/// The shared textures the browser made for a renderer's video, as the renderer receives them.
+pub struct PoolHandles {
+    /// Counts the video's pools: a frame names the pool it is in.
+    pub generation: u32,
+    /// [`POOL_TEXTURES`] descriptors.
+    pub handles: Vec<std::os::fd::OwnedFd>,
+}
+
+/// Where a renderer's store sends its videos' frames: the browser, which draws them (the Windows
+/// half's interface; no frame reaches a slot here yet, so none is sent).
+pub trait VideoExport: Send + Sync {
+    /// Which device to make for the videos. `None`: no device, no frames.
+    fn driver(&self) -> Option<crate::Driver>;
+    /// Shared textures for video `id` at this size, made by the browser.
+    fn pool(&self, id: VideoId, width: u32, height: u32) -> Option<PoolHandles>;
+    /// Video `id` has a new frame to show, in texture `index` of pool `generation`.
+    fn frame(&self, id: VideoId, generation: u32, index: u32);
+    /// Video `id`, which had a pool, is gone.
+    fn removed(&self, id: VideoId);
+}
+
 /// The video slots of a window or a headless run.
 pub struct VideoStore {
     gpu: Option<Arc<Gpu>>,
@@ -35,6 +62,34 @@ impl VideoStore {
             slots: Mutex::new(HashMap::new()),
             next: AtomicU32::new(1),
         })
+    }
+
+    /// A renderer process's store, whose videos' frames would go to the browser through `export`:
+    /// with no frames on Linux yet, a store like any other.
+    pub fn exporting(_export: Arc<dyn VideoExport>) -> Arc<VideoStore> {
+        VideoStore::new(None)
+    }
+
+    /// Asks the browser again for shared textures of the videos that have them (after the
+    /// browser's device changed): none have them here, so nothing is asked (false).
+    pub fn repool(&self) -> bool {
+        false
+    }
+
+    /// A slot in the browser for a renderer's video.
+    pub fn import(&self) -> VideoId {
+        self.create().id()
+    }
+
+    /// Shared textures for a renderer's video `id`: none can be made without a GPU device.
+    pub fn make_pool(&self, _id: VideoId, _width: u32, _height: u32) -> Result<PoolHandles> {
+        Err(snowlark_graphics::Error::Unsupported)
+    }
+
+    /// A renderer's video `id` shows texture `index` of pool `generation`: there are no pools,
+    /// so it never does (false).
+    pub fn imported_frame(&self, _id: VideoId, _generation: u32, _index: u32) -> bool {
+        false
     }
 
     /// The device frames are drawn with.

@@ -134,6 +134,21 @@ fn stuck(tab: &Started, after: Duration) -> u64 {
     panic!("the browser never saw the tab stuck");
 }
 
+/// What a crashed tab says and its process's exit code, for each way the tests crash one: a stack
+/// overflow, a write through a null pointer, an abort. (Linux: signal numbers; a stack overflow
+/// ends as an abort there.)
+#[cfg(windows)]
+const STACK: (&str, u32) = ("a stack overflow", 0xC000_00FD);
+#[cfg(windows)]
+const AV: (&str, u32) = ("an access violation", 0xC000_0005);
+#[cfg(windows)]
+const ABORT: (&str, u32) = ("a fast fail", 0xC000_0409);
+#[cfg(unix)]
+const STACK: (&str, u32) = ("an abort", 6);
+#[cfg(unix)]
+const AV: (&str, u32) = ("a segmentation fault", 11);
+#[cfg(unix)]
+const ABORT: (&str, u32) = ("an abort", 6);
 #[test]
 fn each_crash_ends_its_tab_only_and_reload_starts_it_again() {
     let Some(gpu) = gpu() else { return };
@@ -144,24 +159,9 @@ fn each_crash_ends_its_tab_only_and_reload_starts_it_again() {
     count_to(&other, 3);
     let mut next = 21;
     for (switch, value, kind, code) in [
-        (
-            "SNOWLARK_TEST_CRASH",
-            "stack",
-            "a stack overflow",
-            Some(0xC000_00FD),
-        ),
-        (
-            "SNOWLARK_TEST_CRASH",
-            "av",
-            "an access violation",
-            Some(0xC000_0005),
-        ),
-        (
-            "SNOWLARK_TEST_CRASH",
-            "abort",
-            "a fast fail",
-            Some(0xC000_0409),
-        ),
+        ("SNOWLARK_TEST_CRASH", "stack", STACK.0, Some(STACK.1)),
+        ("SNOWLARK_TEST_CRASH", "av", AV.0, Some(AV.1)),
+        ("SNOWLARK_TEST_CRASH", "abort", ABORT.0, Some(ABORT.1)),
         (
             "SNOWLARK_TEST_PANIC",
             "tab",
@@ -220,8 +220,8 @@ fn a_crashed_renderer_leaves_a_minidump_its_tab_names() {
     navigate(&tab, &l.services.net, &origin);
     let (why, _) = crashed(&tab, WAIT).expect("no crash");
     let (exit, _) = ended.recv().unwrap();
-    assert_eq!(exit, Some(0xC000_0005), "{why}");
-    assert!(why.contains("an access violation"), "{why}");
+    assert_eq!(exit, Some(AV.1), "{why}");
+    assert!(why.contains(AV.0), "{why}");
     let dump = tab.renderer.process().crash_dump().expect("no dump");
     let file = dump.file_name().unwrap().to_string_lossy().into_owned();
     assert!(why.contains(&file), "{why}");
@@ -278,8 +278,8 @@ fn a_deep_tree_overflows_one_renderer_only() {
         "deep tree: Crashed {:?} after the exit ({exit:x?}): {why}",
         heard.saturating_duration_since(at)
     );
-    assert_eq!(exit, Some(0xC000_00FD), "{why}");
-    assert!(why.contains("a stack overflow"), "{why}");
+    assert_eq!(exit, Some(STACK.1), "{why}");
+    assert!(why.contains(STACK.0), "{why}");
     assert!(runs_on(&other, Duration::from_millis(500)) >= 5);
     assert_eq!(other.renderer.process().wait(Duration::ZERO), None);
 }

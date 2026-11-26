@@ -23,11 +23,12 @@ use std::ffi::{c_char, c_int, c_uint, c_void, CStr, CString};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 #[path = "ffi.rs"]
-mod ffi;
+pub(crate) mod ffi;
 
 use ffi::*;
 
 use crate::display_list::{FontId, GlyphOffset};
+use crate::raster_tables::{FontFile, FontSource};
 use crate::text_cache::{SharedTextCaches, WordCache};
 use crate::web_font::FontLoadError;
 pub use snowlark_graphics::text::*;
@@ -55,14 +56,14 @@ unsafe impl Sync for FontBytes {}
 
 impl FontBytes {
     /// Maps a font file.
-    fn from_file(path: &CStr) -> Option<FontBytes> {
+    pub(crate) fn from_file(path: &CStr) -> Option<FontBytes> {
         // SAFETY: a NUL-terminated path; the blob returned is owned (null on failure).
         let blob = unsafe { hb_blob_create_from_file_or_fail(path.as_ptr()) };
         FontBytes::from_blob(blob)
     }
 
     /// Takes ownership of `bytes`.
-    fn from_vec(bytes: Vec<u8>) -> Option<FontBytes> {
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> Option<FontBytes> {
         unsafe extern "C" fn release(user: *mut c_void) {
             // SAFETY: `user` is the box made below, released once by HarfBuzz.
             drop(unsafe { Box::from_raw(user.cast::<Vec<u8>>()) });
@@ -130,6 +131,8 @@ pub struct FontData {
 /// A face the engine handed out an id for.
 struct Face {
     data: FontData,
+    /// Where it was loaded from ([`TextEngine::font_source`]).
+    key: FaceKey,
     hb_face: *mut hb_face_t,
     /// Immutable, at the face's design units.
     font: *mut hb_font_t,
@@ -715,6 +718,41 @@ impl TextEngine {
         self.face(font).map(|_| 0)
     }
 
+    /// What the raster side needs to find the face behind `font` by itself: an installed font's
+    /// path (its bytes, one per unit of [`FontFile::System`]'s path) or a memory font's bytes, with
+    /// the face index, the axis values (tags as `u32::from_le_bytes`, as on Windows) and the
+    /// synthesized bold (1) and oblique (2).
+    pub fn font_source(&self, font: FontId) -> Result<FontSource> {
+        use std::os::unix::ffi::OsStrExt;
+        let face = self.face(font).ok_or(Error::Invalid)?;
+        let file = match &face.key {
+            FaceKey::File(path, ..) => {
+                let os = std::ffi::OsStr::from_bytes(path.to_bytes());
+                let last_write = std::fs::metadata(os)
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map_or(0, |d| d.as_nanos() as u64);
+                FontFile::System {
+                    path: path.to_bytes().iter().map(|&b| b as u16).collect(),
+                    last_write,
+                }
+            }
+            FaceKey::Memory(_) => FontFile::Data(face.data.bytes.to_vec()),
+        };
+        let data = &face.data;
+        Ok(FontSource {
+            file,
+            index: data.index,
+            simulations: data.embolden as u32 | (data.oblique as u32) << 1,
+            axes: data
+                .variations
+                .iter()
+                .map(|&(tag, value)| (u32::from_le_bytes(tag), value))
+                .collect(),
+        })
+    }
+
     /// CSS Text Decoration 4 §2.6 `text-decoration-skip-ink`: the leftmost and rightmost x, from the
     /// glyph's origin, of `glyph`'s outline at `size` between `top` and `bottom` (CSS px below the
     /// baseline), or `None` when the outline does not reach into that band.
@@ -1167,6 +1205,7 @@ impl TextEngine {
                     embolden,
                     oblique,
                 },
+                key: key.clone(),
                 hb_face,
                 font,
                 upem,
