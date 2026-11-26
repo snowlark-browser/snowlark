@@ -109,8 +109,21 @@ impl Remote {
 }
 
 impl Session {
+    /// Gives the page its services through this connection.
+    pub fn connect(&self, browser: &NetClient, options: &mut snowlark_page::PageOptions) {
+        options.net = Some(self.net(browser));
+        options.broadcast = Some(snowlark_page::BroadcastHub::with_backend(
+            self.services.broadcast.clone(),
+        ));
+        options.web_storage = Some(self.services.storage.clone() as Arc<_>);
+        options.idb = Some(snowlark_page::IdbBackend::new(self.services.idb.clone()));
+        options.caches = Some(snowlark_page::CacheBackend::new(
+            self.services.caches.clone(),
+        ));
+    }
+
     /// The page's network: the renderer's client, but the top-level navigation the browser's own.
-    pub fn net(&self, browser: &NetClient) -> NetClient {
+    fn net(&self, browser: &NetClient) -> NetClient {
         NetClient::with_backend(Arc::new(Split {
             renderer: self.services.net.clone(),
             browser: browser.backend().clone(),

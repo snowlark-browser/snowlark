@@ -276,11 +276,12 @@ impl NavigatorUADataImpl for Engine {
     fn brands(&self, this: Handle) -> Vec<NavigatorUABrandVersion> {
         brands(&self.navigator_ua_profile(this), false)
     }
-    fn mobile(&self, _this: Handle) -> bool {
-        self.ua_profile().mobile
+    /// `mobile` and `platform` are those of the same user agent as `brands` and `toJSON()`.
+    fn mobile(&self, this: Handle) -> bool {
+        self.navigator_ua_profile(this).mobile
     }
-    fn platform(&self, _this: Handle) -> DomStr<'_> {
-        DomStr::Borrowed(self.ua_profile().os)
+    fn platform(&self, this: Handle) -> DomStr<'_> {
+        DomStr::Borrowed(self.navigator_ua_profile(this).os)
     }
     /// UA-CH §6.1 `getHighEntropyValues()`: the low-entropy values and each hint asked for.
     fn get_high_entropy_values(
@@ -776,7 +777,11 @@ mod tests {
                 i.bitness,
                 i.mobile
             ),
-            ("Snowlark", "0", "Windows", "10.0.0", "x86", "64", false)
+            if cfg!(windows) {
+                ("Snowlark", "0", "Windows", "10.0.0", "x86", "64", false)
+            } else {
+                ("Snowlark", "0", "Linux", "", "x86", "64", false)
+            }
         );
         assert_eq!(
             permission_state("clipboard-write"),

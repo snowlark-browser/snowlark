@@ -137,7 +137,8 @@ fn a_filter_makes_a_stacking_context_and_a_containing_block() {
 
 /// The window rasters in 512 px tiles and culls each item to the tile, in frame pixels: a
 /// filtered inline `<svg>` icon in a round button (the player controls of a video site) in the
-/// second tile must survive that as it does headless.
+/// second tile must survive that as it does headless. (Tiles are Windows-only so far.)
+#[cfg(windows)]
 #[test]
 fn a_filtered_svg_icon_survives_tile_culling() {
     use snowlark_paint::{Driver, Gpu, Sources, TileRasterizer, Viewport};

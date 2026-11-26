@@ -1638,9 +1638,18 @@ fn navigator_plugins_device_memory_battery_and_do_not_track() {
         out
         "#,
     );
-    assert_eq!(r, "5,2,true,true,8,");
+    // (HTML §8.9.1.6: the five plugins and two MIME types only with a PDF viewer)
+    let expected = if snowlark_paint::pdf::AVAILABLE {
+        "5,2,true,true,8,"
+    } else {
+        "0,0,false,true,8,"
+    };
+    assert_eq!(r, expected);
     page.run_until_settled(Duration::from_secs(5));
     assert_eq!(eval(&mut page, "battery"), "true,true,0,Infinity,1,true");
+    if !snowlark_paint::pdf::AVAILABLE {
+        return;
+    }
     // HTML §8.9.1.6 with a PDF viewer (the engine's, on by default): the five plugins and two MIME
     // types.
     let r = eval(

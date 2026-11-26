@@ -27,7 +27,8 @@ use std::time::{Duration, Instant};
 
 use snowlark_page::{ConsoleOutput, Page, PageOptions, RenderSetup, Terminator};
 
-#[path = "wpt/remote.rs"]
+#[cfg_attr(windows, path = "wpt/remote.rs")]
+#[cfg_attr(not(windows), path = "wpt/remote_none.rs")]
 mod remote;
 
 const TESTHARNESSREPORT: &str = include_str!("wpt/testharnessreport.js");
@@ -239,23 +240,8 @@ pub fn run(args: &[String]) -> i32 {
                     },
                     None => None,
                 };
-                let mut page = Page::new(PageOptions {
-                    net: Some(match &session {
-                        Some(s) => s.net(&client),
-                        None => client.clone(),
-                    }),
-                    broadcast: session.as_ref().map(|s| {
-                        snowlark_page::BroadcastHub::with_backend(s.services.broadcast.clone())
-                    }),
-                    web_storage: session
-                        .as_ref()
-                        .map(|s| s.services.storage.clone() as Arc<_>),
-                    idb: session
-                        .as_ref()
-                        .map(|s| snowlark_page::IdbBackend::new(s.services.idb.clone())),
-                    caches: session
-                        .as_ref()
-                        .map(|s| snowlark_page::CacheBackend::new(s.services.caches.clone())),
+                let mut options = PageOptions {
+                    net: Some(client.clone()),
                     content_filter: snowlark_blocker::content_filter(blocker.as_ref()),
                     console: if log {
                         ConsoleOutput::Stderr
@@ -266,7 +252,11 @@ pub fn run(args: &[String]) -> i32 {
                     heap_limit: Some(HEAP_LIMIT),
                     render: Some(render.clone()),
                     ..Default::default()
-                });
+                };
+                if let Some(s) = &session {
+                    s.connect(&client, &mut options);
+                }
+                let mut page = Page::new(options);
                 // (test runs play media without a user, and silently)
                 page.engine().set_media_config(snowlark_page::media::MediaConfig {
                     autoplay: snowlark_page::media::AutoplayPolicy::Allowed,

@@ -355,6 +355,10 @@ fn small_pdf(pages: &[(u32, u32)]) -> String {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no PDF renderer here yet (docs/linux.md stage 9)"
+)]
 fn pdfs_show_in_the_pdf_viewer_in_frames_objects_and_at_the_top() {
     // HTML §7.4.6 and §4.8.6/§4.8.7 with "PDF viewer supported": a PDF navigation makes a document
     // of the file's pages (images of the PDF renderer's output), in an iframe, in an `object` or

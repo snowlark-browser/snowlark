@@ -763,9 +763,10 @@ impl Engine {
             selectionchange_pending: RefCell::default(),
             cssom: RefCell::new(cssom::CssomState::default()),
             storage: RefCell::new(storage::StorageState::default()),
-            // (the engine's own PDF viewer: on unless the embedder turns it off)
+            // (the engine's own PDF viewer where the system can render PDF files: on unless the
+            // embedder turns it off)
             embedder: RefCell::new(crate::embedder::EmbedderHooks {
-                pdf_viewer: true,
+                pdf_viewer: snowlark_paint::pdf::AVAILABLE,
                 ..Default::default()
             }),
             history: RefCell::new(history::HistoryState::default()),

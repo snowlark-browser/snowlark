@@ -25,7 +25,11 @@ pub enum Error {
     /// The browser refused a section (over the quota, or a size it does not allow).
     Refused,
     /// The operating system said no.
+    #[cfg(windows)]
     Os(windows::core::Error),
+    /// The operating system said no.
+    #[cfg(unix)]
+    Os(std::io::Error),
 }
 
 impl fmt::Display for Error {
@@ -46,6 +50,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+#[cfg(windows)]
 impl From<windows::core::Error> for Error {
     fn from(e: windows::core::Error) -> Error {
         Error::Os(e)

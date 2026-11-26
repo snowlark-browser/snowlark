@@ -213,6 +213,10 @@ impl Reporter {
 enum Backend {
     #[cfg(windows)]
     Win(win::player::WinPlayer),
+    /// No media backend on this system yet (Linux until FFmpeg, docs/linux.md stage 7): the
+    /// player failed at opening.
+    #[cfg(not(windows))]
+    Unsupported,
     Remote(Box<dyn Remote>),
 }
 
@@ -238,12 +242,23 @@ impl Player {
             Source::Resource { resource, .. } => Some(resource.clone()),
             Source::Mse(_) => None,
         };
+        #[cfg(windows)]
+        let inner = Backend::Win(win::player::WinPlayer::open(
+            options,
+            source,
+            shared.clone(),
+        ));
+        #[cfg(not(windows))]
+        let inner = {
+            drop((options, source));
+            shared.push(PlayerEvent::Failed {
+                code: ErrorCode::SrcNotSupported,
+                message: "no media backend on this system".into(),
+            });
+            Backend::Unsupported
+        };
         Player {
-            inner: Backend::Win(win::player::WinPlayer::open(
-                options,
-                source,
-                shared.clone(),
-            )),
+            inner,
             shared,
             resource,
         }
@@ -274,14 +289,20 @@ impl Player {
 
     pub fn play(&self) {
         match &self.inner {
+            #[cfg(windows)]
             Backend::Win(p) => p.play(),
+            #[cfg(not(windows))]
+            Backend::Unsupported => {}
             Backend::Remote(r) => r.play(),
         }
     }
 
     pub fn pause(&self) {
         match &self.inner {
+            #[cfg(windows)]
             Backend::Win(p) => p.pause(),
+            #[cfg(not(windows))]
+            Backend::Unsupported => {}
             Backend::Remote(r) => r.pause(),
         }
     }
@@ -289,21 +310,30 @@ impl Player {
     /// Seeks to `t` seconds (a [`PlayerEvent::Seeked`] follows).
     pub fn seek(&self, t: f64) {
         match &self.inner {
+            #[cfg(windows)]
             Backend::Win(p) => p.seek(t),
+            #[cfg(not(windows))]
+            Backend::Unsupported => {}
             Backend::Remote(r) => r.seek(t),
         }
     }
 
     pub fn set_rate(&self, rate: f64) {
         match &self.inner {
+            #[cfg(windows)]
             Backend::Win(p) => p.set_rate(rate),
+            #[cfg(not(windows))]
+            Backend::Unsupported => {}
             Backend::Remote(r) => r.set_rate(rate),
         }
     }
 
     pub fn set_volume(&self, volume: f64, muted: bool) {
         match &self.inner {
+            #[cfg(windows)]
             Backend::Win(p) => p.set_volume(volume, muted),
+            #[cfg(not(windows))]
+            Backend::Unsupported => {}
             Backend::Remote(r) => r.set_volume(volume, muted),
         }
     }
@@ -312,7 +342,10 @@ impl Player {
     /// pass through the page).
     pub fn video(&self) -> Option<VideoId> {
         match &self.inner {
+            #[cfg(windows)]
             Backend::Win(p) => p.video(),
+            #[cfg(not(windows))]
+            Backend::Unsupported => None,
             Backend::Remote(_) => None,
         }
     }
@@ -328,6 +361,8 @@ impl Player {
         match &self.inner {
             #[cfg(windows)]
             Backend::Win(p) => p.filter_events(&mut events),
+            #[cfg(not(windows))]
+            Backend::Unsupported => {}
             Backend::Remote(_) => {}
         }
         events
@@ -341,7 +376,10 @@ impl Player {
     /// Stops playback and lets go of the decoder and the fetch (also on drop).
     pub fn close(&self) {
         match &self.inner {
+            #[cfg(windows)]
             Backend::Win(p) => p.close(),
+            #[cfg(not(windows))]
+            Backend::Unsupported => {}
             Backend::Remote(r) => r.close(),
         }
         if let Some(r) = &self.resource {
@@ -393,7 +431,103 @@ pub fn can_play_type(type_: &str) -> CanPlay {
 }
 
 pub mod mse {
-    //! Media Source Extensions (see [`crate::win::mse`]).
+    //! Media Source Extensions (Media Foundation's on Windows: `win::mse`).
     #[cfg(windows)]
     pub use crate::win::mse::*;
+
+    /// What happened to a MediaSource or one of its buffers (by id).
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum MseEvent {
+        Opened,
+        Ended,
+        Closed,
+        UpdateStart(u32),
+        Update(u32),
+        UpdateEnd(u32),
+        Error(u32),
+        Abort(u32),
+    }
+
+    /// Why `addSourceBuffer` failed.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub enum AddError {
+        NotSupported,
+        QuotaExceeded,
+        InvalidState,
+    }
+
+    #[cfg(not(windows))]
+    pub use unsupported::*;
+
+    #[cfg(not(windows))]
+    mod unsupported {
+        //! No MSE backend on this system yet (docs/linux.md stage 7): a source cannot be made, so
+        //! attaching a MediaSource fails as HTML says for a media source it cannot use.
+        use std::sync::Arc;
+
+        use super::{AddError, MseEvent};
+        use crate::Ranges;
+
+        /// Why a source could not be made.
+        #[derive(Debug)]
+        pub struct Unsupported;
+
+        /// One `MediaSource` object's media side: none can be made here.
+        #[derive(Clone)]
+        pub struct MseSource(std::convert::Infallible);
+
+        impl MseSource {
+            pub fn new() -> Result<MseSource, Unsupported> {
+                Err(Unsupported)
+            }
+            pub fn set_wake(&self, _wake: Option<Arc<dyn Fn() + Send + Sync>>) {
+                match self.0 {}
+            }
+            pub fn take_events(&self) -> Vec<MseEvent> {
+                match self.0 {}
+            }
+            pub fn ready_state(&self) -> &'static str {
+                match self.0 {}
+            }
+            pub fn add_source_buffer(&self, _type: &str) -> Result<u32, AddError> {
+                match self.0 {}
+            }
+            pub fn remove_source_buffer(&self, _id: u32) {
+                match self.0 {}
+            }
+            pub fn append(&self, _id: u32, _bytes: &[u8]) -> Result<(), String> {
+                match self.0 {}
+            }
+            pub fn remove(&self, _id: u32, _start: f64, _end: f64) -> Result<(), String> {
+                match self.0 {}
+            }
+            pub fn abort(&self, _id: u32) {
+                match self.0 {}
+            }
+            pub fn updating(&self, _id: u32) -> bool {
+                match self.0 {}
+            }
+            pub fn buffered(&self, _id: u32) -> Ranges {
+                match self.0 {}
+            }
+            pub fn set_timestamp_offset(&self, _id: u32, _t: f64) {
+                match self.0 {}
+            }
+            pub fn set_append_window(&self, _id: u32, _start: f64, _end: f64) {
+                match self.0 {}
+            }
+            pub fn set_sequence_mode(&self, _id: u32, _sequence: bool) {
+                match self.0 {}
+            }
+            pub fn end_of_stream(&self, _error: Option<&str>) {
+                match self.0 {}
+            }
+            pub fn duration(&self) -> f64 {
+                match self.0 {}
+            }
+            pub fn set_duration(&self, _d: f64) {
+                match self.0 {}
+            }
+        }
+    }
 }

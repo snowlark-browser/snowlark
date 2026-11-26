@@ -69,7 +69,7 @@ mod ink;
 pub mod input;
 #[cfg(windows)]
 pub mod os_crypt;
-#[cfg(windows)]
+#[cfg_attr(not(windows), path = "linux/pdf.rs")]
 pub mod pdf;
 pub mod placement;
 #[cfg(windows)]
@@ -80,7 +80,7 @@ mod soft_blur;
 mod svg_effects;
 #[cfg(windows)]
 pub mod timer_resolution;
-#[cfg(windows)]
+#[cfg_attr(not(windows), path = "linux/video.rs")]
 pub mod video;
 #[cfg(windows)]
 pub mod vsync;
@@ -93,9 +93,9 @@ pub use compositor::{Compositor, ContentPass};
 pub use display_list::*;
 pub use filter::{ColorFilter, ColorFilters, FilterOp, FilterRange};
 pub use geom::*;
-pub use gpu::Driver;
+pub use gpu::{Driver, Gpu};
 #[cfg(windows)]
-pub use gpu::{Gpu, RasterStats, RasterWork, TileRasterizer, TiledFrame, TILE_SIZE};
+pub use gpu::{RasterStats, RasterWork, TileRasterizer, TiledFrame, TILE_SIZE};
 pub use image::{DecodedImage, Frame, ImageStore, Pixmap, ShownImage};
 pub use raster::{FontResolver, HeadlessRenderer, ImageResolver, Sources, Viewport};
 #[cfg(windows)]
@@ -106,7 +106,6 @@ pub use raster_tables::{
 pub use text::*;
 pub use text_cache::{ShapeCache, ShapeKey, TextCache, WordCache, WordCacheStats};
 pub use ticks::Ticks;
-#[cfg(windows)]
 pub use video::{VideoSlot, VideoStore};
 #[cfg(windows)]
 pub use window::{WindowHandle, WindowProxy};

@@ -67,6 +67,10 @@ const PROGRAM: &str = "
 ";
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn a_webgl2_context_is_given_and_reports_itself() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);
@@ -88,6 +92,10 @@ fn a_webgl2_context_is_given_and_reports_itself() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn a_vertex_array_with_instancing_and_a_uniform_block_draws_into_the_page() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);
@@ -150,6 +158,10 @@ fn a_vertex_array_with_instancing_and_a_uniform_block_draws_into_the_page() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn a_fence_signals_only_after_the_task_that_made_it() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);
@@ -180,6 +192,10 @@ fn a_fence_signals_only_after_the_task_that_made_it() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn pixels_come_back_through_a_pixel_pack_buffer() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);
@@ -213,6 +229,10 @@ fn pixels_come_back_through_a_pixel_pack_buffer() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn an_offscreen_canvas_gives_a_webgl2_context() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);

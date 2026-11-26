@@ -13,6 +13,9 @@
 //! `Start-Process -Wait`, `| Out-Host`, any process API). PowerShell also doesn't capture or
 //! redirect a GUI program's output (`$x = snowlark --eval 1`, `> file`): scripts use `snowlark-cli.exe`,
 //! the console-subsystem build of this same file (`src/bin/snowlark-cli.rs`).
+//!
+//! Elsewhere than Windows only the headless modes are built so far: the window, its processes and
+//! the modes that need a GPU device wait on docs/linux.md stages 4 and 5.
 #![windows_subsystem = "windows"]
 
 // Rust's allocations go to mimalloc rather than the Windows heap, which was 9 to 14% of page work,
@@ -21,10 +24,43 @@
 #[global_allocator]
 static ALLOCATOR: snowlark_js::rust_heap::Allocator = snowlark_js::rust_heap::Allocator;
 
+/// What the window takes from the command line.
+#[cfg(windows)]
+type WindowSetup = (snowlark_shell::ProcessModel, snowlark_shell::WindowFlags);
+#[cfg(not(windows))]
+type WindowSetup = ();
+
 pub fn main() {
+    #[allow(unused_mut)]
     let mut args: Vec<String> = std::env::args().collect();
+    #[cfg(windows)]
+    let setup = window_setup(&mut args);
+    #[cfg(not(windows))]
+    let setup = ();
+    // The headless modes run their page on a thread with a page thread's stack (layout recurses
+    // over the box tree, and the main thread's stack is 1 MiB on Windows); the window runs its pages
+    // on tab threads of that size.
+    if args.get(1).is_some_and(|a| a.starts_with("--")) {
+        let code = std::thread::Builder::new()
+            .name("snowlark main".into())
+            .stack_size(snowlark_page::PAGE_THREAD_STACK)
+            .spawn(move || run(args, setup))
+            .expect("the main thread")
+            .join()
+            .unwrap_or(101);
+        snowlark_js::write_pgo_profile();
+        std::process::exit(code);
+    }
+    let code = run(args, setup);
+    snowlark_js::write_pgo_profile();
+    std::process::exit(code);
+}
+
+/// Takes the window's flags out of `args`.
+#[cfg(windows)]
+fn window_setup(args: &mut Vec<String>) -> WindowSetup {
     // The window's process model: `--process-model=tab|single`, else `SNOWLARK_PROCESS_MODEL`.
-    let model = match take_process_model(&mut args) {
+    let model = match take_process_model(args) {
         Ok(m) => m,
         Err(bad) => {
             snowlark_paint::window::attach_parent_console();
@@ -33,32 +69,17 @@ pub fn main() {
         }
     };
     // `--gpu-process`: the window composites in a GPU process (with `--process-model=tab`).
-    let gpu_process = take_flag(&mut args, "--gpu-process");
+    let gpu_process = take_flag(args, "--gpu-process");
     // `--incognito`: the window opens as an Incognito window.
     let flags = snowlark_shell::WindowFlags {
         gpu_process,
-        incognito: take_flag(&mut args, "--incognito"),
+        incognito: take_flag(args, "--incognito"),
     };
-    // The headless modes run their page on a thread with a page thread's stack (layout recurses
-    // over the box tree, and the main thread's stack is 1 MiB on Windows); the window runs its pages
-    // on tab threads of that size.
-    if args.get(1).is_some_and(|a| a.starts_with("--")) {
-        let code = std::thread::Builder::new()
-            .name("snowlark main".into())
-            .stack_size(snowlark_page::PAGE_THREAD_STACK)
-            .spawn(move || run(args, model, flags))
-            .expect("the main thread")
-            .join()
-            .unwrap_or(101);
-        snowlark_js::write_pgo_profile();
-        std::process::exit(code);
-    }
-    let code = run(args, model, flags);
-    snowlark_js::write_pgo_profile();
-    std::process::exit(code);
+    (model, flags)
 }
 
 /// Takes `flag` out of `args`: whether it was there.
+#[cfg(windows)]
 fn take_flag(args: &mut Vec<String>, flag: &str) -> bool {
     match args.iter().position(|a| a == flag) {
         Some(i) => {
@@ -72,6 +93,7 @@ fn take_flag(args: &mut Vec<String>, flag: &str) -> bool {
 /// Takes `--process-model=<model>` out of `args`; without it, `SNOWLARK_PROCESS_MODEL` says, and
 /// without that, the default (`snowlark_shell::ProcessModel::choose`). An unknown model is the error.
 /// Only the window has a process model: the headless modes run their page in this process.
+#[cfg(windows)]
 fn take_process_model(args: &mut Vec<String>) -> Result<snowlark_shell::ProcessModel, String> {
     const FLAG: &str = "--process-model=";
     let flag = args
@@ -82,17 +104,14 @@ fn take_process_model(args: &mut Vec<String>) -> Result<snowlark_shell::ProcessM
     snowlark_shell::ProcessModel::choose(flag.as_deref(), env.as_deref())
 }
 
-fn run(
-    args: Vec<String>,
-    model: snowlark_shell::ProcessModel,
-    flags: snowlark_shell::WindowFlags,
-) -> i32 {
+fn run(args: Vec<String>, setup: WindowSetup) -> i32 {
     let window = match args.get(1).map(String::as_str) {
         None => true,
         Some(a) => !a.starts_with("--"),
     };
     // The window mode prints only diagnostics (SNOWLARK_GPU_STATS, SNOWLARK_TRACE): those go to the
     // console too when it was started from one.
+    #[cfg(windows)]
     if !window
         || std::env::var_os("SNOWLARK_GPU_STATS").is_some()
         || std::env::var_os("SNOWLARK_TRACE").is_some()
@@ -101,11 +120,13 @@ fn run(
     }
     // The window processes leave the folder they were started in (a graphics driver writes a folder
     // of its own to the current directory); the command line's file is made absolute first.
+    #[cfg(windows)]
     let start = args.get(1).filter(|a| !a.starts_with("--")).map(|a| {
         snowlark_shell::working_dir::absolute_start(a)
             .to_string_lossy()
             .into_owned()
     });
+    #[cfg(windows)]
     if window
         || matches!(
             args.get(1).map(String::as_str),
@@ -125,6 +146,7 @@ fn run(
             mod wpt;
             wpt::run(&args)
         }
+        #[cfg(windows)]
         Some("--speedometer") => {
             #[path = "cli/speedometer.rs"]
             mod speedometer;
@@ -135,6 +157,7 @@ fn run(
             mod reftest;
             reftest::run(&args)
         }
+        #[cfg(windows)]
         Some("--render-demo") => {
             #[path = "cli/render_demo.rs"]
             mod render_demo;
@@ -165,21 +188,25 @@ fn run(
             mod render;
             render::run(&args[2..])
         }
+        #[cfg(windows)]
         Some("--bench") => {
             #[path = "cli/bench.rs"]
             mod bench;
             bench::run(&args[2..])
         }
+        #[cfg(windows)]
         Some("--video") => {
             #[path = "cli/video.rs"]
             mod video;
             video::run(&args[2..])
         }
+        #[cfg(windows)]
         Some("--type=renderer") => {
             #[path = "cli/renderer.rs"]
             mod renderer;
             renderer::run()
         }
+        #[cfg(windows)]
         Some("--type=gpu") => {
             #[path = "cli/gpu.rs"]
             mod gpu;
@@ -191,8 +218,16 @@ fn run(
             media_types::run()
         }
         // The browser window: no arguments (the home page) or an address.
-        None => snowlark_shell::run(None, model, flags),
-        Some(a) if !a.starts_with("--") => snowlark_shell::run(start.as_deref(), model, flags),
+        #[cfg(windows)]
+        None => snowlark_shell::run(None, setup.0, setup.1),
+        #[cfg(windows)]
+        Some(a) if !a.starts_with("--") => snowlark_shell::run(start.as_deref(), setup.0, setup.1),
+        #[cfg(not(windows))]
+        _ if window => {
+            let () = setup;
+            eprintln!("the window is not built for this system yet; the -- modes run headless");
+            2
+        }
         _ => {
             eprintln!("usage: snowlark [--process-model=tab|single] [--gpu-process] [--incognito] [<url>] | --eval <js> | --render <url> <png> [width] | --reftest <list> <outdir> | --video <url> <png> [--time T] [--wait S] | --media-types");
             2

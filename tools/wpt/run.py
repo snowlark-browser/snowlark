@@ -895,7 +895,10 @@ def lock_dir():
 
 
 def slots_held(kind):
-    """How many of the machine-wide `kind` slots (lock files in lock_dir) are held right now, by anyone."""
+    """How many of the machine-wide `kind` slots (lock files in lock_dir) are held right now, by anyone.
+    The slots are Windows byte locks: elsewhere none are held."""
+    if os.name != 'nt':
+        return 0
     import msvcrt
     held = 0
     try:

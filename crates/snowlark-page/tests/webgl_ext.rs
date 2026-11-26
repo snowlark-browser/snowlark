@@ -76,6 +76,10 @@ const RECT: &str = "
 ";
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn each_supported_extension_is_one_object_per_context() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);
@@ -101,6 +105,10 @@ fn each_supported_extension_is_one_object_per_context() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn the_extensions_each_version_offers() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);
@@ -117,6 +125,10 @@ fn the_extensions_each_version_offers() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn an_extension_is_on_only_once_asked_for() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);
@@ -145,6 +157,10 @@ fn an_extension_is_on_only_once_asked_for() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn debug_renderer_info_gives_only_maker_and_model() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);
@@ -164,6 +180,10 @@ fn debug_renderer_info_gives_only_maker_and_model() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn instanced_arrays_and_a_vertex_array_object_draw_in_webgl1() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);
@@ -202,6 +222,10 @@ fn instanced_arrays_and_a_vertex_array_object_draw_in_webgl1() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "WebGL needs ANGLE, not built for this system yet (docs/linux.md stage 6)"
+)]
 fn multi_draw_draws_each_range() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(&net, CANVAS);

@@ -67,6 +67,10 @@ fn invalid_configurations_reject_with_a_type_error() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn decoding_is_answered_from_what_plays() {
     let mut p = page();
     let r = run_async(
@@ -98,6 +102,10 @@ fn decoding_is_answered_from_what_plays() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn a_key_system_configuration_is_asked_of_the_key_system() {
     // "Check Encrypted Decoding Support": Clear Key decrypts MP4, so it is supported with a
     // MediaKeySystemAccess; an unknown key system is not, and has none.

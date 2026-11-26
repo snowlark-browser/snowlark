@@ -823,8 +823,12 @@ pub enum Backend {
 }
 
 impl Backend {
-    /// The backend `SNOWLARK_CANVAS` selects (`skia`, `warp`; the graphics card otherwise).
+    /// The backend `SNOWLARK_CANVAS` selects (`skia`, `warp`; the graphics card otherwise), and
+    /// the CPU where canvases have no GPU device.
     pub fn from_env() -> Backend {
+        if !snowlark_paint::canvas_thread::AVAILABLE {
+            return Backend::Skia;
+        }
         match std::env::var("SNOWLARK_CANVAS").as_deref() {
             Ok("skia") | Ok("cpu") => Backend::Skia,
             Ok("warp") => Backend::Gpu(Driver::Warp),
@@ -2813,20 +2817,12 @@ fn css_font_size(s: &str) -> Option<f32> {
 }
 
 /// The system fonts for the CPU backend's text: the renderer's, or (when it gave none, because
-/// canvases draw on the GPU, but this one could not) the process's, loaded once.
+/// canvases draw on the GPU, but this one could not) the text engine's, loaded once.
 fn cpu_fonts(given: &Fonts) -> Arc<usvg::fontdb::Database> {
-    if let Some(db) = &given.cpu {
-        return db.clone();
+    match &given.cpu {
+        Some(db) => db.clone(),
+        None => given.text.font_database(),
     }
-    static FONTS: std::sync::OnceLock<Arc<usvg::fontdb::Database>> = std::sync::OnceLock::new();
-    FONTS
-        .get_or_init(|| {
-            let mut db = usvg::fontdb::Database::new();
-            db.load_system_fonts();
-            snowlark_paint::font_files::map_all(&mut db);
-            Arc::new(db)
-        })
-        .clone()
 }
 
 /// The `font-size` of a canvas `font` value in px (CSS px, pt and em/rem against 16 px).

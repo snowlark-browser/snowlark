@@ -21,6 +21,9 @@ use crate::text::{ShapedText, TextEngine};
 /// page thread's wake-up.
 pub type Wake = Arc<dyn Fn() + Send + Sync>;
 
+/// Whether canvases can draw on a GPU device here: not yet (docs/linux.md stage 5).
+pub const AVAILABLE: bool = false;
+
 /// Makes the canvas thread's device ahead of the first canvas: nothing to make here.
 pub fn prepare(_driver: Driver) {}
 

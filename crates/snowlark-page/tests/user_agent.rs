@@ -302,7 +302,13 @@ fn the_default_is_the_familys_string_with_snowlark_last() {
     );
     assert_eq!(eval(&mut page, "typeof navigator.oscpu"), "undefined");
     assert_eq!(eval(&mut page, "navigator.vendor"), "Google Inc.");
-    assert_eq!(eval(&mut page, "navigator.platform"), "Win32");
+    // (the platform of the system's User-Agent string)
+    let platform = if cfg!(windows) {
+        "Win32"
+    } else {
+        "Linux x86_64"
+    };
+    assert_eq!(eval(&mut page, "navigator.platform"), platform);
     assert_eq!(eval(&mut page, "navigator.productSub"), "20030107");
     let doc = seen.lock().unwrap()[0].clone();
     assert_eq!(
@@ -324,17 +330,22 @@ fn the_default_is_the_familys_string_with_snowlark_last() {
         )
     );
     // `appVersion` is the same string after `Mozilla/`.
+    let os = if cfg!(windows) {
+        "Windows NT 10.0; Win64; x64"
+    } else {
+        "X11; Linux x86_64"
+    };
     assert_eq!(
         snowlark_net::metadata::USER_AGENT,
         format!(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) \
+            "Mozilla/5.0 ({os}) AppleWebKit/537.36 (KHTML, like Gecko) \
              Chrome/{chrome}.0.0.0 Safari/537.36 Snowlark/0.1"
         )
     );
     assert_eq!(
         eval(&mut page, "navigator.appVersion"),
         format!(
-            "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) \
+            "5.0 ({os}) AppleWebKit/537.36 (KHTML, like Gecko) \
              Chrome/{chrome}.0.0.0 Safari/537.36 Snowlark/0.1"
         )
     );
@@ -363,7 +374,8 @@ fn the_default_is_the_familys_string_with_snowlark_last() {
     assert!(
         list.contains(&format!("Chromium {chrome}.0.0.0")) && list.contains(&"Snowlark 0.1".into())
     );
-    assert_eq!(rest, format!("{chrome}.0.0.0 | Windows"));
+    let platform = if cfg!(windows) { "Windows" } else { "Linux" };
+    assert_eq!(rest, format!("{chrome}.0.0.0 | {platform}"));
 }
 
 #[test]

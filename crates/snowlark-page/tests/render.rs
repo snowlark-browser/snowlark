@@ -813,6 +813,10 @@ fn a_canvas_frame_read_after_its_update_shows_at_a_later_one() {
 /// frame shows from a later update, its box rebuilt with it. Without that, the update waited for the
 /// canvas thread and showed the frame at once.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no GPU canvas on this system yet (docs/linux.md stage 5)"
+)]
 fn a_canvas_first_frame_is_not_waited_for() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(
@@ -852,6 +856,10 @@ fn a_canvas_first_frame_is_not_waited_for() {
 /// moves its canvas and redraws it showed the old drawing at the new place for a frame), and the
 /// frame's coming asks for no second paint. Without it, the update asked for a paint at once.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no GPU canvas on this system yet (docs/linux.md stage 5)"
+)]
 fn a_paint_waits_for_its_updates_canvas_frames() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = rendered(
@@ -913,6 +921,10 @@ fn a_paint_waits_for_its_updates_canvas_frames() {
 // starts (it makes and warms the device).
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no GPU canvas on this system yet (docs/linux.md stage 5)"
+)]
 fn a_parsed_canvas_starts_making_the_canvas_device() {
     use snowlark_paint::{canvas_thread, gpu::Driver};
     let net = NetThread::start(NetConfig::default()).unwrap();
@@ -931,6 +943,10 @@ fn a_parsed_canvas_starts_making_the_canvas_device() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no GPU canvas on this system yet (docs/linux.md stage 5)"
+)]
 fn a_canvas_starts_the_device_only_once_connected() {
     use snowlark_paint::{canvas_thread, gpu::Driver};
     let net = NetThread::start(NetConfig::default()).unwrap();
@@ -947,6 +963,10 @@ fn a_canvas_starts_the_device_only_once_connected() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no GPU canvas on this system yet (docs/linux.md stage 5)"
+)]
 fn a_canvas_makes_the_device_at_its_first_drawing() {
     use snowlark_paint::{canvas_thread, gpu::Driver};
     let net = NetThread::start(NetConfig::default()).unwrap();
@@ -1004,10 +1024,13 @@ fn draw_image_of_an_img_draws_its_pixels_within_each_clip() {
          [at(2), at(7), at(22), at(32), at(37), img.width].join(' ')",
     );
     assert_eq!(r, "255,0,0,255 0,0,0,0 0,0,255,255 0,0,255,255 0,0,0,0 40");
-    assert_eq!(
-        canvas_thread::kept_images(Driver::Hardware),
-        (1, 40 * 20 * 4)
-    );
+    // (the canvas thread's upload, where canvases draw on the GPU)
+    if canvas_thread::AVAILABLE {
+        assert_eq!(
+            canvas_thread::kept_images(Driver::Hardware),
+            (1, 40 * 20 * 4)
+        );
+    }
 }
 
 /// UI Events §5.3.1 and §7.1.1, Pointer Events 3 §11.3: a mouse event's screen coordinates are the

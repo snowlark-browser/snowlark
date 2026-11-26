@@ -719,6 +719,9 @@ impl Drop for Link {
     }
 }
 
+/// Whether canvases can draw on a GPU device here.
+pub const AVAILABLE: bool = true;
+
 /// Starts this thread's canvas thread for `driver` (which makes the device), unless it has one: the
 /// first canvas then finds the device made, or being made off this thread.
 pub fn prepare(driver: Driver) {

@@ -17,7 +17,6 @@ snowlark-dom = { path = "../snowlark-dom" }
 snowlark-style = { path = "../snowlark-style" }
 snowlark-layout = { path = "../snowlark-layout" }
 snowlark-render = { path = "../snowlark-render" }
-snowlark-shell = { path = "../snowlark-shell" }
 snowlark-ipc = { path = "../snowlark-ipc" }
 snowlark-tab = { path = "../snowlark-tab" }
 snowlark-page = { path = "../snowlark-page" }
@@ -26,6 +25,10 @@ snowlark-media = { path = "../snowlark-media" }
 snowlark-idb = { path = "../snowlark-idb" }
 snowlark-sw = { path = "../snowlark-sw" }
 url = "2.5"
+
+# (the window and its processes: Windows only so far, docs/linux.md stages 4 and 5)
+[target.'cfg(windows)'.dependencies]
+snowlark-shell = { path = "../snowlark-shell" }
 
 [[test]]
 name = "it"

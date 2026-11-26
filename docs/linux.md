@@ -26,7 +26,32 @@ six AVIF tests, which need the dav1d library (below). `snowlark-js` and `snowlar
 Linux V8 library and pass their tests (69, among them the access check, streaming, code cache, object clone and
 inline field tests that drive the mangled-name declarations through V8). `snowlark-paint` has the Linux text
 engine (below) with its tests, and the Skia painter with its own. `snowlark-layout` and `snowlark-render` build
-and pass their tests (`snowlark-render`'s GPU canvas tests are ignored there).
+and pass their tests (`snowlark-render`'s GPU canvas tests are ignored there). `snowlark-page`, `snowlark-media`
+and `snowlark-ipc` build and pass their tests; the page tests that need WebGL (stage 6), a media backend (stage
+7), the GPU canvas (stage 5) or the PDF viewer (stage 9) are ignored there, each with its reason.
+
+**The binary** builds on Linux with its headless modes: `--eval`, `--render`, `--wpt`, `--reftest`, `--fetch`,
+`--computed`, `--layout-demo`, `--media-types` and `--update-filters`. The window, the renderer and GPU processes
+and the modes that need a GPU device or Windows' CPU counters (`--video`, `--render-demo`, `--bench`,
+`--speedometer`) are compiled out until their stages; `snowlark` without a `--` mode says so. `snowlark-tab`
+builds only its platform-free parts there (the network thread's start, WebDriver actions), and `snowlark-shell`
+is not built. What is missing behaves as on a system without it: a media element fails with
+`MEDIA_ERR_SRC_NOT_SUPPORTED`, `MediaSource` cannot attach, `getContext("webgl")` returns null, canvases draw on
+the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is false and
+`navigator.plugins` empty).
+
+**Identity:** the default User-Agent carries the platform token of the family's reduced strings for Linux,
+`X11; Linux x86_64` (Windows keeps `Windows NT 10.0; Win64; x64`); `navigator.platform` (`Linux x86_64`),
+`navigator.userAgentData.platform` and `Sec-CH-UA-Platform` (`Linux`) follow it. The platform version hint is
+empty there. Per-site User-Agents are the same on both systems.
+
+**Fonts:** the CSS generic families resolve as on other systems' defaults: `serif` to Times New Roman,
+`sans-serif` to Arial, `cursive` to Comic Sans MS and `fantasy` to Impact, through fontconfig's rules (which
+bind them to metric-compatible faces such as Liberation's where those fonts are absent), with fontconfig's own
+generic as the next choice; `monospace` and `system-ui` are fontconfig's. The font database of SVG text and CPU
+canvases (fontdb) knows the same families: its generic families are the text engine's choices, and Arial,
+Helvetica, Times New Roman, Times, Courier New, Courier, Comic Sans MS and Impact, where not installed, name
+the faces fontconfig binds them to.
 
 ### A Linux machine for building
 
@@ -110,8 +135,9 @@ half; a module with a Linux half has it in `src/linux/<module>.rs` under the sam
 releases; a machine without network access builds it from source, which needs `python3`, `ninja` and `clang`).
 
 The rest of `snowlark-paint` (the compositor, tiles, video, the window, cursors, the clipboard, the PDF viewer, the
-password store's key) is Windows-only and compiled out elsewhere; its integration tests too. Every crate above
-render (`snowlark-page`, `-tab`, `-media`, `-shell`, `-blocker`, the binary) waits on stage 3 and later.
+password store's key) is Windows-only and compiled out elsewhere; its integration tests too. `video` has a
+Linux half that hands out slots no frame reaches, `pdf` one that renders nothing (`AVAILABLE` false), and `gpu` a
+`Gpu` that cannot be made.
 
 `snowlark-gl` (ANGLE), `snowlark-ipc` (pipes, sections, process launch), `snowlark-media` (Media Foundation,
 PlayReady, WASAPI) and the window half of `snowlark-paint` are platform halves by nature: each gets a Linux half.

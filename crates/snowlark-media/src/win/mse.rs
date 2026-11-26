@@ -23,28 +23,8 @@ use windows::Media::Core::{
 };
 use windows::Security::Cryptography::CryptographicBuffer;
 
+use crate::mse::{AddError, MseEvent};
 use crate::Ranges;
-
-/// What happened to a MediaSource or one of its buffers (by id).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MseEvent {
-    Opened,
-    Ended,
-    Closed,
-    UpdateStart(u32),
-    Update(u32),
-    UpdateEnd(u32),
-    Error(u32),
-    Abort(u32),
-}
-
-/// Why `addSourceBuffer` failed.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AddError {
-    NotSupported,
-    QuotaExceeded,
-    InvalidState,
-}
 
 struct Inner {
     source: MseStreamSource,

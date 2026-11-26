@@ -3,7 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! Playback end to end: the fixture clip served over HTTP with range requests, fetched through
-//! snowlark-net, decoded by Media Foundation into GPU textures.
+//! snowlark-net, decoded by Media Foundation into GPU textures (Windows only: docs/linux.md stage 7).
+
+#![cfg(windows)]
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;

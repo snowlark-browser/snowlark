@@ -11,10 +11,13 @@ snowlark-audio = { path = "../snowlark-audio" }
 snowlark-net = { path = "../snowlark-net" }
 snowlark-paint = { path = "../snowlark-paint" }
 serde = { version = "1", features = ["derive"] }
+
+# Media Foundation, PlayReady and WASAPI (`win/`); Linux has no player yet (docs/linux.md, stage 7).
+[target.'cfg(windows)'.dependencies]
 windows-core = "0.62"
 windows-collections = "0.3"
 
-[dependencies.windows]
+[target.'cfg(windows)'.dependencies.windows]
 version = "0.62"
 features = [
     "Foundation",
@@ -45,7 +48,7 @@ features = [
     "Win32_UI_WindowsAndMessaging",
 ]
 
-[dev-dependencies.windows]
+[target.'cfg(windows)'.dev-dependencies.windows]
 version = "0.62"
 features = [
     "Win32_Graphics_DirectComposition",

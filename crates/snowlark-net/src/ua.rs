@@ -750,12 +750,13 @@ mod tests {
         assert!(p.edge && p.family == Family::Chromium && !p.unbranded);
         assert_eq!(p.os, "Windows");
         assert_eq!(p.ua_full_version(), "150.0.0.0");
-        // The rest of `navigator` is the default's, so nothing a tab decided at start changes.
+        // The rest of `navigator` is the default's, so nothing a tab decided at start changes (the
+        // platform too where the default is Windows's).
         let d = UserAgent::default().profile();
-        assert_eq!(
-            (p.vendor(), p.nav_platform(), p.product_sub()),
-            (d.vendor(), d.nav_platform(), d.product_sub())
-        );
+        assert_eq!((p.vendor(), p.product_sub()), (d.vendor(), d.product_sub()));
+        if cfg!(windows) {
+            assert_eq!(p.nav_platform(), d.nav_platform());
+        }
         assert_eq!(
             (p.has_ua_data(), p.has_oscpu()),
             (d.has_ua_data(), d.has_oscpu())
@@ -800,10 +801,15 @@ mod tests {
             chrome_major.parse::<u32>().unwrap() >= 158,
             "{COMPAT_VERSION}"
         );
+        let platform = if cfg!(windows) {
+            "Windows NT 10.0; Win64; x64"
+        } else {
+            "X11; Linux x86_64"
+        };
         assert_eq!(
             d.value,
             format!(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) \
+                "Mozilla/5.0 ({platform}) AppleWebKit/537.36 (KHTML, like Gecko) \
                  Chrome/{COMPAT_VERSION} Safari/537.36 {PRODUCT}/{VERSION}"
             )
         );
@@ -816,10 +822,15 @@ mod tests {
         assert!(!p.edge);
         assert_eq!((p.brand.as_str(), p.full.as_str()), (PRODUCT, VERSION));
         assert!(p.has_ua_data() && !p.has_oscpu());
-        // HTML's navigator compatibility mode of the family.
+        // HTML's navigator compatibility mode of the family, on this system's platform.
+        let platform = if cfg!(windows) {
+            "Win32"
+        } else {
+            "Linux x86_64"
+        };
         assert_eq!(
             (p.vendor(), p.nav_platform(), p.product_sub()),
-            ("Google Inc.", "Win32", "20030107")
+            ("Google Inc.", platform, "20030107")
         );
         // The brands: the grease brand, `Chromium` at the `Chrome/` token's major and Snowlark's own,
         // never another browser's, in the order the release seeds (UA-CH §5.1).

@@ -9,6 +9,9 @@
 use windows::Data::Pdf::{PdfDocument, PdfPageRenderOptions};
 use windows::Storage::Streams::{DataReader, DataWriter, InMemoryRandomAccessStream};
 
+/// Whether this system renders PDF files.
+pub const AVAILABLE: bool = true;
+
 /// One rendered page.
 pub struct PdfPage {
     /// The page's size in CSS px (the renderer's device-independent pixels, 96 per inch).

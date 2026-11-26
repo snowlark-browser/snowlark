@@ -83,6 +83,10 @@ for (const t of ['loadstart','durationchange','loadedmetadata','loadeddata','can
 </script>";
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn loads_plays_seeks_and_ends() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -155,6 +159,10 @@ fn loads_plays_seeks_and_ends() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn source_children_and_failures() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     // The first source's type can't play, the second is missing, the third plays.
@@ -204,6 +212,10 @@ fn source_children_and_failures() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn autoplay_needs_muting_or_activation() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -235,6 +247,10 @@ fn autoplay_needs_muting_or_activation() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn preload_none_waits_for_play() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -262,6 +278,10 @@ fn preload_none_waits_for_play() {
 /// `load()` is script asking for the resource: with `preload=none` the fetch then goes ahead
 /// (to `canplaythrough`, without playing); the `src` attribute being set again suspends it again.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn preload_none_fetches_after_load() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -369,6 +389,10 @@ fn track_elements_load_webvtt() {
 /// (HTML §4.8.11.5; Chromium's `HTMLMediaElement::StartProgressEventTimer`): a check that finds no
 /// new data leaves the loop asleep until the next one, rather than due again at once.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn a_loading_media_element_does_not_keep_the_loop_awake() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -407,6 +431,10 @@ fn a_loading_media_element_does_not_keep_the_loop_awake() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn media_source_opens_and_appends() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -483,6 +511,10 @@ fn media_source_opens_and_appends() {
 /// opens only once it has data at the playback position, so before the fix `loadedmetadata`
 /// never came and the seek never happened.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn media_source_metadata_comes_with_the_initialization_segments() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -590,6 +622,10 @@ fn settle(page: &mut Page, ms: u64) {
 /// state is back to HAVE_CURRENT_DATA or more, `ChunkDemuxer::Seek` holds the seek until
 /// `SourceBufferStream::Seek` finds a range with the position.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn a_seek_past_the_buffered_data_waits_for_the_page_to_append_there() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -723,6 +759,10 @@ fn paints_a_video(page: &Page) -> bool {
 /// HAVE_METADATA before any video data was obtained, shows the poster. A page that scrubs a video
 /// by seeking it as it scrolls would otherwise blink between the frame and the poster.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn a_seeking_video_shows_its_last_frame() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -867,6 +907,10 @@ fn a_lazy_videos_poster_waits_for_the_viewport() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn lazy_media_waits_for_the_viewport_and_cues_enter_and_exit() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -917,6 +961,10 @@ fn lazy_media_waits_for_the_viewport_and_cues_enter_and_exit() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn the_tab_counts_audible_media_and_its_mute_is_invisible_to_the_page() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let group = snowlark_media::AudioGroup::new();
@@ -982,6 +1030,10 @@ fn the_tab_counts_audible_media_and_its_mute_is_invisible_to_the_page() {
 /// HTML "HAVE_ENOUGH_DATA": `canplaythrough` is queued before the autoplay steps fire `play` and
 /// `playing`.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn canplaythrough_comes_before_autoplay() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -1025,6 +1077,10 @@ fn the_muted_attribute_mutes_until_the_setter_runs() {
 /// `progress` (the network state still NETWORK_LOADING), then sets NETWORK_IDLE and fires
 /// `suspend`.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn a_fetched_resource_fires_progress_then_suspend() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -1054,6 +1110,10 @@ fn a_fetched_resource_fires_progress_then_suspend() {
 /// is still busy (which failed the append and ended the stream with a decode error: a video that
 /// switched to 4K on YouTube errored out and was reloaded at 480p).
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn an_append_ends_once_however_the_media_side_reports_it() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1186,6 +1246,10 @@ fn serve_clip_and_track(vtt_delay: Duration) -> url::Url {
 /// (enabled by automatic selection once the resource selection began) that is still loading holds
 /// the element at HAVE_CURRENT_DATA: `canplay` comes after the track's `load`.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn the_ready_state_waits_for_the_text_tracks() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let base = serve_clip_and_track(Duration::from_millis(1500));
@@ -1235,6 +1299,10 @@ fn the_ready_state_waits_for_the_text_tracks() {
 /// The load algorithm takes the ready state back to HAVE_NOTHING: no cue stays active once the
 /// element's `src` is set to one that fails.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn no_cue_is_active_after_the_media_is_unloaded() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(

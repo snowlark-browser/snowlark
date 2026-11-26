@@ -277,18 +277,35 @@ unsafe impl Send for TextEngine {}
 // SAFETY: as above.
 unsafe impl Sync for TextEngine {}
 
-/// The CSS generic families, as fontconfig names them.
-fn generic_family(name: &str) -> Option<&'static str> {
+/// Families pages name most that Linux systems rarely have, but whose metric-compatible stand-ins
+/// fontconfig binds to them: the font database ([`TextEngine::font_database`]) knows them by these
+/// names too.
+const ALIASED: [&str; 8] = [
+    "Arial",
+    "Helvetica",
+    "Times New Roman",
+    "Times",
+    "Courier New",
+    "Courier",
+    "Comic Sans MS",
+    "Impact",
+];
+
+/// A CSS generic family: the family a browser's default settings name for it, if any, and the
+/// fontconfig generic that stands in when no font is that family or bound to it. The defaults are
+/// the usual ones of Linux browsers (Times New Roman, Arial, Comic Sans MS, Impact, which
+/// fontconfig's rules bind to the metric-compatible Liberation faces and their like where those
+/// fonts are not installed), so a page lays out with the metrics it gets on other systems.
+fn generic_family(name: &str) -> Option<(Option<&'static str>, &'static str)> {
     Some(match name.to_ascii_lowercase().as_str() {
-        "serif" | "ui-serif" => "serif",
-        "sans-serif" | "system-ui" | "ui-sans-serif" | "-apple-system" | "ui-rounded" => {
-            "sans-serif"
-        }
-        "monospace" | "ui-monospace" => "monospace",
-        "cursive" => "cursive",
-        "fantasy" => "fantasy",
-        "emoji" => "emoji",
-        "math" => "math",
+        "serif" | "ui-serif" => (Some("Times New Roman"), "serif"),
+        "sans-serif" => (Some("Arial"), "sans-serif"),
+        "system-ui" | "ui-sans-serif" | "-apple-system" | "ui-rounded" => (None, "sans-serif"),
+        "monospace" | "ui-monospace" => (None, "monospace"),
+        "cursive" => (Some("Comic Sans MS"), "cursive"),
+        "fantasy" => (Some("Impact"), "fantasy"),
+        "emoji" => (None, "emoji"),
+        "math" => (None, "math"),
         _ => return None,
     })
 }
@@ -613,16 +630,64 @@ impl TextEngine {
     }
 
     /// The system font database (fontdb's, with every file mapped once: see
-    /// [`crate::font_files`]), loaded the first time it is asked for.
+    /// [`crate::font_files`]), loaded the first time it is asked for. fontdb knows each face only
+    /// by its own family names, so the families fontconfig resolves are given to it: its generic
+    /// families are the faces this engine picks for them, and the families of [`ALIASED`] that are
+    /// not installed name the faces fontconfig binds them to (Liberation Sans for Arial).
     pub fn font_database(&self) -> Arc<fontdb::Database> {
         self.font_db
             .get_or_init(|| {
                 let mut db = fontdb::Database::new();
                 db.load_system_fonts();
                 crate::font_files::map_all(&mut db);
+                self.name_resolved_families(&mut db);
                 Arc::new(db)
             })
             .clone()
+    }
+
+    fn name_resolved_families(&self, db: &mut fontdb::Database) {
+        let resolved = |name: &str| {
+            self.find_family(name, 400, FontStyle::Normal, FontStretch::NORMAL)
+                .and_then(|f| self.family_name(f))
+        };
+        if let Some(f) = resolved("serif") {
+            db.set_serif_family(f);
+        }
+        if let Some(f) = resolved("sans-serif") {
+            db.set_sans_serif_family(f);
+        }
+        if let Some(f) = resolved("monospace") {
+            db.set_monospace_family(f);
+        }
+        if let Some(f) = resolved("cursive") {
+            db.set_cursive_family(f);
+        }
+        if let Some(f) = resolved("fantasy") {
+            db.set_fantasy_family(f);
+        }
+        let named = |db: &fontdb::Database, name: &str| {
+            db.faces()
+                .any(|f| f.families.iter().any(|(n, _)| n.eq_ignore_ascii_case(name)))
+        };
+        for alias in ALIASED {
+            if named(db, alias) {
+                continue;
+            }
+            let Some(target) = resolved(alias) else {
+                continue;
+            };
+            let faces: Vec<fontdb::FaceInfo> = db
+                .faces()
+                .filter(|f| f.families.iter().any(|(n, _)| *n == target))
+                .cloned()
+                .collect();
+            for mut face in faces {
+                face.families
+                    .push((alias.to_string(), fontdb::Language::English_UnitedStates));
+                db.push_face_info(face);
+            }
+        }
     }
 
     fn face(&self, font: FontId) -> Option<Arc<Face>> {
@@ -918,12 +983,19 @@ impl TextEngine {
         stretch: FontStretch,
     ) -> Option<FontId> {
         let generic = generic_family(name);
-        let family = c_string(generic.unwrap_or(name));
+        // (a generic family asks for its default family first, then fontconfig's generic)
+        let families: Vec<_> = match generic {
+            Some((default, fc_generic)) => default.into_iter().chain([fc_generic]).collect(),
+            None => vec![name],
+        };
+        let families: Vec<_> = families.into_iter().map(c_string).collect();
         // SAFETY: fontconfig calls on a pattern this owns, under the `fc` lock; every pattern made
         // is destroyed before returning.
         unsafe {
             let p = FcPatternCreate();
-            FcPatternAddString(p, obj(FC_FAMILY), family.as_ptr().cast());
+            for family in &families {
+                FcPatternAddString(p, obj(FC_FAMILY), family.as_ptr().cast());
+            }
             FcPatternAddDouble(p, obj(FC_WEIGHT), fc_weight(weight));
             FcPatternAddInteger(p, obj(FC_SLANT), fc_slant(style));
             FcPatternAddInteger(p, obj(FC_WIDTH), fc_width(stretch));

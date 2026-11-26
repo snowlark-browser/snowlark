@@ -188,6 +188,10 @@ fn page_with(fake: &Arc<Fake>) -> Page {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn clear_key_configuration() {
     let mut p = page();
     let r = run_async(
@@ -222,6 +226,10 @@ fn clear_key_configuration() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn clear_key_session_request_licence_and_statuses() {
     let mut p = page();
     let r = run_async(
@@ -259,6 +267,10 @@ fn clear_key_session_request_licence_and_statuses() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn set_media_keys_attaches_to_one_element() {
     let mut p = page();
     let r = run_async(
@@ -434,6 +446,10 @@ fn an_empty_robustness_takes_the_configurations_level() {
 /// robustness and encryption scheme), is supported exactly when that gives a configuration, and
 /// answers with a `MediaKeySystemAccess` for it whose keys are made as `requestMediaKeySystemAccess`'s.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn decoding_info_asks_the_key_system() {
     let fake = Arc::new(Fake::default());
     let mut p = page_with(&fake);
@@ -509,6 +525,10 @@ fn module_instances_are_released_with_their_document() {
 /// over is told to play, as the element's player is when its metadata arrives, without the page
 /// calling `play()` again.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn a_modules_player_that_takes_over_a_playing_element_plays() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -555,6 +575,10 @@ fn a_modules_player_that_takes_over_a_playing_element_plays() {
 /// ends of its streams, is handed the samples from the key frame again, and then the ends again,
 /// so that it can start (its engine otherwise waits for more audio) and reach the end.
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn a_seek_in_an_ended_media_source_ends_the_players_streams_again() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -607,6 +631,10 @@ fn a_seek_in_an_ended_media_source_ends_the_players_streams_again() {
 /// seek hands it the samples again from the key frame at or before the new position; what it
 /// reports becomes the element's state (`playing`, `currentTime`, `seeked`, the playback quality).
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "no media backend on this system yet (docs/linux.md stage 7)"
+)]
 fn a_modules_player_plays_a_media_source() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))

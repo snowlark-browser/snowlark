@@ -444,14 +444,23 @@ fn synthetic_steps<'s>(
     Some(resolver.get_promise(scope).into())
 }
 
-/// Keeps the flag of [`watch_heap_limit`] alive as long as the isolate (an isolate slot).
-struct HeapFlag(*const std::sync::atomic::AtomicBool);
+/// Keeps the flag of [`watch_heap_limit`] alive while V8 can call the callback (an isolate slot).
+/// The `v8` crate drops an isolate's slots before V8's last garbage collection, which still calls
+/// the callbacks: the slot unregisters its callback as it drops, while the isolate still exists.
+struct HeapFlag {
+    flag: *const std::sync::atomic::AtomicBool,
+    isolate: v8::UnsafeRawIsolatePtr,
+}
 
 impl Drop for HeapFlag {
     fn drop(&mut self) {
+        // SAFETY: the isolate drops its slots on its own thread before it is deleted, so `isolate`
+        // is alive; the callback is unregistered before its data is released.
+        let mut isolate = unsafe { v8::Isolate::from_raw_isolate_ptr(self.isolate) };
+        isolate.remove_near_heap_limit_callback(near_heap_limit, 0);
         // SAFETY: the pointer came from `Arc::into_raw` in `watch_heap_limit` and is released once,
-        // here, when the isolate drops its slots (after V8 stopped calling the callback).
-        unsafe { drop(std::sync::Arc::from_raw(self.0)) };
+        // here, after V8 can no longer call the callback.
+        unsafe { drop(std::sync::Arc::from_raw(self.flag)) };
     }
 }
 
@@ -462,8 +471,13 @@ pub fn watch_heap_limit(
     flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) {
     let ptr = std::sync::Arc::into_raw(flag);
-    isolate.set_slot(HeapFlag(ptr));
     isolate.add_near_heap_limit_callback(near_heap_limit, ptr as *mut std::ffi::c_void);
+    // SAFETY: the C++ isolate's own address (`v8::Isolate` is a handle that moves with its owner).
+    let raw = unsafe { isolate.as_raw_isolate_ptr() };
+    isolate.set_slot(HeapFlag {
+        flag: ptr,
+        isolate: raw,
+    });
 }
 
 unsafe extern "C" fn near_heap_limit(
@@ -472,21 +486,39 @@ unsafe extern "C" fn near_heap_limit(
     _initial_heap_limit: usize,
 ) -> usize {
     // SAFETY: `data` is the `Arc<AtomicBool>` pointer `watch_heap_limit` registered; the isolate's
-    // `HeapFlag` slot keeps it alive while V8 can call this.
+    // `HeapFlag` slot keeps it alive while the callback is registered.
     let flag = unsafe { &*(data as *const std::sync::atomic::AtomicBool) };
     flag.store(true, std::sync::atomic::Ordering::SeqCst);
     current_heap_limit + current_heap_limit / 2
 }
 
-/// How many garbage collections V8 finished in an isolate ([`count_gcs`]).
-struct GcCount(std::sync::atomic::AtomicU64);
+/// How many garbage collections V8 finished in an isolate ([`count_gcs`]), and the isolate whose
+/// callback counts them (unregistered as the slot drops, as [`HeapFlag`]'s).
+struct GcCount {
+    count: std::sync::atomic::AtomicU64,
+    isolate: v8::UnsafeRawIsolatePtr,
+}
+
+impl Drop for GcCount {
+    fn drop(&mut self) {
+        let data = self as *const GcCount as *mut std::ffi::c_void;
+        // SAFETY: the isolate drops its slots on its own thread before it is deleted, so `isolate`
+        // is alive.
+        let mut isolate = unsafe { v8::Isolate::from_raw_isolate_ptr(self.isolate) };
+        isolate.remove_gc_epilogue_callback(gc_epilogue, data);
+    }
+}
 
 /// Counts `isolate`'s garbage collections from now on ([`gc_count`]): weak handles only die in one,
 /// so a reader that scans them can skip the scan while the count stays the same.
 pub fn count_gcs(isolate: &mut v8::Isolate) {
-    let count = Box::new(GcCount(std::sync::atomic::AtomicU64::new(0)));
+    let count = Box::new(GcCount {
+        count: std::sync::atomic::AtomicU64::new(0),
+        // SAFETY: as in `watch_heap_limit`.
+        isolate: unsafe { isolate.as_raw_isolate_ptr() },
+    });
     let data = &*count as *const GcCount as *mut std::ffi::c_void;
-    // The box lives in the isolate's slot, so as long as the isolate (and its callbacks).
+    // The box lives in the isolate's slot, which unregisters the callback before freeing it.
     isolate.set_slot(count);
     isolate.add_gc_epilogue_callback(gc_epilogue, data, v8::GCType::kGCTypeAll);
 }
@@ -495,7 +527,7 @@ pub fn count_gcs(isolate: &mut v8::Isolate) {
 pub fn gc_count(isolate: &v8::Isolate) -> Option<u64> {
     isolate
         .get_slot::<Box<GcCount>>()
-        .map(|c| c.0.load(std::sync::atomic::Ordering::Relaxed))
+        .map(|c| c.count.load(std::sync::atomic::Ordering::Relaxed))
 }
 
 unsafe extern "C" fn gc_epilogue(
@@ -504,8 +536,10 @@ unsafe extern "C" fn gc_epilogue(
     _flags: v8::GCCallbackFlags,
     data: *mut std::ffi::c_void,
 ) {
-    // SAFETY: `data` points at the GcCount boxed in the isolate's slot ([`count_gcs`]), which lives
-    // as long as the isolate that runs this callback.
+    // SAFETY: `data` points at the GcCount boxed in the isolate's slot ([`count_gcs`]), which
+    // unregisters this callback before it is freed.
     let count = unsafe { &*(data as *const GcCount) };
-    count.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    count
+        .count
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 }

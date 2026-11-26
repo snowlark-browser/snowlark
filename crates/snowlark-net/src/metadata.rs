@@ -9,6 +9,22 @@
 use crate::origin::{is_url_potentially_trustworthy, origin_of, same_site};
 use crate::request::{Destination, Mode, ReferrerPolicy, Request, ResponseTainting};
 
+/// The platform part of the default User-Agent: the fixed token the family's reduced User-Agent
+/// strings send on this system. The navigator's platform and the client hints follow it
+/// (`crate::ua::Profile`).
+#[cfg(windows)]
+macro_rules! platform_token {
+    () => {
+        "Windows NT 10.0; Win64; x64"
+    };
+}
+#[cfg(not(windows))]
+macro_rules! platform_token {
+    () => {
+        "X11; Linux x86_64"
+    };
+}
+
 /// The `User-Agent` header and `navigator.userAgent` by default: Snowlark's own identity
 /// ([`crate::ua`]), in the shape browsers built on the same engine family send: the family's
 /// string, with the `Chrome/` token of the release the engine's V8 comes from
@@ -20,7 +36,9 @@ use crate::request::{Destination, Mode, ReferrerPolicy, Request, ResponseTaintin
 /// ([`crate::ua::Profile`]): HTML's navigator compatibility mode, `userAgentData` with the family's
 /// equivalence brand and Snowlark's, and the client hints.
 pub const USER_AGENT: &str = concat!(
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/",
+    "Mozilla/5.0 (",
+    platform_token!(),
+    ") AppleWebKit/537.36 (KHTML, like Gecko) Chrome/",
     env!("SNOWLARK_CHROMIUM_MAJOR"),
     ".0.0.0 Safari/537.36 Snowlark/",
     env!("CARGO_PKG_VERSION_MAJOR"),
