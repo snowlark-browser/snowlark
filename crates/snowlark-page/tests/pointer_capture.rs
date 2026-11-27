@@ -85,6 +85,42 @@ fn an_element_of_another_frame_does_not_capture_the_pointer() {
     page.pointer_released(Point::new(50.0, 50.0), 0, none, 1);
 }
 
+/// A line of text with an empty box `g` after it; `capture` makes `g` capture the pointer at its
+/// `pointerdown`. A press on `g` dragged left over the text.
+fn drag_from_the_box_over_the_text(capture: bool) -> String {
+    let mut page = page_with(&format!(
+        "<!doctype html><style>body{{margin:0}}p{{margin:0;font:20px/30px monospace}}\
+         #g{{display:inline-block;width:50px;height:30px;vertical-align:top}}</style>\
+         <p>Hello world <span id=g></span></p><script>{}</script>",
+        if capture {
+            "g.addEventListener('pointerdown', e => g.setPointerCapture(e.pointerId));"
+        } else {
+            ""
+        }
+    ));
+    let none = Modifiers::default();
+    let left = eval(&mut page, "String(g.getBoundingClientRect().left + 25)");
+    let x: f32 = left.parse().unwrap();
+    page.pointer_moved(Point::new(x, 15.0), none);
+    page.pointer_pressed(Point::new(x, 15.0), 0, none, 1);
+    for step in 1..=10 {
+        let t = step as f32 / 10.0;
+        page.pointer_moved(Point::new(x + (2.0 - x) * t, 15.0), none);
+    }
+    page.pointer_released(Point::new(2.0, 15.0), 0, none, 1);
+    eval(&mut page, "getSelection().toString()")
+}
+
+#[test]
+fn a_selection_drag_does_not_follow_a_captured_pointer_off_its_capture_target() {
+    // (without capture the drag selects the text it passes over)
+    assert_eq!(drag_from_the_box_over_the_text(false).trim(), "Hello world");
+    // Pointer Events 3: the mouse events of a captured pointer are targeted at the capture
+    // target, and the selection drag (the moves' default action) hit tests to it as well: `g` has
+    // no text, so the selection stays where the press put it.
+    assert_eq!(drag_from_the_box_over_the_text(true), "");
+}
+
 #[test]
 fn capture_needs_a_button_down() {
     let mut page = page_with(PAGE);

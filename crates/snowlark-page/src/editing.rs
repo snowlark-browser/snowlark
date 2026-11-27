@@ -701,9 +701,30 @@ impl Engine {
         // The focus is the position for the point in what is under the pointer, as for the press
         // (CSSOM View's caret position for a point hit tests first): text elsewhere on the same
         // line, such as a side column's beside a gap between paragraphs, is not a candidate.
-        let within = self
-            .editing_host(drag.anchor.0 .0)
-            .or_else(|| self.text_scope_under(drag.doc, top));
+        // While the pointer is captured (Pointer Events 3: its mouse events are targeted at the
+        // capture target, pending since `setPointerCapture`), what is under it is the capture
+        // target wherever the pointer is: a position in its text, and none in one without text,
+        // where the selection stays as it is.
+        let captured = self.pointer.borrow().pending_capture.filter(|&c| {
+            let dom = self.dom();
+            dom.is_alive(c) && dom.shadow_including_root(c) == drag.doc
+        });
+        let within = match captured {
+            Some(c) => {
+                let has_text = {
+                    let dom = self.dom();
+                    dom.descendants(c)
+                        .any(|n| dom.is_text(n) && dom.length(n) > 0)
+                };
+                if !has_text {
+                    return;
+                }
+                Some(c)
+            }
+            None => self
+                .editing_host(drag.anchor.0 .0)
+                .or_else(|| self.text_scope_under(drag.doc, top)),
+        };
         let Some(at) = self.caret_at_point(drag.doc, p, within) else {
             return;
         };

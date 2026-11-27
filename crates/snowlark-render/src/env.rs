@@ -280,6 +280,9 @@ pub struct StyleEnv {
     /// The path data of the shapes `offset-path: url()` names in the document, by id: the DOM is not
     /// at hand where a style's transform is worked out.
     pub motion_paths: Arc<RwLock<HashMap<String, String>>>,
+    /// Gradient color ramps already sampled, kept across style changes: a box's gradient is
+    /// worked out again each time its document is painted.
+    pub ramps: Arc<std::sync::Mutex<crate::adapter::RampCache>>,
 }
 
 /// A face's `font-style` descriptor as font matching sees it (CSS Fonts 4 §5.2): an italic face, or a

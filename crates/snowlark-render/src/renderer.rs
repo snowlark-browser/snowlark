@@ -1340,6 +1340,7 @@ impl Renderer {
             fonts: FontAliases::default(),
             images: self.image_table.clone(),
             motion_paths: Default::default(),
+            ramps: Default::default(),
         });
         drop(dom);
         let mut doc = Box::new(Doc {
@@ -1956,6 +1957,7 @@ impl Renderer {
                             fonts: self.fonts.read().unwrap().clone(),
                             images: self.image_table.clone(),
                             motion_paths: doc.env.motion_paths.clone(),
+                            ramps: doc.env.ramps.clone(),
                         });
                         doc.fonts_arrived.push(family);
                         // Font-relative units (ex, ch) may change.
@@ -2162,6 +2164,7 @@ impl Renderer {
             fonts: self.fonts.read().unwrap().clone(),
             images: self.image_table.clone(),
             motion_paths: doc.env.motion_paths.clone(),
+            ramps: doc.env.ramps.clone(),
         });
         // Images. A walk over every element when the viewport, the device pixel ratio or the base
         // URL changed (`srcset` chooses again, relative URLs resolve again); otherwise only the
@@ -5588,6 +5591,7 @@ impl Renderer {
                 fonts: self.fonts.read().unwrap().clone(),
                 images: self.image_table.clone(),
                 motion_paths: doc.env.motion_paths.clone(),
+                ramps: doc.env.ramps.clone(),
             });
         }
         doc.face_order
@@ -5692,6 +5696,7 @@ impl Renderer {
             fonts: self.fonts.read().unwrap().clone(),
             images: self.image_table.clone(),
             motion_paths: doc.env.motion_paths.clone(),
+            ramps: doc.env.ramps.clone(),
         });
     }
 
@@ -5722,6 +5727,7 @@ impl Renderer {
                 fonts: self.fonts.read().unwrap().clone(),
                 images: self.image_table.clone(),
                 motion_paths: doc.env.motion_paths.clone(),
+                ramps: doc.env.ramps.clone(),
             });
         }
     }

@@ -23,6 +23,53 @@ use style::values::computed::font::{GenericFontFamily, SingleFontFamily};
 use style::values::computed::{self as c, Length};
 
 use crate::env::{face_rank, StyleEnv, Wanted};
+use style::color::mix::ColorInterpolationMethod;
+use style::color::AbsoluteColor;
+
+/// Gradient color ramps by what they are sampled from (CSS Images 4 §3.5.2: two adjacent color
+/// stops' colors, resolved, and the gradient's interpolation method), as their exact bits.
+#[derive(Debug, Default)]
+pub struct RampCache {
+    ramps: std::collections::HashMap<[u32; 11], ls::Ramp>,
+}
+
+/// How many ramps a document keeps: more than any page's gradients have stop pairs, and few
+/// enough to drop all at once when a page animates its gradients' colors.
+const RAMPS_KEPT: usize = 512;
+
+impl RampCache {
+    fn get_or_sample(
+        &mut self,
+        method: &ColorInterpolationMethod,
+        a: AbsoluteColor,
+        b: AbsoluteColor,
+        sample: impl Fn(AbsoluteColor, AbsoluteColor) -> ls::Ramp,
+    ) -> ls::Ramp {
+        let bits = |c: &AbsoluteColor| {
+            [
+                c.components.0.to_bits(),
+                c.components.1.to_bits(),
+                c.components.2.to_bits(),
+                c.alpha.to_bits(),
+                c.color_space as u32 | (c.flags.bits() as u32) << 8,
+            ]
+        };
+        let (ka, kb) = (bits(&a), bits(&b));
+        let mut key = [0u32; 11];
+        key[..5].copy_from_slice(&ka);
+        key[5..10].copy_from_slice(&kb);
+        key[10] = method.space as u32 | (method.hue as u32) << 8;
+        if let Some(r) = self.ramps.get(&key) {
+            return *r;
+        }
+        if self.ramps.len() >= RAMPS_KEPT {
+            self.ramps.clear();
+        }
+        let r = sample(a, b);
+        self.ramps.insert(key, r);
+        r
+    }
+}
 
 /// A cheap handle (three pointers) to an element's, pseudo-element's or anonymous box's computed
 /// values, implementing [`Style`](snowlark_layout::Style).
@@ -446,19 +493,21 @@ impl RenderStyle {
         if (method.space == ColorSpace::Srgb && !missing) || colors.len() < 2 {
             return (out, Vec::new());
         }
+        let sample = |a: AbsoluteColor, b: AbsoluteColor| -> ls::Ramp {
+            std::array::from_fn(|k| {
+                let t = k as f32 / ls::RAMP_STEPS as f32;
+                let mixed = mix_many(
+                    *method,
+                    [ColorMixItem::new(a, 1.0 - t), ColorMixItem::new(b, t)],
+                    ColorMixFlags::empty(),
+                );
+                to_color(&mixed)
+            })
+        };
+        let mut cache = self.env.ramps.lock().unwrap_or_else(|e| e.into_inner());
         let ramps = colors
             .windows(2)
-            .map(|w| {
-                std::array::from_fn(|k| {
-                    let t = k as f32 / ls::RAMP_STEPS as f32;
-                    let mixed = mix_many(
-                        *method,
-                        [ColorMixItem::new(w[0], 1.0 - t), ColorMixItem::new(w[1], t)],
-                        ColorMixFlags::empty(),
-                    );
-                    to_color(&mixed)
-                })
-            })
+            .map(|w| cache.get_or_sample(method, w[0], w[1], sample))
             .collect();
         (out, ramps)
     }
@@ -3815,5 +3864,33 @@ fn basic_shape(shape: &c::basic_shape::BasicShape, zoom: f32) -> ls::ClipShape {
                 },
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    #[test]
+    fn a_ramp_is_sampled_once_for_its_colors_and_method() {
+        let mut cache = RampCache::default();
+        let (red, blue) = (
+            AbsoluteColor::srgb_legacy(255, 0, 0, 1.0),
+            AbsoluteColor::srgb_legacy(0, 0, 255, 1.0),
+        );
+        let sampled = Cell::new(0);
+        let sample = |_: AbsoluteColor, b: AbsoluteColor| {
+            sampled.set(sampled.get() + 1);
+            [to_color(&b); ls::RAMP_STEPS + 1]
+        };
+        let oklab = ColorInterpolationMethod::oklab();
+        let first = cache.get_or_sample(&oklab, red, blue, sample);
+        assert_eq!(cache.get_or_sample(&oklab, red, blue, sample), first);
+        assert_eq!(sampled.get(), 1);
+        // (another pair, or the same pair in another space, is another ramp)
+        cache.get_or_sample(&oklab, blue, red, sample);
+        cache.get_or_sample(&ColorInterpolationMethod::srgb(), red, blue, sample);
+        assert_eq!(sampled.get(), 3);
     }
 }

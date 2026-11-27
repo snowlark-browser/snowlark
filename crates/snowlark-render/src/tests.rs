@@ -404,6 +404,7 @@ fn fonts_and_web_font_substitution() {
             fonts,
             images: Arc::new(ImageTable::default()),
             motion_paths: Default::default(),
+            ramps: Default::default(),
         },
     );
     let a = d.s("a");
@@ -637,6 +638,7 @@ fn lists_and_generated_content() {
             fonts: FontAliases::default(),
             images: table_with("https://example.test/dir/dot.png", 8.0, 6.0),
             motion_paths: Default::default(),
+            ramps: Default::default(),
         },
     );
     let a = d.s("a");
@@ -728,6 +730,7 @@ fn backgrounds_shadows_and_outlines() {
             fonts: FontAliases::default(),
             images: table_with("https://example.test/dir/bg.png", 30.0, 20.0),
             motion_paths: Default::default(),
+            ramps: Default::default(),
         },
     );
     let a = d.s("a");

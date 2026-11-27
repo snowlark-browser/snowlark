@@ -271,33 +271,55 @@ pub struct GlState {
 
 /// The pixels a canvas shows from a drawing buffer read back by the service (RGBA, bottom row
 /// first): premultiplied BGRA, top row first, opaque when the context has no alpha.
-fn to_frame(rb: &snowlark_gl::Readback, a: &Attributes) -> snowlark_paint::image::Frame {
+/// Converted in place: a drawing buffer is read back each frame it changes, and a new buffer of
+/// its size per frame costs more than the conversion.
+fn to_frame(rb: snowlark_gl::Readback, a: &Attributes) -> snowlark_paint::image::Frame {
     let (w, h) = (rb.width as usize, rb.height as usize);
-    let mut pixels = vec![0u8; w * h * 4];
-    for y in 0..h {
-        let src = &rb.rgba[(h - 1 - y) * w * 4..(h - y) * w * 4];
-        let dst = &mut pixels[y * w * 4..(y + 1) * w * 4];
-        for (s, d) in src
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .zip(dst.as_chunks_mut::<4>().0)
-        {
-            let (mut r, mut gg, mut b, mut al) = (s[0], s[1], s[2], s[3]);
-            if !a.alpha {
-                al = 255;
-            } else if !a.premultiplied_alpha {
-                let m = |v: u8| ((v as u32 * al as u32 + 127) / 255) as u8;
-                (r, gg, b) = (m(r), m(gg), m(b));
-            }
-            d.copy_from_slice(&[b, gg, r, al]);
-        }
+    let mut pixels = rb.rgba;
+    pixels.resize(w * h * 4, 0);
+    // Each pixel as a little-endian word: RGBA is 0xAABBGGRR, BGRA 0xAARRGGBB.
+    if !a.alpha {
+        flip_and_convert(&mut pixels, w, h, |v| {
+            (v & 0x0000_ff00) | ((v >> 16) & 0xff) | ((v & 0xff) << 16) | 0xff00_0000
+        });
+    } else if a.premultiplied_alpha {
+        flip_and_convert(&mut pixels, w, h, |v| {
+            (v & 0xff00_ff00) | ((v >> 16) & 0xff) | ((v & 0xff) << 16)
+        });
+    } else {
+        flip_and_convert(&mut pixels, w, h, |v| {
+            let al = v >> 24;
+            let m = |c: u32| (c * al + 127) / 255;
+            let (r, g, b) = (v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff);
+            (al << 24) | (m(r) << 16) | (m(g) << 8) | m(b)
+        });
     }
     snowlark_paint::image::Frame {
         width: rb.width,
         height: rb.height,
         pixels,
         delay_ms: 0,
+    }
+}
+
+/// Turns `h` rows of `w` pixels bottom row first into top row first, each pixel (a little-endian
+/// word) through `convert`: rows swapped pairwise, the middle one left in place.
+fn flip_and_convert(pixels: &mut [u8], w: usize, h: usize, convert: impl Fn(u32) -> u32 + Copy) {
+    let row = w * 4;
+    let fix = |line: &mut [u8]| {
+        for px in line.as_chunks_mut::<4>().0 {
+            *px = convert(u32::from_le_bytes(*px)).to_le_bytes();
+        }
+    };
+    for y in 0..h / 2 {
+        let (top, bottom) = pixels.split_at_mut((h - 1 - y) * row);
+        let (a_row, b_row) = (&mut top[y * row..(y + 1) * row], &mut bottom[..row]);
+        a_row.swap_with_slice(b_row);
+        fix(a_row);
+        fix(b_row);
+    }
+    if h % 2 == 1 {
+        fix(&mut pixels[(h / 2) * row..(h / 2 + 1) * row]);
     }
 }
 
@@ -994,7 +1016,7 @@ impl Engine {
                 continue;
             }
             if let Some(rb) = readback {
-                let frame = to_frame(&rb, &attrs);
+                let frame = to_frame(rb, &attrs);
                 match el {
                     CanvasOwner::Element(el) => {
                         self.show_canvas_frame(el, Some(frame));
@@ -1045,7 +1067,7 @@ impl Engine {
                 _ => return None,
             }
         };
-        Some(to_frame(&rgba, &keep))
+        Some(to_frame(rgba, &keep))
     }
 
     /// Whether the canvas has a WebGL context.
@@ -3282,5 +3304,45 @@ impl WebGLContextEventImpl for Engine {
             init.composed,
             EventExt::WebGlContext(init.status_message),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Three rows of one pixel each, bottom first as the service reads them back.
+    fn readback() -> snowlark_gl::Readback {
+        snowlark_gl::Readback {
+            width: 1,
+            height: 3,
+            rgba: vec![10, 20, 30, 128, 40, 50, 60, 255, 200, 100, 50, 0],
+        }
+    }
+
+    #[test]
+    fn a_drawing_buffer_becomes_a_frame_top_row_first_in_bgra() {
+        let premultiplied = to_frame(readback(), &Attributes::default());
+        assert_eq!(
+            premultiplied.pixels,
+            [50, 100, 200, 0, 60, 50, 40, 255, 30, 20, 10, 128]
+        );
+        let opaque = Attributes {
+            alpha: false,
+            ..Attributes::default()
+        };
+        assert_eq!(
+            to_frame(readback(), &opaque).pixels,
+            [50, 100, 200, 255, 60, 50, 40, 255, 30, 20, 10, 255]
+        );
+        let straight = Attributes {
+            premultiplied_alpha: false,
+            ..Attributes::default()
+        };
+        // (each color component times alpha / 255, rounded)
+        assert_eq!(
+            to_frame(readback(), &straight).pixels,
+            [0, 0, 0, 0, 60, 50, 40, 255, 15, 10, 5, 128]
+        );
     }
 }
