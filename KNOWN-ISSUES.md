@@ -6,6 +6,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## Layout
 
+- A box whose used height is zero but whose `height` is not `auto` (`height: 1px; max-height: 0`) keeps its top and
+  bottom margins apart instead of letting them collapse through it. (ref 903)
 - **Flexbox gaps.** A column flex item with an explicit height and `min-height: auto` does not shrink to its automatic
   minimum when the items overflow, and a single-line `flex-wrap: wrap-reverse` container puts its line at the wrong
   cross edge. `flex-wrap: balance` and `flex-line-count` are not implemented. Both layout bugs are in the vendored
@@ -57,6 +59,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## CSS and style
 
+- **`calc-size()`.** A keyword basis in `flex-basis` sizes the item by the keyword alone, intrinsic size
+  contributions (a shrink-to-fit parent) ignore the calculation, and the Typed OM does not reify it. (ref 901)
 - **CSS Shapes.** Lines wrap around `shape-outside` shapes, images and gradients, but text beside a rounded shape
   can end at a fraction of a pixel and leave a hairline gap, and a `path()` in `shape-outside` reads back with
   relative commands where other browsers make them absolute. (ref 760)
@@ -144,6 +148,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## Scripting and bindings
 
+- A `fetch()` or XMLHttpRequest whose header value holds a control byte (other than tab) fails instead of sending it.
+  (ref 902)
 - **Service workers.** `navigator.serviceWorker` is missing: no registration, no worker that controls pages, no fetch
   interception. The Cache API (`caches`) works in windows and dedicated workers, but its storage is per origin (not
   partitioned by the top-level site), it does not count towards `navigator.storage.estimate()`, and a cache name with

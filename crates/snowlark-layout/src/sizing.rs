@@ -146,6 +146,42 @@ pub(crate) fn resolve_width(
             Some(c.shrink_to_fit(avail.max(0.0)) + pb)
         }
         SizeValue::Stretch => Some(stretch.max(pb)),
+        // CSS Sizing 4 §7.1: the basis's size, then the calculation. An `auto` basis is resolved
+        // where `auto` is ([`finish_auto`]).
+        SizeValue::CalcSize(c) => {
+            let b = resolve_width(c.basis_value(), basis, pb, sizing, stretch, content)?;
+            Some(calc_size_border_box(&c, b, basis, pb, sizing))
+        }
+    }
+}
+
+/// `calc-size()` for a basis whose border-box size is `b`, as a border-box size.
+fn calc_size_border_box(
+    c: &CalcSize,
+    b: f32,
+    basis: Option<f32>,
+    pb: f32,
+    sizing: BoxSizing,
+) -> f32 {
+    let size = match sizing {
+        BoxSizing::ContentBox => (b - pb).max(0.0),
+        BoxSizing::BorderBox => b,
+    };
+    to_border_box(c.apply(size, basis).max(0.0), pb, sizing)
+}
+
+/// The used border-box size of a `width` or `height` that behaved as `auto`, where `auto` gave
+/// the border-box size `auto`: a `calc-size()` applies its calculation to it (CSS Sizing 4 §7.1).
+pub(crate) fn finish_auto(
+    value: SizeValue,
+    auto: f32,
+    basis: Option<f32>,
+    pb: f32,
+    sizing: BoxSizing,
+) -> f32 {
+    match value {
+        SizeValue::CalcSize(c) => calc_size_border_box(&c, auto, basis, pb, sizing),
+        _ => auto,
     }
 }
 
@@ -165,6 +201,7 @@ pub(crate) fn resolve_max_width(
         MaxSizeValue::MaxContent => SizeValue::MaxContent,
         MaxSizeValue::FitContent(l) => SizeValue::FitContent(l),
         MaxSizeValue::Stretch => SizeValue::Stretch,
+        MaxSizeValue::CalcSize(c) => SizeValue::CalcSize(c),
     };
     resolve_width(as_size, basis, pb, sizing, stretch, content)
 }
@@ -182,6 +219,10 @@ pub(crate) fn resolve_height(
             .resolve_opt(basis)
             .map(|v| to_border_box(v.max(0.0), pb, sizing)),
         SizeValue::Stretch => basis.map(|b| b.max(pb)),
+        // (other bases behave as `auto`: [`finish_auto`])
+        SizeValue::CalcSize(c) if c.basis == CalcSizeBasis::Stretch => basis
+            .map(|b| b.max(pb))
+            .map(|b| calc_size_border_box(&c, b, basis, pb, sizing)),
         _ => None,
     }
 }
@@ -197,6 +238,9 @@ pub(crate) fn resolve_max_height(
             .resolve_opt(basis)
             .map(|v| to_border_box(v.max(0.0), pb, sizing)),
         MaxSizeValue::Stretch => basis.map(|b| b.max(pb)),
+        MaxSizeValue::CalcSize(c) if c.basis == CalcSizeBasis::Stretch => basis
+            .map(|b| b.max(pb))
+            .map(|b| calc_size_border_box(&c, b, basis, pb, sizing)),
         _ => None,
     }
 }
@@ -228,17 +272,24 @@ pub(crate) fn width_bounds<S: Style>(
     (min, max)
 }
 
-/// The min/max border-box heights.
+/// The min/max border-box heights. `stretch` is the border-box height that fills the available
+/// space (the containing block less the margins, css-sizing-4 §6) where it differs from `basis`.
 pub(crate) fn height_bounds<S: Style>(
     s: &S,
     basis: Option<f32>,
     pb: f32,
+    stretch: Option<f32>,
 ) -> (Option<f32>, Option<f32>) {
     let sizing = s.box_sizing();
-    (
-        resolve_height(s.min_height(), basis, pb, sizing),
-        resolve_max_height(s.max_height(), basis, pb, sizing),
-    )
+    let min = match s.min_height() {
+        SizeValue::Stretch if stretch.is_some() => stretch.map(|v| v.max(pb)),
+        v => resolve_height(v, basis, pb, sizing),
+    };
+    let max = match s.max_height() {
+        MaxSizeValue::Stretch if stretch.is_some() => stretch.map(|v| v.max(pb)),
+        v => resolve_max_height(v, basis, pb, sizing),
+    };
+    (min, max)
 }
 
 /// The preferred aspect ratio a non-replaced box's style gives (width / height), if any.

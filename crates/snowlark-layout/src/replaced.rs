@@ -20,6 +20,8 @@ struct Natural {
     width: Option<f32>,
     height: Option<f32>,
     ratio: Option<f32>,
+    /// The ratio is the `aspect-ratio` property's rather than the content's own.
+    style_ratio: bool,
 }
 
 /// The view box `object-view-box` cuts out of content with natural dimensions (CSS Images 5 §5.1),
@@ -76,16 +78,20 @@ fn natural<S: Style>(tree: &BoxTree<S>, text: &TextEngine, b: &LayoutBox<S>, s: 
         own_ratio = None;
     }
     let ar = s.aspect_ratio();
-    let ratio = match (ar.auto, ar.ratio) {
-        (true, Some(r)) => own_ratio.or(Some(r)),
-        (false, Some(r)) => Some(r),
-        _ => own_ratio,
-    }
-    .filter(|r| *r > 0.0 && r.is_finite());
+    let (ratio, style_ratio) = match (ar.auto, ar.ratio) {
+        (true, Some(r)) => match own_ratio {
+            Some(o) => (Some(o), false),
+            None => (Some(r), true),
+        },
+        (false, Some(r)) => (Some(r), true),
+        _ => (own_ratio, false),
+    };
+    let ratio = ratio.filter(|r| *r > 0.0 && r.is_finite());
     Natural {
         width: content.natural_width,
         height: content.natural_height,
         ratio,
+        style_ratio: style_ratio && ratio.is_some(),
     }
 }
 
@@ -125,9 +131,14 @@ fn used_size<S: Style>(
             .then(|| resolve_width(s.width(), cb_width, pbh, sizing, stretch, &mut nothing))
             .flatten()
     }));
+    // (`stretch` fills the containing block less the margins, css-sizing-4 §6)
+    let stretch_h = cb_height.map(|h| h - edges.margin_v());
     let h = content_h(fixed.1.or_else(|| {
         own_sizes
-            .then(|| resolve_height(s.height(), cb_height, pbv, sizing))
+            .then(|| match s.height() {
+                SizeValue::Stretch => stretch_h.map(|v| v.max(pbv)),
+                v => resolve_height(v, cb_height, pbv, sizing),
+            })
             .flatten()
     }));
     // The default object size is physical: 300px wide, 150px tall.
@@ -158,6 +169,13 @@ fn used_size<S: Style>(
             (w, h)
         }
         (None, None) => match (n.width, n.height, n.ratio) {
+            // css-sizing-4 §5.1: a preferred aspect ratio from `aspect-ratio` replaces the
+            // natural one, so the natural width keeps and the height follows the ratio.
+            // (the ratio is of the box `box-sizing` names)
+            (Some(w), Some(_), Some(r)) if n.style_ratio => match sizing {
+                BoxSizing::ContentBox => (w, w / r),
+                BoxSizing::BorderBox => (w, ((w + pbh) / r - pbv).max(0.0)),
+            },
             (Some(w), Some(h), _) => (w, h),
             (Some(w), None, Some(r)) => (w, w / r),
             (None, Some(h), Some(r)) => (h * r, h),
@@ -181,7 +199,7 @@ fn used_size<S: Style>(
     // min/max (content box).
     let to_c = |v: Option<f32>, pb: f32| v.map(|x| (x - pb).max(0.0));
     let (min_w, max_w) = width_bounds(s, cb_width, pbh, stretch, &mut nothing);
-    let (min_h, max_h) = height_bounds(s, cb_height, pbv);
+    let (min_h, max_h) = height_bounds(s, cb_height, pbv, stretch_h);
     let (min_w, max_w) = (to_c(min_w, pbh).unwrap_or(0.0), to_c(max_w, pbh));
     let (min_h, max_h) = (to_c(min_h, pbv).unwrap_or(0.0), to_c(max_h, pbv));
     if let (None, None, Some(_)) = (w, h, n.ratio) {

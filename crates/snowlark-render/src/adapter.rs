@@ -1100,6 +1100,114 @@ pub(crate) fn size(v: &c::Size) -> ls::SizeValue {
         S::WebkitFillAvailable | S::Stretch => ls::SizeValue::Stretch,
         // Anchor positioning is not implemented: as `auto`.
         S::AnchorSizeFunction(_) | S::AnchorContainingCalcFunction(_) => ls::SizeValue::Auto,
+        S::CalcSize(f) => match calc_size(f) {
+            CalcSizeUse::Length(l) => ls::SizeValue::LengthPercentage(l),
+            CalcSizeUse::Keyword(c) => ls::SizeValue::CalcSize(c),
+        },
+    }
+}
+
+/// A computed `calc-size()` in layout's terms (CSS Sizing 4 §7).
+enum CalcSizeUse {
+    /// The basis is `any` or a percentage: a plain `<length-percentage>`.
+    Length(ls::LengthPercentage),
+    Keyword(ls::CalcSize),
+}
+
+/// A computed `calc-size()` at used-value time (§7.1): its calculation with `size` the basis's
+/// size. A nested basis composes as a line (`k × size + rest`), level by level: substituting
+/// each basis's tree into the next (§7.2.1) grows exponentially with nesting. A calculation that
+/// is not linear in `size` (such as `min(size, 10px)`) is used as `size` itself.
+fn calc_size(f: &style::values::computed::calc_size::CalcSizeFunction) -> CalcSizeUse {
+    use style::values::computed::length_percentage::Unpacked;
+    use style::values::generics::length::GenericCalcSizeBasis as B;
+    let line = |length, percent| ls::Linear { length, percent };
+    let to_lp = |l: ls::Linear| {
+        ls::LengthPercentage::linear(l.length, (l.percent != 0.0).then_some(l.percent))
+    };
+    let of_lp = |l: &ls::LengthPercentage| line(l.length, l.percent.unwrap_or(0.0));
+    if let B::Any = f.basis {
+        // (the calculation does not refer to `size`, or with a factor of zero)
+        if let Unpacked::Calc(calc) = f.calc.0.unpack() {
+            if let Some((_, rest)) = calc_size_linear(calc.node()) {
+                return CalcSizeUse::Length(to_lp(rest));
+            }
+        }
+        return CalcSizeUse::Length(lp(&f.calc.0));
+    }
+    let (k, rest) = match f.calc.0.unpack() {
+        Unpacked::Length(l) => Some((0.0, line(l.px(), 0.0))),
+        Unpacked::Percentage(p) => Some((0.0, line(0.0, p.0))),
+        Unpacked::Calc(calc) => calc_size_linear(calc.node()),
+    }
+    .unwrap_or((1.0, line(0.0, 0.0)));
+    // `k × (inner_k × size + inner) + rest`
+    let compose = |inner_k: f32, inner: ls::Linear| {
+        (
+            k * inner_k,
+            line(
+                k * inner.length + rest.length,
+                k * inner.percent + rest.percent,
+            ),
+        )
+    };
+    let keyword = |basis, (size_factor, rest): (f32, ls::Linear)| {
+        CalcSizeUse::Keyword(ls::CalcSize {
+            basis,
+            size_factor,
+            rest: to_lp(rest),
+        })
+    };
+    match &f.basis {
+        B::LengthPercentage(b) => CalcSizeUse::Length(to_lp(compose(0.0, of_lp(&lp(&b.0))).1)),
+        B::CalcSize(inner) => match calc_size(inner) {
+            CalcSizeUse::Length(l) => CalcSizeUse::Length(to_lp(compose(0.0, of_lp(&l)).1)),
+            CalcSizeUse::Keyword(c) => keyword(c.basis, compose(c.size_factor, of_lp(&c.rest))),
+        },
+        B::Auto | B::Any => keyword(ls::CalcSizeBasis::Auto, (k, rest)),
+        B::MinContent => keyword(ls::CalcSizeBasis::MinContent, (k, rest)),
+        B::MaxContent => keyword(ls::CalcSizeBasis::MaxContent, (k, rest)),
+        B::FitContent => keyword(ls::CalcSizeBasis::FitContent, (k, rest)),
+        B::Stretch => keyword(ls::CalcSizeBasis::Stretch, (k, rest)),
+        B::Content => keyword(ls::CalcSizeBasis::Content, (k, rest)),
+    }
+}
+
+/// A `calc-size()` calculation as `k × size + linear`, or `None` when it is not linear in `size`.
+fn calc_size_linear(node: &c::length_percentage::CalcNode) -> Option<(f32, ls::Linear)> {
+    use style::values::computed::calc::ComputedLeaf;
+    use style::values::generics::calc::GenericCalcNode as N;
+    let lin = |length, percent| ls::Linear { length, percent };
+    let scale = |(k, l): (f32, ls::Linear), f: f32| (k * f, lin(l.length * f, l.percent * f));
+    match node {
+        N::Leaf(ComputedLeaf::Size) => Some((1.0, lin(0.0, 0.0))),
+        N::Leaf(ComputedLeaf::Length(l)) => Some((0.0, lin(l.px(), 0.0))),
+        N::Leaf(ComputedLeaf::Percentage(p)) => Some((0.0, lin(0.0, p.get()))),
+        N::Negate(x) => Some(scale(calc_size_linear(x)?, -1.0)),
+        N::Sum(items) => {
+            let mut acc = (0.0, lin(0.0, 0.0));
+            for item in items.iter() {
+                let (k, l) = calc_size_linear(item)?;
+                acc = (
+                    acc.0 + k,
+                    lin(acc.1.length + l.length, acc.1.percent + l.percent),
+                );
+            }
+            Some(acc)
+        }
+        N::Product(items) => {
+            let mut f = 1.0;
+            let mut term = None;
+            for item in items.iter() {
+                match item {
+                    N::Leaf(ComputedLeaf::Number(n)) => f *= n,
+                    _ if term.is_none() => term = Some(calc_size_linear(item)?),
+                    _ => return None,
+                }
+            }
+            Some(scale(term?, f))
+        }
+        _ => None,
     }
 }
 
@@ -1114,6 +1222,10 @@ pub(crate) fn max_size(v: &c::MaxSize) -> ls::MaxSizeValue {
         S::FitContentFunction(l) => ls::MaxSizeValue::FitContent(Some(lp(&l.0))),
         S::WebkitFillAvailable | S::Stretch => ls::MaxSizeValue::Stretch,
         S::AnchorSizeFunction(_) | S::AnchorContainingCalcFunction(_) => ls::MaxSizeValue::None,
+        S::CalcSize(f) => match calc_size(f) {
+            CalcSizeUse::Length(l) => ls::MaxSizeValue::LengthPercentage(l),
+            CalcSizeUse::Keyword(c) => ls::MaxSizeValue::CalcSize(c),
+        },
     }
 }
 
@@ -2027,6 +2139,15 @@ impl ls::Style for RenderStyle {
             B::Size(S::LengthPercentage(l)) => ls::FlexBasis::LengthPercentage(lp(&l.0)),
             // `max-content` and friends as a basis behave as `content`.
             B::Size(S::MaxContent | S::MinContent | S::FitContent) => ls::FlexBasis::Content,
+            // `calc-size()` (CSS Sizing 4 §7): exact with a definite basis; with a keyword basis the
+            // flex algorithm takes the keyword's size, without the calculation.
+            B::Size(S::CalcSize(f)) => match calc_size(f) {
+                CalcSizeUse::Length(l) => ls::FlexBasis::LengthPercentage(l),
+                CalcSizeUse::Keyword(c) => match c.basis {
+                    ls::CalcSizeBasis::Auto => ls::FlexBasis::Auto,
+                    _ => ls::FlexBasis::Content,
+                },
+            },
             B::Size(_) => ls::FlexBasis::Auto,
         }
     }

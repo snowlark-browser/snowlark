@@ -390,6 +390,50 @@ pub enum SizeValue {
     FitContent(Option<LengthPercentage>),
     /// `stretch` (`-webkit-fill-available`).
     Stretch,
+    /// `calc-size()` with a keyword basis.
+    CalcSize(CalcSize),
+}
+
+/// The basis of a [`CalcSize`]: the sizing keyword whose size `size` refers to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CalcSizeBasis {
+    Auto,
+    MinContent,
+    MaxContent,
+    FitContent,
+    Stretch,
+    /// `content` (`flex-basis`).
+    Content,
+}
+
+/// `calc-size(<keyword>, <calculation>)` (CSS Sizing 4 §7) as `size × size_factor + rest`, where
+/// `size` is the size the basis keyword gives (in the box `box-sizing` names). A basis of `any`, a
+/// length or a percentage needs no layout of its own: such values are plain lengths here.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CalcSize {
+    pub basis: CalcSizeBasis,
+    pub size_factor: f32,
+    /// The rest of the calculation. Its percentages resolve to zero against an indefinite basis
+    /// (§7.1).
+    pub rest: LengthPercentage,
+}
+
+impl CalcSize {
+    /// The basis keyword as a size value.
+    pub fn basis_value(&self) -> SizeValue {
+        match self.basis {
+            CalcSizeBasis::Auto | CalcSizeBasis::Content => SizeValue::Auto,
+            CalcSizeBasis::MinContent => SizeValue::MinContent,
+            CalcSizeBasis::MaxContent => SizeValue::MaxContent,
+            CalcSizeBasis::FitContent => SizeValue::FitContent(None),
+            CalcSizeBasis::Stretch => SizeValue::Stretch,
+        }
+    }
+
+    /// The value for a basis of `size` (both in the box `box-sizing` names).
+    pub fn apply(&self, size: f32, basis: Option<f32>) -> f32 {
+        self.size_factor * size + self.rest.resolve_or_zero(basis)
+    }
 }
 
 impl SizeValue {
@@ -424,6 +468,8 @@ pub enum MaxSizeValue {
     MaxContent,
     FitContent(Option<LengthPercentage>),
     Stretch,
+    /// `calc-size()` with a keyword basis.
+    CalcSize(CalcSize),
 }
 
 impl MaxSizeValue {

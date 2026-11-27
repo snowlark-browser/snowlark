@@ -192,6 +192,8 @@ fn dimension(v: SizeValue, calcs: &mut Vec<LengthPercentage>) -> taffy::Dimensio
             taffy::Dimension::fit_content_px(l.length)
         }
         SizeValue::FitContent(_) => taffy::Dimension::fit_content(),
+        // (flex and grid items size calc-size() by its basis keyword)
+        SizeValue::CalcSize(c) => dimension(c.basis_value(), calcs),
     }
 }
 
@@ -1365,7 +1367,7 @@ fn contained_inputs<S: Style>(
     let edges = Edges::of(s, parent.width.unwrap_or(0.0));
     let (pbh, pbv) = (edges.pb_h(), edges.pb_v());
     let (min_w, max_w) = width_bounds(s, parent.width, pbh, pbh, &mut || ContentSizes::ZERO);
-    let (min_h, max_h) = height_bounds(s, parent.height, pbv);
+    let (min_h, max_h) = height_bounds(s, parent.height, pbv, None);
     let grid = b.kind == BoxKind::Grid;
     let explicit = (contained.intrinsic_width, contained.intrinsic_height);
     let empty = if grid && (explicit.0.is_none() || explicit.1.is_none()) {
@@ -1595,7 +1597,7 @@ pub(crate) fn content_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> ContentS
     // A height that is definite without a containing block (a length) is known while the widths are
     // measured: the items' cross sizes and percentages depend on it (css-flexbox-1 §9.8), and the
     // container's inline size is computed after it only in writing modes we don't have.
-    let (min_h, max_h) = height_bounds(style, None, edges.pb_v());
+    let (min_h, max_h) = height_bounds(style, None, edges.pb_v(), None);
     // (a percentage of a parent's length is as definite)
     let basis = cx.tree.b(id).parent.and_then(|p| {
         let parent = cx.tree.b(p);

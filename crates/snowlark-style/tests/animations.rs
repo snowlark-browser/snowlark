@@ -357,3 +357,102 @@ fn an_auto_duration_parses_and_resolves_to_zero_seconds() {
     assert_eq!(p.get("#b", "animation-name"), "grow");
     assert_eq!(p.get("#b", "animation-duration"), "0s");
 }
+
+/// CSS Sizing 4 §7.2-7.3: under `interpolate-size: allow-keywords` a width transitions from `auto`
+/// as `calc-size(auto, size)`; under `numeric-only` a keyword combines only with a `calc-size()` of
+/// the same basis, so `auto` to a length does not transition.
+#[test]
+fn sizing_keywords_interpolate_as_calc_size() {
+    let mut p = Page::new(
+        "<!DOCTYPE html><style>
+           div { transition: width 1s linear; }
+           .on { width: 100px; }
+           #k { interpolate-size: allow-keywords; }
+           #c { width: min-content; }
+           #c.on { width: calc-size(min-content, size * 3); }
+         </style><div id=k></div><div id=n></div><div id=c></div>",
+    );
+    p.restyle_at(1.0);
+    for id in ["#k", "#n", "#c"] {
+        let e = p.q(id);
+        p.dom.set_attribute(e, "class", "on").unwrap();
+    }
+    p.restyle_at(1.0);
+    p.restyle_at(1.5);
+    assert_eq!(p.get("#k", "width"), "calc-size(auto, 50px + (0.5 * size))");
+    assert_eq!(p.get("#n", "width"), "100px");
+    // (like terms combine; the zero length stays, as it does in a value written that way)
+    assert_eq!(
+        p.get("#c", "width"),
+        "calc-size(min-content, 0px + (2 * size))"
+    );
+}
+
+/// CSS Sizing 4 §7.2.1: substituting nested `calc-size()` bases may fail past a limit, and such a
+/// value does not interpolate. Twenty bases that each use `size` twice would make a tree of a
+/// million nodes.
+#[test]
+fn deeply_nested_calc_size_does_not_interpolate() {
+    let mut deep = "auto".to_string();
+    for _ in 0..20 {
+        deep = format!("calc-size({deep}, size / 2 + size / 2)");
+    }
+    let mut p = Page::new(&format!(
+        "<!DOCTYPE html><style>
+           #d {{ transition: width 1s linear; width: {deep}; }}
+           #d.on {{ width: calc-size(auto, size * 3); }}
+         </style><div id=d></div>"
+    ));
+    p.restyle_at(1.0);
+    let d = p.q("#d");
+    p.dom.set_attribute(d, "class", "on").unwrap();
+    p.restyle_at(1.0);
+    p.restyle_at(1.5);
+    assert_eq!(p.get("#d", "width"), "calc-size(auto, 3 * size)");
+}
+
+/// A sizing property's value from an easing that overshoots below zero is clamped as its values
+/// are (`min-height` is non-negative).
+#[test]
+fn extrapolated_sizes_are_clamped_to_zero() {
+    let mut p = Page::new(
+        "<!DOCTYPE html><style>
+           #m { min-height: 0px; transition: min-height 1s cubic-bezier(0.5, -5, 0.5, 1); }
+           #m.on { min-height: 100px; }
+         </style><div id=m></div>",
+    );
+    p.restyle_at(1.0);
+    let m = p.q("#m");
+    p.dom.set_attribute(m, "class", "on").unwrap();
+    p.restyle_at(1.0);
+    // (the easing is near -1.8 a quarter of the way in)
+    p.restyle_at(1.25);
+    assert_eq!(p.get("#m", "min-height"), "0px");
+}
+
+/// Lengths in the sizing properties animate unzoomed, as other lengths do: a width transition under
+/// `zoom: 2` is halfway between its two zoomed values.
+#[test]
+fn sizes_animate_unzoomed_under_zoom() {
+    let mut p = Page::new(
+        "<!DOCTYPE html><style>
+           #z { zoom: 2; width: 100px; transition: width 1s linear; }
+           #z.on { width: 200px; }
+         </style><div id=z></div>",
+    );
+    p.restyle_at(1.0);
+    let before = p.get("#z", "width");
+    let z = p.q("#z");
+    p.dom.set_attribute(z, "class", "on").unwrap();
+    p.restyle_at(1.0);
+    p.restyle_at(1.5);
+    let half = p.get("#z", "width");
+    p.restyle_at(2.0);
+    let after = p.get("#z", "width");
+    let px = |s: &str| s.trim_end_matches("px").parse::<f32>().unwrap();
+    assert_eq!(
+        px(&half),
+        (px(&before) + px(&after)) / 2.0,
+        "{before} {half} {after}"
+    );
+}

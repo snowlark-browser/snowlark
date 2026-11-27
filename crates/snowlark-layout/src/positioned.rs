@@ -570,7 +570,7 @@ fn place_absolute<S: Style>(
     let known_h = if replaced {
         None
     } else {
-        let (min_h, max_h) = height_bounds(&style, Some(cbh), pbv);
+        let (min_h, max_h) = height_bounds(&style, Some(cbh), pbv, Some(stretch_h));
         match resolve_height(style.height(), Some(cbh), pbv, sizing) {
             Some(hh) => Some(clamp(hh, min_h, max_h)),
             None if style.height().is_auto() && v.stretches(replaced_or_table) => {
@@ -661,7 +661,7 @@ fn place_absolute<S: Style>(
         None if style.height() == SizeValue::Stretch => Some(stretch_h.max(pbv)),
         None => resolve_height(style.height(), Some(cbh), pbv, sizing),
     };
-    let (min_h, max_h) = height_bounds(&style, Some(cbh), pbv);
+    let (min_h, max_h) = height_bounds(&style, Some(cbh), pbv, Some(stretch_h));
     let stretch_height = style.height().is_auto() && v.stretches(replaced_or_table);
     let fixed_h = match specified_h {
         Some(_) if control && stretch_height => Some(clamp(stretch_h, min_h, max_h).max(pbv)),

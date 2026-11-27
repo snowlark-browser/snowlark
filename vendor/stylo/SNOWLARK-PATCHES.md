@@ -652,6 +652,17 @@ The patches below were written on 0.22.0 and carried to 0.24.0 by a three-way me
    (an interpolated `inset()`, whose `rect()` end gives `100% - 80%` as the f32 fraction 0.19999999) drops its
    repeated sides as the value written would (CSSOM's shortest serialization; WPT
    `css-shapes/animation/shape-outside-interpolation.html`).
+107. **`calc-size()` and `interpolate-size`** (CSS Sizing 4 §7; `values/generics/length.rs`,
+   `values/specified/length.rs`, `values/specified/calc.rs`, `values/computed/calc.rs`,
+   `values/computed/calc_size.rs`): `width`, `height`, their `min-`/`max-` and logical forms and `flex-basis`
+   parse `calc-size(<basis>, <calc-sum>)` into a `CalcSize` variant of `Size`/`MaxSize`. The calculation is a
+   `<length-percentage>` whose calc tree may hold a `size` leaf (specified `Leaf::Size`, computed
+   `ComputedLeaf::Size`, parsed only inside calc-size(), through `AdditionalFunctions::SIZE_KEYWORD`). Specified
+   and computed values keep the basis as written (§7.1); `CalcSizeFunction::prepare` does §7.2.1 (a nested
+   basis or a `<calc-sum>` basis substituted into the calculation, a percentage basis de-percentified to `100%`)
+   for interpolation and for layout. The animated value of the sizing properties is `AnimatedSize`, which
+   carries the element's `interpolate-size`: values that do not interpolate as they are interpolate as
+   calc-size() (§7.2), a keyword combining with a `<length-percentage>` only under `allow-keywords` (§7.3).
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

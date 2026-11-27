@@ -725,6 +725,7 @@ pub(crate) fn layout_table_wrapper<S: Style>(
         MaxSizeValue::MaxContent => Some(max_w),
         MaxSizeValue::FitContent(a) => size_of(SizeValue::FitContent(a)),
         MaxSizeValue::Stretch => Some(available),
+        MaxSizeValue::CalcSize(c) => size_of(SizeValue::CalcSize(c)),
     };
     let min_size = if space.fixed_width.is_some() || swapped {
         None

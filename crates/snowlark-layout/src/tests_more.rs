@@ -1144,3 +1144,145 @@ fn a_percentage_width_resolves_against_zero_in_a_min_content_contribution() {
     let f = t.run(800.0, 600.0);
     assert_eq!(rect(&f, img).width, 100.0);
 }
+
+/// CSS Sizing 4 §7.1: `calc-size()` applies its calculation to the size its basis keyword gives,
+/// in the box `box-sizing` names; an `auto` basis once `auto` has given its size.
+#[test]
+fn calc_size_applies_its_calculation_to_the_basis_size() {
+    let mut t = T::new();
+    let r0 = t.root();
+    let calc = |basis, size_factor, px| {
+        SizeValue::CalcSize(CalcSize {
+            basis,
+            size_factor,
+            rest: LengthPercentage::px(px),
+        })
+    };
+    // `calc-size(auto, size * 0.5 + 10px)`: half the stretched width, plus 10px.
+    let a = t
+        .doc
+        .block(r0, |s| s.width = calc(CalcSizeBasis::Auto, 0.5, 10.0));
+    // `calc-size(min-content, size * 2)` of a 30px block.
+    let m = t
+        .doc
+        .block(r0, |s| s.width = calc(CalcSizeBasis::MinContent, 2.0, 0.0));
+    t.doc.block(m, |s| {
+        s.width = SizeValue::px(30.0);
+        s.height = SizeValue::px(20.0);
+    });
+    // `height: calc-size(auto, size + 5px)` over 20px of content, with 10px of padding outside
+    // the content box `size` measures.
+    let h = t.doc.block(r0, |s| {
+        s.height = calc(CalcSizeBasis::Auto, 1.0, 5.0);
+        s.padding[0] = LengthPercentage::px(10.0);
+    });
+    t.doc.block(h, |s| s.height = SizeValue::px(20.0));
+    let f = t.run(200.0, 400.0);
+    assert_eq!(rect(&f, a).width, 110.0);
+    assert_eq!(rect(&f, m).width, 60.0);
+    assert_eq!(rect(&f, h).height, 35.0);
+}
+/// css-sizing-4 §6: `stretch` in `min-height` and `max-height` fills the containing block less the
+/// margins, as it does in `height`.
+#[test]
+fn stretch_min_and_max_height_leave_the_margins() {
+    let mut t = T::new();
+    let r0 = t.root();
+    // (padding keeps the margins from collapsing through the containing block's edges)
+    let cb = t.doc.block(r0, |s| {
+        s.height = SizeValue::px(100.0);
+        s.padding_px(1.0);
+    });
+    let margins = |s: &mut TestStyle| {
+        s.margin[0] = LengthPercentageAuto::px(10.0);
+        s.margin[2] = LengthPercentageAuto::px(5.0);
+    };
+    let min = t.doc.block(cb, |s| {
+        margins(s);
+        s.height = SizeValue::px(0.0);
+        s.min_height = SizeValue::Stretch;
+    });
+    let cb2 = t.doc.block(r0, |s| {
+        s.height = SizeValue::px(100.0);
+        s.padding_px(1.0);
+    });
+    let max = t.doc.block(cb2, |s| {
+        margins(s);
+        s.height = SizeValue::px(200.0);
+        s.max_height = MaxSizeValue::Stretch;
+    });
+    let f = t.run(200.0, 400.0);
+    assert_eq!(rect(&f, min).height, 85.0);
+    assert_eq!(rect(&f, max).height, 85.0);
+}
+/// css-sizing-4 §5.1: an `aspect-ratio` without `auto` is the preferred aspect ratio of a replaced
+/// element in place of its natural one: with both sizes `auto`, its natural width keeps and its
+/// height follows the ratio. With `auto`, the natural ratio wins.
+#[test]
+fn aspect_ratio_replaces_a_replaced_elements_natural_ratio() {
+    let mut t = T::new();
+    let r0 = t.root();
+    let content = ReplacedContent::image(snowlark_paint::ImageId(1), 15.0, 15.0);
+    let ratio = |auto| AspectRatio {
+        auto,
+        ratio: Some(2.0),
+    };
+    let given = t.doc.element(r0, "canvas", |s| {
+        s.display = Display::BLOCK;
+        s.aspect_ratio = ratio(false);
+    });
+    t.doc.replace(given, content.clone());
+    let auto = t.doc.element(r0, "canvas", |s| {
+        s.display = Display::BLOCK;
+        s.aspect_ratio = ratio(true);
+    });
+    t.doc.replace(auto, content);
+    // (under `box-sizing: border-box` the ratio is the border box's: 20 + 80 wide, so 100 tall)
+    let bb = t.doc.element(r0, "img", |s| {
+        s.display = Display::BLOCK;
+        s.aspect_ratio = AspectRatio {
+            auto: false,
+            ratio: Some(1.0),
+        };
+        s.box_sizing = BoxSizing::BorderBox;
+        s.padding[1] = LengthPercentage::px(80.0);
+        s.padding[2] = LengthPercentage::px(50.0);
+    });
+    t.doc.replace(
+        bb,
+        ReplacedContent::image(snowlark_paint::ImageId(2), 20.0, 50.0),
+    );
+    let f = t.run(200.0, 400.0);
+    assert_eq!((rect(&f, given).width, rect(&f, given).height), (15.0, 7.5));
+    assert_eq!((rect(&f, auto).width, rect(&f, auto).height), (15.0, 15.0));
+    assert_eq!((rect(&f, bb).width, rect(&f, bb).height), (100.0, 100.0));
+}
+
+/// css-sizing-3 §5.1: `min-content`, `max-content` and `fit-content` in `min-height` and
+/// `max-height` bound the height by the content's height.
+#[test]
+fn intrinsic_keywords_in_min_and_max_height_are_the_content_height() {
+    let mut t = T::new();
+    let r0 = t.root();
+    let min = t.doc.block(r0, |s| {
+        s.height = SizeValue::px(0.0);
+        s.min_height = SizeValue::MinContent;
+    });
+    t.doc.block(min, |s| s.height = SizeValue::px(30.0));
+    let max = t.doc.block(r0, |s| {
+        s.height = SizeValue::px(500.0);
+        s.max_height = MaxSizeValue::MaxContent;
+    });
+    t.doc.block(max, |s| s.height = SizeValue::px(30.0));
+    let both = t.doc.block(r0, |s| {
+        s.height = SizeValue::px(500.0);
+        s.max_height = MaxSizeValue::FitContent(None);
+        s.min_height = SizeValue::px(40.0);
+    });
+    t.doc.block(both, |s| s.height = SizeValue::px(30.0));
+    let f = t.run(200.0, 900.0);
+    assert_eq!(rect(&f, min).height, 30.0);
+    assert_eq!(rect(&f, max).height, 30.0);
+    // (`min-height` wins)
+    assert_eq!(rect(&f, both).height, 40.0);
+}

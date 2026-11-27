@@ -117,13 +117,16 @@ pub(crate) fn block_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId, space: &Space
         let auto_width = specified.is_none();
         let w = match specified {
             Some(w) => w,
-            None => match space.mode {
-                WidthMode::Fill if justify.is_none() => stretch,
-                _ => match ratio_width {
-                    Some(w) => w,
-                    None => content().shrink_to_fit((stretch - pb).max(0.0)) + pb,
-                },
-            },
+            None => {
+                let auto = match space.mode {
+                    WidthMode::Fill if justify.is_none() => stretch,
+                    _ => match ratio_width {
+                        Some(w) => w,
+                        None => content().shrink_to_fit((stretch - pb).max(0.0)) + pb,
+                    },
+                };
+                finish_auto(width_value, auto, basis, pb, sizing)
+            }
         };
         let w = clamp(w, min, max).max(pb);
         if space.mode == WidthMode::Fill && !(auto_width && w == stretch) {
@@ -149,7 +152,18 @@ pub(crate) fn block_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId, space: &Space
     let (min_height, max_height) = if space.content_height {
         (None, None)
     } else {
-        height_bounds(&style, space.cb_height, pbv)
+        // (`stretch` fills the containing block less the margins, css-sizing-4 §6, as for
+        // `height` below)
+        let stretch = (style.min_height() == SizeValue::Stretch
+            || style.max_height() == MaxSizeValue::Stretch)
+            .then(|| {
+                space.cb_height.map(|h| {
+                    let (over, under) = uncollapsed_margins(cx, id, &edges);
+                    h - over - under
+                })
+            })
+            .flatten();
+        height_bounds(&style, space.cb_height, pbv, stretch)
     };
     let height = match space.fixed_height {
         Some(h) => Some(h),
@@ -697,10 +711,62 @@ pub(crate) fn layout_block_container_box<S: Style>(
     let used_height = match sizes.height {
         Some(h) => h,
         None => clamp(
-            auto_content.max(0.0) + edges.pb_v() + legend_shift,
+            finish_auto(
+                style.height(),
+                auto_content.max(0.0) + edges.pb_v() + legend_shift,
+                space.cb_height,
+                edges.pb_v(),
+                style.box_sizing(),
+            ),
             sizes.min_height,
             sizes.max_height,
         ),
+    };
+    // css-sizing-3 §5.1: in the block axis `min-content`, `max-content` and `fit-content` are the
+    // content's height (a block container's auto height), so as `min-height` and `max-height` they
+    // bound the height once it is known (max first, then min).
+    let used_height = if space.fixed_height.is_none() && !space.content_height {
+        let content = auto_content.max(0.0) + edges.pb_v() + legend_shift;
+        let mut h = used_height;
+        let max = match style.max_height() {
+            MaxSizeValue::MinContent
+            | MaxSizeValue::MaxContent
+            | MaxSizeValue::FitContent(None) => Some(content),
+            MaxSizeValue::CalcSize(c) if c.basis != CalcSizeBasis::Stretch => Some(finish_auto(
+                SizeValue::CalcSize(c),
+                content,
+                space.cb_height,
+                edges.pb_v(),
+                style.box_sizing(),
+            )),
+            _ => None,
+        };
+        if let Some(max) = max {
+            h = h.min(max).max(sizes.min_height.unwrap_or(0.0));
+        }
+        match style.min_height() {
+            SizeValue::MinContent | SizeValue::MaxContent | SizeValue::FitContent(None) => {
+                h = h.max(content);
+            }
+            // (CSS Sizing 4 §7: the calculation on the content's height; an `auto` minimum
+            // is zero here)
+            SizeValue::CalcSize(c)
+                if !matches!(c.basis, CalcSizeBasis::Auto | CalcSizeBasis::Stretch) =>
+            {
+                let sizing = style.box_sizing();
+                h = h.max(finish_auto(
+                    SizeValue::CalcSize(c),
+                    content,
+                    space.cb_height,
+                    edges.pb_v(),
+                    sizing,
+                ));
+            }
+            _ => {}
+        }
+        h
+    } else {
+        used_height
     };
     // CSS Box Alignment 3 §5.4: `align-content` on a block container aligns its content as a
     // whole in its content box (here for boxes that establish an independent formatting context,
