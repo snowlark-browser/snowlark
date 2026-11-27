@@ -178,3 +178,74 @@ fn an_insecure_page_has_no_caches_and_keeps_its_own_variable() {
         "true,true,true,true,true"
     );
 }
+
+/// HTML "secure context" goes by the top-level creation URL: a `srcdoc` frame (`about:srcdoc`, a
+/// potentially trustworthy URL of its own) is a secure context in an `https:` page and not in an
+/// `http:` one, with the `[SecureContext]` constructs to match.
+#[test]
+fn a_frames_secure_context_is_its_top_level_pages() {
+    let caches = CacheBackend::in_memory();
+    let probe = "{ const w = f.contentWindow; [w.isSecureContext, 'subtle' in w.crypto,\
+                 'caches' in w].join() }";
+    for (url, want) in [
+        ("http://example.test/", "false,false,false"),
+        ("https://example.test/", "true,true,true"),
+    ] {
+        let mut page = page_at(&caches, url);
+        eval(
+            &mut page,
+            "window.f = document.createElement('iframe'); f.srcdoc = '<p>x';\
+             window.loaded = false; f.onload = () => loaded = true;\
+             document.body.appendChild(f); 'ok'",
+        );
+        page.run_until(std::time::Instant::now() + Duration::from_secs(5), |p| {
+            p.eval("loaded", "test.js").as_deref() == Ok("true")
+        });
+        assert_eq!(eval(&mut page, probe), want, "{url}");
+    }
+}
+
+/// HTML "secure context": a dedicated worker is one when its owner is, whatever its own URL (a
+/// `data:` worker's origin is opaque).
+#[test]
+fn a_workers_secure_context_is_its_owners() {
+    let net = snowlark_net::NetThread::start(snowlark_net::NetConfig::default()).unwrap();
+    for (url, want) in [
+        ("http://example.test/", "false,false"),
+        ("https://example.test/", "true,true"),
+    ] {
+        let mut page = Page::new(PageOptions {
+            net: Some(net.client()),
+            ..Default::default()
+        });
+        page.load_html("<!doctype html>", &url::Url::parse(url).unwrap());
+        page.run_until_settled(Duration::from_secs(5));
+        let got = run_async(
+            &mut page,
+            "const w = new Worker(\"data:text/javascript,postMessage([isSecureContext, 'subtle' in crypto].join())\");\
+             return await new Promise((ok, no) => { w.onmessage = e => ok(e.data); w.onerror = () => no(new Error('error')); });",
+        );
+        assert_eq!(got, want, "{url}");
+    }
+}
+
+/// Web IDL §3.3.20 for the members of other interfaces: a `[SecureContext]` attribute or operation
+/// of an interface exposed in an insecure realm is not there (`navigator.storage`, `crypto.subtle`,
+/// `crypto.randomUUID`), while the interface's other members are; a secure realm has them all.
+#[test]
+fn an_insecure_page_has_no_secure_members_of_other_interfaces() {
+    let caches = CacheBackend::in_memory();
+    let probe = "['storage' in navigator, 'clipboard' in navigator, 'credentials' in navigator,\
+                  'subtle' in crypto, 'randomUUID' in crypto, typeof crypto.getRandomValues,\
+                  typeof navigator.userAgent, 'getCoalescedEvents' in PointerEvent.prototype].join()";
+    let mut insecure = page_at(&caches, "http://example.test/");
+    assert_eq!(
+        eval(&mut insecure, probe),
+        "false,false,false,false,false,function,string,false"
+    );
+    let mut secure = page_at(&caches, "https://example.test/");
+    assert_eq!(
+        eval(&mut secure, probe),
+        "true,true,true,true,true,function,string,true"
+    );
+}

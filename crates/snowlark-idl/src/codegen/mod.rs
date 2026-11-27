@@ -393,7 +393,7 @@ impl Plan<'_> {
     /// interface objects, and the members of the global's interface and its inherited ones (those live
     /// on the global object or its prototype chain).
     fn hide_secure_context(&self, o: &mut String) {
-        o.push_str("\n/// Removes from the current context's global the `[SecureContext]` interface objects exposed in `kind`\n/// and the `[SecureContext]` members of its global interface (Web IDL §3.3.20): for a realm that is not a\n/// secure context. Members of other interfaces' prototypes stay.\npub fn hide_secure_context(scope: &mut v8::PinScope<'_, '_>, kind: GlobalKind) {\n    let global = scope.get_current_context().global(scope);\n    let interfaces: &[(&str, &[&str])] = &[\n");
+        o.push_str("\n/// Removes from the current context's global the `[SecureContext]` interface objects exposed in `kind`\n/// and the `[SecureContext]` members of its global interface and of the other interfaces and namespaces\n/// exposed there (Web IDL §3.3.20): for a realm that is not a secure context.\npub fn hide_secure_context(scope: &mut v8::PinScope<'_, '_>, kind: GlobalKind) {\n    let global = scope.get_current_context().global(scope);\n    let interfaces: &[(&str, &[&str])] = &[\n");
         for ip in &self.ifaces {
             if !ip.secure || ip.no_interface_object || ip.namespace {
                 continue;
@@ -423,6 +423,61 @@ impl Plan<'_> {
             let names: Vec<String> = names.iter().map(|n| lit(n)).collect();
             writeln!(o, "        GlobalKind::{kind} => &[{}],", names.join(", ")).unwrap();
         }
-        o.push_str("    };\n    for name in members {\n        // (the nearest object of the global's prototype chain that has it)\n        let key = rt::name(scope, name);\n        let mut at = Some(global);\n        while let Some(object) = at {\n            if object.has_own_property(scope, key.into()) == Some(true) {\n                object.delete(scope, key.into());\n                break;\n            }\n            at = object.get_prototype(scope).and_then(|p| v8::Local::<v8::Object>::try_from(p).ok());\n        }\n    }\n}\n");
+        o.push_str("    };\n    for name in members {\n        // (the nearest object of the global's prototype chain that has it)\n        let key = rt::name(scope, name);\n        let mut at = Some(global);\n        while let Some(object) = at {\n            if object.has_own_property(scope, key.into()) == Some(true) {\n                object.delete(scope, key.into());\n                break;\n            }\n            at = object.get_prototype(scope).and_then(|p| v8::Local::<v8::Object>::try_from(p).ok());\n        }\n    }\n");
+        // The `[SecureContext]` members of the other interfaces exposed in the realm: regular ones on
+        // the interface prototype object, static ones on the interface object, a namespace's on the
+        // namespace object.
+        let globals: BTreeSet<String> = {
+            let mut g = BTreeSet::new();
+            for start in ["Window", "DedicatedWorkerGlobalScope"] {
+                let mut at = Some(start.to_string());
+                while let Some(name) = at {
+                    let Some(ip) = self.ifaces.iter().find(|i| i.name == name) else {
+                        break;
+                    };
+                    g.insert(name);
+                    at = ip.parent.clone();
+                }
+            }
+            g
+        };
+        o.push_str("    // (interface, exposure, members of its prototype, members of its interface or namespace object)\n    type Members = (&'static str, &'static [&'static str], &'static [&'static str], &'static [&'static str]);\n    let others: &[Members] = &[\n");
+        for ip in &self.ifaces {
+            if ip.secure || ip.no_interface_object || globals.contains(&ip.name) {
+                continue;
+            }
+            let mut on_proto = BTreeSet::new();
+            let mut on_object = BTreeSet::new();
+            for a in ip.attrs.iter().filter(|a| a.secure) {
+                if a.is_static || ip.namespace {
+                    on_object.insert(a.name.clone());
+                } else {
+                    on_proto.insert(a.name.clone());
+                }
+            }
+            for op in ip.ops.iter().filter(|op| op.secure) {
+                if op.is_static || ip.namespace {
+                    on_object.insert(op.name.clone());
+                } else {
+                    on_proto.insert(op.name.clone());
+                }
+            }
+            if on_proto.is_empty() && on_object.is_empty() {
+                continue;
+            }
+            let list =
+                |s: &BTreeSet<String>| s.iter().map(|n| lit(n)).collect::<Vec<_>>().join(", ");
+            let names: Vec<String> = ip.exposure.iter().map(|n| lit(n)).collect();
+            writeln!(
+                o,
+                "        ({}, &[{}], &[{}], &[{}]),",
+                lit(&ip.name),
+                names.join(", "),
+                list(&on_proto),
+                list(&on_object)
+            )
+            .unwrap();
+        }
+        o.push_str("    ];\n    for (name, exposure, on_proto, on_object) in others {\n        if !kind.exposes(exposure) {\n            continue;\n        }\n        let key = rt::name(scope, name);\n        let Some(object) = global.get(scope, key.into()).and_then(|v| v8::Local::<v8::Object>::try_from(v).ok()) else {\n            continue;\n        };\n        for member in *on_object {\n            let key = rt::name(scope, member);\n            object.delete(scope, key.into());\n        }\n        if on_proto.is_empty() {\n            continue;\n        }\n        let key = rt::name(scope, \"prototype\");\n        let Some(proto) = object.get(scope, key.into()).and_then(|v| v8::Local::<v8::Object>::try_from(v).ok()) else {\n            continue;\n        };\n        for member in *on_proto {\n            let key = rt::name(scope, member);\n            proto.delete(scope, key.into());\n        }\n    }\n}\n");
     }
 }

@@ -27,6 +27,8 @@ pub enum Microtask {
     ImageData = 3,
     /// HTML §4.8.4.4 `decode()` step 2's microtask.
     ImageDecode = 4,
+    /// ECMA-262 ContinueDynamicImport: link and evaluate a loaded `import()`'s module.
+    ContinueDynamicImport = 5,
 }
 
 fn microtask_callback(
@@ -43,6 +45,7 @@ fn microtask_callback(
         2 => engine.notify_mutation_observers(&mut cx),
         3 => engine.img_microtask(),
         4 => engine.img_decode_microtask(&mut cx),
+        5 => engine.continue_dynamic_import(&mut cx),
         _ => {}
     }
 }
@@ -221,6 +224,11 @@ impl Engine {
             return;
         };
         scope.enqueue_microtask(f);
+    }
+
+    /// Queues [`Microtask::ContinueDynamicImport`] for the `import()` loaded last.
+    pub(crate) fn queue_continue_dynamic_import(&self, cx: &mut Cx) {
+        self.queue_internal_microtask(cx, Microtask::ContinueDynamicImport);
     }
 
     /// After a DOM operation outside `[CEReactions]` (or inside one, before its element queue pops).

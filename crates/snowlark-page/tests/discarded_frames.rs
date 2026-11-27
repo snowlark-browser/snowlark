@@ -211,6 +211,45 @@ fn a_removed_frames_window_stays_usable_while_referenced() {
     assert!(after < nodes, "{after} nodes, {nodes} before");
 }
 
+/// A removed frame's NodeIterator and Range over a subtree that script removed from the frame's
+/// document keep that subtree while the page holds them (DOM §6.1 NodeIterator's root and reference,
+/// §5.5 a range's boundary points): the subtree is freed with the frame's group, not before it.
+#[test]
+fn a_removed_frames_iterator_keeps_its_removed_subtree() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = page(&net);
+    frame_of_script(&mut page, "parent.d = document;");
+    eval(
+        &mut page,
+        "{ const b = d.body; b.append(d.createElement('p'), d.createElement('q'));\
+         b.remove(); window.it = d.createNodeIterator(b); it.nextNode(); it.nextNode();\
+         window.r = d.createRange(); r.setStart(b.lastChild, 0); } d = null; 'ok'",
+    );
+    collect(&mut page);
+    assert_eq!(
+        eval(
+            &mut page,
+            "[it.referenceNode.nodeName, it.root.nodeName, it.nextNode().nodeName,\
+             r.startContainer.nodeName, r.startContainer.parentNode.nodeName].join()"
+        ),
+        "P,BODY,Q,Q,BODY"
+    );
+    // A removal elsewhere runs every live iterator's and range's removing steps.
+    eval(
+        &mut page,
+        "document.body.appendChild(document.createElement('i')).remove(); 'ok'",
+    );
+    eval(&mut page, "it = r = null; 'ok'");
+    for _ in 0..4 {
+        assert!(page.collect_garbage());
+        eval(
+            &mut page,
+            "document.body.appendChild(document.createElement('i')).remove(); 'ok'",
+        );
+    }
+    assert!(page.frames_alive().is_empty(), "{:?}", page.frames_alive());
+}
+
 /// Makes a frame of `script` (run in the frame), waits for its load, and removes it.
 fn frame_of_script(page: &mut Page, script: &str) {
     let source = format!("<script>window.big = Array(20000).fill(1); {script}</script>");

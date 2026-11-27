@@ -99,6 +99,18 @@ fn open(base: &str, net: &snowlark_net::NetThread) -> Page {
     page
 }
 
+/// A document of `url` (an `https:` one: `navigator.userAgentData` is `[SecureContext]`, and the
+/// test server speaks plain HTTP) made without a fetch.
+fn open_secure(url: &str, net: &snowlark_net::NetThread) -> Page {
+    let mut page = Page::new(PageOptions {
+        net: Some(net.client()),
+        ..Default::default()
+    });
+    page.load_html("<!doctype html><body>", &url::Url::parse(url).unwrap());
+    page.run_until_settled(Duration::from_secs(10));
+    page
+}
+
 /// Checks that everything a site can read says the same of `ua`.
 fn check(label: &str, ua: &UserAgent, base: &str, seen: &Seen, net: &snowlark_net::NetThread) {
     net.client().set_user_agent(ua.clone());
@@ -512,29 +524,11 @@ fn listed_sites_get_the_default_unbranded_in_requests_and_navigator() {
         .collect();
     assert!(unbranded.iter().any(|b| b == "Chromium"));
     assert_ne!(unbranded, default_brands);
-    let brands_js = "navigator.userAgentData.brands.map(b => b.brand).sort().join()";
-    assert_eq!(eval(&mut page, brands_js), unbranded.join(","));
+    // (`navigator.userAgentData` only in a secure document of the site: below)
     assert_eq!(
-        eval(
-            &mut page,
-            "f.contentWindow.navigator.userAgentData.brands.map(b => b.brand).sort().join()"
-        ),
-        unbranded.join(","),
-        "the site's frame"
+        eval(&mut page, "typeof navigator.userAgentData"),
+        "undefined"
     );
-    assert_eq!(
-        eval(
-            &mut page,
-            "JSON.stringify(navigator.userAgentData.toJSON().brands.map(b => b.brand).sort())"
-        ),
-        serde_json::to_string(&unbranded).unwrap()
-    );
-    eval(
-        &mut page,
-        "window.fv = null; navigator.userAgentData.getHighEntropyValues(['fullVersionList'])         .then(v => { window.fv = v.fullVersionList.map(b => b.brand).sort().join(); }); 1",
-    );
-    wait_for(&mut page, "window.fv");
-    assert_eq!(eval(&mut page, "window.fv"), unbranded.join(","));
     assert_eq!(
         eval(&mut page, "navigator.platform"),
         UserAgent::default().profile().nav_platform()
@@ -562,11 +556,6 @@ fn listed_sites_get_the_default_unbranded_in_requests_and_navigator() {
         "other document"
     );
     assert_eq!(eval(&mut page, "navigator.userAgent"), plain);
-    assert_eq!(
-        eval(&mut page, brands_js),
-        default_brands.join(","),
-        "other: brands"
-    );
     eval(
         &mut page,
         &format!("fetch('{listed}/from-other', {{mode: 'no-cors'}}); 1"),
@@ -592,6 +581,43 @@ fn listed_sites_get_the_default_unbranded_in_requests_and_navigator() {
         eval(&mut page, "navigator.userAgent"),
         plain,
         "off: navigator"
+    );
+
+    // `navigator.userAgentData` is `[SecureContext]`: the brands, in secure documents of the sites
+    // (pages made after the ones above, which are not used again).
+    net.client()
+        .set_user_agent(UserAgent::default_with_site_compat());
+    let mut secure = open_secure("https://mail.google.com/", &net);
+    let brands_js = "navigator.userAgentData.brands.map(b => b.brand).sort().join()";
+    assert_eq!(eval(&mut secure, brands_js), unbranded.join(","));
+    assert_eq!(
+        eval(
+            &mut secure,
+            "const f = document.createElement('iframe'); document.body.append(f); \
+             f.contentWindow.navigator.userAgentData.brands.map(b => b.brand).sort().join()"
+        ),
+        unbranded.join(","),
+        "the site's frame"
+    );
+    assert_eq!(
+        eval(
+            &mut secure,
+            "JSON.stringify(navigator.userAgentData.toJSON().brands.map(b => b.brand).sort())"
+        ),
+        serde_json::to_string(&unbranded).unwrap()
+    );
+    eval(
+        &mut secure,
+        "window.fv = null; navigator.userAgentData.getHighEntropyValues(['fullVersionList']) \
+         .then(v => { window.fv = v.fullVersionList.map(b => b.brand).sort().join(); }); 1",
+    );
+    wait_for(&mut secure, "window.fv");
+    assert_eq!(eval(&mut secure, "window.fv"), unbranded.join(","));
+    let mut secure = open_secure("https://other.test/", &net);
+    assert_eq!(
+        eval(&mut secure, brands_js),
+        default_brands.join(","),
+        "other: brands"
     );
 }
 
@@ -635,34 +661,8 @@ fn hbo_max_gets_the_edge_identity_in_requests_and_navigator() {
         .iter()
         .map(|(b, v)| format!("{b}/{v}"))
         .collect();
-    let brands_js = "navigator.userAgentData.brands.map(b => b.brand + '/' + b.version).join(',')";
-    assert_eq!(eval(&mut page, brands_js), want.join(","));
+    // (`navigator.userAgentData` only in a secure document of the app: at the end)
     assert!(want.iter().any(|b| b == "Microsoft Edge/150"), "{want:?}");
-    assert_eq!(
-        eval(&mut page, "navigator.userAgentData.platform"),
-        "Windows"
-    );
-    assert_eq!(
-        eval(
-            &mut page,
-            "const f = document.createElement('iframe'); document.body.append(f); \
-             f.contentWindow.navigator.userAgentData.brands.map(b => b.brand + '/' + b.version).join(',')"
-        ),
-        want.join(","),
-        "an about:blank frame of the app"
-    );
-    eval(
-        &mut page,
-        "window.fv = null; navigator.userAgentData.getHighEntropyValues(['fullVersionList', 'uaFullVersion']) \
-         .then(v => { window.fv = v.fullVersionList.map(b => b.brand).sort().join() + '|' + v.uaFullVersion; }); 1",
-    );
-    wait_for(&mut page, "window.fv");
-    let mut full: Vec<String> = profile.brands(true).into_iter().map(|(b, _)| b).collect();
-    full.sort();
-    assert_eq!(
-        eval(&mut page, "window.fv"),
-        format!("{}|{}", full.join(","), profile.ua_full_version())
-    );
     eval(
         &mut page,
         "window.w = null; const w = new Worker('/w.js'); w.onmessage = e => { window.w = e.data; }; 1",
@@ -699,4 +699,37 @@ fn hbo_max_gets_the_edge_identity_in_requests_and_navigator() {
     let doc = seen.lock().unwrap()[0].clone();
     assert_eq!(header(&doc, "user-agent"), Some(chrome.value.as_str()));
     assert_eq!(eval(&mut page, "navigator.userAgent"), chrome.value);
+
+    // `navigator.userAgentData` is `[SecureContext]`: the Edge brands, in a secure document of the
+    // app (made after the pages above, which are not used again).
+    net.client()
+        .set_user_agent(UserAgent::default_with_site_compat());
+    let mut secure = open_secure("https://play.hbomax.com/", &net);
+    let brands_js = "navigator.userAgentData.brands.map(b => b.brand + '/' + b.version).join(',')";
+    assert_eq!(eval(&mut secure, brands_js), want.join(","));
+    assert_eq!(
+        eval(&mut secure, "navigator.userAgentData.platform"),
+        "Windows"
+    );
+    assert_eq!(
+        eval(
+            &mut secure,
+            "const f = document.createElement('iframe'); document.body.append(f); \
+             f.contentWindow.navigator.userAgentData.brands.map(b => b.brand + '/' + b.version).join(',')"
+        ),
+        want.join(","),
+        "an about:blank frame of the app"
+    );
+    eval(
+        &mut secure,
+        "window.fv = null; navigator.userAgentData.getHighEntropyValues(['fullVersionList', 'uaFullVersion']) \
+         .then(v => { window.fv = v.fullVersionList.map(b => b.brand).sort().join() + '|' + v.uaFullVersion; }); 1",
+    );
+    wait_for(&mut secure, "window.fv");
+    let mut full: Vec<String> = profile.brands(true).into_iter().map(|(b, _)| b).collect();
+    full.sort();
+    assert_eq!(
+        eval(&mut secure, "window.fv"),
+        format!("{}|{}", full.join(","), profile.ua_full_version())
+    );
 }

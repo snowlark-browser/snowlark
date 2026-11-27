@@ -2296,6 +2296,21 @@ impl Engine {
             c.queues.retain(|n, _| !freed.contains(n));
             c.interface_override.retain(|n, _| !freed.contains(n));
         }
+        {
+            // A live range or NodeIterator that refers to a freed node is out of script's reach (its
+            // node would have pinned it otherwise): it takes no part in later removing steps, and
+            // goes with its group.
+            let objects = self.objects.borrow();
+            let refers_to_freed = |h: &Handle| match objects.get(h.get() as usize - 1) {
+                Some(Object::Range(b)) => freed.contains(&b.start.0) || freed.contains(&b.end.0),
+                Some(Object::NodeIterator(i)) => {
+                    freed.contains(&i.root) || freed.contains(&i.reference)
+                }
+                _ => false,
+            };
+            self.ranges.borrow_mut().retain(|h| !refers_to_freed(h));
+            self.iterators.borrow_mut().retain(|h| !refers_to_freed(h));
+        }
         let observers: Vec<Handle> = {
             let mut o = self.observers.borrow_mut();
             o.registered.retain(|n, _| !freed.contains(n));
@@ -2574,21 +2589,39 @@ impl Engine {
         let mut free_realms = Vec::new();
         // (a subtree that keeps a wrapper is walked only up to its first wrapped node)
         let mut nodes = Vec::new();
+        // (whether script or the engine still reaches a discarded browsing context's group: asked
+        // once per group and collection)
+        let mut groups_alive: FxHashMap<Handle, bool> = FxHashMap::default();
+        let mut group_alive = |cx: &mut Cx, window: Handle| {
+            *groups_alive.entry(window).or_insert_with(|| {
+                let group = snap.discarded.of_window(window);
+                rt::any_wrapped(cx.scope(), group.iter().copied())
+                    || group.iter().any(|h| snap.pinned_objects.contains(&h.get()))
+            })
+        };
         while let Some(root) = roots.pop() {
             // A discarded browsing context's document goes with its Window's group, once nothing
             // of it has a wrapper or a pin and no node of the document is outside its tree.
             let realm = match snap.discarded.docs.get(&root) {
                 Some(&window) => {
-                    let group = snap.discarded.of_window(window);
-                    if rt::any_wrapped(cx.scope(), group.iter().copied())
-                        || group.iter().any(|h| snap.pinned_objects.contains(&h.get()))
-                    {
+                    if group_alive(cx, window) {
                         continue;
                     }
-                    Some((window, group))
+                    Some((window, snap.discarded.of_window(window)))
                 }
                 None => None,
             };
+            // A subtree removed from such a document is the group's too: its members' references
+            // into it (a NodeIterator's root, a range's boundary points) do not pin it, so it waits
+            // while the group is reached.
+            if realm.is_none() && !self.dom().is_document(root) {
+                let doc = self.dom().node_document(root);
+                if let Some(&window) = snap.discarded.docs.get(&doc) {
+                    if group_alive(cx, window) {
+                        continue;
+                    }
+                }
+            }
             nodes.clear();
             let unwrapped = rt::with_wrapped(cx.scope(), |wrapped| {
                 self.dom()

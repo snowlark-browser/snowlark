@@ -399,6 +399,7 @@ impl Page {
             blob_url_entry: init.blob_url_entry,
             module: init.module,
             load_failed: false,
+            owner_secure: init.owner_secure,
             held: init.module.map(|_| Vec::new()),
         });
         let mut isolate = v8::Isolate::new(v8::CreateParams::default());

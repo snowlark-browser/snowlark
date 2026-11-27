@@ -1316,23 +1316,27 @@ impl Engine {
         sel
     }
 
+    /// A select's list of options (HTML §4.10.7): its `option` children and those of its
+    /// `optgroup` children, in tree order.
+    fn list_of_options(dom: &Dom, select: NodeId) -> Vec<NodeId> {
+        let mut out = Vec::new();
+        for c in dom.children(select) {
+            if is(dom, c, &local_name!("option")) {
+                out.push(c);
+            } else if is(dom, c, &local_name!("optgroup")) {
+                out.extend(
+                    dom.children(c)
+                        .filter(|&o| is(dom, o, &local_name!("option"))),
+                );
+            }
+        }
+        out
+    }
+
     pub(crate) fn option_selected_in(&self, dom: &Dom, option: NodeId) -> bool {
         match self.select_of(dom, option) {
             Some(select) if is(dom, select, &local_name!("select")) => {
-                let options = {
-                    let mut out = Vec::new();
-                    for c in dom.children(select) {
-                        if is(dom, c, &local_name!("option")) {
-                            out.push(c);
-                        } else if is(dom, c, &local_name!("optgroup")) {
-                            out.extend(
-                                dom.children(c)
-                                    .filter(|&o| is(dom, o, &local_name!("option"))),
-                            );
-                        }
-                    }
-                    out
-                };
+                let options = Self::list_of_options(dom, select);
                 let sel = self.select_selection(dom, select, &options);
                 options
                     .iter()
@@ -1340,6 +1344,43 @@ impl Engine {
                     .is_some_and(|i| sel[i])
             }
             _ => self.raw_selected(dom, option),
+        }
+    }
+
+    /// A select's list of options and each one's selectedness after the selectedness setting
+    /// algorithm, computed once for all of them.
+    pub(crate) fn select_selectedness(
+        &self,
+        dom: &Dom,
+        select: NodeId,
+    ) -> (Vec<NodeId>, Vec<bool>) {
+        let options = Self::list_of_options(dom, select);
+        let sel = self.select_selection(dom, select, &options);
+        (options, sel)
+    }
+
+    /// The `select` element whose list of options `el` is in, if `el` is an option.
+    pub(crate) fn select_of_option(&self, el: NodeId) -> Option<NodeId> {
+        let dom = self.dom();
+        if !dom.is_alive(el) || !is(&dom, el, &local_name!("option")) {
+            return None;
+        }
+        self.select_of(&dom, el)
+            .filter(|&s| is(&dom, s, &local_name!("select")))
+    }
+
+    /// [`Engine::sync_checked_state`] for every option of `select`, whose selectedness is computed
+    /// once for all of them (each option's depends on the others').
+    pub(crate) fn sync_select_checked_states(&self, select: NodeId) {
+        let (options, sel) = {
+            let dom = self.dom();
+            if !dom.is_alive(select) {
+                return;
+            }
+            self.select_selectedness(&dom, select)
+        };
+        for (o, on) in options.into_iter().zip(sel) {
+            self.set_element_state(o, ElementState::CHECKED, on);
         }
     }
 
@@ -1826,9 +1867,7 @@ impl Engine {
                 for o in self.options_of(c) {
                     self.ctl(o, |s| s.selected = None);
                 }
-                for o in self.options_of(c) {
-                    self.sync_checked_state(o);
-                }
+                self.sync_select_checked_states(c);
             }
             self.sync_checked_state(c);
             if self.dom().is_html_element_named(c, &local_name!("output")) {
@@ -2240,9 +2279,18 @@ impl Engine {
                 }
             }
         }
+        // (the selects whose options' `:checked` was brought up to date, all at once)
+        let mut selects_synced: rustc_hash::FxHashSet<NodeId> = Default::default();
         for c in controls {
             // (`:checked` and `:indeterminate` as checkedness and selectedness have them)
-            self.sync_checked_state(c);
+            match self.select_of_option(c) {
+                Some(select) => {
+                    if selects_synced.insert(select) {
+                        self.sync_select_checked_states(select);
+                    }
+                }
+                None => self.sync_checked_state(c),
+            }
             self.form_states_computed
                 .set(self.form_states_computed.get() + 1);
             let Some(state) = self.control_form_state(cx.as_deref_mut(), c) else {

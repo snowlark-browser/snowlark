@@ -84,6 +84,8 @@ pub struct WorkerScope {
     pub module: Option<snowlark_net::CredentialsMode>,
     /// Its main script failed (the parent was told): the thread ends without `Closed`.
     pub load_failed: bool,
+    /// Whether its owner is a secure context, which makes it one (HTML §8.1.3.1).
+    pub owner_secure: bool,
     /// The parent's messages that came before the main script ran: HTML "run a worker" enables
     /// the port message queue only after running it (a module worker's script runs when its graph
     /// has loaded, after the event loop started).
@@ -106,6 +108,8 @@ pub struct WorkerInit {
     pub blob_url_entry: Option<u64>,
     /// A module worker's credentials mode ([`WorkerScope::module`]).
     pub module: Option<snowlark_net::CredentialsMode>,
+    /// Whether the creating global is a secure context ([`WorkerScope::owner_secure`]).
+    pub owner_secure: bool,
     /// The BroadcastChannel registry of the creator's event loop.
     pub broadcast: crate::BroadcastHub,
     /// The IndexedDB backend of the creator's event loop.
@@ -626,10 +630,22 @@ impl WorkerImpl for Engine {
             }
             _ => false,
         };
+        // HTML "secure context": a worker is one when its owner is (the global running `new
+        // Worker()`: a Window, or the worker making a nested one).
+        let worker_owner = self.worker_scope.borrow().as_ref().map(|w| w.owner_secure);
+        let owner_secure = match worker_owner {
+            Some(secure) => secure,
+            None => self.current_window(cx).is_some_and(|w| {
+                snowlark_bindings::generated::WindowOrWorkerGlobalScopeImpl::is_secure_context(
+                    self, w,
+                )
+            }),
+        };
         if blocked {
             let _ = to_parent.send(FromWorker::LoadFailed);
         } else {
             let init = WorkerInit {
+                owner_secure,
                 net: self.hooks.borrow().net.clone(),
                 // `SNOWLARK_CONSOLE=tagged` (headless runs): the worker's messages as tagged lines, with
                 // its realm, since its console has no sink of its own.

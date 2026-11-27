@@ -12521,8 +12521,8 @@ pub fn install<D: Dom>(
 }
 
 /// Removes from the current context's global the `[SecureContext]` interface objects exposed in `kind`
-/// and the `[SecureContext]` members of its global interface (Web IDL §3.3.20): for a realm that is not a
-/// secure context. Members of other interfaces' prototypes stay.
+/// and the `[SecureContext]` members of its global interface and of the other interfaces and namespaces
+/// exposed there (Web IDL §3.3.20): for a realm that is not a secure context.
 pub fn hide_secure_context(scope: &mut v8::PinScope<'_, '_>, kind: GlobalKind) {
     let global = scope.get_current_context().global(scope);
     let interfaces: &[(&str, &[&str])] = &[
@@ -12585,6 +12585,100 @@ pub fn hide_secure_context(scope: &mut v8::PinScope<'_, '_>, kind: GlobalKind) {
             at = object
                 .get_prototype(scope)
                 .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok());
+        }
+    }
+    // (interface, exposure, members of its prototype, members of its interface or namespace object)
+    type Members = (
+        &'static str,
+        &'static [&'static str],
+        &'static [&'static str],
+        &'static [&'static str],
+    );
+    let others: &[Members] = &[
+        (
+            "Crypto",
+            &["Window", "Worker"],
+            &["randomUUID", "subtle"],
+            &[],
+        ),
+        ("PointerEvent", &["Window"], &["getCoalescedEvents"], &[]),
+        ("Document", &["Window"], &["onpointerrawupdate"], &[]),
+        ("HTMLElement", &["Window"], &["onpointerrawupdate"], &[]),
+        ("HTMLIFrameElement", &["Window"], &["privateToken"], &[]),
+        (
+            "HTMLMediaElement",
+            &["Window"],
+            &["mediaKeys", "setMediaKeys", "setSinkId", "sinkId"],
+            &[],
+        ),
+        ("SVGElement", &["Window"], &["onpointerrawupdate"], &[]),
+        (
+            "Navigator",
+            &["Window"],
+            &[
+                "canShare",
+                "clearAppBadge",
+                "clipboard",
+                "cpuPerformance",
+                "credentials",
+                "deviceMemory",
+                "getBattery",
+                "getInstalledRelatedApps",
+                "install",
+                "mediaDevices",
+                "queryHandwritingRecognizer",
+                "registerProtocolHandler",
+                "requestMediaKeySystemAccess",
+                "setAppBadge",
+                "share",
+                "storage",
+                "unregisterProtocolHandler",
+                "userAgentData",
+            ],
+            &[],
+        ),
+        ("Screen", &["Window"], &["isExtended", "onchange"], &[]),
+        (
+            "WorkerNavigator",
+            &["Worker"],
+            &[
+                "clearAppBadge",
+                "deviceMemory",
+                "setAppBadge",
+                "storage",
+                "userAgentData",
+            ],
+            &[],
+        ),
+    ];
+    for (name, exposure, on_proto, on_object) in others {
+        if !kind.exposes(exposure) {
+            continue;
+        }
+        let key = rt::name(scope, name);
+        let Some(object) = global
+            .get(scope, key.into())
+            .and_then(|v| v8::Local::<v8::Object>::try_from(v).ok())
+        else {
+            continue;
+        };
+        for member in *on_object {
+            let key = rt::name(scope, member);
+            object.delete(scope, key.into());
+        }
+        if on_proto.is_empty() {
+            continue;
+        }
+        let key = rt::name(scope, "prototype");
+        let Some(proto) = object
+            .get(scope, key.into())
+            .and_then(|v| v8::Local::<v8::Object>::try_from(v).ok())
+        else {
+            continue;
+        };
+        for member in *on_proto {
+            let key = rt::name(scope, member);
+            proto.delete(scope, key.into());
         }
     }
 }

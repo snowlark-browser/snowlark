@@ -51,6 +51,29 @@ fn colors(page: &mut Page) -> String {
     )
 }
 
+/// A select's options' `:checked` comes from one run of the selectedness setting algorithm (HTML
+/// §4.10.7) for all of them: 40,000 blank options made by the `length` setter (HTML
+/// `HTMLOptionsCollection`, up to 100,000) are styled in well under a second, not once per option
+/// over every option (about 12 s before).
+#[test]
+fn a_select_of_many_options_is_styled_in_linear_time() {
+    let mut page = rendered(
+        "<style>option:checked { color: green }</style><select id=s><option>a<option>b</select>",
+    );
+    let started = std::time::Instant::now();
+    assert_eq!(
+        eval(
+            &mut page,
+            "s.options.length = 40000; s.options[39999].selected = true; document.body.offsetTop;\
+             [s.options.length, getComputedStyle(s.options[39999]).color,\
+              getComputedStyle(s.options[0]).color].join()"
+        ),
+        "40000,rgb(0, 128, 0),rgb(0, 0, 0)"
+    );
+    let took = started.elapsed();
+    assert!(took < Duration::from_secs(3), "{took:?}");
+}
+
 /// A required field's validity, its form's and fieldset's, and a number field's range follow
 /// value, attribute and tree changes, for style (through `:has()`) and for `matches()`.
 #[test]

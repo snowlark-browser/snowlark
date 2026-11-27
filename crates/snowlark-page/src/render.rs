@@ -1523,15 +1523,20 @@ impl Engine {
         // shows its state there)
         let mut waiting: Vec<NodeId> = Vec::new();
         let mut seen = rustc_hash::FxHashSet::default();
+        let mut selects_synced = rustc_hash::FxHashSet::default();
         for el in els {
             // (`:checked` follows checkedness and selectedness; an option's depends on its select's
-            // other options)
+            // other options, so a select's options are brought up to date together, once)
             if self
                 .dom()
                 .is_html_element_named(el, &snowlark_dom::local_name!("select"))
             {
-                for o in self.options_of(el) {
-                    self.sync_checked_state(o);
+                if selects_synced.insert(el) {
+                    self.sync_select_checked_states(el);
+                }
+            } else if let Some(select) = self.select_of_option(el) {
+                if selects_synced.insert(select) {
+                    self.sync_select_checked_states(select);
                 }
             } else {
                 self.sync_checked_state(el);
@@ -1592,12 +1597,16 @@ impl Engine {
         if select {
             let options = self.options_of(el);
             let dom = self.dom();
-            state.selected = Some(
+            // (the selectedness setting algorithm once for the select, not once per option)
+            let (list, selected) = self.select_selectedness(&dom, el);
+            state.selected = Some(if list == options {
+                selected
+            } else {
                 options
                     .iter()
                     .map(|&o| self.option_selected_in(&dom, o))
-                    .collect(),
-            );
+                    .collect()
+            });
             return Some(state);
         }
         if !input && !textarea {

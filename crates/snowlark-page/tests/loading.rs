@@ -1601,6 +1601,45 @@ fn a_frames_dynamic_import_evaluates_in_the_frame() {
     assert_eq!(got, ["frame:frame:frame:string", "top:top"]);
 }
 
+/// ECMA-262 ContinueDynamicImport evaluates the imported module in a reaction to its load, never
+/// inside the `import()` call: a module that imports itself while it evaluates (the module map has
+/// it, so its graph is loaded at once) is evaluated once, and its `import()`s resolve with its
+/// namespace after its body has run (test262 `dynamic-import/eval-self-once-*`, which aborted the
+/// process).
+#[test]
+fn a_module_importing_itself_while_it_evaluates_runs_once() {
+    let server = Server::start(vec![
+        (
+            "/",
+            resource(
+                "text/html",
+                "<!doctype html><script>window.r = []; import('/self.js').then(m => r.push('top:' + m.n));</script>",
+            ),
+        ),
+        (
+            "/self.js",
+            resource(
+                "text/javascript",
+                "window.evaluated = (window.evaluated || 0) + 1; export let n = 0;\
+                 import('/self.js').then(m => r.push('inner:' + m.n + ':' + evaluated)); n = 1;",
+            ),
+        ),
+    ]);
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = page(&net);
+    load(&mut page, server.url("/"));
+    let start = std::time::Instant::now();
+    while start.elapsed() < Duration::from_millis(500) {
+        page.run_for(Duration::from_millis(10));
+    }
+    // (the outer import's evaluation promise settles first: the inner import's link-and-evaluate
+    // job is queued while the body runs, its own promise reaction only once that job ran)
+    assert_eq!(
+        eval(&mut page, "r.join() + ';' + evaluated"),
+        "top:1,inner:1:1;1"
+    );
+}
+
 /// HTML §7.4.2.3.3 "navigate to a `javascript:` URL": the URL's script runs in the target's
 /// document; a string result becomes a new HTML document there (with the active document's URL,
 /// and the frame's `load` event), anything else leaves the document as it is.

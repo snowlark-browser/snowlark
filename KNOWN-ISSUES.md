@@ -140,7 +140,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## DOM and HTML
 
-- **Two web-platform tests stop the page.** `acid3/numbered-tests.html` panics on a node used after its tree was freed, and a test that sets an `HTMLOptionsCollection`'s `length` to a huge value does not return in time. (ref 749)
 - **Selection across shadow trees.** A selection cannot keep its two ends in different trees, so dragging across a
   shadow boundary and `getComposedRanges()` crossing ranges do not work as in other browsers. (ref 62)
 - **Google's sign-in button.** The "Continue with Google" button that Google's sign-in script builds can stay empty
@@ -152,10 +151,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   interception. The Cache API (`caches`) works in windows and dedicated workers, but its storage is per origin (not
   partitioned by the top-level site), it does not count towards `navigator.storage.estimate()`, and a cache name with
   an unpaired surrogate is stored with U+FFFD. (ref 770)
-- **Secure contexts.** On plain HTTP pages, secure-context-only members of objects other than the global (such as
-  `navigator.credentials`, `navigator.storage`, `navigator.clipboard` and `crypto.subtle`) still exist, and a secure frame inside an insecure
-  page reports `isSecureContext` as true. (ref 771)
-- **A dynamic `import()` of the module that is evaluating crashes the process.** Fifteen ECMAScript test suite files under `dynamic-import` end in a V8 fatal error ("Module in unexpected status Evaluating"). (ref 748)
 - **Cross-origin objects.** `[[SetPrototypeOf]]` and `[[PreventExtensions]]` on a cross-origin object throw a
   `SecurityError` instead of returning false. A receiver that is not the object itself is not detected for
   `CrossOriginGet`/`Set`. Same-origin `Location` is an ordinary object (it lacks the specified default properties),

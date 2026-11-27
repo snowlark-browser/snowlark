@@ -2555,9 +2555,34 @@ impl WindowOrWorkerGlobalScopeImpl for Engine {
             _ => DomStr::Borrowed("null"),
         }
     }
+    /// HTML §8.1.3.1 "secure context": the environment's top-level origin is potentially trustworthy.
+    /// A frame's is its top-level document's (so an `https:` frame of an `http:` page is not one,
+    /// and a `data:` or `about:blank` frame is one only in a page that is); an `about:blank` or
+    /// `javascript:` popup's is its creator's. An opaque top-level origin (a `file:` page, a sandboxed
+    /// one, an `about:blank` nothing created) goes by the top-level creation URL instead, as the
+    /// definition did before it took the origin. A dedicated worker is one when its owner is.
     fn is_secure_context(&self, this: Handle) -> bool {
-        self.window_url(this)
-            .is_some_and(|u| snowlark_net::origin::is_url_potentially_trustworthy(&u))
+        // (a worker's is its owner's)
+        if let Some(w) = self.worker_scope.borrow().as_ref() {
+            return w.owner_secure;
+        }
+        let Some(doc) = self
+            .document_of_window(this)
+            .filter(|&d| self.dom().is_alive(d))
+        else {
+            return false;
+        };
+        let top = self.top_level_document(doc);
+        if !self.dom().is_alive(top) {
+            return false;
+        }
+        match self.net_origin_of_document(top) {
+            url::Origin::Opaque(_) => {
+                let url = self.parsed_document_url(&self.dom(), top);
+                url.is_some_and(|u| snowlark_net::origin::is_url_potentially_trustworthy(&u))
+            }
+            origin => snowlark_net::origin::is_origin_potentially_trustworthy(&origin),
+        }
     }
     fn cross_origin_isolated(&self, _this: Handle) -> bool {
         false

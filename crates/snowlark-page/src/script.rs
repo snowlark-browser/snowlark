@@ -89,6 +89,14 @@ pub struct ModuleMap {
     pub running_classic: u32,
     /// Each Window's import map and resolved module set (HTML §8.1.5.3), by module map id.
     pub imports: rustc_hash::FxHashMap<u64, crate::import_map::GlobalImports>,
+    /// `import()`s whose graph has loaded, in order, waiting for their microtask to link and
+    /// evaluate the module ([`Engine::continue_dynamic_import`]), with the document whose realm
+    /// loaded it.
+    pub imports_loaded: std::collections::VecDeque<(
+        Option<NodeId>,
+        v8::Global<v8::Module>,
+        v8::Global<v8::PromiseResolver>,
+    )>,
 }
 
 /// HTML "script fetch options" as the module fetches use them (CSP and SRI).
@@ -1512,20 +1520,57 @@ impl Engine {
                 // completes in; that realm links and evaluates it. (A worker has one realm: map 0.)
                 let doc = snowlark_dom::NodeId::from_bits(split_module_key(&root).0);
                 match doc.filter(|&d| self.context_of_document(d).is_some()) {
-                    Some(d) => {
-                        self.in_document_realm(cx, d, |cx| self.module_graph_done(cx, done, result))
-                    }
-                    None => self.module_graph_done(cx, done, result),
+                    Some(d) => self.in_document_realm(cx, d, |cx| {
+                        self.module_graph_done_in(cx, done, result, Some(d))
+                    }),
+                    None => self.module_graph_done_in(cx, done, result, None),
                 }
             }
         }
     }
 
+    /// ECMA-262 ContinueDynamicImport's reaction to the load: links and evaluates the oldest
+    /// loaded `import()`'s module, in the realm that loaded it.
+    pub(crate) fn continue_dynamic_import(&self, cx: &mut Cx) {
+        let Some((doc, module, resolver)) = self.modules.borrow_mut().imports_loaded.pop_front()
+        else {
+            return;
+        };
+        match doc.filter(|&d| self.context_of_document(d).is_some()) {
+            Some(d) => {
+                self.in_document_realm(cx, d, |cx| self.run_module(cx, &module, Some(resolver)))
+            }
+            // (a realm a navigation replaced since: its import never settles, as its other tasks)
+            None if doc.is_some() => {}
+            None => self.run_module(cx, &module, Some(resolver)),
+        }
+    }
+
     fn module_graph_done(&self, cx: &mut Cx, done: GraphDone, result: GraphResult) {
+        self.module_graph_done_in(cx, done, result, None)
+    }
+
+    fn module_graph_done_in(
+        &self,
+        cx: &mut Cx,
+        done: GraphDone,
+        result: GraphResult,
+        doc: Option<NodeId>,
+    ) {
         match done {
             GraphDone::Element(el) => self.module_script_ready(cx, el, result),
             GraphDone::Import(resolver) => match result {
-                GraphResult::Module(m) => self.run_module(cx, &m, Some(resolver)),
+                // ECMA-262 ContinueDynamicImport links and evaluates the module in a reaction to
+                // its load promise, a microtask: never inside the `import()` call itself, where a
+                // module importing itself would still be evaluating (its graph loads at once when
+                // the module map has it).
+                GraphResult::Module(m) => {
+                    self.modules
+                        .borrow_mut()
+                        .imports_loaded
+                        .push_back((doc, m, resolver));
+                    self.queue_continue_dynamic_import(cx);
+                }
                 GraphResult::Error(e) => {
                     let scope = cx.scope();
                     let r = v8::Local::new(scope, &resolver);
