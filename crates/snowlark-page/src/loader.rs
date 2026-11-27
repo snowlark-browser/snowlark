@@ -1286,7 +1286,11 @@ impl Engine {
                         {
                             Some(JobEvent::Violation(v))
                         }
-                        Some(FetchEvent::Violation(_)) => Some(JobEvent::Nothing),
+                        // (the request's observer queued it for `report_network_violations`
+                        // before the stream had it: report it now, before the events behind it,
+                        // so a blocked redirect's violation event is queued ahead of its element's
+                        // `error` event; CSP 3 §5.5 queues it when the check fails)
+                        Some(FetchEvent::Violation(_)) => Some(JobEvent::NetworkViolations),
                         Some(FetchEvent::Head(h)) => {
                             job.head = Some(h);
                             Some(JobEvent::Head)
@@ -1325,6 +1329,10 @@ impl Engine {
                 Some(JobEvent::Violation(v)) => {
                     progressed = true;
                     self.console_print("error", &v.console_message());
+                }
+                Some(JobEvent::NetworkViolations) => {
+                    progressed = true;
+                    self.report_network_violations(cx);
                 }
                 Some(JobEvent::Head) => {
                     progressed = true;
@@ -3537,6 +3545,8 @@ enum JobEvent {
     Nothing,
     /// A frame-ancestors violation the network layer found (its console message).
     Violation(snowlark_net::csp::Violation),
+    /// Another violation of the job's request: the ones queued for the document are reported.
+    NetworkViolations,
     /// The script's code cache entry was read (`None`: there was none to read).
     CacheEntry(Option<Entry>),
     Head,

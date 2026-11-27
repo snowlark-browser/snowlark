@@ -6,8 +6,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## Layout
 
-- A box whose used height is zero but whose `height` is not `auto` (`height: 1px; max-height: 0`) keeps its top and
-  bottom margins apart instead of letting them collapse through it. (ref 903)
 - **Flexbox gaps.** A column flex item with an explicit height and `min-height: auto` does not shrink to its automatic
   minimum when the items overflow, and a single-line `flex-wrap: wrap-reverse` container puts its line at the wrong
   cross edge. `flex-wrap: balance` and `flex-line-count` are not implemented. Both layout bugs are in the vendored
@@ -152,6 +150,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## Scripting and bindings
 
+- A `File` made without a `lastModified` (as `FormData` makes from a `Blob`) can carry a time a millisecond after
+  what `Date.now()` returns right after it. (ref 920)
 - A `fetch()` or XMLHttpRequest whose header value holds a control byte (other than tab) fails instead of sending it.
   (ref 902)
 - **Service workers.** `navigator.serviceWorker` is missing: no registration, no worker that controls pages, no fetch

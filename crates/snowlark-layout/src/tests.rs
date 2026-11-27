@@ -331,6 +331,49 @@ fn empty_blocks_collapse_through() {
 }
 
 #[test]
+fn empty_blocks_of_zero_used_height_collapse_through() {
+    // csswg-drafts issue 8919: the used height decides, not the computed `height`.
+    let empty = |set: fn(&mut TestStyle)| {
+        let mut t = T::new();
+        let r0 = t.root();
+        t.doc.block(r0, |s| s.height = SizeValue::px(10.0));
+        let e = t.doc.block(r0, |s| {
+            s.margin[0] = LengthPercentageAuto::px(50.0);
+            s.margin[2] = LengthPercentageAuto::px(50.0);
+            set(s);
+        });
+        let c = t.doc.block(r0, |s| s.height = SizeValue::px(10.0));
+        let f = t.run(100.0, 300.0);
+        (rect(&f, e).height, rect(&f, c).y)
+    };
+    // `height: 0px`, `height: 1px; max-height: 0px` and `max-height: stretch` filling nothing but
+    // the margins are all 0px tall: one 50px margin between the neighbours.
+    assert_eq!(empty(|s| s.height = SizeValue::px(0.0)), (0.0, 60.0));
+    assert_eq!(
+        empty(|s| {
+            s.height = SizeValue::px(1.0);
+            s.max_height = MaxSizeValue::px(0.0);
+        }),
+        (0.0, 60.0)
+    );
+    // A box that keeps its height keeps both margins.
+    assert_eq!(empty(|s| s.height = SizeValue::px(1.0)), (1.0, 111.0));
+
+    // CSS 2 §8.3.1: a `min-height` box's empty child collapses with the box's top margin, and so not
+    // with its bottom margin (WPT css/CSS2/margin-padding-clear/margin-collapse-min-height-001).
+    let mut t = T::new();
+    let r0 = t.root();
+    t.doc.block(r0, |s| s.height = SizeValue::px(10.0));
+    let parent = t.doc.block(r0, |s| s.min_height = SizeValue::px(20.0));
+    t.doc
+        .block(parent, |s| s.margin[2] = LengthPercentageAuto::px(50.0));
+    let c = t.doc.block(r0, |s| s.height = SizeValue::px(10.0));
+    let f = t.run(100.0, 300.0);
+    assert_eq!(rect(&f, parent), r(0.0, 60.0, 100.0, 20.0));
+    assert_eq!(rect(&f, c).y, 80.0);
+}
+
+#[test]
 fn auto_margins_center_and_min_max_width() {
     let mut t = T::new();
     let r0 = t.root();

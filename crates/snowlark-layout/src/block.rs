@@ -561,10 +561,16 @@ pub(crate) fn layout_block_container_box<S: Style>(
         && padding.bottom == 0.0
         && height_auto
         && sizes.min_height.is_none_or(|m| m <= edges.pb_v());
+    // A box with no in-flow content whose top and bottom margins adjoin collapses through when its
+    // used height is zero, whatever `height`, `min-height` and `max-height` compute to
+    // (csswg-drafts issue 8919; CSS 2 §8.3.1 names zero or `auto` heights): `through` is undone
+    // below once the used height is known to be more.
+    let collapse_through = collapse_top && border.bottom == 0.0 && padding.bottom == 0.0;
 
     let mut start = Strut::of(edges.mt());
     let mut end = Strut::of(edges.mb());
     let mut through = false;
+    let mut through_bottom: Option<Strut> = None;
 
     // The in-flow content's bounds (CSS Overflow 3 §2.2), in the border box's coordinates.
     let mut inflow: Option<Rect> = None;
@@ -603,7 +609,7 @@ pub(crate) fn layout_block_container_box<S: Style>(
         if !out.has_content {
             // Only phantom lines: the box may be empty for margin collapsing.
             h = 0.0;
-            if collapse_top && collapse_bottom && sizes.min_height.is_none_or(|m| m <= 0.0) {
+            if collapse_through {
                 through = true;
             }
         }
@@ -650,9 +656,11 @@ pub(crate) fn layout_block_container_box<S: Style>(
             start = start.join(r.top_strut);
         }
         if r.empty {
-            if collapse_top && collapse_bottom && sizes.min_height.is_none_or(|m| m <= 0.0) {
+            if collapse_through {
                 through = true;
-                end = end.join(r.bottom_strut);
+                // (the children's margins join the box's bottom margin only if the box collapses
+                // through after all, or its own bottom collapses with them: below)
+                through_bottom = Some(r.bottom_strut);
             }
         } else if collapse_bottom {
             end = end.join(r.bottom_strut);
@@ -821,6 +829,13 @@ pub(crate) fn layout_block_container_box<S: Style>(
     }
     if through && used_height > 0.0 {
         through = false;
+    }
+    // A box that does not collapse through keeps its empty children's margins inside unless its
+    // bottom margin collapses with theirs (`height: auto`, no `min-height`: CSS 2 §8.3.1).
+    if let Some(s) = through_bottom {
+        if through || (collapse_bottom && sizes.min_height.is_none_or(|m| m <= 0.0)) {
+            end = end.join(s);
+        }
     }
 
     // Floats placed in our parent's BFC by our subtree, relative to our border box.

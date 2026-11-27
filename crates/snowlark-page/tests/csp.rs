@@ -476,6 +476,38 @@ fn a_redirect_is_checked_again() {
 }
 
 #[test]
+fn a_blocked_redirects_violation_is_queued_before_the_scripts_error_event() {
+    // CSP 3 §5.5 queues the violation's event when the redirect's check fails, before the fetch
+    // returns its network error to the script element: a task the `error` handler queues runs after
+    // it (as WPT's content-security-policy/gen tests check).
+    let server = Server::start(vec![
+        (
+            "/",
+            with_csp(
+                html(&format!(
+                    "{RECORD}<script nonce=rec>window.order = [];\
+                     for (let i = 0; i < 8; i++) {{ const s = document.createElement('script');\
+                     s.src = '/go.js?' + i;\
+                     s.onerror = () => setTimeout(() => order.push(v.some(x => x.b.endsWith('/go.js?' + i)) ? 'after' : 'before'));\
+                     document.head.append(s); }}</script>"
+                )),
+                "script-src 'self' 'nonce-rec'",
+            ),
+        ),
+        ("/go.js", redirect("http://localhost:2/elsewhere.js")),
+    ]);
+    let net = net();
+    let mut page = page(&net, false);
+    load(&mut page, server.url("/"));
+    assert_eq!(eval(&mut page, "String(v.length)"), "8");
+    assert_eq!(
+        eval(&mut page, "order.join()"),
+        ["after"; 8].join(","),
+        "a task queued at each error event runs after its violation's event"
+    );
+}
+
+#[test]
 fn connect_src_blocks_fetch_xhr_and_beacons() {
     let server = Server::start(vec![
         (
