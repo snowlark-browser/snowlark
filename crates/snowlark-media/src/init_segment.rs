@@ -440,7 +440,7 @@ const DISPLAY_WIDTH: u32 = 0x54B0;
 const DISPLAY_HEIGHT: u32 = 0x54BA;
 
 /// An element ID (its length marker kept, as the IDs are written).
-fn read_id(b: &[u8]) -> Option<(u32, usize)> {
+pub(crate) fn read_id(b: &[u8]) -> Option<(u32, usize)> {
     let first = *b.first()?;
     let len = first.leading_zeros() as usize + 1;
     if len > 4 || b.len() < len {
@@ -450,7 +450,7 @@ fn read_id(b: &[u8]) -> Option<(u32, usize)> {
 }
 
 /// An element size; `None` inside for "unknown" (all value bits set).
-fn read_size(b: &[u8]) -> Option<(Option<u64>, usize)> {
+pub(crate) fn read_size(b: &[u8]) -> Option<(Option<u64>, usize)> {
     let first = *b.first()?;
     let len = first.leading_zeros() as usize + 1;
     if len > 8 || b.len() < len {
@@ -466,7 +466,7 @@ fn read_size(b: &[u8]) -> Option<(Option<u64>, usize)> {
 }
 
 /// The child elements of a master element's body, as (id, body).
-fn elements(mut data: &[u8]) -> impl Iterator<Item = (u32, &[u8])> {
+pub(crate) fn elements(mut data: &[u8]) -> impl Iterator<Item = (u32, &[u8])> {
     std::iter::from_fn(move || {
         let (id, il) = read_id(data)?;
         let (size, sl) = read_size(&data[il..])?;
@@ -477,7 +477,7 @@ fn elements(mut data: &[u8]) -> impl Iterator<Item = (u32, &[u8])> {
     })
 }
 
-fn uint(b: &[u8]) -> u64 {
+pub(crate) fn uint(b: &[u8]) -> u64 {
     b.iter().take(8).fold(0, |v, &x| (v << 8) | x as u64)
 }
 

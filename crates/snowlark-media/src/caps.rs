@@ -445,7 +445,7 @@ pub fn parse_type(type_: &str) -> Option<ParsedType> {
 /// The MIME types of the MSE byte stream formats (the MSE Byte Stream Format Registry: ISO BMFF,
 /// WebM, MPEG audio).
 /// The byte stream formats this system's MSE parses: every one of `MSE_TYPES` with Media
-/// Foundation on Windows; on Linux the ISO BMFF one so far (`linux::mse`).
+/// Foundation on Windows; on Linux the ISO BMFF and WebM ones so far (`linux::mse`).
 #[cfg(windows)]
 const MSE_PARSERS: &[Container] = &[
     Container::Mp4,
@@ -454,7 +454,7 @@ const MSE_PARSERS: &[Container] = &[
     Container::Adts,
 ];
 #[cfg(not(windows))]
-const MSE_PARSERS: &[Container] = &[Container::Mp4];
+const MSE_PARSERS: &[Container] = &[Container::Mp4, Container::WebM];
 
 const MSE_TYPES: [&str; 6] = [
     "video/mp4",
@@ -701,8 +701,7 @@ mod tests {
     fn mse_types() {
         let s = Support::everything();
         assert!(s.mse_supports("video/mp4; codecs=\"avc1.4d401f\""));
-        // (Linux's MSE parses ISO BMFF only so far)
-        assert_eq!(s.mse_supports("video/webm; codecs=\"vp9\""), cfg!(windows));
+        assert!(s.mse_supports("video/webm; codecs=\"vp9\""));
         assert!(s.mse_supports("video/mp4"));
         assert!(!s.mse_supports("video/ogg; codecs=\"theora\""));
         assert!(!s.mse_supports("audio/wav"));
@@ -897,10 +896,10 @@ mod tests {
             "audio/mpeg",
             "audio/aac",
         ] {
-            // (Linux's MSE parses ISO BMFF only so far)
+            // (Linux's MSE parses ISO BMFF and WebM so far)
             assert_eq!(
                 s.mse_supports(t),
-                cfg!(windows) || t.contains("/mp4"),
+                cfg!(windows) || t.contains("/mp4") || t.contains("/webm"),
                 "{t}"
             );
         }

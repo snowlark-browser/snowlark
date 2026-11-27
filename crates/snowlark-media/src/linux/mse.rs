@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! Media Source Extensions' media side on Linux: each `SourceBuffer`'s byte stream is parsed into
-//! coded frames ([`crate::fmp4::SampleReader`], the ISO BMFF byte stream format), which the coded
+//! coded frames ([`crate::fmp4::SampleReader`] for the ISO BMFF byte stream format,
+//! [`super::webm::WebmReader`] for the WebM one), which the coded
 //! frame processing algorithm (MSE §3.5.8) places in one track buffer per track by decode time,
 //! under the buffer's timestamp offset, append window and mode. The track buffers answer
 //! `buffered`, lose frames to `remove()` (§3.5.9, "coded frame removal") and to eviction when they
@@ -21,6 +22,7 @@
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::Duration;
 
+use super::webm::WebmReader;
 use crate::fmp4::{Codec, Output, SampleReader, Track};
 use crate::init_segment::Container;
 use crate::mse::{AddError, MseEvent};
@@ -67,9 +69,82 @@ fn sample_entry_codec(c: &Codec) -> Option<crate::caps::Codec> {
             b"alac" => C::Alac,
             b"ac-3" => C::Ac3,
             b"ec-3" => C::Eac3,
+            // (WebM's `A_VORBIS`, as [`WebmReader`] names it)
+            b"vorb" => C::Vorbis,
             _ => return None,
         },
     })
+}
+
+/// A buffer's byte stream parser: ISO BMFF or WebM.
+enum Parser {
+    Mp4(SampleReader),
+    WebM(WebmReader),
+}
+
+impl Parser {
+    fn new(format: Container) -> Parser {
+        match format {
+            Container::WebM => Parser::WebM(WebmReader::new()),
+            _ => Parser::Mp4(SampleReader::raw()),
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Parser::Mp4(_) => "an ISO BMFF",
+            Parser::WebM(_) => "a WebM",
+        }
+    }
+
+    /// `changeType()` stays on the page's side: the next initialization segment being of the other
+    /// format (a WebM EBML header, an ISO BMFF `ftyp` or `moov`) at the start of an append switches
+    /// the parser, as a new type's parser takes over the byte stream (MSE §3.2 `changeType`).
+    fn follow_format(&mut self, bytes: &[u8]) {
+        let ebml = bytes.starts_with(&[0x1A, 0x45, 0xDF, 0xA3]);
+        let mp4 = matches!(bytes.get(4..8), Some(b"ftyp") | Some(b"moov"));
+        match self {
+            Parser::Mp4(_) if ebml => *self = Parser::WebM(WebmReader::new()),
+            Parser::WebM(r) if mp4 && r.at_boundary() => *self = Parser::Mp4(SampleReader::raw()),
+            _ => {}
+        }
+    }
+
+    fn push(&mut self, bytes: &[u8]) -> Vec<Output> {
+        match self {
+            Parser::Mp4(r) => r.push(bytes),
+            Parser::WebM(r) => r.push(bytes),
+        }
+    }
+
+    fn segments(&self) -> u64 {
+        match self {
+            Parser::Mp4(r) => r.segments(),
+            Parser::WebM(r) => r.segments(),
+        }
+    }
+
+    fn failed(&self) -> bool {
+        match self {
+            Parser::Mp4(r) => r.failed(),
+            Parser::WebM(r) => r.failed(),
+        }
+    }
+
+    fn reset(&mut self) {
+        match self {
+            Parser::Mp4(r) => r.reset(),
+            Parser::WebM(r) => r.reset(),
+        }
+    }
+
+    /// The last initialization segment, as FFmpeg's demuxer opens it.
+    fn init(&self) -> &[u8] {
+        match self {
+            Parser::Mp4(r) => r.moov(),
+            Parser::WebM(r) => r.init(),
+        }
+    }
 }
 
 /// One coded frame of a track buffer.
@@ -184,9 +259,9 @@ impl TrackBuffer {
 /// One `SourceBuffer`'s media side.
 pub(crate) struct Buffer {
     pub id: u32,
-    reader: SampleReader,
-    /// The first initialization segment's `moov` (FFmpeg configures the decoders from it), and
-    /// the tracks it gave.
+    reader: Parser,
+    /// The first initialization segment, as FFmpeg's demuxer opens it to configure the decoders
+    /// (ISO BMFF: its `moov`; WebM: the EBML header, `Info` and `Tracks`), and the tracks it gave.
     pub init: Option<Vec<u8>>,
     pub tracks: Vec<Track>,
     pub track_buffers: Vec<TrackBuffer>,
@@ -198,10 +273,10 @@ pub(crate) struct Buffer {
 }
 
 impl Buffer {
-    fn new(id: u32) -> Buffer {
+    fn new(id: u32, format: Container) -> Buffer {
         Buffer {
             id,
-            reader: SampleReader::raw(),
+            reader: Parser::new(format),
             init: None,
             tracks: Vec::new(),
             track_buffers: Vec::new(),
@@ -244,7 +319,7 @@ impl Buffer {
                 .filter(|t| !is_text(&t.codec))
                 .map(TrackBuffer::new)
                 .collect();
-            self.init = Some(self.reader.moov().to_vec());
+            self.init = Some(self.reader.init().to_vec());
         } else {
             let kinds = |ts: &[Track]| {
                 let v = ts.iter().filter(|t| t.video).count();
@@ -600,9 +675,10 @@ impl MseSource {
 
     /// MSE §3.5.1 `addSourceBuffer` (after the page's checks): a new buffer's id.
     pub fn add_source_buffer(&self, type_: &str) -> Result<u32, AddError> {
-        if Container::of_type(type_) != Some(Container::Mp4) {
-            return Err(AddError::NotSupported);
-        }
+        let format = match Container::of_type(type_) {
+            Some(c @ (Container::Mp4 | Container::WebM)) => c,
+            _ => return Err(AddError::NotSupported),
+        };
         let mut s = self.state();
         if s.ready != Ready::Open {
             return Err(AddError::InvalidState);
@@ -612,7 +688,7 @@ impl MseSource {
         }
         let id = s.next;
         s.next += 1;
-        s.buffers.push(Buffer::new(id));
+        s.buffers.push(Buffer::new(id, format));
         self.changed(&mut s);
         Ok(id)
     }
@@ -640,6 +716,7 @@ impl MseSource {
             return Err("QuotaExceededError".into());
         }
         let mut failed = None;
+        b.reader.follow_format(bytes);
         let segments = b.reader.segments();
         for out in b.reader.push(bytes) {
             match out {
@@ -663,8 +740,8 @@ impl MseSource {
             failed = Some("a media segment before the initialization segment".into());
         }
         if failed.is_none() && b.reader.failed() {
-            // (§3.5.? the segment parser loop: bytes that are not a box of the byte stream)
-            failed = Some("not an ISO BMFF byte stream".into());
+            // (§3.5.? the segment parser loop: bytes that are not of the byte stream format)
+            failed = Some(format!("not {} byte stream", b.reader.name()));
         }
         self.changed(&mut s);
         drop(s);

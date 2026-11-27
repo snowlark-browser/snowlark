@@ -459,12 +459,11 @@ fn media_source_opens_and_appends() {
     );
     // VP9 by profile and depth, from the decoders' and the GPU's decoder profiles: profile 1
     // (4:4:4) has no GPU decoder profile and no decoder here takes it, though Media Foundation's own
-    // MSE check, which brings up a decoder per question, says yes to every VP9 profile. (MSE takes
-    // WebM byte streams on Windows only so far.)
-    if cfg!(windows)
-        && snowlark_media::support()
-            .codecs
-            .contains(&snowlark_media::caps::Codec::Vp9)
+    // MSE check, which brings up a decoder per question, says yes to every VP9 profile. (On Linux,
+    // FFmpeg's decoder takes every profile.)
+    if snowlark_media::support()
+        .codecs
+        .contains(&snowlark_media::caps::Codec::Vp9)
     {
         assert_eq!(
             eval(
@@ -472,7 +471,11 @@ fn media_source_opens_and_appends() {
                 "[MediaSource.isTypeSupported('video/webm; codecs=\"vp09.00.51.08\"'),
                   MediaSource.isTypeSupported('video/webm; codecs=\"vp09.01.51.08\"')].join()"
             ),
-            "true,false"
+            if cfg!(windows) {
+                "true,false"
+            } else {
+                "true,true"
+            }
         );
     }
 }
@@ -1270,7 +1273,9 @@ fn no_cue_is_active_after_the_media_is_unloaded() {
 /// HTML ready states and "reaches the end": a clip too short for the player to report a frame or
 /// playing (two frames) still passes HAVE_CURRENT_DATA and HAVE_FUTURE_DATA before it ends, so its
 /// `play()` promise resolves, and it ends once. Made with its attributes in a disconnected tree
-/// (`innerHTML`), it loads before it is inserted, as setting `src` does.
+/// (`innerHTML`), it loads before it is inserted, as setting `src` does. (Windows: the clip is
+/// written with Media Foundation's encoder.)
+#[cfg(windows)]
 #[test]
 fn a_two_frame_clip_reaches_the_ready_states_and_ends_once() {
     let dir = std::env::temp_dir().join(format!("snowlark-page-media-{}", std::process::id()));

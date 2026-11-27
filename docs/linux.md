@@ -48,8 +48,8 @@ there are not signed). The chrome's icons are Unicode symbols where Windows' ico
 `~/.config/snowlark` (`XDG_CONFIG_HOME`). `<video>` and `<audio>` play through the system's FFmpeg (loaded at run
 time: releases 6.1, 7.1 and 8.0, whichever is installed; what its build decodes is what `canPlayType` says) with
 sound through the desktop's sound server (PulseAudio, or PipeWire's PulseAudio service), and `decodeAudioData` and
-AudioContexts use them too (below), as do Media Source Extensions with ISO BMFF (MP4) byte streams (WebM byte
-streams are not taken yet: `isTypeSupported` says no to them). What is missing behaves as on a system without it:
+AudioContexts use them too (below), as do Media Source Extensions with ISO BMFF (MP4) and WebM byte streams (MPEG
+audio byte streams are not taken yet: `isTypeSupported` says no to them). What is missing behaves as on a system without it:
 canvases draw on the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is
 false and `navigator.plugins` empty); without FFmpeg a media element fails with `MEDIA_ERR_SRC_NOT_SUPPORTED`.
 
@@ -62,10 +62,14 @@ the first video and audio streams decoded in software, pictures to BGRA, sound t
 (`pulse.rs`: PulseAudio's simple API, else a null sink that keeps time). The clock is the wall clock and the sound
 follows it; at a rate other than 1 the sound is silent. `VideoSlot` frames are in memory; a renderer's go to the
 browser through pools of shared memory (`memfd`) passed as descriptors, as Windows' shared textures are.
-`mse.rs` is MSE's media side: each `SourceBuffer`'s appends parsed into coded frames (`fmp4.rs`), placed by the
+`mse.rs` is MSE's media side: each `SourceBuffer`'s appends parsed into coded frames (`fmp4.rs` for ISO BMFF,
+`webm.rs` for WebM: clusters block by block, no lacing, durations from Opus packets, `BlockDuration`,
+`DefaultDuration` or the next block; the next initialization segment of the other format switches the parser, as
+`changeType()` needs), placed by the
 coded frame processing algorithm in one track buffer per track (timestamp offset, append window, sequence mode,
 overlaps), with removal, eviction past a quota and `buffered`. `mse_player.rs` gives the player its decoders from
-each buffer's initialization segment (FFmpeg's demuxer over the `moov`) and reads the track buffers in decode order
+each buffer's initialization segment (FFmpeg's demuxer over the `moov`, or over the EBML header, `Info` and `Tracks`)
+and reads the track buffers in decode order
 from the random access point before a seek's time; with nothing buffered at the position the decoder waits for an
 append (the element is then waiting), and the end comes after `endOfStream()`.
 
@@ -320,7 +324,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | Tiles and the compositor | `gpu.rs` `TileRasterizer`, `compositor.rs` `Compositor` | tiles and the compositor on Skia's CPU backend done (`linux/gpu.rs`, `linux/compositor.rs`); both over Skia's GPU backend (GL or Vulkan) |
 | Window | `snowlark-paint` `window.rs` `Window`, `Event`, `WindowProxy` | started: `linux/window.rs` on Wayland (X11 desktops through XWayland) |
 | Process boundary | `snowlark-ipc`'s `Link`, `Section`, `RemoteHandle`, `launch` | done: the `posix/` half under the same names |
-| Media player | `snowlark-media` `win/` (`Player`, MSE) | started: `linux/` (`player.rs` on the system's FFmpeg, `pulse.rs`, `probe.rs`, `decode.rs`), MSE (`mse.rs`, `mse_player.rs`: MP4 byte streams), frames across processes; WebM byte streams in MSE and hardware decoding to do |
+| Media player | `snowlark-media` `win/` (`Player`, MSE) | started: `linux/` (`player.rs` on the system's FFmpeg, `pulse.rs`, `probe.rs`, `decode.rs`), MSE (`mse.rs`, `mse_player.rs`, `webm.rs`: MP4 and WebM byte streams), frames across processes; MPEG audio byte streams in MSE and hardware decoding to do |
 | ANGLE | `snowlark-gl` `ffi.rs` loads two libraries by name | done: the `.so` names, a surfaceless EGL display |
 | OS services | `os_crypt.rs`, shell `profile.rs`, `downloads_ui.rs` | a function each behind `cfg` |
 

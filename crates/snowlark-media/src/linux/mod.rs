@@ -13,3 +13,4 @@ mod mse_player;
 pub mod player;
 pub mod probe;
 pub mod pulse;
+mod webm;

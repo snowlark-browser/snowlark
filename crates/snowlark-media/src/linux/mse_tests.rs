@@ -230,11 +230,37 @@ fn the_end_of_stream_sets_the_duration_and_an_append_opens_again() {
 }
 
 #[test]
-fn webm_buffers_are_not_supported_yet() {
+fn buffers_take_the_iso_bmff_and_webm_byte_streams_only() {
     let ms = MseSource::new().unwrap();
     ms.open();
+    assert!(ms.add_source_buffer("video/webm; codecs=\"vp9\"").is_ok());
     assert_eq!(
-        ms.add_source_buffer("video/webm; codecs=\"vp9\""),
+        ms.add_source_buffer("audio/mpeg"),
         Err(AddError::NotSupported)
     );
+}
+
+/// `changeType()` to WebM and back: the next initialization segment's format picks the parser.
+#[test]
+fn a_webm_initialization_segment_after_iso_bmff_switches_the_parser() {
+    use crate::linux::webm::tests::{cluster, entry, init_segment, simple};
+    let (ms, id) = source();
+    ms.append(id, &clip()).unwrap();
+    ms.take_events();
+    // (the clip has one video track, as this has)
+    ms.append(id, &init_segment(&[entry(1, 1, "V_VP9", &[])]))
+        .unwrap();
+    ms.append(id, &cluster(10_000, &[simple(1, 0, true, &[1])]))
+        .unwrap();
+    let events = ms.take_events();
+    assert!(!events.contains(&MseEvent::Error(id)), "{events:?}");
+    let s = ms.state();
+    let b = &s.buffers[0];
+    assert!(b
+        .track_buffers
+        .iter()
+        .any(|t| t.frames.iter().any(|f| f.pts == 100_000_000)));
+    drop(s);
+    ms.append(id, &clip()).unwrap();
+    assert!(!ms.take_events().contains(&MseEvent::Error(id)));
 }

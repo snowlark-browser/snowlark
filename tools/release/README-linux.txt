@@ -26,8 +26,8 @@ through the system's OpenGL.
 Settings, history and bookmarks are at snowlark://settings, snowlark://history and
 snowlark://bookmarks. The open source software in Snowlark is listed at snowlark://credits.
 
-Not there yet on Linux: WebM streams through Media Source Extensions (MP4 streams play), dragging
-out of the window, updates. Video and audio play through the system's FFmpeg (6.1, 7.1 or 8.0)
+Not there yet on Linux: MPEG audio streams through Media Source Extensions (MP4 and WebM streams
+play), dragging out of the window, updates. Video and audio play through the system's FFmpeg (6.1, 7.1 or 8.0)
 and sound server; what plays depends on the codecs your distribution's FFmpeg includes. File
 dialogs (Save As, the downloads folder) are the desktop's, through its portal (or zenity or
 kdialog).
