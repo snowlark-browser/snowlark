@@ -23,6 +23,8 @@ serde = { version = "1", features = ["derive"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 snowlark-sandbox = { path = "../snowlark-sandbox" }
+# (WebGL's device, opened before the sandbox locks the renderer down)
+snowlark-gl = { path = "../snowlark-gl" }
 
 [lib]
 doctest = false

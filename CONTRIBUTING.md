@@ -137,7 +137,7 @@ Environment variables, in any mode that runs a page unless noted:
 | `SNOWLARK_PROFILE_DIR` | The profile folder (default `%LOCALAPPDATA%\Snowlark`). |
 | `SNOWLARK_NO_ACTIVATE=1` | The window never takes the foreground. |
 | `SNOWLARK_SCALE=1.5` | Draws the window as on a monitor at that display scale (0.5 to 4). |
-| `SNOWLARK_SANDBOX=1` | Linux: starts renderers sandboxed (namespaces, then a system call filter; `docs/process-isolation.md` §7). Sound and WebGL do not work in them yet. |
+| `SNOWLARK_SANDBOX=0` | Linux: starts renderers without their sandbox (namespaces, then a system call filter; `docs/process-isolation.md` §7), which is on otherwise. |
 | `SNOWLARK_PROCESS_MODEL=single` | Keeps every tab on a thread of the browser's process instead of a renderer process each (also `--process-model=single`). |
 | `SNOWLARK_IPC=loopback` | Puts every tab message through the wire format inside `send`, so the window and `snowlark-shell`'s tests run as if each crossed a process. |
 | `SNOWLARK_PLAYREADY=0` | Stops offering the `com.microsoft.playready.recommendation.3000` key system to pages in the window (offered by default where Windows has it: Windows 10 2004 or later, hardware DRM). The headless modes never offer it. |

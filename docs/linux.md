@@ -58,8 +58,9 @@ Media (`snowlark-media` `linux/`): `ffmpeg.rs` loads `libavformat`, `libavcodec`
 `ffmpeg_layout.rs` lists per release (printed from each release's headers by `tools/ffmpeg/layout.sh`; a new
 release is a new entry there). `player.rs` runs a decoder thread (the container read through the media resource,
 the first video and audio streams decoded in software, pictures to BGRA, sound to 48 kHz stereo), a clock thread
-(pictures shown in the element's `VideoSlot` when due, the element's events and status) and a sound thread
-(`pulse.rs`: PulseAudio's simple API, else a null sink that keeps time). The clock is the wall clock and the sound
+(pictures shown in the element's `VideoSlot` when due, the element's events and status) and a sound thread (to
+the page's output when it has one, which in a renderer is the browser's, through messages; else `pulse.rs`:
+PulseAudio's simple API; else a null sink that keeps time). The clock is the wall clock and the sound
 follows it; at a rate other than 1 the sound is silent. `VideoSlot` frames are in memory; a renderer's go to the
 browser through pools of shared memory (`memfd`) passed as descriptors, as Windows' shared textures are.
 `mse.rs` is MSE's media side: each `SourceBuffer`'s appends parsed into coded frames (`fmp4.rs` for ISO BMFF,
@@ -339,7 +340,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop. Done so far: tiles and the compositor on the CPU, the Wayland window (input, keys, integer scale, CPU pixels, frame callbacks, moves and resizes from its own frame, the clipboard, cursors, several windows), `snowlark-tab` and the browser window (`snowlark-shell`) on Linux |
 | 6 | **WebGL** on ANGLE for Linux | S | done: the WebGL conformance areas as on Windows (WPT `webgl/` 4249 subtests on both) |
 | 7 | **Media**: playback and MSE on FFmpeg, audio output; hardware decoding later | L | `<video>`, `<audio>`, MSE sites play |
-| 8 | **Sandbox**: namespaces and seccomp-bpf for renderers, a font broker | L | a renderer that cannot open a file or a socket. Done so far: `snowlark-sandbox` (user and network namespaces from the launcher, the renderer's seccomp-bpf filter after its warm-up; `docs/process-isolation.md` §7), fonts from files mapped before it; on with `SNOWLARK_SANDBOX=1` until sound and WebGL leave the renderer's own opens |
+| 8 | **Sandbox**: namespaces and seccomp-bpf for renderers, a font broker | L | a renderer that cannot open a file or a socket. Done so far: `snowlark-sandbox` (user and network namespaces from the launcher, the renderer's seccomp-bpf filter after its warm-up; `docs/process-isolation.md` §7), fonts from files mapped before it, media sound played by the browser, WebGL's device opened before it; on by default (`SNOWLARK_SANDBOX=0`: off) |
 | 9 | **OS integration and distribution**: profile folders, the password store's key, PDF, opening downloads, packages and their signing | M | a package a user can install. Done so far: profile folder, opening downloads, the preview `.tar.gz` (`tools/release/package.sh`) |
 
 Stages 2 and 3 need no window; stage 3 builds on the painting backend and the text stack decided below. Stages 4

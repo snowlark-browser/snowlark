@@ -1079,6 +1079,22 @@ fn run(
     }
     // What needs no tab: the text engine (DirectWrite's factory and the system's fonts) and V8.
     let text = Arc::new(TextEngine::new().expect("DirectWrite"));
+    // A sandboxed renderer opens what its lockdown closes off on a helper thread, while it starts
+    // or waits as a spare, and waits for it just before the lockdown: the system's font files, each
+    // mapped once (faces are then made from the mappings), and WebGL's device (ANGLE, the system's
+    // GL driver and the GPU's device node; from 50 ms to over a second), which the process's WebGL
+    // thread then keeps for the page's contexts. Without it, or with SNOWLARK_WEBGL=off, the page
+    // has no WebGL, as on a system without a GPU.
+    #[cfg(target_os = "linux")]
+    let opening = snowlark_ipc::sandboxed().then(|| {
+        let text = text.clone();
+        std::thread::spawn(move || {
+            let started = Instant::now();
+            let _ = text.font_database();
+            let webgl = snowlark_gl::Service::from_env().is_ok();
+            (webgl, started.elapsed())
+        })
+    });
     snowlark_js::init();
     let (id, device, live) = match assign {
         Assign::Now(a) => a,
@@ -1115,8 +1131,21 @@ fn run(
     #[cfg(target_os = "linux")]
     if snowlark_ipc::sandboxed() {
         let _ = snowlark_media::support();
-        // (the system's font files, each mapped once: faces are made from the mappings)
+        // (the time zone, read from files the first time a page needs it)
+        let _ = snowlark_js::settle_time_zone();
+        let waited = Instant::now();
+        let opened = opening.and_then(|h| h.join().ok());
+        // (the font files, should the helper have failed)
         let _ = text.font_database();
+        if std::env::var("SNOWLARK_TRACE").is_ok_and(|v| v == "1") {
+            if let Some((webgl, took)) = opened {
+                eprintln!(
+                    "[tab {id}] fonts and WebGL's device ({}) opened in {took:?}, waited for {:?}",
+                    if webgl { "open" } else { "none" },
+                    waited.elapsed()
+                );
+            }
+        }
         if !snowlark_sandbox::in_namespaces() {
             eprintln!("[tab {id}] no namespaces for the sandbox here: the system call filter only");
         }

@@ -933,6 +933,84 @@ fn a_sandboxed_renderer_runs_its_page() {
     assert_eq!(title, "object true");
 }
 
+/// Faces a sandboxed renderer first needs after its lockdown (bold, italic, another family) come
+/// from the font files it mapped before it: its text engine opens no font file by its path.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_sandboxed_renderer_finds_faces_it_had_not_used() {
+    let (ctx, _net, rx, _comp_rx) = remote_context();
+    let url = Url::parse(
+        "data:text/html,<b id=b>Bold</b> <i id=i>Italic</i> <code id=c>mono</code> \
+         <span id=s style='font: bold italic 20px serif'>Serif</span><script>document.title = \
+         ['b', 'i', 'c', 's'].map(id => document.getElementById(id).getBoundingClientRect().width \
+         > 10).join(' ')</script>",
+    )
+    .unwrap();
+    let mut tab = TabHost::spawn(
+        1,
+        ctx,
+        Default::default(),
+        DEVICE,
+        url,
+        remote(child_launch().sandbox(true)),
+    );
+    let title = next_of(&rx, &mut tab, 1, |e| match e {
+        TabEvent::State(s) if !s.title.is_empty() => Some(s.title),
+        TabEvent::Crashed(why) => Some(format!("crashed: {why:?}")),
+        _ => None,
+    });
+    assert_eq!(title, "true true true true");
+}
+
+/// WebGL in a sandboxed renderer: its device is opened before the lockdown, so a context clears
+/// and reads back as in a renderer without the sandbox (skipped where there is no WebGL at all).
+#[cfg(target_os = "linux")]
+#[test]
+fn a_sandboxed_renderer_has_webgl() {
+    let page = "data:text/html,<script>const gl = document.createElement('canvas').getContext('webgl'); \
+                let r = 'none'; if (gl) { gl.clearColor(1, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); \
+                const p = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p); \
+                r = p.join(); } document.title = 'gl ' + r</script>";
+    let open = renderer_title(page, false);
+    if open == "gl none" {
+        eprintln!("no WebGL here: skipped");
+        return;
+    }
+    assert_eq!(open, "gl 255,0,0,255");
+    assert_eq!(renderer_title(page, true), open);
+}
+
+/// A sandboxed renderer's pages have the system's time zone (`Intl`'s, and `Date`'s offsets), read
+/// before the lockdown, as a renderer without the sandbox has it.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_sandboxed_renderer_has_the_time_zone() {
+    let page = "data:text/html,<script>document.title = [Intl.DateTimeFormat().resolvedOptions().\
+                timeZone, new Date(2026, 0, 1).getTimezoneOffset(), new Date(2026, 6, 1).\
+                getTimezoneOffset()].join(' ')</script>";
+    let open = renderer_title(page, false);
+    assert_eq!(renderer_title(page, true), open);
+}
+
+/// The title a page in a renderer process (sandboxed or not) gives itself.
+#[cfg(target_os = "linux")]
+fn renderer_title(url: &str, sandbox: bool) -> String {
+    let (ctx, _net, rx, _comp_rx) = remote_context();
+    let mut tab = TabHost::spawn(
+        1,
+        ctx,
+        Default::default(),
+        DEVICE,
+        Url::parse(url).unwrap(),
+        remote(child_launch().sandbox(sandbox)),
+    );
+    next_of(&rx, &mut tab, 1, |e| match e {
+        TabEvent::State(s) if !s.title.is_empty() => Some(s.title),
+        TabEvent::Crashed(why) => Some(format!("crashed: {why:?}")),
+        _ => None,
+    })
+}
+
 /// This test binary as a renderer process ([`renderer_child`]).
 fn child_launch() -> snowlark_ipc::Launch {
     snowlark_ipc::Launch::new(std::env::current_exe().unwrap())

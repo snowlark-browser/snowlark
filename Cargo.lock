@@ -3784,6 +3784,7 @@ dependencies = [
 name = "snowlark-js"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "libmimalloc-sys",
  "serde_json",
  "sha2",
@@ -4057,6 +4058,7 @@ dependencies = [
  "serde",
  "snowlark-audio",
  "snowlark-dom",
+ "snowlark-gl",
  "snowlark-idb",
  "snowlark-ipc",
  "snowlark-js",

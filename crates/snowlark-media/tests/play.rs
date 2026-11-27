@@ -210,6 +210,7 @@ fn plays_the_fixture_into_gpu_frames() {
             muted: true,
             rate: 1.0,
             audio: None,
+            audio_out: None,
         },
         Source::Resource {
             resource: resource(
@@ -307,6 +308,7 @@ fn seeks_while_paused_show_the_frame() {
             muted: true,
             rate: 1.0,
             audio: None,
+            audio_out: None,
         },
         Source::Resource {
             resource: resource(
@@ -393,6 +395,7 @@ fn a_burst_of_seeks_ends_once_at_the_last_frame() {
             muted: true,
             rate: 1.0,
             audio: None,
+            audio_out: None,
         },
         Source::Resource {
             resource: resource(
@@ -505,6 +508,7 @@ fn play_in_tab(
             muted: false,
             rate: 1.0,
             audio: Some(group.clone()),
+            audio_out: None,
         },
         Source::Resource {
             resource: resource(
@@ -570,6 +574,110 @@ fn audible_follows_playback_and_the_elements_volume() {
     let heard = heard.lock().unwrap().clone();
     assert!(heard.len() >= 8, "{heard:?}");
     assert!(heard.windows(2).all(|w| w[0] != w[1]), "{heard:?}");
+}
+
+/// A sink that keeps time as the null sink does and records what it was given.
+#[cfg(target_os = "linux")]
+#[derive(Default)]
+struct Recorded {
+    config: Option<(f32, u32, usize)>,
+    periods: usize,
+    loudest: f32,
+}
+
+#[cfg(target_os = "linux")]
+struct RecordingOutputs(Arc<Mutex<Recorded>>);
+
+#[cfg(target_os = "linux")]
+struct RecordingSink(Arc<Mutex<Recorded>>, snowlark_audio::realtime::NullSink);
+
+#[cfg(target_os = "linux")]
+impl snowlark_audio::realtime::AudioOutputs for RecordingOutputs {
+    fn device(&self) -> Option<snowlark_audio::realtime::DeviceInfo> {
+        None
+    }
+    fn open(&self) -> Box<dyn snowlark_audio::realtime::AudioSink> {
+        Box::new(RecordingSink(self.0.clone(), Default::default()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl snowlark_audio::realtime::AudioSink for RecordingSink {
+    fn start(
+        &mut self,
+        config: &snowlark_audio::realtime::StreamConfig,
+    ) -> Result<(), snowlark_audio::realtime::SinkError> {
+        self.0.lock().unwrap().config =
+            Some((config.sample_rate, config.channels, config.period_frames));
+        self.1.start(config)
+    }
+    fn wait_period(&mut self) -> Result<Instant, snowlark_audio::realtime::SinkError> {
+        self.1.wait_period()
+    }
+    fn write(&mut self, channels: &[Vec<f32>]) -> Result<(), snowlark_audio::realtime::SinkError> {
+        let mut r = self.0.lock().unwrap();
+        r.periods += 1;
+        for c in channels {
+            for s in c {
+                r.loudest = r.loudest.max(s.abs());
+            }
+        }
+        self.1.write(channels)
+    }
+    fn stop(&mut self) {
+        self.1.stop()
+    }
+}
+
+/// The sound goes to the embedder's output when the page has one (in a renderer: the browser's,
+/// through messages, as the sandbox opens no sound server), not to the sound server from here.
+#[cfg(target_os = "linux")]
+#[test]
+fn the_sound_plays_on_the_output_the_page_gives() {
+    let body = std::fs::read(fixture()).expect("the fixture clip");
+    let (port, _) = serve(body, "video/mp4", true);
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let wake = Wake::new();
+    let recorded: Arc<Mutex<Recorded>> = Arc::default();
+    let w2 = wake.clone();
+    let player = Player::open(
+        PlayerOptions {
+            videos: None,
+            wake: Arc::new(move || {
+                *w2.0.lock().unwrap() = true;
+                w2.1.notify_all();
+            }),
+            volume: 1.0,
+            muted: false,
+            rate: 1.0,
+            audio: None,
+            audio_out: Some(Arc::new(RecordingOutputs(recorded.clone()))),
+        },
+        Source::Resource {
+            resource: resource(
+                &net,
+                &format!("http://127.0.0.1:{port}/clip.mp4"),
+                wake.clone(),
+            ),
+            hint: None,
+        },
+    );
+    assert!(wait_until(&wake, 20, || player
+        .take_events()
+        .iter()
+        .any(|e| matches!(e, PlayerEvent::Opened { .. }))));
+    player.play();
+    assert!(
+        wait_until(&wake, 5, || {
+            let r = recorded.lock().unwrap();
+            r.loudest > 0.01 && r.periods > 10
+        }),
+        "no sound reached the output"
+    );
+    player.close();
+    let r = recorded.lock().unwrap();
+    assert_eq!(r.config, Some((48000.0, 2, 480)));
+    assert!(r.periods > 10, "{} periods", r.periods);
 }
 
 /// (Windows: the clip is made by its encoder)

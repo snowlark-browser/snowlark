@@ -807,6 +807,7 @@ impl Engine {
             muted: muted || config.silent,
             rate,
             audio: config.audio.clone(),
+            audio_out: config.audio_out.clone(),
         }
     }
 

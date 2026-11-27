@@ -10,8 +10,10 @@
 //! - the **player** keeps the clock (wall time at the playback rate, from a position), shows each
 //!   picture in the element's [`VideoSlot`] when the clock reaches it, and reports
 //!   [`PlayerEvent`]s and the status;
-//! - the **sound** thread writes the queued sound to the desktop's sound server ([`PulseSink`], else
-//!   a null sink that keeps time) when the clock is at it, with the element's volume.
+//! - the **sound** thread writes the queued sound when the clock is at it, with the element's volume:
+//!   to the embedder's output when the page has one (`PlayerOptions::audio_out`: in a renderer, the
+//!   browser plays it), else to the desktop's sound server ([`PulseSink`]), else to a null sink that
+//!   keeps time.
 //!
 //! The clock is the wall clock rather than the sound card's: the sound follows it, dropping what
 //! is late and waiting for what is early. At a rate other than 1 the sound is silent.
@@ -26,7 +28,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use snowlark_audio::realtime::{AudioSink, NullSink, StreamConfig};
+use snowlark_audio::realtime::{AudioOutputs, AudioSink, NullSink, StreamConfig};
 use snowlark_paint::video::VideoSlot;
 use snowlark_paint::VideoId;
 
@@ -371,9 +373,10 @@ fn run(
     }));
     let sound = has_audio.then(|| {
         let (q, s, group) = (queues.clone(), sound_state.clone(), options.audio.clone());
+        let outputs = options.audio_out.clone();
         std::thread::Builder::new()
             .name("media sound".into())
-            .spawn(move || play_sound(q, s, group))
+            .spawn(move || play_sound(q, s, group, outputs))
             .ok()
     });
 
@@ -856,42 +859,74 @@ fn decode(ff: &'static ffmpeg::Ffmpeg, mut s: Media, queues: Shared2) {
 
 /// Where the sound goes.
 enum Out {
+    /// A sink on the embedder's output: each period waits until the output wants it.
+    Sink(Box<dyn AudioSink>, Vec<Vec<f32>>),
     Server(PulseSink),
     Null(NullSink),
 }
 
+fn stream_config() -> StreamConfig {
+    StreamConfig {
+        sample_rate: RATE as f32,
+        channels: CHANNELS,
+        period_frames: PERIOD,
+    }
+}
+
 impl Out {
-    fn open() -> Out {
-        let config = StreamConfig {
-            sample_rate: RATE as f32,
-            channels: CHANNELS,
-            period_frames: PERIOD,
-        };
-        if PulseOutputs::new().is_some() {
-            let mut s = PulseSink::default();
-            if s.start(&config).is_ok() {
-                return Out::Server(s);
+    fn open(outputs: Option<&Arc<dyn AudioOutputs>>) -> Out {
+        let config = stream_config();
+        match outputs {
+            Some(o) => {
+                let mut s = o.open();
+                if s.start(&config).is_ok() {
+                    return Out::Sink(s, vec![vec![0.0; PERIOD]; CHANNELS as usize]);
+                }
             }
+            None if PulseOutputs::new().is_some() => {
+                let mut s = PulseSink::default();
+                if s.start(&config).is_ok() {
+                    return Out::Server(s);
+                }
+            }
+            None => {}
         }
+        Out::null()
+    }
+
+    fn null() -> Out {
         let mut n = NullSink::default();
-        let _ = n.start(&config);
+        let _ = n.start(&stream_config());
         Out::Null(n)
     }
 
-    fn latency(&self) -> f64 {
+    /// Waits until the output takes the next period; then how long until what is written now is
+    /// heard (none: the output went away).
+    fn ready(&mut self) -> Option<f64> {
         match self {
-            Out::Server(s) => s.latency(),
-            Out::Null(_) => 0.0,
+            Out::Sink(s, _) => s
+                .wait_period()
+                .ok()
+                .map(|at| at.saturating_duration_since(Instant::now()).as_secs_f64()),
+            // (its writes block instead)
+            Out::Server(s) => Some(s.latency()),
+            Out::Null(n) => n.wait_period().ok().map(|_| 0.0),
         }
     }
 
     fn write(&mut self, samples: &[f32]) -> bool {
         match self {
+            Out::Sink(s, planar) => {
+                let ch = CHANNELS as usize;
+                for (c, channel) in planar.iter_mut().enumerate() {
+                    for (i, o) in channel.iter_mut().enumerate() {
+                        *o = samples[i * ch + c];
+                    }
+                }
+                s.write(planar).is_ok()
+            }
             Out::Server(s) => s.write_interleaved(samples).is_ok(),
             Out::Null(n) => {
-                if n.wait_period().is_err() {
-                    return false;
-                }
                 let frames = samples.len() / CHANNELS as usize;
                 n.write(&vec![vec![0.0; frames]; CHANNELS as usize]).is_ok()
             }
@@ -904,9 +939,13 @@ impl Out {
         }
     }
 }
-
-fn play_sound(queues: Shared2, state: Arc<Mutex<SoundState>>, group: Option<Arc<AudioGroup>>) {
-    let mut out = Out::open();
+fn play_sound(
+    queues: Shared2,
+    state: Arc<Mutex<SoundState>>,
+    group: Option<Arc<AudioGroup>>,
+    outputs: Option<Arc<dyn AudioOutputs>>,
+) {
+    let mut out = Out::open(outputs.as_ref());
     let mut generation = 0;
     let mut buf = vec![0.0f32; PERIOD * CHANNELS as usize];
     let (m, _) = &*queues;
@@ -929,6 +968,12 @@ fn play_sound(queues: Shared2, state: Arc<Mutex<SoundState>>, group: Option<Arc<
             generation = g;
             out.flush();
         }
+        // (the output's latency, once it wants the period)
+        let Some(latency) = out.ready() else {
+            // (the output went away: keep time without it)
+            out = Out::null();
+            continue;
+        };
         buf.fill(0.0);
         {
             let mut q = m.lock().unwrap();
@@ -937,7 +982,7 @@ fn play_sound(queues: Shared2, state: Arc<Mutex<SoundState>>, group: Option<Arc<
             }
             if clock.running {
                 // The sound written now leaves the output after the latency.
-                let due = clock.now() + out.latency();
+                let due = clock.now() + latency;
                 // (late sound is dropped)
                 while q.sound.front().is_some_and(|s| s.end() < due - 0.05) {
                     q.sound.pop_front();
@@ -970,16 +1015,8 @@ fn play_sound(queues: Shared2, state: Arc<Mutex<SoundState>>, group: Option<Arc<
             }
         }
         if !out.write(&buf) {
-            // (the server went away: keep time without it)
-            out = Out::Null(NullSink::default());
-            let _ = match &mut out {
-                Out::Null(n) => n.start(&StreamConfig {
-                    sample_rate: RATE as f32,
-                    channels: CHANNELS,
-                    period_frames: PERIOD,
-                }),
-                Out::Server(_) => Ok(()),
-            };
+            // (the output went away: keep time without it)
+            out = Out::null();
         }
     }
 }

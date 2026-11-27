@@ -16,6 +16,10 @@ sha2 = "0.10"
 # The C runtime's heap functions are defined on mimalloc (`crt_heap.rs`).
 libmimalloc-sys = { version = "0.1", default-features = false }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# (V8's entropy: the `getrandom` call)
+libc = "0.2"
+
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.62"
 features = [

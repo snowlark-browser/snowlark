@@ -204,9 +204,10 @@ path, making, binding or connecting a socket (pairs of local sockets excepted), 
 (`clone` only with `CLONE_THREAD`; `clone3` is `ENOSYS`, so the C library falls back to `clone`), signalling or
 tracing another process, changing credentials, and the kernel's rarer surfaces; a call for another architecture
 ends the process. What it reads afterwards it must hold already or receive as a descriptor from the browser (a font
-installed after the renderer started is in the next renderer). It is switched on with `SNOWLARK_SANDBOX=1` until
-the renderer's own opens go: sound (the sound server's socket) and WebGL (ANGLE's libraries and the GPU's device
-files). Not done yet: a PID namespace (the filter already keeps the renderer from signalling or
+installed after the renderer started is in the next renderer). Media elements' sound goes to the browser as
+AudioContexts' does (the browser plays it on the sound server), and WebGL's device (ANGLE's libraries, the system's
+GL driver and the GPU's device node) is opened before the lockdown and kept by the renderer's WebGL thread. It is on
+by default; `SNOWLARK_SANDBOX=0` starts renderers without it. Not done yet: a PID namespace (the filter already keeps the renderer from signalling or
 tracing other processes), an allow-list filter in place of the deny-list, and `stat` calls with `AT_EMPTY_PATH` and
 a path (allowed, as the C library's `fstat` uses them: they show a file's metadata, not its contents).
 

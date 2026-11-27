@@ -62,6 +62,24 @@ impl FontBytes {
         FontBytes::from_blob(blob)
     }
 
+    /// Shares a mapping the font database made (each face of the file reads it).
+    pub(crate) fn from_shared(data: Arc<dyn AsRef<[u8]> + Sync + Send>) -> Option<FontBytes> {
+        type Shared = Arc<dyn AsRef<[u8]> + Sync + Send>;
+        unsafe extern "C" fn release(user: *mut c_void) {
+            // SAFETY: `user` is the box made below, released once by HarfBuzz.
+            drop(unsafe { Box::from_raw(user.cast::<Shared>()) });
+        }
+        let bytes: &[u8] = (*data).as_ref();
+        let len = c_uint::try_from(bytes.len()).ok()?;
+        let ptr = bytes.as_ptr().cast::<c_char>();
+        let user = Box::into_raw(Box::new(data)).cast::<c_void>();
+        // SAFETY: the mapping stays valid while the box holds its `Arc`, until HarfBuzz calls
+        // `release`, which it does exactly once (also when the creation fails).
+        let blob = unsafe {
+            hb_blob_create_or_fail(ptr, len, HB_MEMORY_MODE_READONLY, user, Some(release))
+        };
+        FontBytes::from_blob(blob)
+    }
     /// Takes ownership of `bytes`.
     pub(crate) fn from_vec(bytes: Vec<u8>) -> Option<FontBytes> {
         unsafe extern "C" fn release(user: *mut c_void) {
@@ -1069,8 +1087,26 @@ impl TextEngine {
         let FaceKey::File(ref file, index, embolden, oblique) = key else {
             return None;
         };
-        let bytes = FontBytes::from_file(file)?;
+        let bytes = self.file_bytes(file)?;
         self.intern(key.clone(), Arc::new(bytes), index, embolden, oblique)
+    }
+
+    /// A system font file's bytes: the mapping the font database made of it, when it has (so a
+    /// renderer whose sandbox opens no file reads the faces it first needs after the lockdown, as
+    /// it mapped every font file before it), else the file mapped now.
+    fn file_bytes(&self, file: &CStr) -> Option<FontBytes> {
+        use std::os::unix::ffi::OsStrExt;
+        if let Some(db) = self.font_db.get() {
+            let path = std::path::Path::new(std::ffi::OsStr::from_bytes(file.to_bytes()));
+            let shared = db.faces().find_map(|f| match &f.source {
+                fontdb::Source::SharedFile(p, data) if p == path => Some(data.clone()),
+                _ => None,
+            });
+            if let Some(data) = shared {
+                return FontBytes::from_shared(data);
+            }
+        }
+        FontBytes::from_file(file)
     }
 
     /// The id for a face, registering it the first time. `index` is fontconfig's: the face index

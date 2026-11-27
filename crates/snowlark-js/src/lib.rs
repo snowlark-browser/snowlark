@@ -52,6 +52,11 @@ pub fn init() {
         if let Ok(flags) = std::env::var("SNOWLARK_V8_FLAGS") {
             v8::V8::set_flags_from_string(&flags);
         }
+        // V8's random numbers (`Math.random`, its hash seeds and address randomization) seeded
+        // from the system's generator through the `getrandom` call, which a sandboxed renderer
+        // makes: it cannot open `/dev/urandom`, and V8 would seed from the clock instead.
+        #[cfg(target_os = "linux")]
+        v8::V8::set_entropy_source(entropy);
         // (each isolate's foreground tasks go to its event loop's queue: platform)
         let platform = platform::new_platform().make_shared();
         v8::V8::initialize_platform(platform);
@@ -59,6 +64,51 @@ pub fn init() {
     });
 }
 
+/// Reads the system's time zone now: ICU's default zone (which `Date` and `Intl` use) and the C
+/// library's. Each is read once per process, the first time it is needed, from files (the zone's
+/// link and its rules) that a sandboxed renderer can no longer open once it is locked down.
+/// Returns ICU's zone id.
+pub fn settle_time_zone() -> String {
+    #[cfg(target_os = "linux")]
+    {
+        unsafe extern "C" {
+            // (POSIX; the `libc` crate does not declare it)
+            fn tzset();
+        }
+        // SAFETY: tzset takes nothing and reads only the TZ variable and the zone file into the C
+        // library's own state.
+        unsafe { tzset() };
+    }
+    v8::icu::get_default_time_zone()
+}
+/// Fills `buf` from the kernel's random number generator (V8's entropy source).
+#[cfg(target_os = "linux")]
+fn entropy(buf: &mut [u8]) -> bool {
+    let mut filled = 0;
+    while filled < buf.len() {
+        let rest = &mut buf[filled..];
+        // SAFETY: writes at most `rest.len()` bytes into `rest`.
+        let n = unsafe { libc::getrandom(rest.as_mut_ptr().cast(), rest.len(), 0) };
+        if n < 0 {
+            if std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted {
+                continue;
+            }
+            return false;
+        }
+        filled += n as usize;
+    }
+    true
+}
+
+#[cfg(all(test, target_os = "linux"))]
+#[test]
+fn entropy_fills_the_buffer() {
+    let mut a = [0u8; 64];
+    let mut b = [0u8; 64];
+    assert!(entropy(&mut a) && entropy(&mut b));
+    assert_ne!(a, b);
+    assert!(a.iter().any(|&x| x != 0));
+}
 /// Writes the execution profile of an instrumented V8 (a PGO training build, feature `pgo-train`;
 /// `docs/v8-speed.md`), and does nothing otherwise. Call it just before the process exits: the
 /// process ends through `ExitProcess`, which skips the C runtime's exit handlers that would write it.

@@ -115,6 +115,11 @@ pub struct PlayerOptions {
     /// The tab the player plays in (none in headless modes): it counts there while audible and
     /// follows the tab's mute.
     pub audio: Option<Arc<AudioGroup>>,
+    /// Where the sound goes on Linux: the embedder's output, as the page's AudioContexts have it
+    /// (in the browser's process, or reached through messages from a renderer, whose sandbox
+    /// opens no sound server). None: the sound server, from this process. Windows' player plays
+    /// through Media Foundation's own renderer and does not use it.
+    pub audio_out: Option<Arc<dyn snowlark_audio::realtime::AudioOutputs>>,
 }
 
 /// What to play.
