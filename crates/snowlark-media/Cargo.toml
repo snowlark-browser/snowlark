@@ -12,7 +12,11 @@ snowlark-net = { path = "../snowlark-net" }
 snowlark-paint = { path = "../snowlark-paint" }
 serde = { version = "1", features = ["derive"] }
 
-# Media Foundation, PlayReady and WASAPI (`win/`); Linux has no player yet (docs/linux.md, stage 7).
+# The system's FFmpeg and PulseAudio libraries, loaded at run time (`linux/`).
+[target.'cfg(not(windows))'.dependencies]
+libloading = "0.8"
+
+# Media Foundation, PlayReady and WASAPI (`win/`).
 [target.'cfg(windows)'.dependencies]
 windows-core = "0.62"
 windows-collections = "0.3"

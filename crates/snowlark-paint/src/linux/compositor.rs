@@ -14,7 +14,7 @@
 //! display lists. What needs a GPU there is absent here: protected players' pictures under the
 //! content ([`Compositor::allow_underlays`] is false) and composition surfaces of another process
 //! ([`WindowSurface`] cannot be made, so a compositor always draws for a window of its own
-//! process). Videos show no frames yet (docs/linux.md, stage 7).
+//! process). Video frames are drawn from memory (`video_frame`).
 
 use std::marker::PhantomData;
 use std::os::fd::OwnedFd;
@@ -352,14 +352,36 @@ impl ContentPass<'_> {
         self.canvas.restore();
     }
 
-    /// Draws a video frame ([`crate::video::VideoStore::front_of`]): there are none here.
+    /// Draws a video frame ([`crate::video::VideoStore::front_of`]) scaled into `dest`, within
+    /// `clip`.
     pub fn video_frame(
         &mut self,
         front: &crate::video::VideoFront,
-        _dest: Rect,
-        _clip: Rect,
+        dest: Rect,
+        clip: Rect,
     ) -> bool {
-        match *front {}
+        let f = &front.0;
+        let Some(image) = sk::images::raster_from_data(
+            &image_info((f.width, f.height)),
+            sk::Data::new_copy(&f.pixels),
+            f.width as usize * 4,
+        ) else {
+            return false;
+        };
+        let (dest, clip) = (self.at(dest), self.at(clip));
+        self.canvas.save();
+        self.canvas.reset_matrix();
+        self.canvas
+            .clip_rect(rect(&clip), sk::ClipOp::Intersect, false);
+        self.canvas.draw_image_rect_with_sampling_options(
+            &image,
+            None,
+            rect(&dest),
+            sk::SamplingOptions::new(sk::FilterMode::Linear, sk::MipmapMode::None),
+            &sk::Paint::default(),
+        );
+        self.canvas.restore();
+        true
     }
 
     /// Clears `rect` to transparent (where a picture under the content would show: none does here).

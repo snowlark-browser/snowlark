@@ -6,8 +6,9 @@
 //!
 //! - [`resource`]: a media resource fetched through snowlark-net with range requests, read by the
 //!   decoder on its own threads.
-//! - [`Player`]: one media element's playback on Windows Media Foundation
-//!   (`Windows.Media.Playback.MediaPlayer` in frame-server mode), on a thread of its own: it opens
+//! - [`Player`]: one media element's playback, on Windows Media Foundation
+//!   (`Windows.Media.Playback.MediaPlayer` in frame-server mode; on Linux the system's FFmpeg and
+//!   sound server, `linux`), on a thread of its own: it opens
 //!   the resource (or a [`mse::MseSource`]), decodes, plays the sound through the system, and copies
 //!   each video frame into a [`snowlark_paint::video::VideoSlot`] the compositor draws. What happens
 //!   comes back as [`PlayerEvent`]s, with a wake of the page.
@@ -32,6 +33,8 @@ pub mod caps;
 pub mod cenc;
 pub mod fmp4;
 pub mod init_segment;
+#[cfg(not(windows))]
+pub mod linux;
 pub mod ranges;
 pub mod resource;
 pub mod sniff;
@@ -54,7 +57,8 @@ pub fn audio_outputs() -> Option<Arc<dyn snowlark_audio::realtime::AudioOutputs>
     }
     #[cfg(not(windows))]
     {
-        None
+        linux::pulse::PulseOutputs::new()
+            .map(|o| Arc::new(o) as Arc<dyn snowlark_audio::realtime::AudioOutputs>)
     }
 }
 pub use caps::{CanPlay, Support};
@@ -213,10 +217,9 @@ impl Reporter {
 enum Backend {
     #[cfg(windows)]
     Win(win::player::WinPlayer),
-    /// No media backend on this system yet (Linux until FFmpeg, docs/linux.md stage 7): the
-    /// player failed at opening.
+    /// FFmpeg and the desktop's sound server (`linux::player`).
     #[cfg(not(windows))]
-    Unsupported,
+    Linux(linux::player::LinuxPlayer),
     Remote(Box<dyn Remote>),
 }
 
@@ -249,14 +252,11 @@ impl Player {
             shared.clone(),
         ));
         #[cfg(not(windows))]
-        let inner = {
-            drop((options, source));
-            shared.push(PlayerEvent::Failed {
-                code: ErrorCode::SrcNotSupported,
-                message: "no media backend on this system".into(),
-            });
-            Backend::Unsupported
-        };
+        let inner = Backend::Linux(linux::player::LinuxPlayer::open(
+            options,
+            source,
+            shared.clone(),
+        ));
         Player {
             inner,
             shared,
@@ -292,7 +292,7 @@ impl Player {
             #[cfg(windows)]
             Backend::Win(p) => p.play(),
             #[cfg(not(windows))]
-            Backend::Unsupported => {}
+            Backend::Linux(p) => p.play(),
             Backend::Remote(r) => r.play(),
         }
     }
@@ -302,7 +302,7 @@ impl Player {
             #[cfg(windows)]
             Backend::Win(p) => p.pause(),
             #[cfg(not(windows))]
-            Backend::Unsupported => {}
+            Backend::Linux(p) => p.pause(),
             Backend::Remote(r) => r.pause(),
         }
     }
@@ -313,7 +313,7 @@ impl Player {
             #[cfg(windows)]
             Backend::Win(p) => p.seek(t),
             #[cfg(not(windows))]
-            Backend::Unsupported => {}
+            Backend::Linux(p) => p.seek(t),
             Backend::Remote(r) => r.seek(t),
         }
     }
@@ -323,7 +323,7 @@ impl Player {
             #[cfg(windows)]
             Backend::Win(p) => p.set_rate(rate),
             #[cfg(not(windows))]
-            Backend::Unsupported => {}
+            Backend::Linux(p) => p.set_rate(rate),
             Backend::Remote(r) => r.set_rate(rate),
         }
     }
@@ -333,7 +333,7 @@ impl Player {
             #[cfg(windows)]
             Backend::Win(p) => p.set_volume(volume, muted),
             #[cfg(not(windows))]
-            Backend::Unsupported => {}
+            Backend::Linux(p) => p.set_volume(volume, muted),
             Backend::Remote(r) => r.set_volume(volume, muted),
         }
     }
@@ -345,7 +345,7 @@ impl Player {
             #[cfg(windows)]
             Backend::Win(p) => p.video(),
             #[cfg(not(windows))]
-            Backend::Unsupported => None,
+            Backend::Linux(p) => p.video(),
             Backend::Remote(_) => None,
         }
     }
@@ -362,7 +362,7 @@ impl Player {
             #[cfg(windows)]
             Backend::Win(p) => p.filter_events(&mut events),
             #[cfg(not(windows))]
-            Backend::Unsupported => {}
+            Backend::Linux(_) => {}
             Backend::Remote(_) => {}
         }
         events
@@ -379,7 +379,7 @@ impl Player {
             #[cfg(windows)]
             Backend::Win(p) => p.close(),
             #[cfg(not(windows))]
-            Backend::Unsupported => {}
+            Backend::Linux(p) => p.close(),
             Backend::Remote(r) => r.close(),
         }
         if let Some(r) = &self.resource {
@@ -406,7 +406,7 @@ pub fn decode_audio_fallback() -> Option<AudioDecoder> {
     }
     #[cfg(not(windows))]
     {
-        None
+        Some(linux::decode::decode_audio)
     }
 }
 
@@ -420,7 +420,7 @@ pub fn support() -> &'static Support {
         }
         #[cfg(not(windows))]
         {
-            Support::default()
+            linux::probe::probe()
         }
     })
 }

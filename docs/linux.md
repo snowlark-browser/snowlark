@@ -28,8 +28,8 @@ Linux V8 library and pass their tests (69, among them the access check, streamin
 inline field tests that drive the mangled-name declarations through V8). `snowlark-paint` has the Linux text
 engine (below) with its tests, and the Skia painter with its own. `snowlark-layout` and `snowlark-render` build
 and pass their tests (`snowlark-render`'s GPU canvas tests are ignored there). `snowlark-page`, `snowlark-media`
-and `snowlark-ipc` build and pass their tests; the page tests that need a media backend (stage
-7), the GPU canvas (stage 5) or the PDF viewer (stage 9) are ignored there, each with its reason.
+and `snowlark-ipc` build and pass their tests; the page tests that need Media Source Extensions (stage 7), the
+GPU canvas (stage 5) or the PDF viewer (stage 9) are ignored there, each with its reason.
 
 **The binary** builds on Linux with its headless modes: `--eval`, `--render`, `--wpt`, `--reftest`, `--fetch`,
 `--computed`, `--layout-demo`, `--media-types` and `--update-filters`. The window, the renderer and GPU processes
@@ -42,12 +42,25 @@ pass their tests but those that need a Windows window, a GPU device, the passwor
 textures. The window has the desktop's clipboard (text and markup, both ways), the desktop's cursors and more
 windows (new and Incognito windows, undocked developer tools, popups), input methods (text-input-v3) and drops
 from other programs (files, links, text), the desktop's dark setting (the portal's, else GTK's) and the password store's
-key from the Secret Service (without one no password is saved, and the prompt and the passwords page say why). Not there
-yet in the window: file dialogs, drags out of the window, the input method's candidate position, updates (releases
+key from the Secret Service (without one no password is saved, and the prompt and the passwords page say why), and file
+dialogs (the portal's, else `zenity` or `kdialog`). Not there yet in the window: drags out of the window, the input method's candidate position, updates (releases
 there are not signed). The chrome's icons are Unicode symbols where Windows' icon font is missing. The profile is
-`~/.config/snowlark` (`XDG_CONFIG_HOME`). What is missing behaves as on a system without it: a media element fails with
-`MEDIA_ERR_SRC_NOT_SUPPORTED`, `MediaSource` cannot attach, canvases draw on the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is false and
-`navigator.plugins` empty).
+`~/.config/snowlark` (`XDG_CONFIG_HOME`). `<video>` and `<audio>` play through the system's FFmpeg (loaded at run
+time: releases 6.1, 7.1 and 8.0, whichever is installed; what its build decodes is what `canPlayType` says) with
+sound through the desktop's sound server (PulseAudio, or PipeWire's PulseAudio service), and `decodeAudioData` and
+AudioContexts use them too (below). What is missing behaves as on a system without it: `MediaSource` cannot
+attach, canvases draw on the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is
+false and `navigator.plugins` empty); without FFmpeg a media element fails with `MEDIA_ERR_SRC_NOT_SUPPORTED`.
+
+Media (`snowlark-media` `linux/`): `ffmpeg.rs` loads `libavformat`, `libavcodec`, `libavutil`, `libswscale` and
+`libswresample` by their versioned names and reads FFmpeg's structures only at the offsets
+`ffmpeg_layout.rs` lists per release (printed from each release's headers by `tools/ffmpeg/layout.sh`; a new
+release is a new entry there). `player.rs` runs a decoder thread (the container read through the media resource,
+the first video and audio streams decoded in software, pictures to BGRA, sound to 48 kHz stereo), a clock thread
+(pictures shown in the element's `VideoSlot` when due, the element's events and status) and a sound thread
+(`pulse.rs`: PulseAudio's simple API, else a null sink that keeps time). The clock is the wall clock and the sound
+follows it; at a rate other than 1 the sound is silent. `VideoSlot` frames are in memory; a renderer's go to the
+browser through pools of shared memory (`memfd`) passed as descriptors, as Windows' shared textures are.
 
 **Processes:** `snowlark-ipc`'s `posix/` half gives the process boundary the same names and rules as on
 Windows, and its tests (a real second process, links between children, the loopback) run on both systems. The
@@ -215,7 +228,11 @@ releases; a machine without network access builds it from source, which needs `p
   Secret Service nothing is protected and `available()` says why; `drop_target`: the drag types (the window's
   `drag` module takes drops). The session bus is reached through the system's libdbus-1 (`dbus` crate,
   `desktop_bus.rs`); the dark setting is the desktop portal's `org.freedesktop.appearance` `color-scheme`,
-  followed through `SettingChanged` on a thread of its own, else GTK's (`GTK_THEME`, `settings.ini`).
+  followed through `SettingChanged` on a thread of its own, else GTK's (`GTK_THEME`, `settings.ini`). File
+  dialogs (`pick_folder_dialog`, `save_file_dialog`) are the portal's `FileChooser` (`OpenFile` with
+  `directory`, `SaveFile`; the request's `Response` listened for before the call), else `zenity` or `kdialog`;
+  they block the window's loop until answered, as Windows' modal dialog does, and have no parent window yet
+  (xdg-foreign).
 
 - `compositor`: the window's compositor on the CPU, with the Windows half's `Compositor` and `ContentPass`: each
   frame is the whole client area (the chrome in its top rows), drawn with Skia's CPU backend (tiles copied, tiles
@@ -296,7 +313,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | Tiles and the compositor | `gpu.rs` `TileRasterizer`, `compositor.rs` `Compositor` | tiles and the compositor on Skia's CPU backend done (`linux/gpu.rs`, `linux/compositor.rs`); both over Skia's GPU backend (GL or Vulkan) |
 | Window | `snowlark-paint` `window.rs` `Window`, `Event`, `WindowProxy` | started: `linux/window.rs` on Wayland (X11 desktops through XWayland) |
 | Process boundary | `snowlark-ipc`'s `Link`, `Section`, `RemoteHandle`, `launch` | done: the `posix/` half under the same names |
-| Media player | `snowlark-media` `win/` (`Player`, MSE) | an FFmpeg half |
+| Media player | `snowlark-media` `win/` (`Player`, MSE) | started: `linux/` (`player.rs` on the system's FFmpeg, `pulse.rs`, `probe.rs`, `decode.rs`); MSE, frames across processes and hardware decoding to do |
 | ANGLE | `snowlark-gl` `ffi.rs` loads two libraries by name | done: the `.so` names, a surfaceless EGL display |
 | OS services | `os_crypt.rs`, shell `profile.rs`, `downloads_ui.rs` | a function each behind `cfg` |
 

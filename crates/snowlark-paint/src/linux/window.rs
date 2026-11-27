@@ -30,6 +30,8 @@ mod appearance;
 mod clipboard;
 #[path = "drag.rs"]
 mod drag;
+#[path = "file_dialog.rs"]
+mod file_dialog;
 #[path = "text_input.rs"]
 mod text_input;
 
@@ -707,23 +709,32 @@ fn user_dir(text: &str, name: &str, home: &std::path::Path) -> Option<std::path:
     path.is_absolute().then_some(path)
 }
 
-/// A folder the user picks: there is no file chooser on Linux yet (the desktop portal's), so
-/// none is picked.
+/// A folder the user picks, through the desktop portal's file chooser (else `zenity` or
+/// `kdialog`); `None` when canceled or there is no way to ask. It blocks until answered, as
+/// Windows' dialog runs its own loop.
 pub fn pick_folder_dialog(
     _owner: WindowHandle,
-    _start: Option<&std::path::Path>,
+    start: Option<&std::path::Path>,
 ) -> Option<std::path::PathBuf> {
-    None
+    file_dialog::ask(&file_dialog::Ask::Folder { start }, "")
 }
 
-/// A file name to save to that the user picks: none yet ([`pick_folder_dialog`]).
+/// A file name to save to that the user picks, `suggested` in `dir`, with `filters`
+/// (description, `*.ext;*.ext`), as [`pick_folder_dialog`].
 pub fn save_file_dialog(
     _owner: WindowHandle,
-    _suggested: &str,
-    _filters: &[(&str, &str)],
-    _dir: Option<&std::path::Path>,
+    suggested: &str,
+    filters: &[(&str, &str)],
+    dir: Option<&std::path::Path>,
 ) -> Option<std::path::PathBuf> {
-    None
+    file_dialog::ask(
+        &file_dialog::Ask::Save {
+            suggested,
+            filters,
+            dir,
+        },
+        "",
+    )
 }
 
 /// How asking the system to confirm the user ended ([`verify_user`]).

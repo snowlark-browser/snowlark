@@ -3,9 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! Playback end to end: the fixture clip served over HTTP with range requests, fetched through
-//! snowlark-net, decoded by Media Foundation into GPU textures (Windows only: docs/linux.md stage 7).
-
-#![cfg(windows)]
+//! snowlark-net, decoded by the platform's player into the video slot's frames (Media Foundation
+//! on Windows, FFmpeg on Linux). The clips are made by the Windows encoder and checked in.
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
@@ -24,6 +23,7 @@ fn fixture() -> PathBuf {
 }
 
 /// Writes the fixtures when `SNOWLARK_WRITE_FIXTURE=1` (once, by hand: the clips are checked in).
+#[cfg(windows)]
 #[test]
 fn write_fixture() {
     if std::env::var("SNOWLARK_WRITE_FIXTURE").as_deref() != Ok("1") {
@@ -352,8 +352,15 @@ fn seeks_while_paused_show_the_frame() {
 
 /// Which second of the pattern clip a pixel is from (its background colour), if any.
 fn pattern_second(p: snowlark_paint::geom::Color) -> Option<u32> {
+    // (the clip's colours per second, BGR, as the Windows encoder's `pattern_color` draws them)
+    const COLORS: [(u8, u8, u8); 4] = [
+        (0x20, 0x20, 0xE0),
+        (0x20, 0xC0, 0x20),
+        (0xE0, 0x40, 0x20),
+        (0x20, 0xC0, 0xE0),
+    ];
     (0..4).find(|&s| {
-        let (b, g, r) = snowlark_media::win::encode::pattern_color(s);
+        let (b, g, r) = COLORS[s as usize];
         let near = |a: u8, e: u8| (a as i32 - e as i32).abs() < 48;
         near(p.b, b) && near(p.g, g) && near(p.r, r)
     })
@@ -565,6 +572,8 @@ fn audible_follows_playback_and_the_elements_volume() {
     assert!(heard.windows(2).all(|w| w[0] != w[1]), "{heard:?}");
 }
 
+/// (Windows: the clip is made by its encoder)
+#[cfg(windows)]
 #[test]
 fn video_without_sound_is_not_audible() {
     let dir = std::env::temp_dir().join(format!("snowlark-media-silent-{}", std::process::id()));

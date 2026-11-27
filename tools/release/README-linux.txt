@@ -26,7 +26,11 @@ through the system's OpenGL.
 Settings, history and bookmarks are at snowlark://settings, snowlark://history and
 snowlark://bookmarks. The open source software in Snowlark is listed at snowlark://credits.
 
-Not there yet on Linux: video and audio, file dialogs, dragging out of the window, updates.
+Not there yet on Linux: Media Source Extensions (the streaming most video sites use), dragging
+out of the window, updates. Video and audio files play through the system's FFmpeg (6.1, 7.1 or
+8.0) and sound server; what plays depends on the codecs your distribution's FFmpeg includes. File
+dialogs (Save As, the downloads folder) are the desktop's, through its portal (or zenity or
+kdialog).
 Passwords are saved only where the desktop runs a keyring (the Secret Service: GNOME Keyring,
 KWallet, KeePassXC); without one, Snowlark says so and saves none.
 
