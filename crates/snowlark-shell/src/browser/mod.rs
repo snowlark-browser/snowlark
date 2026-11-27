@@ -20,6 +20,7 @@ mod devtools_menus;
 mod devtools_ui;
 mod devtools_window;
 mod downloads_ui;
+mod drag_out;
 mod drop_files;
 mod find;
 mod fullscreen;
@@ -301,6 +302,9 @@ pub struct Browser {
     /// A tab pressed in the side panel (a drag once the pointer moves).
     tab_drag: Option<side_tabs_ui::TabDrag>,
     address_drag: bool,
+    /// A press on the site button or the selected address (a drag out of the window once the
+    /// pointer moves).
+    drag_out: Option<drag_out::DragOutPress>,
     caret_on: bool,
     suggestions: Vec<Suggestion>,
     selected: Option<usize>,
@@ -583,6 +587,7 @@ impl Browser {
             side_resize: None,
             tab_drag: None,
             address_drag: false,
+            drag_out: None,
             caret_on: true,
             suggestions: Vec::new(),
             selected: None,
@@ -2006,6 +2011,9 @@ impl Browser {
             self.drag_scrollbar(dip, grab);
             return;
         }
+        if self.drag_out_move(window, dip) {
+            return;
+        }
         if self.address_drag {
             let layout = self.layout();
             let x = dip.x - layout.address_text.x + self.address_scroll;
@@ -2303,8 +2311,8 @@ impl Browser {
                     self.bar_overflow();
                 }
                 (Hit::SiteInfo, MouseButton::Left) => {
-                    self.pressed = Hit::None;
-                    self.open_site_info();
+                    // (a click opens the site information; a drag takes the page's link)
+                    self.drag_out_press(window, dip, drag_out::DragOrigin::SiteButton);
                 }
                 (Hit::Shield, MouseButton::Left) => {
                     self.pressed = Hit::None;
@@ -2323,7 +2331,13 @@ impl Browser {
                 (Hit::Address, MouseButton::Left) => {
                     let layout = self.layout();
                     if self.focus != Focus::Address {
+                        // (all of it selected: a drag takes the page's link)
                         self.focus_address();
+                        self.drag_out_press(
+                            window,
+                            dip,
+                            drag_out::DragOrigin::Address { caret: None },
+                        );
                     } else {
                         let x = dip.x - layout.address_text.x + self.address_scroll;
                         let i = self.fonts.index_at(
@@ -2331,7 +2345,16 @@ impl Browser {
                             x,
                             chrome::address_font_size(),
                         );
-                        if self.address.press(i, clicks, mods.shift) {
+                        let in_selection =
+                            self.address.has_selection() && self.address.selection().contains(&i);
+                        if clicks == 1 && !mods.shift && in_selection {
+                            // (a press in the selection drags it; a click puts the caret there)
+                            self.drag_out_press(
+                                window,
+                                dip,
+                                drag_out::DragOrigin::Address { caret: Some(i) },
+                            );
+                        } else if self.address.press(i, clicks, mods.shift) {
                             self.address_drag = true;
                             window.capture_mouse();
                         }
@@ -2408,6 +2431,9 @@ impl Browser {
             return;
         }
         if self.devtools_mouse_up() {
+            return;
+        }
+        if self.drag_out_release() {
             return;
         }
         if self.bm_drag.is_some() {
@@ -2807,6 +2833,7 @@ impl WindowHandler for Browser {
                 self.scrollbar_drag = None;
                 self.address_drag = false;
             }
+            Event::DragOutEnded(_) => self.drag_out_ended(),
             Event::Wheel {
                 x,
                 y,

@@ -269,6 +269,8 @@ pub struct WindowProxy {
 const WM_WAKE: u32 = WM_APP + 1;
 const WM_RUN_OPS: u32 = WM_APP + 2;
 const WM_DESTROY_SELF: u32 = WM_APP + 3;
+/// A drag out of the window ended (WPARAM: the operation, as [`Window::run_ops`] codes it).
+const WM_DRAG_OUT_ENDED: u32 = WM_APP + 4;
 
 impl WindowProxy {
     /// A proxy for no window: waking it does nothing (for running a window's workers without one).
@@ -376,6 +378,9 @@ pub enum Event {
     },
     /// The drag left the window or was canceled.
     DragLeave,
+    /// A drag out of the window ([`Window::start_drag`]) ended, with the operation its target
+    /// carried out (none: canceled). The button that started it is up by now.
+    DragOutEnded(crate::drop_target::DropEffect),
     /// The drag was dropped on the window.
     Drop {
         x: i32,
@@ -506,6 +511,8 @@ enum Op {
     Fullscreen(bool),
     /// Left, top, width, height on the screen (physical px), kept in the work area.
     OuterRect(i32, i32, i32, i32),
+    /// A drag out of the window.
+    Drag(Box<crate::drop_target::DragOut>),
 }
 
 /// The work area (left, top, right, bottom) of the monitor nearest `rect`.
@@ -841,6 +848,15 @@ impl Window {
         self.post_ops();
     }
 
+    /// Starts a drag of `out` out of the window, from the press of a mouse button still held (the
+    /// system's drag loop: it runs after the handler returns, which goes on getting the window's
+    /// events meanwhile, a drop on this window's own target among them); [`Event::DragOutEnded`]
+    /// says how it ended.
+    pub fn start_drag(&self, out: crate::drop_target::DragOut) {
+        self.ops.borrow_mut().push(Op::Drag(Box::new(out)));
+        self.post_ops();
+    }
+
     fn post_ops(&self) {
         // SAFETY: a message without pointers to our own window.
         let _ = unsafe { PostMessageW(Some(self.hwnd.get()), WM_RUN_OPS, WPARAM(0), LPARAM(0)) };
@@ -932,6 +948,23 @@ impl Window {
                             w,
                             h,
                             SWP_NOZORDER | SWP_NOACTIVATE,
+                        );
+                    }
+                    Op::Drag(out) => {
+                        // (the drag loop captures the mouse itself)
+                        let _ = ReleaseCapture();
+                        let effect = crate::drag_source::run(&out);
+                        let code = match effect {
+                            crate::drop_target::DropEffect::None => 0,
+                            crate::drop_target::DropEffect::Copy => 1,
+                            crate::drop_target::DropEffect::Move => 2,
+                            crate::drop_target::DropEffect::Link => 3,
+                        };
+                        let _ = PostMessageW(
+                            Some(self.hwnd.get()),
+                            WM_DRAG_OUT_ENDED,
+                            WPARAM(code),
+                            LPARAM(0),
                         );
                     }
                 }
@@ -2229,6 +2262,20 @@ unsafe fn handle_message(
             }
             WM_RUN_OPS => {
                 w.run_ops();
+                LRESULT(0)
+            }
+            WM_DRAG_OUT_ENDED => {
+                use crate::drop_target::DropEffect;
+                // (the drag loop took the button's release: the press is over)
+                w.press_held.set(false);
+                track_leave(hwnd, w);
+                let effect = match wparam.0 {
+                    1 => DropEffect::Copy,
+                    2 => DropEffect::Move,
+                    3 => DropEffect::Link,
+                    _ => DropEffect::None,
+                };
+                state.dispatch(Event::DragOutEnded(effect));
                 LRESULT(0)
             }
             WM_SETTINGCHANGE => {

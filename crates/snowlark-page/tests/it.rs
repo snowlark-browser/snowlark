@@ -60,6 +60,7 @@ mod fullscreen;
 mod gamepad;
 mod gc;
 mod geometry;
+mod hidden_load;
 mod hit_replaced;
 mod html_parsing_methods;
 mod image_map;

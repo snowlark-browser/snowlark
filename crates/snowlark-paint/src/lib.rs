@@ -62,6 +62,8 @@ pub mod demo;
 #[path = "linux/desktop_bus.rs"]
 mod desktop_bus;
 mod drag_data;
+#[cfg(windows)]
+mod drag_source;
 #[cfg_attr(not(windows), path = "linux/drop_target.rs")]
 pub mod drop_target;
 #[cfg(windows)]

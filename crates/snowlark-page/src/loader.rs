@@ -2592,7 +2592,10 @@ impl Engine {
         if !since.2 {
             return false;
         }
-        if since.0 == updates {
+        // A hidden page (a background tab) has no rendering opportunities (HTML §8.1.7.3), so none
+        // comes to wait for: its `img` elements' requests, started by "update the image data",
+        // are what delay its load.
+        if since.0 == updates && !self.page_hidden() {
             if since.1.elapsed() > IMAGES_LOAD_DELAY_MAX {
                 return false;
             }

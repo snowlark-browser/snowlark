@@ -181,6 +181,8 @@ pub enum Event {
         mods: Modifiers,
     },
     DragLeave,
+    /// A drag out of the window ended (none are started here yet: [`Window::start_drag`]).
+    DragOutEnded(crate::drop_target::DropEffect),
     Drop {
         x: i32,
         y: i32,
@@ -541,6 +543,9 @@ impl Window {
     pub fn set_drop_effect(&self, effect: crate::drop_target::DropEffect) {
         self.ops.borrow_mut().push(Op::DropEffect(effect));
     }
+
+    /// A drag out of the window: not offered to the desktop yet on Linux, so nothing starts.
+    pub fn start_drag(&self, _out: crate::drop_target::DragOut) {}
 
     /// Brings a minimized window back: a Wayland client cannot (the desktop restores it when the
     /// user picks it).

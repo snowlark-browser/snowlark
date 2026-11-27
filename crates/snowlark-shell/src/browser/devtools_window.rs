@@ -391,6 +391,7 @@ impl Browser {
             Event::DragEnter { .. }
             | Event::DragOver { .. }
             | Event::DragLeave
+            | Event::DragOutEnded(_)
             | Event::Drop { .. } => {}
             Event::MouseDown {
                 x,

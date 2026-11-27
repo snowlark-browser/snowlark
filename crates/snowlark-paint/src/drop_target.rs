@@ -27,7 +27,9 @@ use windows_core::Ref;
 use crate::input::Modifiers;
 use crate::window::{Event, State};
 
-pub use crate::drag_data::{DragData, DropEffect};
+pub use crate::drag_data::{
+    shortcut_file_contents, shortcut_file_name, DragData, DragImage, DragLink, DragOut, DropEffect,
+};
 
 /// Registers `hwnd` as a drop target (OLE is set up for the window's thread first).
 pub(crate) fn register(hwnd: HWND) {

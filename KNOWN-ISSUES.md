@@ -21,7 +21,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - Dragging a selection beside an inline `svg` heading extends it to the next line's text (ref 840).
 - An inline `svg` path with `pathLength` and dashes draws no stroke when its color is a `color-mix()` of system
   colors, as jhey.dev's signature (ref 855).
-- A link opened in a new background tab keeps loading until you switch to the tab (ref 842).
 - An image opened on its own shows in the top-left corner instead of centred (ref 853).
 - **Grid gaps.** `display: grid-lanes` (masonry) is not implemented. Subgrids in another writing mode or direction than
   their parent are laid out as ordinary grids, a subgrid's items share baselines only within it, and a subgrid's
@@ -271,6 +270,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   before they are saved. (ref 542)
 - **Incognito windows are not finished.** They keep nothing on disk, but open the settings, history and bookmark
   pages in themselves rather than in a regular window, and lose bookmarks added in them when they close. (ref 540)
+- Links, images and selected text cannot be dragged out of a page to other programs yet; the address and the site
+  button can (ref 847).
 
 ## Tooling
 

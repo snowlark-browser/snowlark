@@ -5,4 +5,6 @@
 //! Drags from other programs on Linux: the types the window's drag events carry (the window's
 //! `drag` module takes them from the desktop's data device).
 
-pub use crate::drag_data::{DragData, DropEffect};
+pub use crate::drag_data::{
+    shortcut_file_contents, shortcut_file_name, DragData, DragImage, DragLink, DragOut, DropEffect,
+};
