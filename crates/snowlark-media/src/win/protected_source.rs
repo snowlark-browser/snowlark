@@ -855,6 +855,7 @@ mod tests {
                 data: vec![1, 2, 3],
                 time: 0,
                 duration: 10,
+                decode: 0,
                 key: true,
                 encryption: None,
             });

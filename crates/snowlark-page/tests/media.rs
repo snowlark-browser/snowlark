@@ -369,10 +369,6 @@ fn track_elements_load_webvtt() {
 /// (HTML §4.8.11.5; Chromium's `HTMLMediaElement::StartProgressEventTimer`): a check that finds no
 /// new data leaves the loop asleep until the next one, rather than due again at once.
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "no Media Source Extensions on Linux yet (docs/linux.md stage 7)"
-)]
 fn a_loading_media_element_does_not_keep_the_loop_awake() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -411,10 +407,6 @@ fn a_loading_media_element_does_not_keep_the_loop_awake() {
 }
 
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "no Media Source Extensions on Linux yet (docs/linux.md stage 7)"
-)]
 fn media_source_opens_and_appends() {
     let net = NetThread::start(NetConfig::default()).unwrap();
     let mut page = page(
@@ -467,10 +459,12 @@ fn media_source_opens_and_appends() {
     );
     // VP9 by profile and depth, from the decoders' and the GPU's decoder profiles: profile 1
     // (4:4:4) has no GPU decoder profile and no decoder here takes it, though Media Foundation's own
-    // MSE check, which brings up a decoder per question, says yes to every VP9 profile.
-    if snowlark_media::support()
-        .codecs
-        .contains(&snowlark_media::caps::Codec::Vp9)
+    // MSE check, which brings up a decoder per question, says yes to every VP9 profile. (MSE takes
+    // WebM byte streams on Windows only so far.)
+    if cfg!(windows)
+        && snowlark_media::support()
+            .codecs
+            .contains(&snowlark_media::caps::Codec::Vp9)
     {
         assert_eq!(
             eval(
@@ -491,10 +485,6 @@ fn media_source_opens_and_appends() {
 /// opens only once it has data at the playback position, so before the fix `loadedmetadata`
 /// never came and the seek never happened.
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "no Media Source Extensions on Linux yet (docs/linux.md stage 7)"
-)]
 fn media_source_metadata_comes_with_the_initialization_segments() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -602,10 +592,6 @@ fn settle(page: &mut Page, ms: u64) {
 /// state is back to HAVE_CURRENT_DATA or more, `ChunkDemuxer::Seek` holds the seek until
 /// `SourceBufferStream::Seek` finds a range with the position.
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "no Media Source Extensions on Linux yet (docs/linux.md stage 7)"
-)]
 fn a_seek_past_the_buffered_data_waits_for_the_page_to_append_there() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -739,10 +725,6 @@ fn paints_a_video(page: &Page) -> bool {
 /// HAVE_METADATA before any video data was obtained, shows the poster. A page that scrubs a video
 /// by seeking it as it scrolls would otherwise blink between the frame and the poster.
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "no Media Source Extensions on Linux yet (docs/linux.md stage 7)"
-)]
 fn a_seeking_video_shows_its_last_frame() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1074,10 +1056,6 @@ fn a_fetched_resource_fires_progress_then_suspend() {
 /// is still busy (which failed the append and ended the stream with a decode error: a video that
 /// switched to 4K on YouTube errored out and was reloaded at 480p).
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "no Media Source Extensions on Linux yet (docs/linux.md stage 7)"
-)]
 fn an_append_ends_once_however_the_media_side_reports_it() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))

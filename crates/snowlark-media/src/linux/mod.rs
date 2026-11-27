@@ -8,6 +8,8 @@
 pub mod decode;
 pub mod ffmpeg;
 mod ffmpeg_layout;
+pub mod mse;
+mod mse_player;
 pub mod player;
 pub mod probe;
 pub mod pulse;

@@ -56,8 +56,8 @@ minisign -Vm snowlark-preview-*-linux-x86_64.tar.gz -P RWQa8wCIad8uYF2fHaCkxdIMZ
 ```
 
 or against the `.sha256` file beside it (`sha256sum -c`). Linux builds do not check for new versions. Not there yet
-on Linux: Media Source Extensions (the video most streaming sites use), drags out of the window, the sandbox for page
-processes.
+on Linux: WebM streams through Media Source Extensions (MP4 streams play), drags out of the window, the sandbox for
+page processes.
 
 ## Building
 
@@ -78,7 +78,8 @@ browser, and `target\iter\snowlark-cli.exe`, the same program for the console.
 
 On Linux, Snowlark builds the browser (a Wayland window) and its headless modes (`--eval`, `--render`, `--wpt`,
 `--reftest`), with input methods, the desktop's file dialogs and password store, and video and audio through the
-system's FFmpeg (loaded at run time); Media Source Extensions, the sandbox and GPU drawing come later ([docs/linux.md](docs/linux.md) has
+system's FFmpeg (loaded at run time), Media Source Extensions with MP4 streams included; the sandbox and GPU drawing
+come later ([docs/linux.md](docs/linux.md) has
 the plan, where it stands and the extra packages the window and WebGL need).
 Any recent x86-64 distribution works, as does WSL 2 with Ubuntu. On Debian or Ubuntu:
 

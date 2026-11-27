@@ -15,6 +15,10 @@
 //!
 //! The clock is the wall clock rather than the sound card's: the sound follows it, dropping what
 //! is late and waiting for what is early. At a rate other than 1 the sound is silent.
+//!
+//! The decoder reads its packets from a [`Packets`] source: the container, or for a Media Source
+//! the track buffers ([`super::mse_player`]), which can have nothing yet at the position (the
+//! decoder then waits for appends, and the player for data, as it does at a slow network).
 
 use std::collections::VecDeque;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
@@ -26,7 +30,11 @@ use snowlark_audio::realtime::{AudioSink, NullSink, StreamConfig};
 use snowlark_paint::video::VideoSlot;
 use snowlark_paint::VideoId;
 
-use super::ffmpeg::{self, ByteSource, Decoded, Decoder, Demuxer, Frame, Kind, Resampler, Scaler};
+use super::ffmpeg::{
+    self, ByteSource, Decoded, Decoder, Demuxer, Frame, Kind, Packet, Resampler, Scaler,
+};
+use super::mse::MseSource;
+use super::mse_player;
 use super::pulse::{PulseOutputs, PulseSink};
 use crate::audio::{output_muted, Audible, AudioGroup, PlayerAudio};
 use crate::resource::Head;
@@ -103,6 +111,65 @@ impl LinuxPlayer {
         // the resource is closed by the caller, which ends such a read)
         drop(self.thread.lock().unwrap().take());
     }
+}
+
+/// What a packet source has next.
+pub(super) enum Next {
+    Packet(Packet),
+    /// Nothing at the position yet; more may come ([`Packets::wait`]).
+    Pending,
+    End,
+}
+
+/// Where the decoder's packets come from.
+pub(super) trait Packets: Send {
+    fn next(&mut self) -> Next;
+    /// To the random access point at or before `t` seconds of the media timeline.
+    fn seek(&mut self, t: f64);
+    /// Waits a short while for more data, after [`Next::Pending`].
+    fn wait(&mut self);
+}
+
+/// A container's packets.
+struct Container {
+    demuxer: Demuxer,
+    start: f64,
+}
+
+impl Packets for Container {
+    fn next(&mut self) -> Next {
+        match self.demuxer.read() {
+            Ok(Some(p)) => Next::Packet(p),
+            // (a read error after some packets ends the stream, as a short file would)
+            Ok(None) | Err(_) => Next::End,
+        }
+    }
+
+    fn seek(&mut self, t: f64) {
+        let _ = self.demuxer.seek(t + self.start);
+    }
+
+    fn wait(&mut self) {}
+}
+
+/// A stream the player decodes: its decoder, the index its packets carry and their time base,
+/// and (video) its size from the metadata.
+pub(super) struct Stream {
+    pub decoder: Decoder,
+    pub index: usize,
+    pub time_base: ffmpeg::Rational,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// The media opened: its packets, streams and duration (seconds; infinite when unknown).
+struct Media {
+    packets: Box<dyn Packets>,
+    video: Option<Stream>,
+    audio: Option<Stream>,
+    duration: f64,
+    /// When the first frame is due on the packets' timeline (the media timeline's zero).
+    start: f64,
 }
 
 /// The media resource as the demuxer reads it.
@@ -228,64 +295,46 @@ fn run(
         );
         return;
     };
-    let resource = match source {
-        Source::Resource { resource, .. } => resource,
-        Source::Mse(_) => {
-            fail(
-                ErrorCode::SrcNotSupported,
-                "no Media Source Extensions here yet".into(),
-            );
-            return;
+    // Commands that came while a Media Source was not ready to open, for the player loop.
+    let mut early = Vec::new();
+    let (media, resource, mse) = match source {
+        Source::Resource { resource, .. } => match open_container(ff, &resource) {
+            Ok(m) => (m, Some(resource), None),
+            Err((code, e)) => return fail(code, e),
+        },
+        Source::Mse(src) => {
+            // MSE §2.4.? "attaching to a media element": the source opens; the decoders come
+            // from the initialization segments, so the player waits for them.
+            src.open();
+            while !mse_player::ready_to_open(&src) {
+                match rx.recv_timeout(Duration::from_millis(50)) {
+                    Ok(Ctl::Close) | Err(RecvTimeoutError::Disconnected) => {
+                        src.close();
+                        return;
+                    }
+                    Ok(c) => early.push(c),
+                    Err(RecvTimeoutError::Timeout) => {}
+                }
+            }
+            match mse_player::open(ff, src.clone()) {
+                Ok(o) => {
+                    let d = src.duration();
+                    let media = Media {
+                        packets: Box::new(o.reader),
+                        video: o.video,
+                        audio: o.audio,
+                        duration: if d.is_nan() { f64::INFINITY } else { d },
+                        start: 0.0,
+                    };
+                    (media, None, Some(src))
+                }
+                Err(e) => return fail(ErrorCode::SrcNotSupported, e),
+            }
         }
     };
-    let demuxer = match Demuxer::open(ff, Box::new(ResourceBytes(resource.clone()))) {
-        Ok(d) => d,
-        Err(e) => {
-            let code = match resource.head() {
-                Head::Failed { network: true, .. } => ErrorCode::Network,
-                _ => ErrorCode::SrcNotSupported,
-            };
-            fail(code, e);
-            return;
-        }
-    };
-    let video = demuxer
-        .streams()
-        .iter()
-        .find(|s| s.kind == Kind::Video)
-        .cloned();
-    let audio = demuxer
-        .streams()
-        .iter()
-        .find(|s| s.kind == Kind::Audio)
-        .cloned();
-    let decoders = (
-        video.as_ref().map(|s| demuxer.decoder(s.index)).transpose(),
-        audio.as_ref().map(|s| demuxer.decoder(s.index)).transpose(),
-    );
-    let (vdec, adec) = match decoders {
-        (Ok(v), Ok(a)) if v.is_some() || a.is_some() => (v, a),
-        (Err(e), _) | (_, Err(e)) => return fail(ErrorCode::SrcNotSupported, e),
-        _ => {
-            return fail(
-                ErrorCode::SrcNotSupported,
-                "no audio or video stream".into(),
-            )
-        }
-    };
-    let start = demuxer.start_time();
-    let mut duration = demuxer.duration();
-    if !duration.is_finite() {
-        duration = [&video, &audio]
-            .iter()
-            .filter_map(|s| s.as_ref().map(|s| s.duration))
-            .filter(|d| d.is_finite())
-            .fold(f64::NAN, f64::max);
-    }
-    if !duration.is_finite() {
-        duration = f64::INFINITY;
-    }
-    let (width, height) = video.as_ref().map_or((0, 0), |v| (v.width, v.height));
+    let duration = media.duration;
+    let (width, height) = media.video.as_ref().map_or((0, 0), |v| (v.width, v.height));
+    let (has_video, has_audio) = (media.video.is_some(), media.audio.is_some());
     {
         let mut st = shared.status.lock().unwrap();
         st.duration = duration;
@@ -304,23 +353,9 @@ fn run(
     let queues: Shared2 = Arc::default();
     let decoder = {
         let q = queues.clone();
-        let (vi, ai) = (
-            video.as_ref().map(|s| s.index),
-            audio.as_ref().map(|s| s.index),
-        );
-        let tb = (
-            video.as_ref().map(|s| s.time_base),
-            audio.as_ref().map(|s| s.time_base),
-        );
-        let streams = Streams {
-            demuxer,
-            video: vdec.zip(vi).zip(tb.0).map(|((d, i), tb)| (d, i, tb)),
-            audio: adec.zip(ai).zip(tb.1).map(|((d, i), tb)| (d, i, tb)),
-            start,
-        };
         std::thread::Builder::new()
             .name("media decoder".into())
-            .spawn(move || decode(ff, streams, q))
+            .spawn(move || decode(ff, media, q))
             .ok()
     };
     let sound_state = Arc::new(Mutex::new(SoundState {
@@ -334,7 +369,7 @@ fn run(
         muted: options.muted,
         generation: 0,
     }));
-    let sound = audio.is_some().then(|| {
+    let sound = has_audio.then(|| {
         let (q, s, group) = (queues.clone(), sound_state.clone(), options.audio.clone());
         std::thread::Builder::new()
             .name("media sound".into())
@@ -348,13 +383,15 @@ fn run(
             slot,
             queues: &queues,
             sound: &sound_state,
-            has_video: video.is_some(),
-            has_audio: audio.is_some(),
+            has_video,
+            has_audio,
             duration,
             size: (width, height),
             audio: PlayerAudio::new(options.audio.clone()),
+            mse: mse.clone(),
         },
         rx,
+        early,
     );
 
     {
@@ -362,13 +399,76 @@ fn run(
         m.lock().unwrap().closed = true;
         cv.notify_all();
     }
-    resource.close();
+    if let Some(r) = resource {
+        r.close();
+    }
+    if let Some(src) = mse {
+        src.close();
+    }
     if let Some(Some(t)) = sound {
         let _ = t.join();
     }
     if let Some(t) = decoder {
         let _ = t.join();
     }
+}
+
+/// Opens a fetched resource's container: its first video and audio streams' decoders.
+fn open_container(
+    ff: &'static ffmpeg::Ffmpeg,
+    resource: &MediaResource,
+) -> Result<Media, (ErrorCode, String)> {
+    let demuxer = Demuxer::open(ff, Box::new(ResourceBytes(resource.clone()))).map_err(|e| {
+        let code = match resource.head() {
+            Head::Failed { network: true, .. } => ErrorCode::Network,
+            _ => ErrorCode::SrcNotSupported,
+        };
+        (code, e)
+    })?;
+    let first = |kind| demuxer.streams().iter().find(|s| s.kind == kind).cloned();
+    let (video, audio) = (first(Kind::Video), first(Kind::Audio));
+    let stream = |s: &ffmpeg::StreamInfo| {
+        demuxer.decoder(s.index).map(|decoder| Stream {
+            decoder,
+            index: s.index,
+            time_base: s.time_base,
+            width: s.width,
+            height: s.height,
+        })
+    };
+    let streams = (
+        video.as_ref().map(stream).transpose(),
+        audio.as_ref().map(stream).transpose(),
+    );
+    let (vs, au) = match streams {
+        (Ok(v), Ok(a)) if v.is_some() || a.is_some() => (v, a),
+        (Err(e), _) | (_, Err(e)) => return Err((ErrorCode::SrcNotSupported, e)),
+        _ => {
+            return Err((
+                ErrorCode::SrcNotSupported,
+                "no audio or video stream".into(),
+            ))
+        }
+    };
+    let start = demuxer.start_time();
+    let mut duration = demuxer.duration();
+    if !duration.is_finite() {
+        duration = [&video, &audio]
+            .iter()
+            .filter_map(|s| s.as_ref().map(|s| s.duration))
+            .filter(|d| d.is_finite())
+            .fold(f64::NAN, f64::max);
+    }
+    if !duration.is_finite() {
+        duration = f64::INFINITY;
+    }
+    Ok(Media {
+        packets: Box::new(Container { demuxer, start }),
+        video: vs,
+        audio: au,
+        duration,
+        start,
+    })
 }
 
 /// The player thread's part.
@@ -383,9 +483,11 @@ struct Play<'a> {
     /// The size of the pictures shown (the metadata's until the first).
     size: (u32, u32),
     audio: PlayerAudio,
+    /// A Media Source: its duration is the player's, and it hears of the playback position.
+    mse: Option<MseSource>,
 }
 
-fn play(mut p: Play, rx: Receiver<Ctl>) {
+fn play(mut p: Play, rx: Receiver<Ctl>, mut early: Vec<Ctl>) {
     let mut clock = Clock {
         at: 0.0,
         since: Instant::now(),
@@ -411,13 +513,18 @@ fn play(mut p: Play, rx: Receiver<Ctl>) {
         } else {
             Duration::from_millis(20)
         };
-        let mut commands = Vec::new();
+        let mut commands = std::mem::take(&mut early);
         match rx.recv_timeout(wait) {
             Ok(c) => commands.push(c),
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => return,
         }
         commands.extend(rx.try_iter());
+        if let Some(src) = &p.mse {
+            // (the page sets a Media Source's duration, and the end of stream does)
+            let d = src.duration();
+            p.duration = if d.is_nan() { f64::INFINITY } else { d };
+        }
         for c in commands {
             match c {
                 Ctl::Close => return,
@@ -548,17 +655,30 @@ fn play(mut p: Play, rx: Receiver<Ctl>) {
             s.muted = muted;
             s.generation = generation;
         }
+        let buffered = match &p.mse {
+            Some(src) => {
+                // (eviction keeps what is after the position)
+                src.set_position(clock.now());
+                src.buffered_all()
+            }
+            None if queued_to > 0.0 => Ranges::single(0.0, queued_to.min(p.duration)),
+            None => Ranges::new(),
+        };
         {
             let mut st = p.shared.status.lock().unwrap();
             st.position = clock.now();
             st.sampled = Instant::now();
             st.playing = clock.running;
             st.rate = clock.rate;
-            st.buffered = if queued_to > 0.0 {
-                Ranges::single(0.0, queued_to.min(p.duration))
-            } else {
-                Ranges::new()
-            };
+            st.buffered = buffered;
+            if p.mse.is_some() {
+                st.duration = p.duration;
+                st.seekable = if p.duration.is_finite() {
+                    Ranges::single(0.0, p.duration)
+                } else {
+                    Ranges::new()
+                };
+            }
         }
         p.audio.update(&Audible {
             playing: clock.running,
@@ -569,15 +689,7 @@ fn play(mut p: Play, rx: Receiver<Ctl>) {
     }
 }
 
-/// The decoder thread's container and streams (decoder, index, time base).
-struct Streams {
-    demuxer: Demuxer,
-    video: Option<(Decoder, usize, ffmpeg::Rational)>,
-    audio: Option<(Decoder, usize, ffmpeg::Rational)>,
-    start: f64,
-}
-
-fn decode(ff: &'static ffmpeg::Ffmpeg, mut s: Streams, queues: Shared2) {
+fn decode(ff: &'static ffmpeg::Ffmpeg, mut s: Media, queues: Shared2) {
     let (m, cv) = &*queues;
     let mut frame = Frame::new(ff);
     let mut scaler = Scaler::new(ff);
@@ -595,12 +707,9 @@ fn decode(ff: &'static ffmpeg::Ffmpeg, mut s: Streams, queues: Shared2) {
                 }
                 if let Some((t, g)) = q.seek.take() {
                     drop(q);
-                    let _ = s.demuxer.seek(t + s.start);
-                    if let Some((d, ..)) = &mut s.video {
-                        d.flush();
-                    }
-                    if let Some((d, ..)) = &mut s.audio {
-                        d.flush();
+                    s.packets.seek(t);
+                    for st in [&mut s.video, &mut s.audio].into_iter().flatten() {
+                        st.decoder.flush();
                     }
                     (generation, from, reached) = (g, t, false);
                     q = m.lock().unwrap();
@@ -617,12 +726,12 @@ fn decode(ff: &'static ffmpeg::Ffmpeg, mut s: Streams, queues: Shared2) {
                 break;
             }
         }
-        let pkt = match s.demuxer.read() {
-            Ok(p) => p,
-            Err(e) => {
-                // (a read error after some packets ends the stream, as a short file would)
-                let _ = e;
-                None
+        let pkt = match s.packets.next() {
+            Next::Packet(p) => Some(p),
+            Next::End => None,
+            Next::Pending => {
+                s.packets.wait();
+                continue;
             }
         };
         let mut out: Vec<Picture> = Vec::new();
@@ -676,38 +785,43 @@ fn decode(ff: &'static ffmpeg::Ffmpeg, mut s: Streams, queues: Shared2) {
                 }
             }
         };
-        let result = match &pkt {
-            Some(pkt) => {
-                let i = pkt.stream();
-                if let Some((d, vi, tb)) = s.video.as_mut().filter(|v| v.1 == i) {
-                    let _ = vi;
-                    d.send(Some(pkt))
-                        .and_then(|_| take(d, *tb, true, &mut out, &mut sound))
-                } else if let Some((d, ai, tb)) = s.audio.as_mut().filter(|a| a.1 == i) {
-                    let _ = ai;
-                    d.send(Some(pkt))
-                        .and_then(|_| take(d, *tb, false, &mut out, &mut sound))
-                } else {
-                    Ok(())
+        let result =
+            match &pkt {
+                Some(pkt) => {
+                    let i = pkt.stream();
+                    if let Some(v) = s.video.as_mut().filter(|v| v.index == i) {
+                        let tb = v.time_base;
+                        v.decoder
+                            .send(Some(pkt))
+                            .and_then(|_| take(&mut v.decoder, tb, true, &mut out, &mut sound))
+                    } else if let Some(a) = s.audio.as_mut().filter(|a| a.index == i) {
+                        let tb = a.time_base;
+                        a.decoder
+                            .send(Some(pkt))
+                            .and_then(|_| take(&mut a.decoder, tb, false, &mut out, &mut sound))
+                    } else {
+                        Ok(())
+                    }
                 }
-            }
-            None => {
-                let mut r = Ok(());
-                if let Some((d, _, tb)) = s.video.as_mut() {
-                    r = r.and(
-                        d.send(None)
-                            .and_then(|_| take(d, *tb, true, &mut out, &mut sound)),
-                    );
+                None => {
+                    let mut r = Ok(());
+                    if let Some(v) = s.video.as_mut() {
+                        let tb = v.time_base;
+                        r =
+                            r.and(v.decoder.send(None).and_then(|_| {
+                                take(&mut v.decoder, tb, true, &mut out, &mut sound)
+                            }));
+                    }
+                    if let Some(a) = s.audio.as_mut() {
+                        let tb = a.time_base;
+                        r =
+                            r.and(a.decoder.send(None).and_then(|_| {
+                                take(&mut a.decoder, tb, false, &mut out, &mut sound)
+                            }));
+                    }
+                    r
                 }
-                if let Some((d, _, tb)) = s.audio.as_mut() {
-                    r = r.and(
-                        d.send(None)
-                            .and_then(|_| take(d, *tb, false, &mut out, &mut sound)),
-                    );
-                }
-                r
-            }
-        };
+            };
         let mut q = m.lock().unwrap();
         if q.generation != generation || q.seek.is_some() {
             continue; // (a seek came meanwhile: what was decoded is of the old position)

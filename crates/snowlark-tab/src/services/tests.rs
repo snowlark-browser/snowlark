@@ -2752,6 +2752,7 @@ fn test_sample(len: usize, time: i64) -> snowlark_media::fmp4::Sample {
         data: vec![7; len],
         time,
         duration: 1,
+        decode: time,
         key: true,
         encryption: None,
     }

@@ -431,7 +431,8 @@ pub fn can_play_type(type_: &str) -> CanPlay {
 }
 
 pub mod mse {
-    //! Media Source Extensions (Media Foundation's on Windows: `win::mse`).
+    //! Media Source Extensions (Media Foundation's on Windows: `win::mse`; on Linux the track
+    //! buffers of `linux::mse`).
     #[cfg(windows)]
     pub use crate::win::mse::*;
 
@@ -457,77 +458,5 @@ pub mod mse {
     }
 
     #[cfg(not(windows))]
-    pub use unsupported::*;
-
-    #[cfg(not(windows))]
-    mod unsupported {
-        //! No MSE backend on this system yet (docs/linux.md stage 7): a source cannot be made, so
-        //! attaching a MediaSource fails as HTML says for a media source it cannot use.
-        use std::sync::Arc;
-
-        use super::{AddError, MseEvent};
-        use crate::Ranges;
-
-        /// Why a source could not be made.
-        #[derive(Debug)]
-        pub struct Unsupported;
-
-        /// One `MediaSource` object's media side: none can be made here.
-        #[derive(Clone)]
-        pub struct MseSource(std::convert::Infallible);
-
-        impl MseSource {
-            pub fn new() -> Result<MseSource, Unsupported> {
-                Err(Unsupported)
-            }
-            pub fn set_wake(&self, _wake: Option<Arc<dyn Fn() + Send + Sync>>) {
-                match self.0 {}
-            }
-            pub fn take_events(&self) -> Vec<MseEvent> {
-                match self.0 {}
-            }
-            pub fn ready_state(&self) -> &'static str {
-                match self.0 {}
-            }
-            pub fn add_source_buffer(&self, _type: &str) -> Result<u32, AddError> {
-                match self.0 {}
-            }
-            pub fn remove_source_buffer(&self, _id: u32) {
-                match self.0 {}
-            }
-            pub fn append(&self, _id: u32, _bytes: &[u8]) -> Result<(), String> {
-                match self.0 {}
-            }
-            pub fn remove(&self, _id: u32, _start: f64, _end: f64) -> Result<(), String> {
-                match self.0 {}
-            }
-            pub fn abort(&self, _id: u32) {
-                match self.0 {}
-            }
-            pub fn updating(&self, _id: u32) -> bool {
-                match self.0 {}
-            }
-            pub fn buffered(&self, _id: u32) -> Ranges {
-                match self.0 {}
-            }
-            pub fn set_timestamp_offset(&self, _id: u32, _t: f64) {
-                match self.0 {}
-            }
-            pub fn set_append_window(&self, _id: u32, _start: f64, _end: f64) {
-                match self.0 {}
-            }
-            pub fn set_sequence_mode(&self, _id: u32, _sequence: bool) {
-                match self.0 {}
-            }
-            pub fn end_of_stream(&self, _error: Option<&str>) {
-                match self.0 {}
-            }
-            pub fn duration(&self) -> f64 {
-                match self.0 {}
-            }
-            pub fn set_duration(&self, _d: f64) {
-                match self.0 {}
-            }
-        }
-    }
+    pub use crate::linux::mse::*;
 }

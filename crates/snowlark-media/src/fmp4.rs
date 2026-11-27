@@ -43,6 +43,9 @@ pub struct Sample {
     /// Presentation time and duration in 100 ns units.
     pub time: i64,
     pub duration: i64,
+    /// Decode time in 100 ns units (on the presentation time's timeline).
+    #[serde(default)]
+    pub decode: i64,
     pub key: bool,
     pub encryption: Option<SampleEncryption>,
 }
@@ -108,13 +111,47 @@ pub struct SampleReader {
     pending: Vec<u8>,
     /// Bytes still to pass of a box this does not read.
     skip: u64,
+    /// Samples as stored ([`SampleReader::raw`]).
+    raw: bool,
+    /// The last initialization segment's `moov` box.
+    moov: Vec<u8>,
+    /// Media segments read.
+    segments: u64,
+    /// The stream had something that is not an ISO BMFF top-level box.
+    failed: bool,
 }
 
 const SAMPLE_IS_NON_SYNC: u32 = 0x1_0000;
 
+/// The box types a stream may have at its top level (ISO/IEC 14496-12's file-level boxes, and
+/// `styp`, `sidx`, `ssix`, `prft` and `emsg` of the byte stream format and DASH).
+const TOP_LEVEL: [&[u8; 4]; 17] = [
+    b"ftyp", b"pdin", b"bloc", b"moov", b"moof", b"mfra", b"mdat", b"free", b"skip", b"meta",
+    b"meco", b"styp", b"sidx", b"ssix", b"prft", b"uuid", b"emsg",
+];
+
 impl SampleReader {
     pub fn new() -> SampleReader {
         SampleReader::default()
+    }
+
+    /// A reader that hands samples over as the segment stores them (H.264 keeps its length
+    /// prefixes, for a decoder configured from the `avcC` itself).
+    pub fn raw() -> SampleReader {
+        SampleReader {
+            raw: true,
+            ..SampleReader::default()
+        }
+    }
+
+    /// The last initialization segment's `moov` box (empty before one).
+    pub fn moov(&self) -> &[u8] {
+        &self.moov
+    }
+
+    /// How many media segments (`moof` and `mdat`) it has read.
+    pub fn segments(&self) -> u64 {
+        self.segments
     }
 
     /// The tracks of the last initialization segment.
@@ -127,6 +164,13 @@ impl SampleReader {
     pub fn reset(&mut self) {
         self.pending.clear();
         self.skip = 0;
+        self.failed = false;
+    }
+
+    /// Whether the bytes had a box that is not a top-level box, or no box where one was due (a
+    /// parse error: MSE's "append error"). What follows is skipped as before.
+    pub fn failed(&self) -> bool {
+        self.failed
     }
 
     /// Takes appended bytes; returns the tracks and samples completed by them, in stream order.
@@ -154,9 +198,13 @@ impl SampleReader {
             let avail = (buf.len() - p) as u64;
             if size == 0 || size < h as u64 {
                 // (a box to the end of the stream, or not a box: nothing more is read)
+                self.failed = true;
                 p = buf.len();
                 self.skip = u64::MAX;
                 break;
+            }
+            if !TOP_LEVEL.contains(&&typ) {
+                self.failed = true;
             }
             match &typ {
                 b"moov" => {
@@ -165,6 +213,7 @@ impl SampleReader {
                     }
                     let e = p + size as usize;
                     self.read_moov(&buf[p..e]);
+                    self.moov = buf[p..e].to_vec();
                     out.push(Output::Tracks(self.tracks.clone()));
                     p = e;
                 }
@@ -300,6 +349,7 @@ impl SampleReader {
     }
 
     fn read_segment(&mut self, b: &[u8], moof_len: usize, out: &mut Vec<Output>) {
+        self.segments += 1;
         let mut prev_end: Option<usize> = None;
         for (ts, te, typ, th) in children(b, 8, moof_len) {
             if &typ != b"traf" {
@@ -325,6 +375,7 @@ impl SampleReader {
                 |v: i64| (v as i128 * 10_000_000 / track.timescale.max(1) as i128) as i64;
             for s in &traf.samples {
                 let time = decode as i64 + s.composition_offset as i64 - track.start;
+                let decode_time = decode as i64 - track.start;
                 decode += s.duration as u64;
                 let Some(data) = b.get(s.offset..s.offset + s.size) else {
                     continue;
@@ -351,6 +402,12 @@ impl SampleReader {
                     }
                 });
                 let data = match &track.codec {
+                    Codec::Avc { length_size, .. } if self.raw => {
+                        if let Some(idr) = avc_idr(data, *length_size as usize) {
+                            key = idr;
+                        }
+                        data.to_vec()
+                    }
                     Codec::Avc {
                         parameter_sets,
                         length_size,
@@ -375,6 +432,7 @@ impl SampleReader {
                         data,
                         time: to_100ns(time),
                         duration: to_100ns(s.duration as i64),
+                        decode: to_100ns(decode_time),
                         key,
                         encryption,
                     },

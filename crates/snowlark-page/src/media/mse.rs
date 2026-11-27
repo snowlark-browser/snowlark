@@ -221,8 +221,13 @@ impl Engine {
         self.fire_at(ms, "sourceclose");
     }
 
-    /// Native MSE events: `sourceopen`, buffers' update events.
-    pub(crate) fn poll_mse(&self, cx: &mut Cx) -> bool {
+    /// Native MSE events: `sourceopen`, buffers' update events. Each is handled in a task of its
+    /// own, after the tasks already queued: the end of an append is a task (MSE §3.5.? "buffer
+    /// append", queued when the append starts), so its `update` and `updateend` come after those
+    /// of the operation before it. Handled at once, a report that comes as soon as the append
+    /// starts would end it before the previous operation's `updateend` ran, and a page that
+    /// appends from both handlers would then start an append per event.
+    pub(crate) fn poll_mse(&self, _cx: &mut Cx) -> bool {
         let sources: Vec<Handle> = self.media.borrow().sources.clone();
         let mut any = false;
         for ms in sources {
@@ -231,96 +236,105 @@ impl Engine {
             };
             for e in native.take_events() {
                 any = true;
-                match e {
-                    MseEvent::Opened => {
-                        let was = self.ms(ms, |s| {
-                            let was = s.ready;
-                            s.ready = ReadyState::Open;
-                            was
-                        });
-                        if was == ReadyState::Closed {
-                            self.fire_at(ms, "sourceopen");
-                        }
+                self.queue_task(TaskSource::DomManipulation, move |eng, cx| {
+                    // (not for a source detached meanwhile)
+                    if eng.ms(ms, |s| s.native.is_some()) {
+                        eng.mse_native_event(cx, ms, e);
                     }
-                    MseEvent::Closed => {
-                        self.ms(ms, |s| s.ready = ReadyState::Closed);
-                        self.fire_at(ms, "sourceclose");
-                    }
-                    MseEvent::Ended | MseEvent::UpdateStart(_) | MseEvent::Abort(_) => {}
-                    MseEvent::Update(id) | MseEvent::UpdateEnd(id) | MseEvent::Error(id) => {
-                        let Some(sb) = self
-                            .ms(ms, |s| s.buffers.clone())
-                            .into_iter()
-                            .find(|&b| self.sb(b, |d| d.id) == id)
-                        else {
-                            continue;
-                        };
-                        // An operation ends once (MSE §3.5.? the "segment parser loop" and "range
-                        // removal": `updating` set to false, then `update` and `updateend`; the
-                        // "append error algorithm": `error` and `updateend`). The media side
-                        // reports each operation with `Updated` (or `ErrorOccurred`) and then
-                        // `UpdateEnded`, which can come in different turns: only `UpdateEnded`
-                        // ends it, so a report of an operation that already ended for the page can
-                        // never end the next one, which the page may have started in between.
-                        let end = self.sb(sb, |b| {
-                            // A native append of bytes the decryptor released ends without
-                            // the page seeing it.
-                            if b.flushing {
-                                if matches!(e, MseEvent::UpdateEnd(_)) {
-                                    b.flushing = false;
-                                }
-                                return None;
-                            }
-                            if b.swallow > 0 {
-                                if matches!(e, MseEvent::UpdateEnd(_)) {
-                                    b.swallow -= 1;
-                                }
-                                return None;
-                            }
-                            match e {
-                                MseEvent::Error(_) => {
-                                    b.failed = true;
-                                    None
-                                }
-                                MseEvent::UpdateEnd(_) if b.updating => {
-                                    b.updating = false;
-                                    Some(std::mem::take(&mut b.failed))
-                                }
-                                _ => None,
-                            }
-                        });
-                        if !matches!(e, MseEvent::Update(_)) {
-                            self.mse_trace(ms, format_args!("{e:?} ends={end:?}"));
-                        }
-                        if matches!(e, MseEvent::UpdateEnd(_)) {
-                            self.mse_flush(sb);
-                        }
-                        let Some(failed) = end else {
-                            continue;
-                        };
-                        let init = self.sb(sb, |b| b.init_pending.take());
-                        if let (Some(init), false) = (init, failed) {
-                            self.mse_init_segment_received(cx, ms, sb, init);
-                        }
-                        if failed {
-                            // MSE §3.5.? "append error algorithm".
-                            self.fire_at(sb, "error");
-                            self.fire_at(sb, "updateend");
-                            self.mse_end_of_stream(ms, Some("decode"));
-                        } else {
-                            // A seek waiting for data at its position (MSE §3.5.? "coded frame
-                            // processing", the end: HAVE_METADATA and data now at the position).
-                            if let Some(el) = self.ms(ms, |s| s.media) {
-                                self.media_seek_check(el);
-                            }
-                            self.fire_at(sb, "update");
-                            self.fire_at(sb, "updateend");
-                        }
-                    }
-                }
+                });
             }
         }
         any
+    }
+
+    fn mse_native_event(&self, cx: &mut Cx, ms: Handle, e: MseEvent) {
+        match e {
+            MseEvent::Opened => {
+                let was = self.ms(ms, |s| {
+                    let was = s.ready;
+                    s.ready = ReadyState::Open;
+                    was
+                });
+                if was == ReadyState::Closed {
+                    self.fire_at(ms, "sourceopen");
+                }
+            }
+            MseEvent::Closed => {
+                self.ms(ms, |s| s.ready = ReadyState::Closed);
+                self.fire_at(ms, "sourceclose");
+            }
+            MseEvent::Ended | MseEvent::UpdateStart(_) | MseEvent::Abort(_) => {}
+            MseEvent::Update(id) | MseEvent::UpdateEnd(id) | MseEvent::Error(id) => {
+                let Some(sb) = self
+                    .ms(ms, |s| s.buffers.clone())
+                    .into_iter()
+                    .find(|&b| self.sb(b, |d| d.id) == id)
+                else {
+                    return;
+                };
+                // An operation ends once (MSE §3.5.? the "segment parser loop" and "range
+                // removal": `updating` set to false, then `update` and `updateend`; the
+                // "append error algorithm": `error` and `updateend`). The media side
+                // reports each operation with `Updated` (or `ErrorOccurred`) and then
+                // `UpdateEnded`, which can come in different turns: only `UpdateEnded`
+                // ends it, so a report of an operation that already ended for the page can
+                // never end the next one, which the page may have started in between.
+                let end = self.sb(sb, |b| {
+                    // A native append of bytes the decryptor released ends without
+                    // the page seeing it.
+                    if b.flushing {
+                        if matches!(e, MseEvent::UpdateEnd(_)) {
+                            b.flushing = false;
+                        }
+                        return None;
+                    }
+                    if b.swallow > 0 {
+                        if matches!(e, MseEvent::UpdateEnd(_)) {
+                            b.swallow -= 1;
+                        }
+                        return None;
+                    }
+                    match e {
+                        MseEvent::Error(_) => {
+                            b.failed = true;
+                            None
+                        }
+                        MseEvent::UpdateEnd(_) if b.updating => {
+                            b.updating = false;
+                            Some(std::mem::take(&mut b.failed))
+                        }
+                        _ => None,
+                    }
+                });
+                if !matches!(e, MseEvent::Update(_)) {
+                    self.mse_trace(ms, format_args!("{e:?} ends={end:?}"));
+                }
+                if matches!(e, MseEvent::UpdateEnd(_)) {
+                    self.mse_flush(sb);
+                }
+                let Some(failed) = end else {
+                    return;
+                };
+                let init = self.sb(sb, |b| b.init_pending.take());
+                if let (Some(init), false) = (init, failed) {
+                    self.mse_init_segment_received(cx, ms, sb, init);
+                }
+                if failed {
+                    // MSE §3.5.? "append error algorithm".
+                    self.fire_at(sb, "error");
+                    self.fire_at(sb, "updateend");
+                    self.mse_end_of_stream(ms, Some("decode"));
+                } else {
+                    // A seek waiting for data at its position (MSE §3.5.? "coded frame
+                    // processing", the end: HAVE_METADATA and data now at the position).
+                    if let Some(el) = self.ms(ms, |s| s.media) {
+                        self.media_seek_check(el);
+                    }
+                    self.fire_at(sb, "update");
+                    self.fire_at(sb, "updateend");
+                }
+            }
+        }
     }
 
     /// Ends, in a task, the page's append whose bytes the media side did not get (they wait for a

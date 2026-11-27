@@ -555,10 +555,6 @@ fn a_modules_player_that_takes_over_a_playing_element_plays() {
 /// ends of its streams, is handed the samples from the key frame again, and then the ends again,
 /// so that it can start (its engine otherwise waits for more audio) and reach the end.
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "no Media Source Extensions on Linux yet (docs/linux.md stage 7)"
-)]
 fn a_seek_in_an_ended_media_source_ends_the_players_streams_again() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -611,10 +607,6 @@ fn a_seek_in_an_ended_media_source_ends_the_players_streams_again() {
 /// seek hands it the samples again from the key frame at or before the new position; what it
 /// reports becomes the element's state (`playing`, `currentTime`, `seeked`, the playback quality).
 #[test]
-#[cfg_attr(
-    not(windows),
-    ignore = "no Media Source Extensions on Linux yet (docs/linux.md stage 7)"
-)]
 fn a_modules_player_plays_a_media_source() {
     let clip = std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
