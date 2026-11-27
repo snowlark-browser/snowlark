@@ -176,12 +176,25 @@ fn uploaded_pixels_draw_where_the_table_has_none() {
 }
 
 #[test]
-fn only_the_software_device_can_be_made() {
-    assert!(Gpu::with_driver(Driver::Hardware).is_err());
+fn the_default_device_is_the_software_one() {
     let gpu = Gpu::with_driver(Driver::Warp).unwrap();
     assert_eq!(gpu.driver(), Driver::Warp);
-    // (the default falls back to it, as on Windows without a usable card)
-    assert_eq!(Gpu::new().unwrap().driver(), Driver::Warp);
+    assert_eq!(gpu.adapter(), "Skia CPU");
+    // (until the window shows GL frames itself, only SNOWLARK_GPU=gl asks for the hardware one)
+    if std::env::var_os("SNOWLARK_GPU").is_none() {
+        assert_eq!(Gpu::new().unwrap().driver(), Driver::Warp);
+    }
+}
+
+#[test]
+fn the_hardware_device_names_its_gl_renderer() {
+    // (a system with EGL and a GL driver: Mesa's software one counts)
+    let Ok(gpu) = Gpu::with_driver(Driver::Hardware) else {
+        eprintln!("no EGL here: skipped");
+        return;
+    };
+    assert_eq!(gpu.driver(), Driver::Hardware);
+    assert!(!gpu.adapter().is_empty() && gpu.adapter() != "Skia CPU");
 }
 
 #[test]

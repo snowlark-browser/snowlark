@@ -6,11 +6,12 @@
 //! ([`TileRasterizer`]) that paint display lists into 512×512 tiles, which a compositor draws at
 //! any scroll offset without painting again.
 //!
-//! The device is Skia's CPU backend for now, the software path a system without a usable GPU
-//! takes on Windows too ([`Driver::Warp`]): its tiles are premultiplied BGRA pixels in memory.
-//! Skia's GL backend comes with the window's GPU compositor (docs/linux.md, stage 5); until then a
-//! hardware device cannot be made, so `Gpu::new()` fails as before and callers that can fall back
-//! to software ask for [`Driver::Warp`].
+//! Tiles are painted with Skia's CPU backend on either device: premultiplied BGRA pixels in
+//! memory. [`Driver::Warp`] is the software path a system without a usable GPU takes on Windows
+//! too: the compositor draws on the CPU as well. [`Driver::Hardware`] is OpenGL ES through EGL
+//! ([`egl`]): the window's compositor draws with Skia's GL backend ("software raster, GPU
+//! compositing"). Until the window shows GL frames itself, `Gpu::new()` makes the hardware device
+//! only when `SNOWLARK_GPU=gl` asks for it.
 //!
 //! Thread rules are the Windows half's: [`Gpu`] is shared, [`TileRasterizer`] stays on the thread
 //! that made it (its Skia caches), and [`TiledFrame`] is `Send` (its tiles are pixels no one
@@ -38,24 +39,43 @@ pub enum Driver {
     Warp,
 }
 
+#[path = "egl.rs"]
+pub(crate) mod egl;
+
 /// The device tiles are painted with (see the module documentation).
-#[derive(Debug)]
 pub struct Gpu {
     driver: Driver,
+    /// The hardware device's display.
+    display: Option<&'static egl::Display>,
+}
+
+impl std::fmt::Debug for Gpu {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Gpu")
+            .field("driver", &self.driver)
+            .field("adapter", &self.adapter())
+            .finish()
+    }
 }
 
 impl Gpu {
-    /// The hardware device, or the software one when there is none (as on Windows): on Linux
-    /// always the software one so far.
+    /// The hardware device, or the software one when there is none (as on Windows); the hardware
+    /// one only with `SNOWLARK_GPU=gl` so far (see the module documentation).
     pub fn new() -> Result<Arc<Gpu>> {
-        Gpu::with_driver(Driver::Hardware).or_else(|_| Gpu::with_driver(Driver::Warp))
+        if std::env::var("SNOWLARK_GPU").is_ok_and(|v| v == "gl") {
+            if let Ok(gpu) = Gpu::with_driver(Driver::Hardware) {
+                return Ok(gpu);
+            }
+        }
+        Gpu::with_driver(Driver::Warp)
     }
 
     pub fn with_driver(driver: Driver) -> Result<Arc<Gpu>> {
-        match driver {
-            Driver::Hardware => Err(Error::Platform("no GPU device on this system yet".into())),
-            Driver::Warp => Ok(Arc::new(Gpu { driver })),
-        }
+        let display = match driver {
+            Driver::Hardware => Some(egl::Display::get().map_err(Error::Platform)?),
+            Driver::Warp => None,
+        };
+        Ok(Arc::new(Gpu { driver, display }))
     }
 
     pub fn driver(&self) -> Driver {
@@ -64,7 +84,7 @@ impl Gpu {
 
     /// The device's name, for diagnostics.
     pub fn adapter(&self) -> &str {
-        "Skia CPU"
+        self.display.map_or("Skia CPU", |d| d.renderer())
     }
 
     /// Lets go of resources freed since the last call (nothing is deferred on the CPU).

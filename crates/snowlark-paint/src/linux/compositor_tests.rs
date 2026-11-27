@@ -24,11 +24,33 @@ const GRAY: Color = Color::rgb(200, 200, 200);
 /// Window ids no real window has.
 static NEXT: AtomicU64 = AtomicU64::new(u64::MAX - 1000);
 
-fn compositor(width: u32, height: u32, chrome: u32) -> (Compositor, Arc<FrameSlot>) {
+/// The devices to test with: the software one, and the hardware one where EGL is (Mesa's software
+/// GL driver counts).
+fn drivers() -> Vec<Driver> {
+    let mut d = vec![Driver::Warp];
+    if Gpu::with_driver(Driver::Hardware).is_ok() {
+        d.push(Driver::Hardware);
+    } else {
+        eprintln!("no EGL here: the GL target is not tested");
+    }
+    d
+}
+
+fn compositor(
+    driver: Driver,
+    width: u32,
+    height: u32,
+    chrome: u32,
+) -> (Compositor, Arc<FrameSlot>) {
     let (window, slot) = FrameSlot::for_test(NEXT.fetch_add(1, Ordering::Relaxed));
-    let gpu = Gpu::with_driver(Driver::Warp).unwrap();
+    let gpu = Gpu::with_driver(driver).unwrap();
     let text = TextEngine::new().unwrap();
     let c = Compositor::new(gpu, &text, window, width, height, chrome).unwrap();
+    // (the hardware device draws on GL)
+    assert_eq!(
+        matches!(c.target, Target::Gl(_)),
+        driver == Driver::Hardware
+    );
     (c, slot)
 }
 
@@ -69,7 +91,13 @@ fn bgra(c: Color) -> [u8; 4] {
 
 #[test]
 fn a_frame_shows_the_chrome_over_the_scrolled_tiles() {
-    let (mut c, slot) = compositor(300, 240, 40);
+    for driver in drivers() {
+        chrome_over_scrolled_tiles(driver);
+    }
+}
+
+fn chrome_over_scrolled_tiles(driver: Driver) {
+    let (mut c, slot) = compositor(driver, 300, 240, 40);
     assert_eq!(c.content_size(), (300, 200));
     let text = TextEngine::new().unwrap();
     let images = ImageStore::default();
@@ -104,7 +132,13 @@ fn a_frame_shows_the_chrome_over_the_scrolled_tiles() {
 
 #[test]
 fn tiles_through_a_state_move_clip_and_fade() {
-    let (mut c, slot) = compositor(200, 200, 0);
+    for driver in drivers() {
+        through_a_state(driver);
+    }
+}
+
+fn through_a_state(driver: Driver) {
+    let (mut c, slot) = compositor(driver, 200, 200, 0);
     let frame = page(100, 100);
     let state = LayerState(vec![
         StateOp::Clip(Rect::new(0.0, 0.0, 150.0, 150.0)),
@@ -133,8 +167,42 @@ fn tiles_through_a_state_move_clip_and_fade() {
 }
 
 #[test]
+fn two_gl_compositors_on_one_thread_draw_their_own_frames() {
+    if !drivers().contains(&Driver::Hardware) {
+        return;
+    }
+    // (each has a context of its own: drawing with one after the other was made current)
+    let (mut a, slot_a) = compositor(Driver::Hardware, 50, 50, 0);
+    let (mut b, slot_b) = compositor(Driver::Hardware, 60, 40, 0);
+    a.draw_content(|pass| pass.clear(RED)).unwrap();
+    b.draw_content(|pass| pass.clear(BLUE)).unwrap();
+    a.draw_content(|pass| pass.hole(Rect::new(0.0, 0.0, 10.0, 10.0)))
+        .unwrap();
+    b.present().unwrap();
+    a.present().unwrap();
+    let (shown_a, shown_b) = (slot_a.take_frame().unwrap(), slot_b.take_frame().unwrap());
+    assert_eq!(
+        (shown_a.0, shown_a.1, shown_b.0, shown_b.1),
+        (50, 50, 60, 40)
+    );
+    assert_eq!(px(&shown_a, 5, 5), [0, 0, 0, 0]);
+    assert_eq!(px(&shown_a, 30, 30), bgra(RED));
+    assert_eq!(px(&shown_b, 30, 30), bgra(BLUE));
+    drop(b);
+    // (dropping one leaves the other's context working)
+    a.draw_content(|pass| pass.clear(GRAY)).unwrap();
+    assert_eq!(px(&a.read_back().unwrap(), 30, 30), bgra(GRAY));
+}
+
+#[test]
 fn a_backdrop_filter_reads_what_is_under_it() {
-    let (mut c, slot) = compositor(100, 100, 0);
+    for driver in drivers() {
+        backdrop_reads_under_it(driver);
+    }
+}
+
+fn backdrop_reads_under_it(driver: Driver) {
+    let (mut c, slot) = compositor(driver, 100, 100, 0);
     let backdrop = crate::display_list::LayerBackdrop {
         filters: vec![crate::filter::FilterOp::Invert(1.0)],
         rect: Rect::new(10.0, 10.0, 30.0, 30.0),

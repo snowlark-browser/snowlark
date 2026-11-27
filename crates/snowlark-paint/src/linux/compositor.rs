@@ -2,12 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! The window's compositor on Linux, on the CPU: each frame is drawn into one buffer of the whole
-//! client area (the chrome in its top rows, the content below, as the Windows half draws one chain
-//! across processes), with Skia's CPU backend, and handed to the window's thread, which shows it in
-//! a `wl_shm` buffer and asks the desktop for a frame callback with it. The next frame waits for
-//! that callback ([`Compositor::wait_for_frame`]): the compositor draws at the display's pace, as
-//! the waitable swap chain makes it on Windows.
+//! The window's compositor on Linux: each frame is drawn into one surface of the whole client area
+//! (the chrome in its top rows, the content below, as the Windows half draws one chain across
+//! processes) and handed to the window's thread, which shows it in a `wl_shm` buffer and asks the
+//! desktop for a frame callback with it. The next frame waits for that callback
+//! ([`Compositor::wait_for_frame`]): the compositor draws at the display's pace, as the waitable
+//! swap chain makes it on Windows.
+//!
+//! With the software device the surface is pixels in memory, drawn by Skia's CPU backend. With the
+//! hardware device ([`Gpu`] on EGL) it is a Skia GL render target on the compositor thread's own
+//! context, read back into memory when the frame is presented (until the window shows GL frames
+//! itself); a device that cannot give the compositor a context leaves it on the CPU.
 //!
 //! The interface is the Windows half's ([`Compositor`], [`ContentPass`]): tiles copied pixel for
 //! pixel, tiles through a layer's clips, transforms, opacity and color filters, backdrop filters,
@@ -25,7 +30,7 @@ use skia_safe as sk;
 
 use crate::display_list::{matrix_of, radii_of, DisplayList, Item, LayerState, StateOp};
 use crate::geom::{Color, Matrix, Radii, Rect};
-use crate::gpu::{Gpu, TiledFrame};
+use crate::gpu::{egl, Driver, Gpu, TiledFrame};
 use crate::raster::{matrix, rect, rrect, Caches, FontResolver, Painter, Sources};
 use crate::window::{FrameSlot, WindowHandle};
 use snowlark_graphics::{Error, Result};
@@ -73,9 +78,92 @@ pub struct Compositor {
     chrome_height: u32,
     /// The chrome's pixels (`size.0` × `chrome_height`), drawn into every frame.
     chrome: Vec<u8>,
-    /// The frame being drawn: the whole client area, premultiplied BGRA, rows packed.
+    /// The frame being drawn on the CPU (the whole client area, premultiplied BGRA, rows packed),
+    /// or the one read back from the GL surface.
     frame: Vec<u8>,
+    target: Target,
     _thread_affine: PhantomData<*const ()>,
+}
+
+/// What a compositor draws its frames into.
+enum Target {
+    /// `Compositor::frame`, in memory.
+    Cpu,
+    /// A GL render target, read back into `Compositor::frame` at present.
+    Gl(GlTarget),
+}
+
+/// The compositor's GL context, Skia's context on it and the frame's render target.
+struct GlTarget {
+    // (dropped in this order: Skia's resources, then the context they live in)
+    surface: Option<sk::Surface>,
+    direct: sk::gpu::DirectContext,
+    context: egl::Context,
+}
+
+impl GlTarget {
+    /// A context current on this thread, with Skia's GL backend on it.
+    fn new() -> std::result::Result<GlTarget, String> {
+        let context = egl::Context::current()?;
+        let interface = sk::gpu::gl::Interface::new_load_with(|name| context.proc_address(name))
+            .ok_or("Skia cannot use this GL")?;
+        let direct = sk::gpu::direct_contexts::make_gl(interface, None)
+            .ok_or("Skia's GL context could not be made")?;
+        Ok(GlTarget {
+            surface: None,
+            direct,
+            context,
+        })
+    }
+
+    /// The render target, `size` (made again when the size changes), with this target's context
+    /// current.
+    fn surface(&mut self, size: (u32, u32)) -> Result<&mut sk::Surface> {
+        self.context.make_current();
+        let fits = self
+            .surface
+            .as_ref()
+            .is_some_and(|s| (s.width(), s.height()) == (size.0 as i32, size.1 as i32));
+        if !fits {
+            self.surface = None;
+            let info = sk::ImageInfo::new(
+                (size.0 as i32, size.1 as i32),
+                sk::ColorType::RGBA8888,
+                sk::AlphaType::Premul,
+                None,
+            );
+            self.surface = sk::gpu::surfaces::render_target(
+                &mut self.direct,
+                sk::gpu::Budgeted::Yes,
+                &info,
+                None,
+                sk::gpu::SurfaceOrigin::TopLeft,
+                None,
+                false,
+                None,
+            );
+        }
+        self.surface
+            .as_mut()
+            .ok_or_else(|| Error::Platform("no GL render target of that size".into()))
+    }
+
+    /// The render target's pixels (premultiplied BGRA, rows packed) into `into`.
+    fn read(&mut self, size: (u32, u32), into: &mut [u8]) -> Result<()> {
+        let surface = self.surface(size)?;
+        if surface.read_pixels(&image_info(size), into, size.0 as usize * 4, (0, 0)) {
+            Ok(())
+        } else {
+            Err(Error::Platform("the GL frame could not be read".into()))
+        }
+    }
+}
+
+impl Drop for GlTarget {
+    fn drop(&mut self) {
+        // (Skia's resources go with this target's context current)
+        self.context.make_current();
+    }
 }
 
 /// Drawing into the content area of the frame (device pixels of the content area).
@@ -116,6 +204,16 @@ impl Compositor {
         chrome_height: u32,
     ) -> Result<Compositor> {
         let slot = FrameSlot::of(window).ok_or(Error::Invalid)?;
+        let target = match gpu.driver() {
+            Driver::Hardware => match GlTarget::new() {
+                Ok(gl) => Target::Gl(gl),
+                Err(e) => {
+                    eprintln!("[compositor] drawing on the CPU: {e}");
+                    Target::Cpu
+                }
+            },
+            Driver::Warp => Target::Cpu,
+        };
         let mut c = Compositor {
             gpu,
             window,
@@ -125,6 +223,7 @@ impl Compositor {
             chrome_height: 0,
             chrome: Vec::new(),
             frame: Vec::new(),
+            target,
             _thread_affine: PhantomData,
         };
         c.resize(width, height, chrome_height)?;
@@ -222,24 +321,34 @@ impl Compositor {
     /// [`Compositor::present`].
     pub fn draw_content(&mut self, paint: impl FnOnce(&mut ContentPass<'_>)) -> Result<()> {
         let content = self.content_size();
-        let need = pixels(self.size);
-        if self.frame.len() != need {
-            self.frame = self
-                .slot
-                .take_spare()
-                .filter(|b| b.len() == need)
-                .unwrap_or_else(|| vec![0; need]);
-        }
-        let info = image_info(self.size);
-        let mut surface =
-            sk::surfaces::wrap_pixels(&info, &mut self.frame, self.size.0 as usize * 4, None)
+        let (size, chrome_height) = (self.size, self.chrome_height);
+        let mut cpu_surface;
+        let canvas = match &mut self.target {
+            Target::Gl(gl) => gl.surface(size)?.canvas(),
+            Target::Cpu => {
+                let need = pixels(size);
+                if self.frame.len() != need {
+                    self.frame = self
+                        .slot
+                        .take_spare()
+                        .filter(|b| b.len() == need)
+                        .unwrap_or_else(|| vec![0; need]);
+                }
+                cpu_surface = sk::surfaces::wrap_pixels(
+                    &image_info(size),
+                    &mut self.frame,
+                    size.0 as usize * 4,
+                    None,
+                )
                 .ok_or(Error::Invalid)?;
-        let canvas = surface.canvas();
+                cpu_surface.canvas()
+            }
+        };
         canvas.save();
         canvas.clip_rect(
             sk::Rect::from_xywh(
                 0.0,
-                self.chrome_height as f32,
+                chrome_height as f32,
                 content.0 as f32,
                 content.1 as f32,
             ),
@@ -250,14 +359,14 @@ impl Compositor {
             canvas,
             caches: &mut self.caches,
             size: content,
-            origin: (0, self.chrome_height as i32),
+            origin: (0, chrome_height as i32),
         };
         paint(&mut pass);
         canvas.restore();
         canvas.reset_matrix();
-        if self.chrome_height > 0 {
-            let row = self.size.0 as usize * 4;
-            let info = image_info((self.size.0, self.chrome_height));
+        if chrome_height > 0 {
+            let row = size.0 as usize * 4;
+            let info = image_info((size.0, chrome_height));
             // (false only for a size the buffer does not have: never here)
             let _ = canvas.write_pixels(&info, &self.chrome, row, (0, 0));
         }
@@ -266,7 +375,15 @@ impl Compositor {
 
     /// The frame drawn last (before [`Compositor::present`]): its size and pixels, BGRA, rows packed.
     pub fn read_back(&mut self) -> Result<(u32, u32, Vec<u8>)> {
-        Ok((self.size.0, self.size.1, self.frame.clone()))
+        let (w, h) = self.size;
+        match &mut self.target {
+            Target::Gl(gl) => {
+                let mut pixels = vec![0; pixels(self.size)];
+                gl.read(self.size, &mut pixels)?;
+                Ok((w, h, pixels))
+            }
+            Target::Cpu => Ok((w, h, self.frame.clone())),
+        }
     }
 
     /// Hands the frame to the window to show. The next frame is drawn into a buffer of one shown
@@ -279,6 +396,16 @@ impl Compositor {
             .take_spare()
             .filter(|b| b.len() == need)
             .unwrap_or_else(|| vec![0; need]);
+        if let Target::Gl(gl) = &mut self.target {
+            // (the frame is on the GPU: read into a buffer of one shown before)
+            self.frame = next;
+            gl.read(self.size, &mut self.frame)?;
+            let frame = std::mem::take(&mut self.frame);
+            if !self.slot.show(self.size.0, self.size.1, frame) {
+                return Err(Error::Platform("the window has gone".into()));
+            }
+            return Ok(t.elapsed());
+        }
         let frame = std::mem::replace(&mut self.frame, next);
         if !self.slot.show(self.size.0, self.size.1, frame) {
             return Err(Error::Platform("the window has gone".into()));

@@ -205,8 +205,11 @@ releases; a machine without network access builds it from source, which needs `p
 
 - `gpu`: tiles. `TileRasterizer` paints a display list into 512 px tiles on Skia's CPU backend (premultiplied BGRA
   in memory) under the Windows half's damage rules (`tiling.rs`, shared): a tile whose items hash as in the last
-  frame is copied, not painted. A list with a backdrop filter is painted whole once and cut into tiles. The device
-  is software only (`Driver::Warp`); `Gpu::new()` (hardware) fails until Skia's GL backend comes.
+  frame is copied, not painted. A list with a backdrop filter is painted whole once and cut into tiles. Tiles are
+  painted on the CPU with either device. The software device (`Driver::Warp`) is the default; the hardware one
+  (`Driver::Hardware`) is OpenGL ES through EGL (`egl.rs`: the system's `libEGL.so.1` loaded at run time, one Mesa
+  surfaceless display per process, a GLES 3 context per thread with no surface), named by its `GL_RENDERER`;
+  `Gpu::new()` makes it only with `SNOWLARK_GPU=gl` until the window shows GL frames itself.
 - `window`: a Wayland client (`smithay-client-toolkit`) with the Windows half's `Window`, `Event`,
   `WindowHandler` and `WindowProxy`: pointer, wheel (high-resolution steps), keys as Windows virtual-key codes
   through xkbcommon (with repeat), focus, timers, maximize, fullscreen and close, and pixels shown from the CPU in
@@ -231,8 +234,8 @@ releases; a machine without network access builds it from source, which needs `p
   accepted; the handler's `set_drop_effect` is the offer's action, and a drop the desktop chose an action for is
   finished. The rest of the Windows half's API is there with what Linux has (sizes and the
   maximized state kept, no position; the downloads folder from the user directories; local time from the C
-  library) or says what is missing. Not yet: drags out (no platform has them yet), fractional scales, the
-  compositor's GPU path.
+  library) or says what is missing. Not yet: drags out (no platform has them yet), fractional scales, an EGL
+  surface for the compositor's GL frames.
 - `vsync`: begin frames from a timer at the refresh interval on a fixed timebase (the window's own frames
   follow the desktop's frame callbacks); `os_crypt`: a secret the Secret Service keeps (an item of the default
   collection, `application: snowlark`, `purpose: safe-storage`, made once with 32 random bytes; the collection
@@ -246,11 +249,16 @@ releases; a machine without network access builds it from source, which needs `p
   they block the window's loop until answered, as Windows' modal dialog does, and have no parent window yet
   (xdg-foreign).
 
-- `compositor`: the window's compositor on the CPU, with the Windows half's `Compositor` and `ContentPass`: each
-  frame is the whole client area (the chrome in its top rows), drawn with Skia's CPU backend (tiles copied, tiles
-  through a layer's clips, transforms, opacity and color filters, backdrop filters, display lists) and handed to the
-  window's thread, which shows it and asks the desktop for a frame callback; the next frame waits for it, so the
-  compositor draws at the display's pace. No protected pictures under the content, no surfaces of another process.
+- `compositor`: the window's compositor, with the Windows half's `Compositor` and `ContentPass`: each frame is the
+  whole client area (the chrome in its top rows), drawn (tiles copied, tiles through a layer's clips, transforms,
+  opacity and color filters, backdrop filters, display lists) and handed to the window's thread, which shows it
+  and asks the desktop for a frame callback; the next frame waits for it, so the compositor draws at the display's
+  pace. With the software device it draws with Skia's CPU backend into memory; with the hardware device, with
+  Skia's GL backend into a render target on the compositor thread's own context, read back when the frame is
+  presented (a device that gives it no context leaves it on the CPU). Next: the window's own EGL surface
+  (`wl_egl_window`), which needs libwayland's display (wayland-backend's system backend), so frames are no longer
+  read back, and tile textures kept from frame to frame. No protected pictures under the content, no surfaces of
+  another process.
 - `raster_tables`: the raster side's `FontTable` takes installed font files fontconfig lists, or bytes that pass
   OTS, as on Windows (`TextEngine::font_source` gives a face's path or bytes).
 
