@@ -203,6 +203,10 @@ stages: `docs/password-manager.md`.
 WebGL runs on ANGLE (OpenGL ES over Direct3D 11) behind a command protocol that can cross a process boundary, in
 four stages from a WebGL 1 context to conformance and WebGL 2: `docs/webgl.md`.
 
+Applications are to embed the engine through a crate below the window, `snowlark-embed` (an engine handle, web views,
+surfaces the application supplies, delegate traits), with the browser window as its first user: `docs/embedding.md`
+has the API, what moves out of `snowlark-shell`, the process options and the steps.
+
 ## Linux, then macOS
 
 Snowlark runs only on Windows today. The platform parts (painting and text, GPU compositing, media decoding, the

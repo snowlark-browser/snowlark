@@ -25,8 +25,8 @@ The rest has no reusable form outside a whole engine: the DOM, the JavaScript bi
 specifications' Web IDL), block and inline layout, painting, the rendering pipeline, networking, the process
 model and the browser window are Snowlark's own code, written in Rust. Each tab runs its pages in a renderer
 process of its own, one per site; a full sandbox for those processes is in progress
-([process isolation](docs/process-isolation.md)). It runs on Windows 10 and 11 (64-bit), and on Linux (x86-64, on a Wayland desktop) in a
-first preview.
+([process isolation](docs/process-isolation.md)). It runs on Windows 10 and 11 (64-bit), and on Linux (x86-64, on a Wayland desktop) in
+preview.
 
 ## Status
 
@@ -45,11 +45,19 @@ GitHub for the list of releases once a day and downloads a newer one, used after
 but while the signing certificate is new Windows SmartScreen may still warn on first start: choose "More info", then
 "Run anyway".
 
-A first preview for Linux (x86-64) is on the releases page too, as a `.tar.gz`: unpack it anywhere and start
+Preview builds for Linux (x86-64) are on the releases page too, as a `.tar.gz`: unpack it anywhere and start
 `./snowlark` in the folder it makes, keeping `libEGL.so` and `libGLESv2.so` beside it. It needs a Wayland desktop and
-glibc 2.43 or newer (for example Ubuntu 26.04, Fedora 44 or Debian testing). It is not signed yet: check it against the
-`.sha256` file beside it (`sha256sum -c`). Linux builds do not check for new versions. Not there yet on Linux: video
-and audio, file dialogs, input methods, saving passwords.
+glibc 2.43 or newer (for example Ubuntu 26.04, Fedora 44 or Debian testing); video and audio need FFmpeg's libraries
+(6.1, 7.1 or 8.0). The archive is signed with [minisign](https://jedisct1.github.io/minisign/); check it next to its
+`.minisig` file with
+
+```sh
+minisign -Vm snowlark-preview-*-linux-x86_64.tar.gz -P RWQa8wCIad8uYF2fHaCkxdIMZwB6HZOHKswRPVw+/Fws2jguH278vfXs
+```
+
+or against the `.sha256` file beside it (`sha256sum -c`). Linux builds do not check for new versions. Not there yet
+on Linux: Media Source Extensions (the video most streaming sites use), drags out of the window, the sandbox for page
+processes.
 
 ## Building
 
