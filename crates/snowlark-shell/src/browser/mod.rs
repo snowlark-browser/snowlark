@@ -447,7 +447,7 @@ impl Browser {
             text.clone(),
             images.clone(),
             &windows,
-            gpu_process.as_ref().map(|h| h.link()),
+            crate::gpu_process::compositing(gpu_process.as_ref()),
         );
         // Video frames: decoded by Media Foundation into textures of the window's device, drawn by
         // the compositor whenever one has a new frame.
@@ -497,6 +497,10 @@ impl Browser {
             net,
             compositor: comp.sender(),
             gpu_raster: comp.gpu_raster(),
+            webgl_links: gpu_process
+                .as_ref()
+                .filter(|_| crate::gpu_process::serves_webgl())
+                .map(|h| Arc::new(h.link()) as Arc<dyn snowlark_tab::services::webgl::WebGlLinks>),
             events: Arc::new(WindowSink {
                 tx: events_tx,
                 window: window.proxy(),

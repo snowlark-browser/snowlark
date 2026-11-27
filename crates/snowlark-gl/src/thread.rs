@@ -179,9 +179,19 @@ pub struct Service {
 }
 
 impl Service {
-    /// The service as `SNOWLARK_WEBGL` asks: `off` (no WebGL), `warp` (Direct3D's software
-    /// rasterizer), otherwise the graphics card.
+    /// The service as `SNOWLARK_WEBGL` asks: `off` (no WebGL), `gpu-process` (this process runs
+    /// none: its contexts are the GPU process's, [`crate::in_gpu_process`]), `warp` (Direct3D's
+    /// software rasterizer), otherwise the graphics card.
     pub fn from_env() -> Result<Service, String> {
+        if crate::in_gpu_process() {
+            return Err("WebGL runs in the GPU process (SNOWLARK_WEBGL=gpu-process)".into());
+        }
+        Service::serving()
+    }
+
+    /// The service of the process that runs the contexts, as `SNOWLARK_WEBGL` asks: the GPU
+    /// process's, where `gpu-process` means the graphics card.
+    pub fn serving() -> Result<Service, String> {
         match std::env::var("SNOWLARK_WEBGL").as_deref() {
             Ok("off") => Err("WebGL is off (SNOWLARK_WEBGL=off)".into()),
             Ok("warp") => Service::new(true),

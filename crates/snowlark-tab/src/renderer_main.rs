@@ -231,6 +231,11 @@ pub(crate) fn run_with(port: RendererPort, factory: fn() -> crate::driver::Drive
             services.service_workers.clone(),
         )),
         cdm: Some(services.cdm.clone() as Arc<dyn snowlark_page::media::cdm::Cdm>),
+        // (the browser launched this renderer for its GPU process to run its WebGL)
+        webgl: snowlark_gl::in_gpu_process().then(|| {
+            Arc::new(crate::webgl_link::GpuWebGl::new(services.webgl.clone()))
+                as Arc<dyn snowlark_page::WebGlProvider>
+        }),
     };
     let tab = crate::tab::spawn_assigned(context, own, rx, factory(), Assign::Later(start));
     let _ = tab.join();

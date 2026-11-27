@@ -349,6 +349,9 @@ pub struct TabContext {
     pub compositor: Sender<CompInput>,
     /// With a GPU process: where renderers' frames are drawn ([`crate::raster_thread::GpuRaster`]).
     pub gpu_raster: Option<Arc<dyn crate::raster_thread::GpuRaster>>,
+    /// Where the GPU process runs a renderer process's WebGL: the browser makes its link there
+    /// (`None`: renderers run their own, or have none).
+    pub webgl_links: Option<Arc<dyn crate::services::webgl::WebGlLinks>>,
     pub events: Arc<dyn EventSink>,
     pub clipboard: Arc<dyn Clipboard>,
     pub internal: Arc<dyn InternalPages>,
@@ -389,6 +392,9 @@ pub(crate) struct RendererContext {
     pub caches: snowlark_page::CacheBackend,
     pub service_workers: Option<snowlark_page::ServiceWorkerBackend>,
     pub cdm: Option<Arc<dyn snowlark_page::media::cdm::Cdm>>,
+    /// Where the pages' WebGL runs: the GPU process's for a renderer whose WebGL is there, else
+    /// `None` (this process's own WebGL thread).
+    pub webgl: Option<Arc<dyn snowlark_page::WebGlProvider>>,
 }
 
 impl From<TabContext> for RendererContext {
@@ -412,6 +418,7 @@ impl From<TabContext> for RendererContext {
             caches: c.caches,
             service_workers: c.service_workers,
             cdm: c.cdm,
+            webgl: None,
         }
     }
 }
@@ -1126,6 +1133,13 @@ fn run(
             }
         }
     };
+    // A renderer whose WebGL runs in the GPU process asks the browser for its link to it now, beside
+    // the page's start, so its first context does not wait for it.
+    if let Some(webgl) = ctx.webgl.clone() {
+        let _ = std::thread::Builder::new()
+            .name("snowlark webgl link".into())
+            .spawn(move || webgl.prepare());
+    }
     // A sandboxed renderer locks itself down before its page: what needs the system (V8, the text
     // engine's configuration, the media libraries) is made by now.
     #[cfg(target_os = "linux")]
@@ -1141,7 +1155,13 @@ fn run(
             if let Some((webgl, took)) = opened {
                 eprintln!(
                     "[tab {id}] fonts and WebGL's device ({}) opened in {took:?}, waited for {:?}",
-                    if webgl { "open" } else { "none" },
+                    if webgl {
+                        "open"
+                    } else if snowlark_gl::in_gpu_process() {
+                        "in the GPU process"
+                    } else {
+                        "none"
+                    },
                     waited.elapsed()
                 );
             }
@@ -1176,6 +1196,7 @@ fn run(
         caches: ctx.caches.clone(),
         service_workers: ctx.service_workers.clone(),
         cdm: ctx.cdm.clone(),
+        webgl: ctx.webgl.clone(),
     });
     *id_slot = id;
     if let Some(terminator) = driver.terminator() {

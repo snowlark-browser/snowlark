@@ -14,8 +14,9 @@
 //! redirect a GUI program's output (`$x = snowlark --eval 1`, `> file`): scripts use `snowlark-cli.exe`,
 //! the console-subsystem build of this same file (`src/bin/snowlark-cli.rs`).
 //!
-//! On Linux the window is a Wayland window with its renderer processes; the modes that need a GPU
-//! device or Windows' CPU counters, and the GPU process, wait on docs/linux.md's stages.
+//! On Linux the window is a Wayland window with its renderer processes and a GPU process that runs
+//! their WebGL; the modes that need a GPU device or Windows' CPU counters wait on docs/linux.md's
+//! stages.
 #![windows_subsystem = "windows"]
 
 // Rust's allocations go to mimalloc rather than the Windows heap, which was 9 to 14% of page work,
@@ -202,7 +203,6 @@ fn run(args: Vec<String>, setup: WindowSetup) -> i32 {
             mod renderer;
             renderer::run()
         }
-        #[cfg(windows)]
         Some("--type=gpu") => {
             #[path = "cli/gpu.rs"]
             mod gpu;

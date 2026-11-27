@@ -231,6 +231,8 @@ pub struct DriverContext {
     pub service_workers: Option<snowlark_page::ServiceWorkerBackend>,
     /// The browser's key systems (none: Clear Key only).
     pub cdm: Option<Arc<dyn snowlark_page::media::cdm::Cdm>>,
+    /// Where the page's WebGL runs (a renderer's link to the GPU process); `None`: this process's own.
+    pub webgl: Option<Arc<dyn snowlark_page::WebGlProvider>>,
 }
 
 /// Makes a tab's driver on the tab's thread (a driver need not be `Send`).

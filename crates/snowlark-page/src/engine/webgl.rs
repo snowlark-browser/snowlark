@@ -254,10 +254,22 @@ impl WebGlObject {
     }
 }
 
+/// Where a page's WebGL contexts run when not on this process's own WebGL thread (`snowlark_gl::Service`):
+/// a renderer's link to the GPU process. Each page and worker asks it for a backend of its own, the first
+/// time it makes a context.
+pub trait WebGlProvider: Send + Sync {
+    fn backend(&self) -> Result<Box<dyn Backend>, String>;
+    /// Gets ready ahead of the first context (a renderer asks for its link at its start, as the
+    /// first context would otherwise wait for it). Blocks: called on a helper thread.
+    fn prepare(&self) {}
+}
+
 /// The page's WebGL: the service, the commands not yet sent, the contexts by canvas.
 #[derive(Default)]
 pub struct GlState {
     backend: Option<Box<dyn Backend>>,
+    /// Where the backend comes from (`None`: this process's WebGL thread).
+    pub(crate) provider: Option<std::sync::Arc<dyn WebGlProvider>>,
     /// The service could not start (no ANGLE): every `getContext("webgl")` returns null.
     unavailable: bool,
     queue: Vec<(ContextId, Command)>,
@@ -510,8 +522,12 @@ impl Engine {
     fn gl_backend(&self) -> Option<std::cell::RefMut<'_, Box<dyn Backend>>> {
         let mut gl = self.gl.borrow_mut();
         if gl.backend.is_none() && !gl.unavailable {
-            match snowlark_gl::Service::from_env() {
-                Ok(s) => gl.backend = Some(Box::new(s)),
+            let made = match &gl.provider {
+                Some(p) => p.backend(),
+                None => snowlark_gl::Service::from_env().map(|s| Box::new(s) as Box<dyn Backend>),
+            };
+            match made {
+                Ok(b) => gl.backend = Some(b),
                 Err(_) => gl.unavailable = true,
             }
         }

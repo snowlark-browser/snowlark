@@ -36,7 +36,8 @@ and `snowlark-ipc` build and pass their tests; the page tests that need the GPU 
 and the modes that need a GPU device or Windows' CPU counters (`--video`, `--render-demo`, `--bench`,
 `--speedometer`) are compiled out until their stages. `snowlark [<url>]` without a `--` mode opens the browser
 window (`snowlark-shell`) on Wayland, with its tabs in renderer processes (`--process-model=single` keeps them in
-the browser's process; there is no GPU process there, `--gpu-process` is ignored): tabs, toolbar, address bar,
+the browser's process; their WebGL runs in a GPU process, which runs nothing else there, so `--gpu-process` is
+ignored and `SNOWLARK_GPU_PROCESS=0` keeps WebGL in the renderers): tabs, toolbar, address bar,
 menus and the internal pages, composited on the CPU. `snowlark-tab` and `snowlark-shell` build whole there and
 pass their tests but those that need a Windows window, a GPU device, the password store's key or shared video
 textures. The window has the desktop's clipboard (text and markup, both ways), the desktop's cursors and more
@@ -348,7 +349,7 @@ compile time (a module per platform under one name, not a `dyn` trait on hot pat
 | 5 | **The window**: Wayland (X11 desktops through XWayland), input and IME, clipboard, drag and drop, cursors, display scale, frame timing; GPU tiles and the compositor on Skia's GPU backend | L | a usable window on a Linux desktop. Done so far: tiles and the compositor on the CPU, the Wayland window (input, keys, integer scale, CPU pixels, frame callbacks, moves and resizes from its own frame, the clipboard, cursors, several windows), `snowlark-tab` and the browser window (`snowlark-shell`) on Linux |
 | 6 | **WebGL** on ANGLE for Linux | S | done: the WebGL conformance areas as on Windows (WPT `webgl/` 4249 subtests on both) |
 | 7 | **Media**: playback and MSE on FFmpeg, audio output; hardware decoding later | L | `<video>`, `<audio>`, MSE sites play |
-| 8 | **Sandbox**: namespaces and seccomp-bpf for renderers, a font broker | L | a renderer that cannot open a file or a socket. Done so far: `snowlark-sandbox` (user and network namespaces from the launcher, the renderer's seccomp-bpf filter after its warm-up; `docs/process-isolation.md` §7), fonts from files mapped before it, media sound played by the browser, WebGL's device opened before it; on by default (`SNOWLARK_SANDBOX=0`: off) |
+| 8 | **Sandbox**: namespaces and seccomp-bpf for renderers, a font broker | L | a renderer that cannot open a file or a socket. Done so far: `snowlark-sandbox` (user and network namespaces from the launcher, the renderer's seccomp-bpf filter after its warm-up; `docs/process-isolation.md` §7), fonts from files mapped before it, media sound played by the browser, WebGL in the GPU process (renderers open no graphics device); on by default (`SNOWLARK_SANDBOX=0`: off) |
 | 9 | **OS integration and distribution**: profile folders, the password store's key, PDF, opening downloads, packages and their signing | M | a package a user can install. Done so far: profile folder, opening downloads, the preview `.tar.gz` (`tools/release/package.sh`) |
 
 Stages 2 and 3 need no window; stage 3 builds on the painting backend and the text stack decided below. Stages 4

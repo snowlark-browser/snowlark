@@ -31,6 +31,7 @@ pub mod site_lock;
 pub mod storage;
 pub mod sw;
 pub mod video;
+pub mod webgl;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -59,6 +60,7 @@ pub enum Up {
     Video(video::Up),
     Cdm(cdm::Up),
     ServiceWorker(sw::Up),
+    WebGl(webgl::Up),
     /// The tab's events, its messages to the compositor and its frames.
     Tab(crate::renderer_process::TabUp),
 }
@@ -108,6 +110,7 @@ pub struct RemoteServices {
     pub video: Arc<video::RemoteVideo>,
     pub cdm: Arc<cdm::RemoteCdm>,
     pub service_workers: Arc<sw::RemoteServiceWorkers>,
+    pub webgl: Arc<webgl::RemoteWebGl>,
 }
 
 impl RemoteServices {
@@ -127,6 +130,7 @@ impl RemoteServices {
             video: Arc::new(video::RemoteVideo::new(port.clone())),
             cdm: Arc::new(cdm::RemoteCdm::new(port.clone())),
             service_workers: Arc::new(sw::RemoteServiceWorkers::new(port.clone())),
+            webgl: Arc::new(webgl::RemoteWebGl::new(port.clone())),
         }
     }
 
@@ -205,6 +209,9 @@ pub struct LocalServices {
     pub cdm: Option<Arc<dyn snowlark_page::media::cdm::Cdm>>,
     /// The profile's service worker registrations.
     pub service_workers: Arc<dyn snowlark_sw::ServiceWorkerHost>,
+    /// Where the renderer's WebGL links to the GPU process are made (none: the renderer runs its
+    /// WebGL itself, or has none).
+    pub webgl: Option<Arc<dyn webgl::WebGlLinks>>,
 }
 
 /// The browser's end for one renderer. Dropping it undoes what the renderer left behind in the
@@ -224,6 +231,7 @@ pub struct ServiceHost {
     video: video::VideoHost,
     cdm: Arc<cdm::CdmHost>,
     service_workers: sw::ServiceWorkerHostSide,
+    webgl: webgl::WebGlHost,
 }
 
 impl ServiceHost {
@@ -280,6 +288,7 @@ impl ServiceHost {
                 local.service_workers.clone(),
                 local.site_lock,
             ),
+            webgl: webgl::WebGlHost::new(port.clone(), local.webgl.clone()),
             port,
         }
     }
@@ -364,6 +373,7 @@ impl ServiceHost {
                 Up::Video(m) => self.video.serve(m, replier),
                 Up::Cdm(m) => self.cdm.serve(m, replier),
                 Up::ServiceWorker(m) => self.service_workers.serve(m, replier),
+                Up::WebGl(m) => self.webgl.serve(m, replier),
                 Up::Tab(m) => tab(m, replier),
             };
             if let Err(e) = served {

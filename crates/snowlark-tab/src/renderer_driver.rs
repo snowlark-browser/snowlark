@@ -765,6 +765,7 @@ mod tests {
             caches: snowlark_page::CacheBackend::in_memory(),
             service_workers: None,
             cdm: None,
+            webgl: None,
         })
     }
 

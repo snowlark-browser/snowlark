@@ -29,9 +29,23 @@ recorded first (an object of another context, a deleted object, a wrong typed ar
 
 ## Where the service runs
 
-Today the service runs in the page's own process: the renderer process in the window, the process itself in the
-headless modes. It needs no new process boundary for the first stages.
+On Linux, with renderer processes (the window's default), the service runs in the GPU process (`snowlark --type=gpu`,
+which there runs nothing else) and a renderer holds no graphics device; on Windows, in the single-process model and
+in the headless modes it runs in the page's own process. `SNOWLARK_WEBGL=gpu-process` puts a headless mode's WebGL
+in a GPU process of its own, so WPT runs that path (`SNOWLARK_GPU_PROCESS=0` keeps a Linux window's WebGL in its
+renderers).
 
+Across processes the protocol crosses a link (`snowlark-tab` `webgl_link.rs`; `snowlark_ipc::link`): a pipe
+between the renderer and the GPU process, made by the browser, with a ring of shared memory each way. The renderer
+asks the browser for it at its start (`services/webgl.rs`); its pages and workers share it, each with a backend of
+its own (`RemoteGl`) whose context ids are renumbered per link. A batch is sent without waiting; a new context, a
+query and a `present` wait for their answer, the only thing the GPU process sends; batches, uploads and readbacks
+go through the rings (longer ones stream through them). The GPU process serves each link on a thread of its own,
+driving its WebGL thread, and checks what comes: a section, a request over its cap or one sent as the other kind
+ends the link; a drawing buffer over 16384 px a side or past 1024 contexts on a link is refused as the device
+would. A link that ends (the GPU process ended or was started again) leaves every context on it reset
+(`getGraphicsResetStatus`, so the page sees `webglcontextlost`), and the next context asks for a new link. The
+drawing buffer is still read back to the renderer each frame it changes.
 Within the process, every context runs on one thread, the WebGL thread (`thread.rs`), whatever page or page thread
 made it. ANGLE opens one display per process for each kind of device, and all its contexts share that display's
 Direct3D 11 device and immediate context, which must not be used from several threads at once: contexts driven
@@ -41,14 +55,12 @@ a GPU process's clients do: batches without waiting, queries and `present` waiti
 renumbered process-wide on the way, so each page still numbers its own from 1. The thread is started by the first
 service and lives as long as the process.
 
-The end state is the GPU process (`docs/process-isolation.md`, M7). A sandboxed renderer will have no Direct3D
-device (M6), so before the renderer sandbox is turned on the service must run in the GPU process: the batch
-crosses a pipe, queries are synchronous round trips, and the drawing buffer becomes a texture the compositor
-samples directly instead of pixels read back. Because the protocol is already messages, that move changes
-`Backend`'s implementation, not the context. Costs of the move: a round trip per query (tens of microseconds; WebGL
-pages query rarely in their frame loop, and the client answers most `getParameter` reads about bindings itself)
-and shared-memory transfer for large buffer and texture uploads.
-
+Left for the end state (`docs/process-isolation.md`, M7): Windows renderers on the same link (which the win32k
+lockdown needs), the drawing buffer as a texture the GPU process's compositor samples instead of pixels read back
+(the compositor and the contexts are then in one process, so it is an id, not a shared texture), and contexts
+restored after a GPU process restart. Costs of the link: a round trip per query (tens of microseconds; WebGL pages
+query rarely in their frame loop, and the client answers most `getParameter` reads about bindings itself), and a
+copy of each batch through the ring.
 ## ANGLE
 
 ANGLE implements OpenGL ES and EGL over Direct3D 11 on Windows. Each context is created with:

@@ -1371,6 +1371,8 @@ impl Child {
             GpuDown::Quit => {}
             // (one page: the browser shares it first)
             GpuDown::Passes { .. } => {}
+            // (served by `gpu_process::run_child` itself: no compositor's)
+            GpuDown::WebGl { end } => end.close(),
             GpuDown::Window { window } => {
                 let tx = self.input(window);
                 let Some(rx) = self.waiting.remove(&window) else {

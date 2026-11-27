@@ -311,7 +311,7 @@ impl Browser {
             self.fonts.engine().clone(),
             self.images.clone(),
             &self.windows,
-            self.gpu_process.as_ref().map(|h| h.link()),
+            crate::gpu_process::compositing(self.gpu_process.as_ref()),
         );
         comp.send(CompMsg::Dark(self.chrome_dark()));
         if let Some(v) = &self.tab_ctx.videos {

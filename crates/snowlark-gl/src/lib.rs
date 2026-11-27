@@ -17,6 +17,13 @@ pub use protocol::{
 };
 pub use thread::Service;
 
+/// Whether this process's WebGL contexts run in the GPU process (`SNOWLARK_WEBGL=gpu-process`, which
+/// the browser sets for its renderers when its GPU process runs their WebGL): it then opens no
+/// device of its own.
+pub fn in_gpu_process() -> bool {
+    std::env::var_os("SNOWLARK_WEBGL").is_some_and(|v| v == "gpu-process")
+}
+
 /// Whether ANGLE's libraries are where the service looks for them.
 pub fn available() -> bool {
     ffi::load().is_ok()

@@ -184,6 +184,10 @@ pub fn renderer_launch(tab: Option<TabId>, crash_dumps: &std::path::Path) -> Lau
     {
         launch = launch.sandbox(std::env::var_os("SNOWLARK_SANDBOX").is_none_or(|v| v != "0"));
     }
+    // Where the GPU process runs the renderers' WebGL, the renderer opens no device of its own.
+    if crate::gpu_process::serves_webgl() {
+        launch = launch.env("SNOWLARK_WEBGL", "gpu-process");
+    }
     launch
 }
 
@@ -1346,6 +1350,7 @@ fn start_process(
                 None,
             )),
         },
+        webgl: context.webgl_links.clone(),
     };
     let window = WindowEnds {
         gpu: context.gpu,

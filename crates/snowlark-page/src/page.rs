@@ -49,6 +49,9 @@ pub struct PageOptions {
     /// browser sends (`docs/password-manager.md`). Off by default and in the headless modes, unless
     /// `SNOWLARK_PASSWORD_FORMS=1` (to show a run with it on observes the same).
     pub password_forms: bool,
+    /// Where the page's WebGL runs (a renderer's link to the GPU process); `None`: on this
+    /// process's own WebGL thread. Its workers use the same.
+    pub webgl: Option<std::sync::Arc<dyn crate::WebGlProvider>>,
 }
 
 impl Default for PageOptions {
@@ -72,6 +75,7 @@ impl Default for PageOptions {
             web_storage: None,
             input: snowlark_style::InputDevices::MOUSE,
             password_forms: std::env::var("SNOWLARK_PASSWORD_FORMS").is_ok_and(|v| v == "1"),
+            webgl: None,
         }
     }
 }
@@ -208,6 +212,7 @@ impl Page {
         }
         engine.set_content_filter(options.content_filter);
         engine.set_password_forms(options.password_forms);
+        engine.gl.borrow_mut().provider = options.webgl;
         if let Some(service) = options.web_storage {
             engine.set_web_storage(service);
         }
@@ -394,6 +399,7 @@ impl Page {
         engine.set_broadcast_hub(init.broadcast.clone());
         engine.set_idb_backend(init.idb.clone());
         engine.set_cache_backend(init.caches.clone());
+        engine.gl.borrow_mut().provider = init.webgl.clone();
         if let Some(b) = init.sw_backend.clone() {
             engine.set_service_worker_backend(b);
         }

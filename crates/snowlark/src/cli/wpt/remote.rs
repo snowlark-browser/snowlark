@@ -68,6 +68,7 @@ impl Remote {
                 Some(net.backend().clone()),
                 None,
             )),
+            webgl: None,
         };
         Ok(Some(Remote {
             local,

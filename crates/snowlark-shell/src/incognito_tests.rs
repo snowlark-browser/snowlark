@@ -103,6 +103,7 @@ fn context_of(
         net: p.net.clone(),
         compositor,
         gpu_raster: None,
+        webgl_links: None,
         events: Arc::new(events),
         clipboard: Arc::new(MemoryClipboard::default()),
         internal: no_internal_pages(),

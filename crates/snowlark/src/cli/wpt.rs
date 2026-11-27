@@ -251,6 +251,7 @@ pub fn run(args: &[String]) -> i32 {
                     resource_override: Some(Box::new(harness_resource)),
                     heap_limit: Some(HEAP_LIMIT),
                     render: Some(render.clone()),
+                    webgl: snowlark_shell::gpu_process::headless_webgl(),
                     ..Default::default()
                 };
                 if let Some(s) = &session {

@@ -641,6 +641,7 @@ impl Engine {
             broadcast: self.broadcast_hub(),
             idb: self.idb_backend_for_worker(),
             caches: self.cache_backend(),
+            webgl: self.gl.borrow().provider.clone(),
             sw_backend: None,
             to_parent,
             inbox,

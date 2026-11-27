@@ -64,6 +64,7 @@ mod worker;
 pub use content_filter::{ContentFilter, DocumentFilters};
 pub use engine::broadcast::{BroadcastBackend, BroadcastHub, Inbox, LocalBroadcast};
 pub use engine::platform::ClipboardAccess;
+pub use engine::webgl::WebGlProvider;
 pub use engine::window::ConsoleOutput;
 pub use engine::window::ScreenPlacement;
 pub use engine::Engine;

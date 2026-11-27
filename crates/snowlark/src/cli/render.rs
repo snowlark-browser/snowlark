@@ -434,6 +434,7 @@ fn render_scripted(url: &Url, png: &std::path::Path, options: &Options) -> Resul
         viewport: (width as i32, viewport.height as i32),
         render: Some(setup),
         content_filter: snowlark_blocker::content_filter(blocker.as_ref()),
+        webgl: snowlark_shell::gpu_process::headless_webgl(),
         ..Default::default()
     });
     // Posters and video frames: decoded on the GPU, copied to memory for the capture; silent.

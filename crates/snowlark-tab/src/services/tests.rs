@@ -493,6 +493,7 @@ pub(crate) fn local() -> Local {
                 Some(net.client().backend().clone()),
                 None,
             )),
+            webgl: None,
         },
         idb,
         broadcast,

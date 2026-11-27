@@ -60,6 +60,7 @@ pub fn run(args: &[String]) -> i32 {
         console: ConsoleOutput::Stderr,
         net: _net_thread.as_ref().map(|t| t.client()),
         render,
+        webgl: snowlark_shell::gpu_process::headless_webgl(),
         ..Default::default()
     });
     let (html, url) = match html_file {

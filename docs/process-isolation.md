@@ -165,6 +165,12 @@ key, into a free pool texture and names it by index; the compositor takes the ne
 drew before. Holding the key around `CopyFrameToVideoSurface` itself makes the call fail. Measured in P0:
 1080p60 for ten minutes with no torn or lost frame.
 
+**WebGL.** On Linux a renderer's contexts run in the GPU process: the page's WebGL client encodes its calls as
+before, and they cross a link (a pipe and a ring each way, made by the browser at the renderer's request) to a
+thread of the GPU process that runs them on its WebGL thread; queries wait for their answer and the drawing buffer
+is read back to the renderer (`docs/webgl.md`). Windows renderers keep theirs in process until the drawing buffer
+becomes a texture the GPU process's compositor samples.
+
 **Canvas.** A sandboxed renderer has no D3D device, so canvas falls back to the software backend (tiny-skia) there;
 the planned end state remotes the device-space draw calls into the GPU process, which would also remove the per-frame
 readback and re-upload.
@@ -205,9 +211,9 @@ path, making, binding or connecting a socket (pairs of local sockets excepted), 
 tracing another process, changing credentials, and the kernel's rarer surfaces; a call for another architecture
 ends the process. What it reads afterwards it must hold already or receive as a descriptor from the browser (a font
 installed after the renderer started is in the next renderer). Media elements' sound goes to the browser as
-AudioContexts' does (the browser plays it on the sound server), and WebGL's device (ANGLE's libraries, the system's
-GL driver and the GPU's device node) is opened before the lockdown and kept by the renderer's WebGL thread. It is on
-by default; `SNOWLARK_SANDBOX=0` starts renderers without it. Not done yet: a PID namespace (the filter already keeps the renderer from signalling or
+AudioContexts' does (the browser plays it on the sound server), and WebGL runs in the GPU process (a renderer opens no graphics device;
+`docs/webgl.md`), which runs in namespaces of its own but has no system call filter yet (it opens the system's GL
+driver as contexts need it). It is on by default; `SNOWLARK_SANDBOX=0` starts renderers without it. Not done yet: a PID namespace (the filter already keeps the renderer from signalling or
 tracing other processes), an allow-list filter in place of the deny-list, and `stat` calls with `AT_EMPTY_PATH` and
 a path (allowed, as the C library's `fstat` uses them: they show a file's metadata, not its contents).
 
@@ -382,6 +388,9 @@ Staged, each stage verified with the browser working and single-process mode unc
   695 to 674 and private bytes at 182 to 180 MiB. Past the crash limit, graphics-card crashes fall back to WARP first
   and then to compositing in the browser; the 100-cycle run on the final build is still to be repeated on an idle
   machine.
+- **WebGL** in the GPU process: on Linux, where the GPU process runs only that (the window composites in the
+  browser there); renderers open no graphics device, about 47 MB and 45 ms of CPU less per renderer in WSL.
+  Windows: not started (the same link; then the drawing buffer as a texture the compositor samples).
 - **G6** canvas remoted: not started. Exit tests: canvas WPT areas equal on and off, the Speedometer canvas suites at
   or above today's, a canvas page surviving a GPU kill through the context-loss steps.
 

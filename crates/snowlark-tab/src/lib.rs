@@ -38,3 +38,4 @@ pub mod tab;
 pub mod video;
 pub mod watchdog;
 pub mod webdriver_actions;
+pub mod webgl_link;

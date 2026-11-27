@@ -251,6 +251,7 @@ impl PageDriver {
             service_workers: ctx.service_workers.clone(),
             // (the window's tabs: the browser's password manager)
             password_forms: true,
+            webgl: ctx.webgl.clone(),
             ..Default::default()
         });
         // The page's network and timer wake-ups wake the tab's thread too.
@@ -1680,6 +1681,7 @@ mod tests {
             caches: snowlark_page::CacheBackend::in_memory(),
             service_workers: None,
             cdm: None,
+            webgl: None,
         });
         d.set_device(Device {
             viewport: Size::new(800.0, 600.0),

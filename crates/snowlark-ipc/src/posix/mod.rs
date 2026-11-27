@@ -14,8 +14,14 @@ pub(crate) mod pipe;
 use crate::wire::BuildId;
 
 /// This binary's identity: its executable file's size and modification time. Both ends being one
-/// file is what makes this enough.
+/// file is what makes this enough. Read once, at the first connection: a sandboxed process can no
+/// longer look at its file once it has locked itself down, and joins links after that.
 pub fn build_id() -> BuildId {
+    static ID: std::sync::OnceLock<BuildId> = std::sync::OnceLock::new();
+    *ID.get_or_init(read_build_id)
+}
+
+fn read_build_id() -> BuildId {
     let mut id = [0u8; 16];
     if let Ok(meta) = std::env::current_exe().and_then(std::fs::metadata) {
         id[0..8].copy_from_slice(&meta.len().to_le_bytes());

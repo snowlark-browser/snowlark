@@ -20,11 +20,11 @@ snowlark-page = { path = "../snowlark-page" }
 snowlark-render = { path = "../snowlark-render" }
 snowlark-style = { path = "../snowlark-style" }
 serde = { version = "1", features = ["derive"] }
+# (WebGL's protocol across the link to the GPU process, and its device when a renderer opens it)
+snowlark-gl = { path = "../snowlark-gl" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 snowlark-sandbox = { path = "../snowlark-sandbox" }
-# (WebGL's device, opened before the sandbox locks the renderer down)
-snowlark-gl = { path = "../snowlark-gl" }
 
 [lib]
 doctest = false

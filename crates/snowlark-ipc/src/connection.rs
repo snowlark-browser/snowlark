@@ -606,6 +606,11 @@ impl<Out: Wire, In: Wire, Tr: Trust> Connection<Out, In, Tr> {
         self.core.state.lock().unwrap().broke.clone()
     }
 
+    /// Whether the connection has ended (closed here, by the peer, or for a broken rule).
+    pub fn is_closed(&self) -> bool {
+        self.core.is_closed()
+    }
+
     /// Closes this end. The peer's reads end, and calls in flight here fail.
     pub fn close(&self) {
         if let Some(t) = self.core.transport.get() {

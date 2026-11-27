@@ -118,6 +118,8 @@ pub struct WorkerInit {
     pub idb: crate::IdbBackend,
     /// The Cache API's storage of the creator's event loop.
     pub caches: crate::CacheBackend,
+    /// Where the creator's WebGL runs (OffscreenCanvas in the worker uses the same).
+    pub webgl: Option<std::sync::Arc<dyn crate::WebGlProvider>>,
     /// The service worker registrations of the creator's event loop.
     pub sw_backend: Option<snowlark_sw::ServiceWorkerBackend>,
     /// A service worker's version and script: the global is a `ServiceWorkerGlobalScope`.
@@ -679,6 +681,7 @@ impl WorkerImpl for Engine {
                 broadcast: self.broadcast_hub(),
                 idb: self.idb_backend_for_worker(),
                 caches: self.cache_backend(),
+                webgl: self.gl.borrow().provider.clone(),
                 sw_backend: Some(self.sw_backend()),
                 service_worker: None,
                 to_parent,
