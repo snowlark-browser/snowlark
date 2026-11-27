@@ -54,6 +54,8 @@ pub fn init() {
         // CSS Values 5 tree-counting functions `sibling-index()`/`sibling-count()` and `progress()`.
         set_pref!("layout.css.tree-counting-functions.enabled", true);
         set_pref!("layout.css.progress-function.enabled", true);
+        // CSS Values 5 `random()` and `random-item()`.
+        set_pref!("layout.css.random.enabled", true);
         // CSS Conditional 5 container style queries (`@container style(--x: 1)`).
         set_pref!("layout.css.style-queries.enabled", true);
         // CSS Conditional 5 `@supports at-rule(@x)`, CSS Conditional 4/5 `font-tech()` and

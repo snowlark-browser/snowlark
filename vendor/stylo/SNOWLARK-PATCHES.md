@@ -663,6 +663,22 @@ The patches below were written on 0.22.0 and carried to 0.24.0 by a three-way me
    for interpolation and for layout. The animated value of the sizing properties is `AnimatedSize`, which
    carries the element's `interpolate-size`: values that do not interpolate as they are interpolate as
    calc-size() (§7.2), a keyword combining with a `<length-percentage>` only under `allow-keywords` (§7.3).
+108. **`if()`** (CSS Values 5 §8.3; `substitution/if_function.rs`, `substitution/mod.rs`,
+   `queries/condition.rs`, `queries/feature_expression.rs`, `queries/mod.rs`, `properties/cascade.rs`,
+   `custom_properties.rs`, `values/specified/random.rs`): a fourth arbitrary substitution function. Its
+   branches are `<condition> : <declaration-value>?` separated by `;`; a condition that parses as
+   `<if-condition>` as written keeps the `var()` in its `style()` tests, any other is kept as a
+   `<declaration-value>` (a top-level `!` makes the `if()` invalid) and parsed after substitution, where
+   a failure to parse is false. `style()` tests the element's own custom properties (`StyleQueryTarget`,
+   also used by container queries with `Container`), `media()` the device (the element is then marked as
+   using viewport units, so it restyles on resize), `supports()` is evaluated when parsed. The first
+   branch that holds gives the value; none makes the function invalid at computed-value time. The
+   custom properties a branch's `style()` tests name are dependencies in the custom-property graph (up to
+   the branch that holds), so a property that tests itself is in a cycle; `substitute_with_seen` carries
+   the properties being resolved into a `style()` value's substitution so a cycle through it ends. A value
+   is attr()-tainted when its conditions read attr()-tainted values. Media features and container style
+   queries refuse `random()` (csswg-drafts 10982; `contains_random_function`), and the `property-scoped`
+   random key of an alias is its property's.
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

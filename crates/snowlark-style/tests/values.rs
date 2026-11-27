@@ -39,6 +39,69 @@ fn custom_properties_and_var() {
 }
 
 #[test]
+fn if_function_takes_the_first_branch_that_holds() {
+    // css-values-5 §8.3: style() tests the element's own custom properties, media() the
+    // device, supports() the engine; with no branch holding, the if() is invalid at
+    // computed-value time.
+    let p = Page::with_device(
+        "<!DOCTYPE html><style>
+           @property --n { syntax: '<number>'; inherits: true; initial-value: 0; }
+           #a { --x: 3; --n: calc(1 + 2);
+                --s: if(style(--x: 3): yes; else: no);
+                --t: if(style(--x: 4): yes; style(--n: 3): second; else: no);
+                --u: if(media(width > 1000px): wide; media(width <= 1000px): narrow);
+                --v: if(supports(display: grid): grid; else: none);
+                --w: if(style(--x: 4): yes);
+                --c: if(style(--x) and invalid: a; else: b);
+                --k: else; --e: if(var(--k): from-var);
+                width: if(style(--x: 3): 7px; else: 1px); }
+           #b { --x: 11; --y: var(--y); --p: if(style(not (--x: var(--y))): t; else: f);
+                --q: if(style(--q): t; else: f); --r: if(style(--x: var(--r)): t; else: f); }
+         </style><div id=a></div><div id=b></div>",
+        DeviceConfig {
+            viewport: (800.0, 600.0),
+            ..DeviceConfig::default()
+        },
+    );
+    assert_eq!(p.get("#a", "--s"), "yes");
+    assert_eq!(p.get("#a", "--t"), "second");
+    assert_eq!(p.get("#a", "--u"), "narrow");
+    assert_eq!(p.get("#a", "--v"), "grid");
+    assert_eq!(p.get("#a", "--w"), "");
+    // A condition that is not an <if-condition> is false, not an error.
+    assert_eq!(p.get("#a", "--c"), "b");
+    // A condition's substitution functions are replaced before it is parsed.
+    assert_eq!(p.get("#a", "--e"), "from-var");
+    assert_eq!(p.get("#a", "width"), "7px");
+    // A query value that fails to substitute matches nothing.
+    assert_eq!(p.get("#b", "--p"), "t");
+    // A property that tests itself is in a cycle, as one that refers to itself is.
+    assert_eq!(p.get("#b", "--q"), "");
+    assert_eq!(p.get("#b", "--r"), "");
+}
+
+#[test]
+fn random_computes_and_is_refused_in_media_features() {
+    // css-values-5 §9.1: random() with equal bounds gives that value; a media feature with a
+    // random() in it is unknown (csswg-drafts issue 10982), so its rule does not apply.
+    let p = Page::with_device(
+        "<!DOCTYPE html><style>
+           #a { width: random(12px, 12px); height: calc(random(--k, 2px, 2px) * 3); }
+           @media (width > random(10px, 30px)) { #a { margin-top: 5px; } }
+           @media not (width > random(10px, 30px)) { #a { margin-left: 5px; } }
+         </style><div id=a></div>",
+        DeviceConfig {
+            viewport: (800.0, 600.0),
+            ..DeviceConfig::default()
+        },
+    );
+    assert_eq!(p.get("#a", "width"), "12px");
+    assert_eq!(p.get("#a", "height"), "6px");
+    assert_eq!(p.get("#a", "margin-top"), "0px");
+    assert_eq!(p.get("#a", "margin-left"), "0px");
+}
+
+#[test]
 fn registered_custom_properties() {
     let p = Page::new(
         "<!DOCTYPE html><style>
