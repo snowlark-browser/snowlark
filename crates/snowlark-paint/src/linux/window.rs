@@ -20,12 +20,16 @@
 //! more windows on the same loop ([`open`], [`open_browser_window`]); pointer (moves, buttons,
 //! wheels with high-resolution steps) with the desktop's cursors, keyboard through xkbcommon (keys
 //! as Windows virtual-key codes and characters, with repeat), focus, timers, close, maximize and
-//! fullscreen, the desktop's clipboard ([`clipboard`]), and showing pixels from the CPU
-//! ([`Window::present`], `wl_shm` buffers). Not yet: the compositor's GPU path, IME
-//! (`zwp_text_input_v3`), drag and drop, fractional scales.
+//! fullscreen, the desktop's clipboard ([`clipboard`]), input methods ([`text_input`]), drops from other
+//! programs ([`drag`]), and showing pixels from the CPU ([`Window::present`], `wl_shm` buffers). Not
+//! yet: the compositor's GPU path, drags out, fractional scales.
 
 #[path = "clipboard.rs"]
 mod clipboard;
+#[path = "drag.rs"]
+mod drag;
+#[path = "text_input.rs"]
+mod text_input;
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -46,7 +50,7 @@ use sctk::reexports::client::globals::registry_queue_init;
 use sctk::reexports::client::protocol::{
     wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface,
 };
-use sctk::reexports::client::{Connection, QueueHandle};
+use sctk::reexports::client::{Connection, Proxy, QueueHandle};
 use sctk::reexports::csd_frame::WindowState;
 use sctk::reexports::protocols::xdg::shell::client::xdg_toplevel::ResizeEdge;
 use sctk::registry::{ProvidesRegistryState, RegistryState};
@@ -54,7 +58,8 @@ use sctk::seat::keyboard::{
     KeyEvent, KeyboardHandler, Keysym, Modifiers as XkbModifiers, RawModifiers,
 };
 use sctk::seat::pointer::{
-    CursorIcon, PointerEvent, PointerEventKind, PointerHandler, ThemeSpec, ThemedPointer,
+    CursorIcon, PointerEvent, PointerEventKind, PointerHandler, PointerThemeError, ThemeSpec,
+    ThemedPointer,
 };
 use sctk::seat::{Capability, SeatHandler, SeatState};
 use sctk::shell::xdg::window::{
@@ -161,7 +166,7 @@ pub enum Event {
         x: i32,
         y: i32,
     },
-    /// A drag from another program entered the client area ([`crate::drop_target`]; not sent yet).
+    /// A drag from another program entered the client area ([`drag`]).
     DragEnter {
         x: i32,
         y: i32,
@@ -287,6 +292,7 @@ enum Op {
     Title(String),
     SetTimer(usize, u32),
     KillTimer(usize),
+    DropEffect(crate::drop_target::DropEffect),
 }
 
 /// Counts presses of one button into multi-clicks (the desktop reports single presses).
@@ -528,8 +534,11 @@ impl Window {
         self.handle.placement()
     }
 
-    /// What the window answers a drag over it: it takes no drops yet.
-    pub fn set_drop_effect(&self, _effect: crate::drop_target::DropEffect) {}
+    /// What the window answers a drag over it: the operation the drag source is told (the offer's
+    /// action, [`drag`]).
+    pub fn set_drop_effect(&self, effect: crate::drop_target::DropEffect) {
+        self.ops.borrow_mut().push(Op::DropEffect(effect));
+    }
 
     /// Brings a minimized window back: a Wayland client cannot (the desktop restores it when the
     /// user picks it).
@@ -1042,6 +1051,9 @@ enum Shape {
     Hidden,
 }
 
+/// The cursors drawn here: the memory they are in, and each one's buffer and hot spot.
+type DrawnCursors = (Option<SlotPool>, HashMap<CursorIcon, (Buffer, (u32, u32))>);
+
 struct State {
     registry: RegistryState,
     seats: SeatState,
@@ -1068,6 +1080,12 @@ struct State {
     qh: QueueHandle<State>,
     /// Told when the first window is first configured ([`ShowWatch`]).
     watch: ShowWatch,
+    /// The desktop's input method.
+    text_input: text_input::TextInput,
+    /// The cursors drawn here ([`State::show_drawn_cursor`]) and the memory they are in.
+    drawn_cursors: RefCell<DrawnCursors>,
+    /// A drag from another program over a window ([`drag`]).
+    drag_in: Option<drag::DragIn>,
 }
 
 impl State {
@@ -1145,6 +1163,9 @@ impl State {
     }
 
     fn carry_out(&mut self, id: u64, op: Op) {
+        if let Op::DropEffect(effect) = op {
+            return drag::set_effect(self, id, effect);
+        }
         let Some(win) = self.wins.get_mut(&id) else {
             return;
         };
@@ -1182,6 +1203,7 @@ impl State {
                 }
             }
             Op::Close => self.destroy(id),
+            Op::DropEffect(_) => {}
         }
     }
 
@@ -1325,13 +1347,50 @@ impl State {
             return;
         }
         let shown = match shape {
-            Shape::Icon(icon) => pointer.set_cursor(&self.conn, icon),
-            Shape::Hidden => pointer.hide_cursor(),
+            Shape::Icon(icon) => match pointer.set_cursor(&self.conn, icon) {
+                // (no cursor theme has it: the browser's own drawing)
+                Err(PointerThemeError::CursorNotFound) => self.show_drawn_cursor(icon),
+                shown => shown.map_err(|_| ()),
+            },
+            Shape::Hidden => pointer.hide_cursor().map_err(|_| ()),
         };
         // (before the pointer's first enter there is no serial to set it with)
         if shown.is_ok() {
             self.shape = Some(shape);
         }
+    }
+
+    /// Shows the browser's own drawing of `icon` as the pointer ([`crate::cursors`]), for a
+    /// desktop that has neither cursor shapes nor a cursor theme with it.
+    fn show_drawn_cursor(&self, icon: CursorIcon) -> std::result::Result<(), ()> {
+        let pointer = self.pointer.as_ref().ok_or(())?;
+        let serial = pointer
+            .pointer()
+            .data::<sctk::seat::pointer::PointerData<()>>()
+            .and_then(|d| d.latest_enter_serial())
+            .ok_or(())?;
+        let mut drawn = self.drawn_cursors.borrow_mut();
+        if !drawn.1.contains_key(&icon) {
+            let art = drawn_cursor(icon);
+            let size = crate::cursors::SIZE as u32;
+            if drawn.0.is_none() {
+                drawn.0 = SlotPool::new((size * size * 4) as usize, &self.shm_state).ok();
+            }
+            let pool = drawn.0.as_mut().ok_or(())?;
+            let buffer = new_buffer(pool, size, size).map_err(|_| ())?;
+            pool.canvas(&buffer).ok_or(())?.copy_from_slice(&art.bgra);
+            drawn.1.insert(icon, (buffer, art.hot));
+        }
+        let (buffer, (hx, hy)) = &drawn.1[&icon];
+        let surface = pointer.surface();
+        surface.set_buffer_scale(1);
+        surface.attach(Some(buffer.wl_buffer()), 0, 0);
+        surface.damage_buffer(0, 0, i32::MAX, i32::MAX);
+        surface.commit();
+        pointer
+            .pointer()
+            .set_cursor(serial, Some(surface), *hx as i32, *hy as i32);
+        Ok(())
     }
 
     fn resized(&mut self, id: u64) {
@@ -1400,6 +1459,40 @@ fn edge_icon(edge: ResizeEdge) -> CursorIcon {
         ResizeEdge::Top => CursorIcon::NResize,
         _ => CursorIcon::SResize,
     }
+}
+
+/// The browser's own drawing of the desktop's cursor `icon` ([`cursor_shape`]'s names, the frame's
+/// edges' arrows): the directional resize arrows (and autoscroll's) as two-headed ones.
+fn drawn_cursor(icon: CursorIcon) -> crate::cursors::Drawn {
+    use crate::cursors::{draw, draw_system};
+    let cursor = match icon {
+        CursorIcon::Pointer => Cursor::Hand,
+        CursorIcon::Text => Cursor::IBeam,
+        CursorIcon::Wait => Cursor::Wait,
+        CursorIcon::Progress => Cursor::Progress,
+        CursorIcon::Crosshair => Cursor::Crosshair,
+        CursorIcon::Move => Cursor::Move,
+        CursorIcon::NotAllowed | CursorIcon::NoDrop => Cursor::NotAllowed,
+        CursorIcon::EwResize | CursorIcon::EResize | CursorIcon::WResize => Cursor::ResizeEW,
+        CursorIcon::NsResize | CursorIcon::NResize | CursorIcon::SResize => Cursor::ResizeNS,
+        CursorIcon::NwseResize | CursorIcon::NwResize | CursorIcon::SeResize => Cursor::ResizeNWSE,
+        CursorIcon::NeswResize | CursorIcon::NeResize | CursorIcon::SwResize => Cursor::ResizeNESW,
+        CursorIcon::Help => Cursor::Help,
+        CursorIcon::AllScroll => Cursor::AutoScroll(0, 0),
+        CursorIcon::VerticalText => Cursor::VerticalText,
+        CursorIcon::Alias => Cursor::Alias,
+        CursorIcon::Copy => Cursor::Copy,
+        CursorIcon::ContextMenu => Cursor::ContextMenu,
+        CursorIcon::ZoomIn => Cursor::ZoomIn,
+        CursorIcon::ZoomOut => Cursor::ZoomOut,
+        CursorIcon::Grab => Cursor::Grab,
+        CursorIcon::Grabbing => Cursor::Grabbing,
+        _ => Cursor::Arrow,
+    };
+    draw_system(cursor)
+        .or_else(|| draw(cursor))
+        .or_else(|| draw_system(Cursor::Arrow))
+        .expect("the arrow is drawn")
 }
 
 /// The desktop's cursor for `cursor` (CSS's cursor names, which the desktop's shapes and cursor
@@ -1710,6 +1803,9 @@ fn run_on(
         done: false,
         qh: qh.clone(),
         watch,
+        text_input: text_input::TextInput::bind(&globals, &qh),
+        drawn_cursors: RefCell::default(),
+        drag_in: None,
     };
     GLOBALS.with(|s| *s.borrow_mut() = Some(g));
     clipboard::connect(conn, qh, &globals);
@@ -1988,6 +2084,7 @@ impl SeatHandler for State {
                 .ok();
             // (the clipboard is the keyboard's seat's selection)
             clipboard::seat(qh, &seat);
+            self.text_input.seat(qh, &seat);
         }
         if capability == Capability::Pointer && self.pointer.is_none() {
             // The cursor: the desktop's shapes (cursor-shape-v1) where it has them, else images
@@ -2019,6 +2116,7 @@ impl SeatHandler for State {
             if let Some(k) = self.keyboard.take() {
                 k.release();
             }
+            self.text_input.release();
         }
         if capability == Capability::Pointer {
             // (dropping the themed pointer releases it)
@@ -2382,6 +2480,26 @@ mod tests {
         assert_eq!(edge_icon(ResizeEdge::TopLeft).name(), "nw-resize");
         assert_eq!(edge_icon(ResizeEdge::Right).name(), "e-resize");
         assert_eq!(edge_icon(ResizeEdge::Bottom).name(), "s-resize");
+    }
+
+    /// With no cursor shapes and no theme, each cursor is the browser's own drawing of it.
+    #[test]
+    fn cursors_no_theme_has_are_drawn() {
+        use crate::cursors::{draw, draw_system, DRAWN, SYSTEM};
+        for c in SYSTEM.iter().chain(DRAWN.iter()) {
+            let Shape::Icon(icon) = cursor_shape(*c) else {
+                panic!("{c:?}")
+            };
+            let own = draw_system(*c).or_else(|| draw(*c)).unwrap();
+            assert_eq!(drawn_cursor(icon).bgra, own.bgra, "{c:?}");
+        }
+        // The frame's edges and autoscroll: two-headed arrows, the all-ways one.
+        let ew = draw_system(Cursor::ResizeEW).unwrap().bgra;
+        assert_eq!(drawn_cursor(edge_icon(ResizeEdge::Right)).bgra, ew);
+        let nwse = draw_system(Cursor::ResizeNWSE).unwrap().bgra;
+        assert_eq!(drawn_cursor(edge_icon(ResizeEdge::BottomRight)).bgra, nwse);
+        let all = draw(Cursor::AutoScroll(0, 0)).unwrap().bgra;
+        assert_eq!(drawn_cursor(CursorIcon::AllScroll).bgra, all);
     }
 
     #[test]

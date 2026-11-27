@@ -119,6 +119,34 @@ fn shapes_paint_as_path_items() {
     assert_pixel(&px, 50, 90, WHITE);
 }
 
+/// An inline `svg` is clipped to its content box as a replaced element is: by its `overflow`
+/// (`hidden` from the UA style sheet), and not where `overflow: visible` (a line hanging above
+/// the box, a circle to its right).
+#[test]
+fn overflow_visible_draws_outside_the_svg() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let shapes = "<line x1=10 y1=-30 x2=10 y2=10 stroke=red stroke-width=6 />
+                  <circle cx=50 cy=10 r=8 fill=blue />";
+    for (style, outside) in [("", WHITE), ("overflow: visible", RED)] {
+        let mut r = render(
+            &net,
+            &format!("<svg width=40 height=40 style='margin: 40px 20px; {style}'>{shapes}</svg>"),
+        );
+        let list = r.paint(VIEWPORT, Point::ZERO);
+        assert!(
+            !list.items.iter().any(|i| matches!(i, Item::Image { .. })),
+            "{:?}",
+            r.inline_svg_unsupported(svg_of(&r))
+        );
+        let px = pixels(&mut r);
+        // (inside the box: drawn either way)
+        assert_pixel(&px, 30, 45, RED);
+        assert_pixel(&px, 30, 20, outside);
+        let circle = if outside == RED { BLUE } else { WHITE };
+        assert_pixel(&px, 70, 50, circle);
+    }
+}
+
 #[test]
 fn group_opacity_composites_once_and_clip_paths_clip() {
     let net = NetThread::start(NetConfig::default()).unwrap();

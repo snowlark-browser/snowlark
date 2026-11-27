@@ -25,7 +25,7 @@ through the system's OpenGL.
 Settings, history and bookmarks are at snowlark://settings, snowlark://history and
 snowlark://bookmarks. The open source software in Snowlark is listed at snowlark://credits.
 
-Not there yet on Linux: video and audio, file dialogs, drag and drop, input methods, saving
+Not there yet on Linux: video and audio, file dialogs, dragging out of the window, saving
 passwords, the desktop's dark setting, updates.
 
 

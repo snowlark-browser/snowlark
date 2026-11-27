@@ -40,8 +40,9 @@ the browser's process; there is no GPU process there, `--gpu-process` is ignored
 menus and the internal pages, composited on the CPU. `snowlark-tab` and `snowlark-shell` build whole there and
 pass their tests but those that need a Windows window, a GPU device, the password store's key or shared video
 textures. The window has the desktop's clipboard (text and markup, both ways), the desktop's cursors and more
-windows (new and Incognito windows, undocked developer tools, popups). Not there yet in the window: file
-dialogs, drag and drop, IME, the desktop's dark setting, the password store (no key: Linux's Secret Service is
+windows (new and Incognito windows, undocked developer tools, popups), input methods (text-input-v3) and drops
+from other programs (files, links, text). Not there yet in the window: file dialogs, drags out of the window,
+the input method's candidate position, the desktop's dark setting, the password store (no key: Linux's Secret Service is
 not used yet, so no password is saved), updates (releases there are not signed). The chrome's icons are Unicode symbols where Windows' icon font is missing. The profile is
 `~/.config/snowlark` (`XDG_CONFIG_HOME`). What is missing behaves as on a system without it: a media element fails with
 `MEDIA_ERR_SRC_NOT_SUPPORTED`, `MediaSource` cannot attach, canvases draw on the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is false and
@@ -190,16 +191,25 @@ releases; a machine without network access builds it from source, which needs `p
   and the loop ends with the last browser window. A window `open` makes asks the desktop for its frame; on a
   desktop that draws none, its edges still resize it. Cursors are the desktop's: its cursor shapes
   (cursor-shape-v1) where it has them, else the cursor theme's images (`XCURSOR_THEME`, `XCURSOR_SIZE`), named
-  as CSS names them; a resize edge shows its resize arrow. The clipboard is the keyboard seat's selection
+  as CSS names them, else (no theme, or one without that cursor) the browser's own drawings (`cursors.rs`: the
+  set Windows draws for the cursors it lacks, and the system ones: arrow, hand, I-beam, wait, progress,
+  crosshair, move, not-allowed, help, the resize arrows); a resize edge shows its resize arrow. The clipboard is the keyboard seat's selection
   (`wl_data_device`): a copy offers `text/plain;charset=utf-8` (and the other names of text other programs ask
   for) and `text/html`, set with the newest key or button press's serial; a paste of another program's
   selection reads its pipe from whichever thread asks, for at most a second, while the browser's own copy is
-  answered from memory. The rest of the Windows half's API is there with what Linux has (sizes and the
+  answered from memory. Input methods: the seat's `zwp_text_input_v3` is enabled while a window has the
+  keyboard focus (as the Windows window keeps its input context), and each batch the input method ends with
+  `done` is applied in the protocol's order (commit string, then the new preedit string, only when it changed)
+  as `ImeEvent`s; no surrounding text or cursor rectangle is sent yet. Drops (`drag.rs`): on enter the offer's
+  `text/uri-list` (`file:` URIs as files, others as text) and text are read at once and the type read is
+  accepted; the handler's `set_drop_effect` is the offer's action, and a drop the desktop chose an action for is
+  finished. The rest of the Windows half's API is there with what Linux has (sizes and the
   maximized state kept, no position; the downloads folder from the user directories; local time from the C
-  library) or says what is missing. Not yet: IME, drag and drop, fractional scales, the compositor's GPU path.
+  library) or says what is missing. Not yet: drags out (no platform has them yet), fractional scales, the
+  compositor's GPU path.
 - `vsync`: begin frames from a timer at the refresh interval on a fixed timebase (the window's own frames
   follow the desktop's frame callbacks); `os_crypt`: nothing can be protected yet (the Secret Service is not
-  used); `drop_target`: the drag types only.
+  used); `drop_target`: the drag types (the window's `drag` module takes drops).
 
 - `compositor`: the window's compositor on the CPU, with the Windows half's `Compositor` and `ContentPass`: each
   frame is the whole client area (the chrome in its top rows), drawn with Skia's CPU backend (tiles copied, tiles

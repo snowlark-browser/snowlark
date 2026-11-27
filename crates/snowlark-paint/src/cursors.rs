@@ -178,6 +178,169 @@ fn magnifier(detail: impl FnOnce(&mut Art)) -> Drawn {
     a.finish((12, 12))
 }
 
+/// The cursors [`draw_system`] draws: those a desktop's cursor theme normally has.
+pub const SYSTEM: [Cursor; 13] = [
+    Cursor::Arrow,
+    Cursor::Hand,
+    Cursor::IBeam,
+    Cursor::Wait,
+    Cursor::Progress,
+    Cursor::Crosshair,
+    Cursor::Move,
+    Cursor::NotAllowed,
+    Cursor::ResizeEW,
+    Cursor::ResizeNS,
+    Cursor::ResizeNWSE,
+    Cursor::ResizeNESW,
+    Cursor::Help,
+];
+
+/// An hourglass between `top` and `bottom`, `half` wide on each side of `cx`.
+fn hourglass(a: &mut Art, cx: f32, top: f32, bottom: f32, half: f32) {
+    let mid = (top + bottom) / 2.0;
+    let cap = (bottom - top) / 7.0;
+    a.polygon(
+        Ink::White,
+        &[
+            (cx - half, top),
+            (cx + half, top),
+            (cx + half, top + cap),
+            (cx + 1.5, mid),
+            (cx + half, bottom - cap),
+            (cx + half, bottom),
+            (cx - half, bottom),
+            (cx - half, bottom - cap),
+            (cx - 1.5, mid),
+            (cx - half, top + cap),
+        ],
+    );
+}
+
+/// A two-headed arrow through the centre, along `angle` (degrees, clockwise from pointing
+/// right).
+fn double_arrow(angle: f32) -> Drawn {
+    let (sin, cos) = angle.to_radians().sin_cos();
+    let reach = if angle % 90.0 == 0.0 { 13.5 } else { 12.5 };
+    let mut a = Art::new();
+    a.fill(Ink::White, |x, y| {
+        let (dx, dy) = (x - 16.0, y - 16.0);
+        let along = (dx * cos + dy * sin).abs();
+        let across = (-dx * sin + dy * cos).abs();
+        let head = reach - 6.5;
+        along <= reach && (across <= 1.5 || (along >= head && across <= reach - along))
+    });
+    a.outline();
+    a.finish((16, 16))
+}
+
+/// What `cursor` looks like where the system has no image for it (a desktop with no cursor
+/// theme), for those a system normally has ([`SYSTEM`]); the others are [`draw`]'s.
+pub fn draw_system(cursor: Cursor) -> Option<Drawn> {
+    Some(match cursor {
+        Cursor::Arrow => {
+            let mut a = Art::new();
+            a.polygon(Ink::White, &ARROW);
+            a.outline();
+            a.finish(ARROW_HOT)
+        }
+        Cursor::Hand => {
+            let mut a = Art::new();
+            a.rows(
+                Ink::White,
+                7,
+                3,
+                &[
+                    "....##.........",
+                    "....##.........",
+                    "....##.........",
+                    "....##.........",
+                    "....##.##......",
+                    "....##.##.##...",
+                    "....##.##.##.##",
+                    "##..##.##.##.##",
+                    "###.###########",
+                    ".##############",
+                    "..#############",
+                    "..#############",
+                    "...###########.",
+                    "...###########.",
+                    "....#########..",
+                    "....#########..",
+                ],
+            );
+            a.outline();
+            a.finish((11, 3))
+        }
+        Cursor::IBeam => {
+            let mut a = Art::new();
+            a.rect(Ink::White, 15, 5, 17, 27);
+            a.rect(Ink::White, 11, 5, 21, 7);
+            a.rect(Ink::White, 11, 25, 21, 27);
+            a.outline();
+            a.finish((16, 16))
+        }
+        Cursor::Wait => {
+            let mut a = Art::new();
+            hourglass(&mut a, 16.0, 4.0, 28.0, 7.0);
+            a.outline();
+            a.finish((16, 16))
+        }
+        Cursor::Progress => {
+            let mut a = Art::new();
+            a.polygon(Ink::White, &ARROW);
+            hourglass(&mut a, 21.0, 15.0, 29.0, 4.5);
+            a.outline();
+            a.finish(ARROW_HOT)
+        }
+        Cursor::Crosshair => {
+            let mut a = Art::new();
+            a.rect(Ink::White, 4, 15, 28, 17);
+            a.rect(Ink::White, 15, 4, 17, 28);
+            a.outline();
+            a.finish((16, 16))
+        }
+        Cursor::Move => {
+            let mut a = Art::new();
+            a.rect(Ink::White, 8, 15, 24, 17);
+            a.rect(Ink::White, 15, 8, 17, 24);
+            a.polygon(Ink::White, &[(16.0, 2.0), (21.5, 8.0), (10.5, 8.0)]);
+            a.polygon(Ink::White, &[(16.0, 30.0), (10.5, 24.0), (21.5, 24.0)]);
+            a.polygon(Ink::White, &[(2.0, 16.0), (8.0, 10.5), (8.0, 21.5)]);
+            a.polygon(Ink::White, &[(30.0, 16.0), (24.0, 21.5), (24.0, 10.5)]);
+            a.outline();
+            a.finish((16, 16))
+        }
+        Cursor::NotAllowed => {
+            let mut a = Art::new();
+            a.fill(Ink::White, |x, y| {
+                let (dx, dy) = (x - 16.0, y - 16.0);
+                let r2 = dx * dx + dy * dy;
+                let ring = (7.5 * 7.5..=11.0 * 11.0).contains(&r2);
+                // (the bar, from top left to bottom right, inside the ring)
+                let bar = (dx - dy).abs() <= 2.5 && r2 <= 8.0 * 8.0;
+                ring || bar
+            });
+            a.outline();
+            a.finish((16, 16))
+        }
+        Cursor::ResizeEW => double_arrow(0.0),
+        Cursor::ResizeNS => double_arrow(90.0),
+        Cursor::ResizeNWSE => double_arrow(45.0),
+        Cursor::ResizeNESW => double_arrow(135.0),
+        Cursor::Help => arrow_with_box(|a| {
+            a.rows(
+                Ink::Black,
+                18,
+                17,
+                &[
+                    ".###.", "#...#", "....#", "...#.", "..#..", "..#..", ".....", "..#..",
+                ],
+            );
+        }),
+        _ => return None,
+    })
+}
+
 /// What `cursor` looks like, for those Windows has no cursor for.
 pub fn draw(cursor: Cursor) -> Option<Drawn> {
     Some(match cursor {
@@ -300,11 +463,29 @@ mod tests {
         assert!(draw(Cursor::Hidden).is_none());
     }
 
+    /// Every cursor [`draw`] or [`draw_system`] draws.
+    fn every_drawn() -> Vec<(Cursor, Drawn)> {
+        let drawn = DRAWN.iter().map(|&c| (c, draw(c).unwrap()));
+        let system = SYSTEM.iter().map(|&c| (c, draw_system(c).unwrap()));
+        drawn.chain(system).collect()
+    }
+
+    #[test]
+    fn the_system_set_is_drawn_and_differs_from_the_others() {
+        let all = every_drawn();
+        for (i, (c, a)) in all.iter().enumerate() {
+            for (d, b) in &all[i + 1..] {
+                assert_ne!(a.bgra, b.bgra, "{c:?} and {d:?}");
+            }
+        }
+        assert!(draw_system(Cursor::Copy).is_none());
+        assert!(draw_system(Cursor::Hidden).is_none());
+    }
+
     /// Every pixel is opaque black, opaque white or clear, and the mask says which.
     #[test]
     fn pixels_are_hard_edged_and_the_mask_agrees() {
-        for c in DRAWN {
-            let d = draw(c).unwrap();
+        for (c, d) in every_drawn() {
             assert_eq!(d.bgra.len(), SIZE * SIZE * 4);
             assert_eq!(d.mask.len(), SIZE * SIZE / 8);
             for i in 0..SIZE * SIZE {
@@ -322,8 +503,7 @@ mod tests {
     /// A white shape with nothing white on a clear pixel's edge: it shows on any background.
     #[test]
     fn white_is_always_outlined() {
-        for c in DRAWN {
-            let d = draw(c).unwrap();
+        for (c, d) in every_drawn() {
             let mut white = 0;
             for y in 0..SIZE {
                 for x in 0..SIZE {
@@ -357,8 +537,7 @@ mod tests {
     /// The hot spot is on the cursor, where the pointer seems to be.
     #[test]
     fn the_hot_spot_is_on_the_drawing() {
-        for c in DRAWN {
-            let d = draw(c).unwrap();
+        for (c, d) in every_drawn() {
             let (x, y) = (d.hot.0 as usize, d.hot.1 as usize);
             assert_ne!(px(&d, x, y)[3], 0, "{c:?}");
         }

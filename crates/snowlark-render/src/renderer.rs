@@ -167,6 +167,20 @@ fn renders_reaction(dom: &Dom, document: NodeId, embeds: bool, r: &Reaction) -> 
 }
 
 /// A content box size as a map key (its bits: sizes compare equal only when they are).
+/// The axes on which an inline `svg`'s content is clipped to its content box: as for any replaced
+/// element, by its `overflow` on that axis (anything but `visible`) or paint containment (CSS
+/// Overflow 3 §3; the UA style sheet's `svg:not(:root) { overflow: hidden }`, SVG 2 Appendix D).
+fn svg_clip_axes(values: &style::properties::ComputedValues) -> snowlark_paint::ClipAxes {
+    use style::values::computed::Contain;
+    use style::values::specified::box_::Overflow;
+    let b = values.get_box();
+    let paint = b.contain.contains(Contain::PAINT);
+    snowlark_paint::ClipAxes {
+        x: paint || b.overflow_x != Overflow::Visible,
+        y: paint || b.overflow_y != Overflow::Visible,
+    }
+}
+
 fn size_key(size: (f32, f32)) -> (u32, u32) {
     (size.0.to_bits(), size.1.to_bits())
 }
@@ -4804,11 +4818,23 @@ impl Renderer {
         }
         let doc = self.doc.as_deref()?;
         let recordings = &doc.svg_recordings;
+        let dom = doc.dom.borrow();
         list.replace_images(&mut |image, dest| {
             let r = recordings.get(&image)?;
             let list = r.recording.as_ref().ok()?;
-            (r.size == (dest.width, dest.height))
-                .then(|| (&**list, snowlark_paint::Matrix::translation(dest.x, dest.y)))
+            // (the root of an SVG document always clips to the viewport)
+            let axes = nodes
+                .get(&image)
+                .filter(|&&(n, _)| dom.parent_element(n).is_some())
+                .and_then(|&(n, _)| doc.data.styles(n))
+                .map_or(snowlark_paint::ClipAxes::BOTH, |v| svg_clip_axes(v));
+            (r.size == (dest.width, dest.height)).then(|| {
+                (
+                    &**list,
+                    snowlark_paint::Matrix::translation(dest.x, dest.y),
+                    axes,
+                )
+            })
         })
     }
 

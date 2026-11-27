@@ -36,7 +36,7 @@ use super::State;
 
 /// Text's types, in the order a paste prefers them: UTF-8 first, then the X11 selection names
 /// XWayland's programs offer.
-const TEXT_TYPES: [&str; 5] = [
+pub(super) const TEXT_TYPES: [&str; 5] = [
     "text/plain;charset=utf-8",
     "UTF8_STRING",
     "text/plain",
@@ -47,7 +47,7 @@ const TEXT_TYPES: [&str; 5] = [
 const HTML_TYPE: &str = "text/html";
 
 /// How long a paste waits for another program's data.
-const READ_TIMEOUT: Duration = Duration::from_secs(1);
+pub(super) const READ_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// The desktop's side, while the window loop runs.
 struct Desktop {
@@ -191,7 +191,7 @@ fn pick(types: &[String], html: bool) -> Option<&'static str> {
 }
 
 /// Reads `fd` until the writer closes it, for at most `timeout`; none if it timed out or failed.
-fn read_until_closed(fd: OwnedFd, timeout: Duration) -> Option<Vec<u8>> {
+pub(super) fn read_until_closed(fd: OwnedFd, timeout: Duration) -> Option<Vec<u8>> {
     let end = Instant::now() + timeout;
     let mut file = std::fs::File::from(fd);
     let mut bytes = Vec::new();
@@ -296,16 +296,21 @@ impl DataDeviceHandler for State {
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: &WlDataDevice,
-        _: f64,
-        _: f64,
-        _: &WlSurface,
+        device: &WlDataDevice,
+        x: f64,
+        y: f64,
+        surface: &WlSurface,
     ) {
+        super::drag::enter(self, device, x, y, surface);
     }
 
-    fn leave(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice) {}
+    fn leave(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice) {
+        super::drag::leave(self);
+    }
 
-    fn motion(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice, _: f64, _: f64) {}
+    fn motion(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice, x: f64, y: f64) {
+        super::drag::motion(self, x, y);
+    }
 
     /// The desktop names the selection: a copy the desktop never took (no source) gives way to it.
     fn selection(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice) {
@@ -316,7 +321,9 @@ impl DataDeviceHandler for State {
         }
     }
 
-    fn drop_performed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice) {}
+    fn drop_performed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice) {
+        super::drag::drop(self);
+    }
 }
 
 impl DataOfferHandler for State {
@@ -334,8 +341,9 @@ impl DataOfferHandler for State {
         _: &Connection,
         _: &QueueHandle<Self>,
         _: &mut DragOffer,
-        _: DndAction,
+        action: DndAction,
     ) {
+        super::drag::selected(self, action);
     }
 }
 

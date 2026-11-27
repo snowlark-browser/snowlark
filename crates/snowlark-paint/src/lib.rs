@@ -55,7 +55,6 @@ pub mod autoscroll_cursor;
 mod com;
 #[cfg_attr(not(windows), path = "linux/compositor.rs")]
 pub mod compositor;
-#[cfg(windows)]
 pub mod cursors;
 #[cfg(windows)]
 pub mod demo;

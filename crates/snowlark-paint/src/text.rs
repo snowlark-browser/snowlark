@@ -558,6 +558,17 @@ impl TextEngine {
                 }));
         }
         let name = generic_family(name).unwrap_or(name);
+        match self.find_installed(name)? {
+            Some(f) => Ok(Some(f)),
+            None => match alternate_family(name) {
+                Some(other) => self.find_installed(other),
+                None => Ok(None),
+            },
+        }
+    }
+
+    /// The installed (or locally added) family `name`.
+    fn find_installed(&self, name: &str) -> Result<Option<Family>> {
         let wide: Vec<u16> = name.encode_utf16().chain(Some(0)).collect();
         // SAFETY: `wide` is NUL-terminated and outlives the call.
         unsafe {
@@ -1271,6 +1282,21 @@ struct MapContext<'a> {
     primary: FontId,
 }
 
+/// The family looked for when a named family is not installed: the names a page uses for the
+/// same design on other systems (CSS Fonts 4 §5.1 lets a user agent match a family name by such
+/// aliases). Courier New for Courier (not the other way: Windows' Courier is a bitmap font),
+/// Times and Times New Roman, Helvetica and Arial, as Windows browsers do.
+fn alternate_family(name: &str) -> Option<&'static str> {
+    Some(match name.to_ascii_lowercase().as_str() {
+        "courier" => "Courier New",
+        "times" => "Times New Roman",
+        "times new roman" => "Times",
+        "helvetica" => "Arial",
+        "arial" => "Helvetica",
+        _ => return None,
+    })
+}
+
 /// The CSS generic families, as Windows browsers map them.
 fn generic_family(name: &str) -> Option<&'static str> {
     Some(match name.to_ascii_lowercase().as_str() {
@@ -1501,6 +1527,28 @@ mod tests {
             stretch: FontStretch::NORMAL,
         })
         .unwrap()
+    }
+
+    /// A family that is not installed under its name is found under its alias: Courier as
+    /// Courier New, Helvetica as Arial, Times as Times New Roman, ahead of the generic family
+    /// that follows it in the list.
+    #[test]
+    fn aliased_families_match_their_installed_names() {
+        let e = engine();
+        let width = |families: &[&str]| {
+            e.measure("charge (s) Wiggly", list(&e, families, 400), 20.0)
+                .unwrap()
+        };
+        assert_eq!(width(&["Courier", "monospace"]), width(&["Courier New"]));
+        assert_ne!(width(&["Courier New"]), width(&["monospace"]));
+        assert_eq!(width(&["Helvetica", "serif"]), width(&["Arial"]));
+        assert_ne!(width(&["Arial"]), width(&["serif"]));
+        assert_eq!(width(&["Times", "sans-serif"]), width(&["Times New Roman"]));
+        // (a family with no alias still falls through to the next)
+        assert_eq!(
+            width(&["No Such Family", "monospace"]),
+            width(&["monospace"])
+        );
     }
 
     /// Splitting the shaping of "AVA" after "A" keeps the "AV" kerning in the first part (narrower

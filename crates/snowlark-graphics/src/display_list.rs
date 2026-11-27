@@ -26,6 +26,19 @@ pub struct FontId(pub u32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ImageId(pub u32);
 
+/// The axes on which a replaced element's content is clipped to its content box (CSS Overflow 3:
+/// an `overflow` other than `visible` on that axis, or paint containment).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ClipAxes {
+    pub x: bool,
+    pub y: bool,
+}
+
+impl ClipAxes {
+    /// Clipped on both axes.
+    pub const BOTH: ClipAxes = ClipAxes { x: true, y: true };
+}
+
 /// A video element's frames in a `VideoStore` (`snowlark-paint`): the compositor draws the latest one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct VideoId(pub u32);
@@ -1532,13 +1545,14 @@ impl DisplayList {
     }
 
     /// The list with image items drawn as other lists: each [`Item::Image`] drawing its whole image
-    /// (an empty `src`) for which `replacement` gives a list and a matrix is replaced by that list,
-    /// under the matrix (from its coordinates to this list's), clipped to the image's `dest` and
-    /// composited with the image's opacity. `None` when nothing was replaced. Replacement lists
+    /// (an empty `src`) for which `replacement` gives a list, a matrix and the axes it clips on is
+    /// replaced by that list, under the matrix (from its coordinates to this list's), clipped to
+    /// the image's `dest` on the axes it clips on ([`ClipAxes`]: a replaced element's `overflow`)
+    /// and composited with the image's opacity. `None` when nothing was replaced. Replacement lists
     /// that do not validate are left out, as the image is.
     pub fn replace_images<'a>(
         &self,
-        replacement: &mut dyn FnMut(ImageId, Rect) -> Option<(&'a DisplayList, Matrix)>,
+        replacement: &mut dyn FnMut(ImageId, Rect) -> Option<(&'a DisplayList, Matrix, ClipAxes)>,
     ) -> Option<DisplayList> {
         let mut out: Option<DisplayList> = None;
         // Whether each list validates, by address: images that share one (a page's repeated
@@ -1554,11 +1568,11 @@ impl DisplayList {
                     opacity,
                     ..
                 } if src.is_empty() => {
-                    replacement(image, dest).map(|(list, m)| (list, m, dest, opacity))
+                    replacement(image, dest).map(|(list, m, axes)| (list, m, dest, axes, opacity))
                 }
                 _ => None,
             };
-            let Some((list, m, dest, opacity)) = found else {
+            let Some((list, m, dest, axes, opacity)) = found else {
                 if let Some(out) = &mut out {
                     copy_item(out, self, item);
                 }
@@ -1579,11 +1593,26 @@ impl DisplayList {
             {
                 continue;
             }
-            out.items.push(Item::PushClipRect { rect: dest });
+            // (an axis that does not clip reaches as far as the list draws)
+            let clip = if axes.x && axes.y {
+                dest
+            } else {
+                let drawn = list.drawn_bounds(&m).union(&dest);
+                let (x0, x1) = match axes.x {
+                    true => (dest.x, dest.right()),
+                    false => (drawn.x, drawn.right()),
+                };
+                let (y0, y1) = match axes.y {
+                    true => (dest.y, dest.bottom()),
+                    false => (drawn.y, drawn.bottom()),
+                };
+                Rect::new(x0, y0, x1 - x0, y1 - y0)
+            };
+            out.items.push(Item::PushClipRect { rect: clip });
             if opacity < 1.0 {
                 out.items.push(Item::PushOpacity {
                     opacity,
-                    bounds: dest,
+                    bounds: clip,
                 });
             }
             out.items.push(Item::PushTransform { matrix: m });
@@ -5484,7 +5513,7 @@ mod tests {
         let out = page
             .replace_images(&mut |id, d| {
                 asked.push((id, d));
-                (id == ImageId(7)).then_some((&content, m))
+                (id == ImageId(7)).then_some((&content, m, ClipAxes::BOTH))
             })
             .unwrap();
         assert_eq!(asked, vec![(ImageId(7), dest), (ImageId(8), dest)]);
@@ -5506,6 +5535,43 @@ mod tests {
         assert_eq!(&b2[4..4 + n], &a[..]);
         // nothing to replace: no list
         assert!(page.replace_images(&mut |_, _| None).is_none());
+    }
+
+    /// A replacement that does not clip on an axis (a replaced element with `overflow: visible`
+    /// there) is clipped to what it draws on that axis, past the image's `dest`.
+    #[test]
+    fn images_replaced_without_a_clip_on_an_axis_draw_past_them() {
+        let mut b = DisplayListBuilder::new();
+        let dest = Rect::new(10.0, 20.0, 30.0, 40.0);
+        b.image(ImageId(7), dest, None, 1.0, ImageRendering::Smooth);
+        let page = b.build();
+        // (content from 5 above to 5 below the box, and 50 to its right)
+        let mut c = DisplayListBuilder::new();
+        c.fill_rect(Rect::new(0.0, -5.0, 80.0, 50.0), Color::BLACK);
+        let content = c.build();
+        let m = Matrix::translation(10.0, 20.0);
+        let clip = |axes| {
+            let out = page
+                .replace_images(&mut |_, _| Some((&content, m, axes)))
+                .unwrap();
+            match out.items[0] {
+                Item::PushClipRect { rect } => rect,
+                ref i => panic!("{i:?}"),
+            }
+        };
+        // (what the content draws, from 10 to 90 across and 15 to 65 down, with its margin)
+        let d = content.drawn_bounds(&m);
+        assert!(d.x <= 10.0 && d.right() >= 90.0 && d.y <= 15.0 && d.bottom() >= 65.0);
+        assert_eq!(clip(ClipAxes::BOTH), dest);
+        assert_eq!(
+            clip(ClipAxes { x: false, y: true }),
+            Rect::new(d.x, 20.0, d.width, 40.0)
+        );
+        assert_eq!(
+            clip(ClipAxes { x: true, y: false }),
+            Rect::new(10.0, d.y, 30.0, d.height)
+        );
+        assert_eq!(clip(ClipAxes { x: false, y: false }), d);
     }
 
     #[test]
