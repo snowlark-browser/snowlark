@@ -2303,6 +2303,8 @@ impl Renderer {
             for p in [
                 snowlark_layout::style::PseudoElement::Before,
                 snowlark_layout::style::PseudoElement::After,
+                snowlark_layout::style::PseudoElement::FirstLetter,
+                snowlark_layout::style::PseudoElement::FirstLine,
             ] {
                 if let Some(pv) =
                     stylo_pseudo(p).and_then(|sp| doc.engine.pseudo_style(&dom, &doc.data, n, &sp))

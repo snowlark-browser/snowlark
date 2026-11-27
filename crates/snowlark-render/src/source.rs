@@ -65,10 +65,11 @@ pub(crate) fn stylo_pseudo(p: PseudoElement) -> Option<StyloPseudo> {
         PseudoElement::After => StyloPseudo::After,
         PseudoElement::Marker => StyloPseudo::Marker,
         PseudoElement::FirstLetter => StyloPseudo::FirstLetter,
+        PseudoElement::FirstLine => StyloPseudo::FirstLine,
         PseudoElement::Backdrop => StyloPseudo::Backdrop,
         PseudoElement::DetailsContent => StyloPseudo::DetailsContent,
         PseudoElement::Part(p) => stylo_part(p),
-        PseudoElement::FirstLine | PseudoElement::DetailsSummary => return None,
+        PseudoElement::DetailsSummary => return None,
     })
 }
 
@@ -821,6 +822,39 @@ impl StyleSource for DocumentStyles<'_> {
             implicit_anchor: None,
             position_try: None,
         })
+    }
+
+    fn first_letter_style(&self, element: NodeId, parent: &RenderStyle) -> Option<RenderStyle> {
+        let mut own = self.pseudo_style(element, PseudoElement::FirstLetter)?;
+        let primary = self.data.styles(element)?;
+        if !std::ptr::eq(primary, &*parent.values) {
+            own.values = self.engine.reparented_pseudo_style(
+                self.dom,
+                self.data,
+                element,
+                &StyloPseudo::FirstLetter,
+                &own.values,
+                &parent.values,
+            );
+        }
+        Some(own)
+    }
+
+    fn on_first_line(
+        &self,
+        element: Option<NodeId>,
+        style: &RenderStyle,
+        parent: &RenderStyle,
+    ) -> RenderStyle {
+        let mut s = style.clone();
+        s.values = self.engine.first_line_style(
+            self.dom,
+            self.data,
+            element,
+            &style.values,
+            &parent.values,
+        );
+        s
     }
 
     fn anonymous_style(&self, parent: &RenderStyle, kind: AnonymousBox) -> RenderStyle {

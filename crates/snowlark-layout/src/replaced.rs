@@ -420,6 +420,17 @@ pub(crate) fn layout_replaced<S: Style>(
         .as_ref()
         .and_then(|c| c.baseline)
         .or_else(|| check.then_some(height));
+    // A textarea's lines are what it scrolls (its scrollable overflow, CSS Overflow 3 §2.2): its
+    // content box as tall as they are, as in-flow content (the lines are not fragments).
+    let textarea_lines = control
+        .as_ref()
+        .filter(|_| {
+            content
+                .control
+                .as_ref()
+                .is_some_and(|c| matches!(c.kind, ControlKind::TextArea { .. }))
+        })
+        .map(|c| Rect::new(content_box.x, content_box.y, cw, c.text_height));
     let fragment = box_fragment(
         cx,
         id,
@@ -438,6 +449,10 @@ pub(crate) fn layout_replaced<S: Style>(
         },
         0,
     );
+    let fragment = match textarea_lines {
+        Some(lines) => crate::layout::with_inflow(fragment, Some(lines)),
+        None => fragment,
+    };
     LayoutResult {
         fragment,
         margin: Sides::new(edges.mt(), mr, edges.mb(), ml),

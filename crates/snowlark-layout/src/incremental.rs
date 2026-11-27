@@ -856,7 +856,10 @@ impl<S: Style> LayoutTree<S> {
         } else {
             None
         };
-        let regenerate = pseudos || marker || (change.decorations && redecorated.is_none());
+        // (the styles of a first formatted line's boxes are made from their own: made again)
+        let first_line = self.tree.first_line.contains_key(&principal);
+        let regenerate =
+            pseudos || marker || first_line || (change.decorations && redecorated.is_none());
         if regenerate && !container {
             return InPlace::Parent;
         }
@@ -886,10 +889,13 @@ impl<S: Style> LayoutTree<S> {
         }
         // The text and anonymous boxes that take or inherit its style.
         let mut stack: Vec<BoxId> = self.tree.b(principal).children.clone();
+        let mut first_letter = false;
         while let Some(c) = stack.pop() {
             let cb = self.tree.b(c);
             let parent = cb.parent.expect("a child box has a parent");
             match (cb.kind, cb.node, cb.pseudo) {
+                // (a `::first-letter` style inherits from the text's parent: made again)
+                (_, _, Some(PseudoElement::FirstLetter)) => first_letter = true,
                 (BoxKind::Text, Some(t), None) => {
                     // (a text node removed and freed since the last update keeps its box until the
                     // removal regenerates the container: nothing to restyle)
@@ -927,6 +933,13 @@ impl<S: Style> LayoutTree<S> {
                 }
                 _ => {}
             }
+        }
+        if first_letter {
+            return if container {
+                InPlace::Contents(principal)
+            } else {
+                InPlace::Parent
+            };
         }
         InPlace::Done
     }

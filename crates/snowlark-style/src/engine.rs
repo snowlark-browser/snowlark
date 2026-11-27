@@ -4435,6 +4435,87 @@ impl StyleEngine {
         Some(style)
     }
 
+    /// `own`, the style of `element`'s eager pseudo-element `pseudo` ([`StyleEngine::pseudo_style`]),
+    /// cascaded again from the same rules with `parent` as its parent style: a `::first-letter`
+    /// inherits from the box its letter is in (CSS Pseudo 4 §3.2), which may be a descendant's.
+    pub fn reparented_pseudo_style(
+        &self,
+        dom: &Dom,
+        data: &StyleData,
+        element: NodeId,
+        pseudo: &PseudoElement,
+        own: &ComputedValues,
+        parent: &ComputedValues,
+    ) -> Arc<ComputedValues> {
+        let entered = !thread_state::get().is_layout();
+        if entered {
+            thread_state::enter(ThreadState::LAYOUT);
+        }
+        let values = self.guards_and_view(dom, data, |shared, view| {
+            self.stylist.compute_pseudo_element_style_with_inputs(
+                style::context::CascadeInputs::new_from_style(own),
+                pseudo,
+                &shared.guards,
+                Some(parent),
+                Some(view.element(element)),
+            )
+        });
+        if entered {
+            thread_state::exit(ThreadState::LAYOUT);
+        }
+        values
+    }
+
+    /// `own` (the style of `element`, of one of its pseudo-elements, or of an anonymous box) as
+    /// it is on a `::first-line`: cascaded again from its rules with `parent`, the first line's
+    /// style or a box's on it (CSS Pseudo 4 §3.1.2, the fictional tag sequence), as its parent.
+    pub fn first_line_style(
+        &self,
+        dom: &Dom,
+        data: &StyleData,
+        element: Option<NodeId>,
+        own: &ComputedValues,
+        parent: &ComputedValues,
+    ) -> Arc<ComputedValues> {
+        let pseudo = own.pseudo();
+        if element.is_none() && pseudo.is_none() {
+            // An anonymous box matches no rules: its inherited properties are the line's.
+            let mut b = style::properties::StyleBuilder::for_inheritance(
+                self.stylist.device(),
+                Some(&self.stylist),
+                Some(parent),
+                None,
+            );
+            b.copy_reset_from(own);
+            return b.build();
+        }
+        let entered = !thread_state::get().is_layout();
+        if entered {
+            thread_state::enter(ThreadState::LAYOUT);
+        }
+        let values = self.guards_and_view(dom, data, |shared, view| {
+            self.stylist.cascade_style_and_visited(
+                element.map(|e| view.element(e)),
+                pseudo.as_ref(),
+                &style::context::CascadeInputs::new_from_style(own),
+                &shared.guards,
+                Some(parent),
+                Some(parent),
+                // (all of it cascaded again: lengths in `em` are the line's font's, CSS Pseudo 4
+                // §3.1.2)
+                style::properties::cascade::FirstLineReparenting::No,
+                &Default::default(),
+                None,
+                &mut Default::default(),
+                &mut Default::default(),
+            )
+        });
+        if entered {
+            thread_state::exit(ThreadState::LAYOUT);
+        }
+        values
+    }
+
     /// The styles of `element`'s position options (CSS Anchor Positioning 1 §6.1, §6.5.2), in
     /// `position-try-fallbacks` order: its style with an `@position-try` rule's declarations, a
     /// try tactic or a `position-area` applied. An option naming no `@position-try` rule is left

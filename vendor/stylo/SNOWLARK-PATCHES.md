@@ -642,5 +642,10 @@ The patches below were written on 0.22.0 and carried to 0.24.0 by a three-way me
    are now built from the style without animation and transition rules
    (`StyleResolverForElement::style_without_animations`); a pseudo-element's style has none.
 
+105. **A textarea is a scroll container** (`style_adjuster.rs`, `adjust_for_textarea_overflow`): `overflow` values
+   of `visible` on an HTML `textarea` compute to `auto`, so its lines scroll inside its box (`scrollTop`, the
+   wheel, the caret kept in view) as in the engines in use. Upstream leaves it to Gecko's anonymous editor
+   root (`adjust_for_text_control_editing_root`), which the servo build has no counterpart of.
+
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

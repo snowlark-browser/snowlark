@@ -53,6 +53,9 @@ pub struct ControlState {
     pub default_value: Option<String>,
     /// How far a one-line field's text is scrolled to keep the caret in view (CSS px).
     pub scroll_x: f32,
+    /// A textarea's caret moved or its text changed through the user since its last layout: the
+    /// next layout scrolls its caret's line into view.
+    pub reveal_caret: bool,
     /// A select whose selection script emptied (`selectedIndex = -1`, a `value` no option has): no
     /// option is selected until the selectedness setting algorithm runs again.
     pub no_selection: bool,
@@ -81,6 +84,7 @@ impl Default for ControlState {
             selection: (0, 0, "none"),
             default_value: None,
             scroll_x: 0.0,
+            reveal_caret: false,
             no_selection: false,
             editor: None,
             user_validity: false,
@@ -4041,6 +4045,7 @@ impl Engine {
             let copy_state = ControlState {
                 selection: ControlState::default().selection,
                 scroll_x: 0.0,
+                reveal_caret: false,
                 ..s
             };
             self.html.borrow_mut().controls.insert(copy, copy_state);

@@ -146,6 +146,9 @@ pub(crate) enum BoxData {
     None,
     /// The text of a Text box (as in the DOM, before white-space processing).
     Text(String),
+    /// The text of a Text box holding the rest of a text node after its `::first-letter` (CSS
+    /// Pseudo 4 §3.2), and the byte offset in the node's data where it starts.
+    TextRest(String, u32),
     Replaced(ReplacedContent),
     /// A table cell's spans (HTML `colspan`/`rowspan`, 1 for CSS-only cells).
     Cell {
@@ -217,8 +220,16 @@ impl<S: Style> LayoutBox<S> {
     /// The box's text, for Text boxes.
     pub fn text(&self) -> Option<&str> {
         match &self.data {
-            BoxData::Text(t) => Some(t),
+            BoxData::Text(t) | BoxData::TextRest(t, _) => Some(t),
             _ => None,
+        }
+    }
+
+    /// Where a Text box's text starts in its node's data (past a `::first-letter`'s).
+    pub(crate) fn text_start(&self) -> u32 {
+        match &self.data {
+            BoxData::TextRest(_, start) => *start,
+            _ => 0,
         }
     }
 
@@ -345,6 +356,11 @@ pub struct BoxTree<S: Style> {
     /// border box: its containing block's content width, the block's height, where the block is
     /// before its own relative offset. The inline's client rect beside the block is this box.
     pub(crate) split_wrappers: rustc_hash::FxHashMap<BoxId, snowlark_paint::Rect>,
+    /// `::first-line` styles (CSS Pseudo 4 §3.1): for a block container whose inline content
+    /// holds a first formatted line, the line's root style; for each inline and text box in that
+    /// content, its style as it is on the first line. The element with the `::first-line` rule
+    /// is keyed too (with its `::first-line` style), so a restyle of it builds its contents again.
+    pub(crate) first_line: rustc_hash::FxHashMap<BoxId, S>,
     /// The boxes made dirty since the last layout (some may have died since), so clearing the flags
     /// after a layout costs what changed, not the tree.
     dirty: Vec<BoxId>,
@@ -376,6 +392,7 @@ impl<S: Style> BoxTree<S> {
             line_height_quirk: false,
             split_owners: Default::default(),
             split_wrappers: Default::default(),
+            first_line: Default::default(),
             dirty: Vec::new(),
         }
     }
@@ -515,6 +532,9 @@ impl<S: Style> BoxTree<S> {
             }
             if !self.split_wrappers.is_empty() {
                 self.split_wrappers.remove(&id);
+            }
+            if !self.first_line.is_empty() {
+                self.first_line.remove(&id);
             }
             stack.extend(b.children.iter().copied());
             stack.extend(b.marker);
@@ -840,7 +860,7 @@ impl<S: Style> BoxTree<S> {
         if let Some(p) = b.pseudo {
             let _ = write!(out, " ::{p:?}");
         }
-        if let BoxData::Text(t) = &b.data {
+        if let Some(t) = b.text() {
             let _ = write!(out, " {t:?}");
         }
         out.push('\n');

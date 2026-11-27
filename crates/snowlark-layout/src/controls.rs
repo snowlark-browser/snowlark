@@ -620,6 +620,37 @@ pub fn control_text_offset_at<S: Style>(f: &crate::Fragment<S>, p: Point) -> Opt
     Some(hi)
 }
 
+/// For a textarea: the top and bottom of the line that byte offset `byte` of its text is on, and
+/// the top and height of its scrollport (its padding box), in the fragment's coordinates unscrolled,
+/// to keep the caret in view. `None` without lines (an empty textarea has nothing to scroll).
+pub fn textarea_caret_line<S: Style>(
+    f: &crate::Fragment<S>,
+    byte: usize,
+) -> Option<(f32, f32, f32, f32)> {
+    let (c, layout, clip) = text_control(f)?;
+    if !matches!(
+        c.kind,
+        ControlKind::TextArea {
+            placeholder: false,
+            ..
+        }
+    ) {
+        return None;
+    }
+    let layout = layout?;
+    let t = layout.texts.first()?;
+    let pitch = layout.text_height / t.lines.len().max(1) as f32;
+    let mut line = 0;
+    for (i, (range, _)) in t.lines.iter().enumerate() {
+        if byte >= line_bytes(t, range).0 {
+            line = i;
+        }
+    }
+    let top = clip.y + line as f32 * pitch;
+    let port = f.padding_rect();
+    Some((top, top + pitch, port.y, port.height))
+}
+
 /// For a one-line text field: the x of byte offset `byte` from the start of its text (unscrolled),
 /// the text's width and the content box's width, to keep the caret in view.
 pub fn control_caret_metrics<S: Style>(
@@ -720,6 +751,7 @@ pub(crate) fn paint<S: Style>(
     layout: Option<&ControlLayout>,
     content: Rect,
     at: Point,
+    scroll: Point,
 ) {
     let off = c.disabled;
     let text_color = s.color();
@@ -937,6 +969,8 @@ pub(crate) fn paint<S: Style>(
         return;
     }
     out.push_clip_rect(layout.clip.translate(at.x, at.y));
+    // (a textarea's lines move with its scroll position, inside its fixed clip)
+    let at = Point::new(at.x - scroll.x, at.y - scroll.y);
     let editing = c.editing.as_ref().filter(|_| {
         matches!(
             c.kind,

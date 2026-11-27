@@ -239,7 +239,12 @@ impl Engine {
     /// point `p`.
     pub(crate) fn text_offset_at(&self, el: NodeId, p: Point) -> Option<u32> {
         let content = self.top_viewport_box(el, true)?;
-        let local = Point::new(p.x - content.x, p.y - content.y);
+        // (a textarea's lines are scrolled inside its box)
+        let scroll = match self.is_textarea_el(el) {
+            true => self.view_scroll_position(el),
+            false => Point::ZERO,
+        };
+        let local = Point::new(p.x - content.x + scroll.x, p.y - content.y + scroll.y);
         let byte = self
             .with_layout(el, |r, _| {
                 r.with_box_fragment(el, |f| {
@@ -323,8 +328,11 @@ impl Engine {
         let Some(el) = self.focused_element(doc) else {
             return false;
         };
-        if !self.is_text_control(el) || self.is_textarea_el(el) {
+        if !self.is_text_control(el) {
             return false;
+        }
+        if self.is_textarea_el(el) {
+            return self.keep_textarea_caret_in_view(doc, el);
         }
         let (_, _, d) = self.ctl(el, |c| c.selection);
         let (s, e, _) = self.ctl(el, |c| c.selection);
@@ -350,6 +358,42 @@ impl Engine {
         }
         self.ctl(el, |c| c.scroll_x = new);
         true
+    }
+
+    /// After a layout that follows an edit or a caret move in focused textarea `el`: it scrolls
+    /// (as little as possible) so that the caret's line is in view. Returns whether it scrolled.
+    fn keep_textarea_caret_in_view(&self, doc: NodeId, el: NodeId) -> bool {
+        if !self.ctl(el, |c| std::mem::take(&mut c.reveal_caret)) {
+            return false;
+        }
+        let (s, e, d) = self.ctl(el, |c| c.selection);
+        let focus = if d == "backward" { s } else { e };
+        let value = self.editor_value(el);
+        let byte = snowlark_render::controls::display_byte(&value, focus, false);
+        let line = self
+            .with_doc_renderer(doc, |r, st| {
+                let old = st.element_scroll.get(&el).copied().unwrap_or(Point::ZERO);
+                r.with_box_fragment(el, |f| {
+                    snowlark_layout::controls::textarea_caret_line(f, byte)
+                })
+                .flatten()
+                .map(|l| (l, old))
+            })
+            .flatten();
+        let Some(((top, bottom, port_top, port_height), old)) = line else {
+            return false;
+        };
+        let mut y = old.y;
+        if bottom - port_top > y + port_height {
+            y = bottom - port_top - port_height;
+        }
+        if top - port_top < y {
+            y = top - port_top;
+        }
+        if (y - old.y).abs() < 0.5 {
+            return false;
+        }
+        self.scroll_container_to(el, Point::new(old.x, y))
     }
 }
 

@@ -601,6 +601,7 @@ impl Engine {
 
     /// A text control's value or selection changed through the user: its rendering follows.
     pub(crate) fn control_edited(&self, el: NodeId) {
+        self.ctl(el, |c| c.reveal_caret = true);
         self.controls_dirty.borrow_mut().insert(el);
         self.render.borrow_mut().dirty = true;
     }

@@ -143,6 +143,16 @@ pub(crate) struct InlineContent<S: Style> {
     pub plaintext: Option<Vec<bool>>,
     /// The container's own font (for the root inline box's strut).
     pub root_font: FontInfo,
+    /// The content as the first formatted line has it, when `::first-line` styles it (CSS Pseudo
+    /// 4 §3.1): the same items, each with its style on that line, shaped for it.
+    pub first_line: Option<Box<FirstLineContent<S>>>,
+}
+
+/// [`InlineContent::first_line`].
+pub(crate) struct FirstLineContent<S: Style> {
+    pub content: InlineContent<S>,
+    /// The line's root style (the container's on its first line).
+    pub style: S,
 }
 
 impl<S: Style> InlineContent<S> {
@@ -434,15 +444,15 @@ impl<S: Style> Prepare<'_, S> {
         self.items.push(it);
     }
 
-    /// CSS Text 3 §4.1.1 phase I for one text box.
-    fn text_box(&mut self, box_id: BoxId, style: &S, raw: &str) {
+    /// CSS Text 3 §4.1.1 phase I for one text box, whose text starts at byte `base` of its node's.
+    fn text_box(&mut self, box_id: BoxId, style: &S, raw: &str, base: u32) {
         let raw = apply_transform(raw, style.text_transform(), &mut self.word_start);
         let collapse = style.white_space_collapse();
         match collapse {
             WhiteSpaceCollapse::Collapse | WhiteSpaceCollapse::PreserveBreaks => {
                 let keep_breaks = collapse == WhiteSpaceCollapse::PreserveBreaks;
                 let mut cur = String::with_capacity(raw.len());
-                let mut start = 0u32;
+                let mut start = base;
                 // Where collapsing removed characters (processed offset, bytes removed so far).
                 let mut collapsed: Vec<(u32, u32)> = Vec::new();
                 let mut removed = 0u32;
@@ -475,7 +485,7 @@ impl<S: Style> Prepare<'_, S> {
                             let br = self.item(ItemKind::Break, box_id, style.clone());
                             self.items.push(br);
                             self.after_space = true;
-                            start = i as u32 + 1;
+                            start = base + i as u32 + 1;
                         }
                         ' ' | '\t' | '\n' | '\r' => {
                             if !self.after_space {
@@ -503,7 +513,7 @@ impl<S: Style> Prepare<'_, S> {
             | WhiteSpaceCollapse::PreserveSpaces => {
                 let breaks = collapse != WhiteSpaceCollapse::PreserveSpaces;
                 let mut cur = String::with_capacity(raw.len());
-                let mut start = 0u32;
+                let mut start = base;
                 for (i, ch) in raw.char_indices() {
                     match ch {
                         '\n' | '\r' if breaks => {
@@ -514,14 +524,14 @@ impl<S: Style> Prepare<'_, S> {
                             self.push_text(box_id, style, t, start);
                             let br = self.item(ItemKind::Break, box_id, style.clone());
                             self.items.push(br);
-                            start = i as u32 + 1;
+                            start = base + i as u32 + 1;
                         }
                         '\t' if breaks => {
                             let t = std::mem::take(&mut cur);
                             self.push_text(box_id, style, t, start);
                             let tab = self.item(ItemKind::Tab, box_id, style.clone());
                             self.items.push(tab);
-                            start = i as u32 + 1;
+                            start = base + i as u32 + 1;
                         }
                         '\n' | '\r' | '\t' => cur.push(' '),
                         _ => cur.push(ch),
@@ -534,7 +544,8 @@ impl<S: Style> Prepare<'_, S> {
     }
 }
 
-/// Builds (or refreshes) the inline content of block container `id`, reusing shaped text from `old`.
+/// Builds (or refreshes) the inline content of block container `id`, reusing shaped text from `old`;
+/// with a first formatted line styled by `::first-line`, also the content as that line has it.
 pub(crate) fn prepare<S: Style>(
     tree: &BoxTree<S>,
     text: &TextEngine,
@@ -542,8 +553,33 @@ pub(crate) fn prepare<S: Style>(
     old: Option<Box<InlineContent<S>>>,
     stats: &mut LayoutStats,
 ) -> Box<InlineContent<S>> {
+    let mut content = prepare_items(tree, text, id, None, old.as_deref(), stats);
+    if let Some(line) = tree.first_line.get(&id) {
+        let old_first = old
+            .as_ref()
+            .and_then(|o| o.first_line.as_ref())
+            .map(|f| &f.content);
+        let first = prepare_items(tree, text, id, Some(line), old_first, stats);
+        content.first_line = Some(Box::new(FirstLineContent {
+            content: first,
+            style: line.clone(),
+        }));
+    }
+    Box::new(content)
+}
+
+/// [`prepare`] of the content as it is everywhere (`line` `None`), or on the first formatted line,
+/// whose root style is `line` and whose boxes take their styles from [`BoxTree::first_line`].
+fn prepare_items<S: Style>(
+    tree: &BoxTree<S>,
+    text: &TextEngine,
+    id: BoxId,
+    line: Option<&S>,
+    old: Option<&InlineContent<S>>,
+    stats: &mut LayoutStats,
+) -> InlineContent<S> {
     let container = tree.b(id);
-    let root_font = tree_font_info(tree, text, &container.style);
+    let root_font = tree_font_info(tree, text, line.unwrap_or(&container.style));
     let mut p = Prepare {
         view: line_view(container.style.view()),
         items: Vec::new(),
@@ -551,13 +587,17 @@ pub(crate) fn prepare<S: Style>(
         word_start: true,
         _text: std::marker::PhantomData,
     };
-    fn walk<S: Style>(tree: &BoxTree<S>, p: &mut Prepare<'_, S>, id: BoxId) {
+    fn walk<S: Style>(tree: &BoxTree<S>, p: &mut Prepare<'_, S>, id: BoxId, first_line: bool) {
         for &c in &tree.b(id).children {
             let b = tree.b(c);
+            let style = match first_line {
+                true => tree.first_line.get(&c).unwrap_or(&b.style),
+                false => &b.style,
+            };
             match b.kind {
                 BoxKind::Text => {
-                    if let BoxData::Text(t) = &b.data {
-                        p.text_box(c, &b.style, t);
+                    if let Some(t) = b.text() {
+                        p.text_box(c, style, t, b.text_start());
                     }
                 }
                 BoxKind::LineBreak => {
@@ -566,12 +606,12 @@ pub(crate) fn prepare<S: Style>(
                     p.after_space = true;
                 }
                 BoxKind::Inline => {
-                    let mut open = p.item(ItemKind::Open, c, p.in_line_frame(&b.style));
+                    let mut open = p.item(ItemKind::Open, c, p.in_line_frame(style));
                     open.has_start_edge = !b.has(flags::NO_START_EDGE);
                     open.has_end_edge = !b.has(flags::NO_END_EDGE);
                     p.items.push(open);
-                    walk(tree, p, c);
-                    let mut close = p.item(ItemKind::Close, c, p.in_line_frame(&b.style));
+                    walk(tree, p, c, first_line);
+                    let mut close = p.item(ItemKind::Close, c, p.in_line_frame(style));
                     close.has_start_edge = !b.has(flags::NO_START_EDGE);
                     close.has_end_edge = !b.has(flags::NO_END_EDGE);
                     p.items.push(close);
@@ -597,7 +637,7 @@ pub(crate) fn prepare<S: Style>(
             }
         }
     }
-    walk(tree, &mut p, id);
+    walk(tree, &mut p, id, line.is_some());
     let mut items = p.items;
     // (`unicode-bidi` is not inherited: an anonymous block's text is that of the block around it)
     let mut bidi = container;
@@ -751,11 +791,12 @@ pub(crate) fn prepare<S: Style>(
     }
     drop(cache);
     drop(reuse);
-    Box::new(InlineContent {
+    InlineContent {
         items,
         plaintext,
         root_font,
-    })
+        first_line: None,
+    }
 }
 
 /// Whether text shaping goes on across an inline box's start or end item (CSS Text 3 §7.3: it is
@@ -1650,13 +1691,22 @@ pub(crate) fn content_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> ContentS
         }
     }
     let empty = HashMap::new();
-    let m = Measure {
+    let m_rest = Measure {
         items: &content.items,
         atomics: &empty,
         cb_width,
         mirrored: false,
         central: false,
     };
+    // Up to the first forced break, the text is on the first line: as `::first-line` styles it.
+    let m_first = content.first_line.as_ref().map(|f| Measure {
+        items: &f.content.items,
+        atomics: &empty,
+        cb_width,
+        mirrored: false,
+        central: false,
+    });
+    let mut on_first = m_first.is_some();
     let style = cx.tree.b(id).style.clone();
     let indent = style.text_indent().resolve(0.0);
     let mut max = 0.0f32;
@@ -1669,9 +1719,14 @@ pub(crate) fn content_sizes<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> ContentS
     let mut word_hanging = 0.0f32;
     let mut floats_line = 0.0f32;
     for i in 0..n {
-        let it = &content.items[i];
+        let m = match (&m_first, on_first) {
+            (Some(f), true) => f,
+            _ => &m_rest,
+        };
+        let it = &m.items[i];
         match it.kind {
             ItemKind::Break => {
+                on_first = false;
                 max = max.max(line - line_trailing + floats_line);
                 min = min.max(word - word_hanging);
                 line = 0.0;
@@ -1827,14 +1882,24 @@ fn take_content<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> Box<InlineContent<S>
 /// only what layout reads from the items' styles changed.
 fn restyle_items<S: Style>(tree: &BoxTree<S>, id: BoxId, content: &mut InlineContent<S>) {
     let view = line_view(tree.b(id).style.view());
-    for it in &mut content.items {
-        let s = &tree.b(it.box_id).style;
-        it.style = match it.kind {
-            ItemKind::Open | ItemKind::Close | ItemKind::Atomic if s.view() != view => {
-                s.with_view(view)
-            }
-            _ => s.clone(),
-        };
+    let restyle = |items: &mut [Item<S>], first_line: bool| {
+        for it in items {
+            let b = &tree.b(it.box_id).style;
+            let s = match first_line {
+                true => tree.first_line.get(&it.box_id).unwrap_or(b),
+                false => b,
+            };
+            it.style = match it.kind {
+                ItemKind::Open | ItemKind::Close | ItemKind::Atomic if s.view() != view => {
+                    s.with_view(view)
+                }
+                _ => s.clone(),
+            };
+        }
+    };
+    restyle(&mut content.items, false);
+    if let Some(f) = &mut content.first_line {
+        restyle(&mut f.content.items, true);
     }
 }
 
@@ -2090,6 +2155,17 @@ fn layout_lines<S: Style>(
         mirrored,
         central: central_baseline(&style),
     };
+    // The first formatted line as `::first-line` styles it (CSS Pseudo 4 §3.1): its own items,
+    // the same ones shaped in the line's styles; the lines after it go on from the same place in
+    // the text.
+    let first = content.first_line.as_deref();
+    let m_first = first.map(|f| Measure {
+        items: &f.content.items,
+        atomics: &atomics,
+        cb_width: content_width,
+        mirrored,
+        central: central_baseline(&f.style),
+    });
     let strut_height = line_height(&style, &content.root_font);
     let indent = style.text_indent().resolve(content_width);
     // CSS Text 3 §7.1: the first formatted line is indented, or, with `each-line`, also every line
@@ -2242,6 +2318,11 @@ fn layout_lines<S: Style>(
             }
         }
         // Decide the line.
+        let (lm, lc, ls) = match (&m_first, first) {
+            (Some(mf), Some(f)) if first_line => (mf, &f.content, &f.style),
+            _ => (&m, content, &style),
+        };
+        let on_first = first.is_some() && first_line;
         let start = pos;
         let stop = planned.last().copied().filter(|_| pos >= planned_from);
         if stop.is_some() {
@@ -2249,7 +2330,7 @@ fn layout_lines<S: Style>(
         }
         let decided = break_line(
             cx,
-            &m,
+            lm,
             start,
             avail,
             if stop.is_some() {
@@ -2354,7 +2435,7 @@ fn layout_lines<S: Style>(
             } else {
                 None
             },
-            if real && trim.end && !content_after(&m, end) {
+            if real && trim.end && !content_after(lm, end) {
                 Some(edge.under)
             } else {
                 None
@@ -2363,7 +2444,7 @@ fn layout_lines<S: Style>(
         // (in the mirrored line of `vertical-lr` the block-start side is the line-under one)
         let line_trim = if mirrored {
             (
-                if real && trim.end && !content_after(&m, end) {
+                if real && trim.end && !content_after(lm, end) {
                     Some(edge.over)
                 } else {
                     None
@@ -2382,9 +2463,9 @@ fn layout_lines<S: Style>(
             .then(|| (open_stack.clone(), out.oof.len()));
         let built = build_line(
             cx,
-            &style,
-            content,
-            &m,
+            ls,
+            lc,
+            lm,
             &spec,
             &mut open_stack,
             real,
@@ -2482,13 +2563,42 @@ fn layout_lines<S: Style>(
                 cluster: 0,
             };
         }
-        pos = end;
+        pos = match on_first && !first_line {
+            true => same_place(&lc.items, items, end),
+            false => end,
+        };
     }
     for f in deferred_floats {
         place_float(cx, bfc, &mut out, f, y);
     }
     out.height = y;
     out
+}
+
+/// The position in `to` at the same place in the text as `p` in `from`: the items of one inline
+/// formatting context as its first formatted line has them and as the others do, the same items
+/// shaped apart (their clusters may differ).
+fn same_place<S: Style>(from: &[Item<S>], to: &[Item<S>], p: Pos) -> Pos {
+    let (Some(a), Some(b)) = (from.get(p.item), to.get(p.item)) else {
+        return p;
+    };
+    let (Some(sa), Some(sb)) = (a.shaped.as_deref(), b.shaped.as_deref()) else {
+        return p;
+    };
+    let at = sa
+        .clusters
+        .get(p.cluster)
+        .map_or(a.text.len() as u32, |c| c.text.0);
+    match sb.clusters.iter().position(|c| c.text.0 >= at) {
+        Some(cluster) => Pos {
+            item: p.item,
+            cluster,
+        },
+        None => Pos {
+            item: p.item + 1,
+            cluster: 0,
+        },
+    }
 }
 
 /// What deciding a line asks of the caller.

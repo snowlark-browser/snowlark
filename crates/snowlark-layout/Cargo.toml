@@ -8,6 +8,8 @@ description = "Snowlark layout: box tree, block/inline/table/positioned layout, 
 [dependencies]
 # UAX #9 over a formatting context's text with CSS's bidi controls (CSS Writing Modes 4 §2.4).
 unicode-bidi = "0.3"
+# Unicode general categories, for the punctuation a `::first-letter` takes (CSS Pseudo 4 §3.2).
+icu_properties = "2"
 snowlark-dom = { path = "../snowlark-dom" }
 snowlark-paint = { path = "../snowlark-paint" }
 kurbo = "0.13"

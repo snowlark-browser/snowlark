@@ -72,6 +72,7 @@ impl<'a, Src: StyleSource> Builder<'a, Src> {
         self.tree.calcs.clear();
         self.tree.split_owners.clear();
         self.tree.split_inlines.clear();
+        self.tree.first_line.clear();
         self.tree.canvas_background = None;
         self.tree.viewport_overflow = None;
         self.tree.line_height_quirk =
@@ -1508,21 +1509,322 @@ impl<'a, Src: StyleSource> Builder<'a, Src> {
         if !any_block {
             self.tree.b_mut(id).set(flags::INLINE_CONTENT, true);
             self.tree.set_children(id, flat);
-            return;
+        } else {
+            self.tree.b_mut(id).set(flags::INLINE_CONTENT, false);
+            let mut children = Vec::with_capacity(flat.len());
+            let mut run: Vec<BoxId> = Vec::new();
+            for c in flat {
+                if self.tree.b(c).is_in_flow_block_level() {
+                    self.flush_inline_run(id, &mut run, &mut children);
+                    children.push(c);
+                } else {
+                    run.push(c);
+                }
+            }
+            self.flush_inline_run(id, &mut run, &mut children);
+            self.tree.set_children(id, children);
         }
-        self.tree.b_mut(id).set(flags::INLINE_CONTENT, false);
-        let mut children = Vec::with_capacity(flat.len());
-        let mut run: Vec<BoxId> = Vec::new();
-        for c in flat {
-            if self.tree.b(c).is_in_flow_block_level() {
-                self.flush_inline_run(id, &mut run, &mut children);
-                children.push(c);
-            } else {
-                run.push(c);
+        self.first_letter(id);
+        self.first_line(id);
+        // A container regenerated in place may hold the first letter or line of a block around it.
+        let mut up = self.tree.b(id).parent;
+        while let Some(a) = up {
+            if self.tree.b(a).kind == BoxKind::Block {
+                self.first_letter(a);
+                self.first_line(a);
+            }
+            up = self.tree.b(a).parent;
+        }
+    }
+
+    /// Whether `id` is an element's block container that can have a `::first-letter` or
+    /// `::first-line` (not a button's), and that element.
+    fn pseudo_line_owner(&self, id: BoxId) -> Option<NodeId> {
+        let b = self.tree.b(id);
+        let el = b.node?;
+        let ok = b.pseudo.is_none()
+            && matches!(
+                b.kind,
+                BoxKind::Block | BoxKind::TableCell | BoxKind::TableCaption
+            )
+            && !self.is_button(Some(el), None)
+            && self.dom.is_element(el);
+        ok.then_some(el)
+    }
+
+    // ----- ::first-line -----
+
+    /// CSS Pseudo 4 §3.1: when block container `id` is an element's box with a `::first-line`
+    /// style, the styles its first formatted line's boxes take ([`BoxTree::first_line`]). The line
+    /// is that of the block container holding it, `id` or its first in-flow block-level descendant
+    /// down a chain of first children; each block on the way, and each inline box on the line, has
+    /// its inherited properties from the box around it as that box is on the line (the fictional tag
+    /// sequence), and a block on the way with its own `::first-line` adds it inside.
+    fn first_line(&mut self, id: BoxId) {
+        let Some(el) = self.pseudo_line_owner(id) else {
+            return;
+        };
+        let Some(line) = self.src.pseudo_style(el, PseudoElement::FirstLine) else {
+            return;
+        };
+        let Some(path) = self.first_line_path(id) else {
+            return;
+        };
+        self.tree.first_line.insert(id, line.clone());
+        let mut root = line;
+        for &b in &path[1..] {
+            let bb = self.tree.b(b);
+            let node = bb.node;
+            root = self.src.on_first_line(node, &bb.style, &root);
+            if let Some(own) = self
+                .pseudo_line_owner(b)
+                .and_then(|n| self.src.pseudo_style(n, PseudoElement::FirstLine))
+            {
+                root = self.src.on_first_line(node, &own, &root);
             }
         }
-        self.flush_inline_run(id, &mut run, &mut children);
-        self.tree.set_children(id, children);
+        let container = *path.last().expect("the path starts at `id`");
+        self.tree.first_line.insert(container, root.clone());
+        let mut stack = vec![(container, root)];
+        while let Some((parent, around)) = stack.pop() {
+            for i in 0..self.tree.b(parent).children.len() {
+                let c = self.tree.b(parent).children[i];
+                let cb = self.tree.b(c);
+                match cb.kind {
+                    BoxKind::Text => {
+                        // (text of an element without a box, `display: contents`, has that
+                        // element's style: cascaded again under the line too)
+                        let element = cb.node.and_then(|n| self.dom.parent(n));
+                        let mut owner = Some(parent);
+                        while let Some(o) = owner.filter(|&o| self.tree.b(o).is_anonymous()) {
+                            owner = self.tree.b(o).parent;
+                        }
+                        let boxed = owner.and_then(|o| self.tree.b(o).node);
+                        let generated = self.tree.b(parent).pseudo.is_some();
+                        let s = match element {
+                            Some(e) if !generated && Some(e) != boxed && self.dom.is_element(e) => {
+                                self.src.on_first_line(Some(e), &cb.style, &around)
+                            }
+                            _ => around.clone(),
+                        };
+                        self.tree.first_line.insert(c, s);
+                    }
+                    BoxKind::Inline => {
+                        let s =
+                            self.src
+                                .on_first_line(cb.node.or(cb.pseudo_of), &cb.style, &around);
+                        self.tree.first_line.insert(c, s.clone());
+                        stack.push((c, s));
+                    }
+                    // (atomic inlines, floats and out-of-flow boxes are not on the line's tree)
+                    _ => {}
+                }
+            }
+        }
+        let cache = &mut self.tree.b_mut(container).cache;
+        cache.inline = None;
+        cache.inline_stale = true;
+        self.tree.mark_dirty(container);
+    }
+
+    /// The blocks from `id` down to the block container whose inline content holds `id`'s first
+    /// formatted line (CSS Pseudo 4 §3.1.1), each the first in-flow child of the one before; `None`
+    /// when a box without lines (a flex, grid or table box, a button) is first.
+    fn first_line_path(&self, id: BoxId) -> Option<Vec<BoxId>> {
+        let mut path = vec![id];
+        let mut container = id;
+        loop {
+            let b = self.tree.b(container);
+            if b.has(flags::INLINE_CONTENT) {
+                return Some(path);
+            }
+            let c = b.children.iter().copied().find(|&c| {
+                let cb = self.tree.b(c);
+                !cb.is_float() && !cb.is_out_of_flow()
+            })?;
+            let cb = self.tree.b(c);
+            if cb.kind != BoxKind::Block || cb.has(flags::BUTTON) || self.is_button(cb.node, None) {
+                return None;
+            }
+            path.push(c);
+            container = c;
+        }
+    }
+
+    // ----- ::first-letter -----
+
+    /// CSS Pseudo 4 §3.2: the `::first-letter` of block container `id` when it is an element's
+    /// box with such a style. The text box holding the first letter of its first formatted line is
+    /// split, the letter (with the punctuation around it) going into a box of its own with that style:
+    /// an inline box, or a block when it floats. The text that follows stays in the text box, which
+    /// records where it now starts in its node's data. Done once: a container whose letter has its
+    /// box already is left alone.
+    fn first_letter(&mut self, id: BoxId) {
+        let Some(el) = self.pseudo_line_owner(id) else {
+            return;
+        };
+        if self
+            .src
+            .pseudo_style(el, PseudoElement::FirstLetter)
+            .is_none()
+        {
+            return;
+        }
+        let Some(text) = self.first_letter_text(id) else {
+            return;
+        };
+        let tb = self.tree.b(text);
+        let Some(full) = tb.text().filter(|_| tb.text_start() == 0) else {
+            return;
+        };
+        let preserve_breaks = !matches!(
+            tb.style.white_space_collapse(),
+            WhiteSpaceCollapse::Collapse | WhiteSpaceCollapse::PreserveSpaces
+        );
+        let n = crate::first_letter::length(
+            full,
+            preserve_breaks,
+            &mut crate::first_letter::Punctuation::NotStarted,
+        );
+        let Some(parent) = tb.parent.filter(|_| n > 0) else {
+            return;
+        };
+        let Some(style) = self.src.first_letter_style(el, &tb.style) else {
+            return;
+        };
+        let (letter, rest) = (full[..n].to_owned(), full[n..].to_owned());
+        let node = tb.node;
+        let deco = tb.decorations.clone();
+        let letter_box = self.tree.alloc(
+            BoxKind::Text,
+            Level::Inline,
+            style.clone(),
+            node,
+            BoxData::Text(letter),
+        );
+        self.tree.b_mut(letter_box).decorations = self.decorations_for(&style, &deco, false);
+        let Some(pseudo) = self.principal_box(
+            None,
+            Some(PseudoElement::FirstLetter),
+            style,
+            Ctx::Flow,
+            false,
+            vec![letter_box],
+        ) else {
+            self.tree.free_subtree(letter_box);
+            return;
+        };
+        let pb = self.tree.b_mut(pseudo);
+        pb.pseudo_of = Some(el);
+        pb.decorations = deco;
+        let mut children = self.tree.b(parent).children.clone();
+        let Some(at) = children.iter().position(|&c| c == text) else {
+            self.tree.free_subtree(pseudo);
+            return;
+        };
+        if rest.is_empty() {
+            children[at] = pseudo;
+            self.tree.free_subtree(text);
+            if let Some(n) = node {
+                self.tree.set_node_box(n, letter_box);
+            }
+        } else {
+            children.insert(at, pseudo);
+            self.tree.b_mut(text).data = BoxData::TextRest(rest, n as u32);
+            self.tree.mark_dirty(text);
+        }
+        self.tree.set_children(parent, children);
+    }
+
+    /// The text box holding the first letter of block container `id`'s first formatted line (CSS
+    /// Pseudo 4 §3.1.1): its own inline content's first line, or that of its first in-flow
+    /// block-level child that is a block container; `None` when the line starts with anything other
+    /// than text (an atomic inline, a line break), when it has no letter, or when its letter has a
+    /// `::first-letter` box already.
+    fn first_letter_text(&self, id: BoxId) -> Option<BoxId> {
+        let mut container = id;
+        'blocks: loop {
+            for &c in &self.tree.b(container).children {
+                let b = self.tree.b(c);
+                if b.pseudo == Some(PseudoElement::FirstLetter) {
+                    return None;
+                }
+                if b.is_float() || b.is_out_of_flow() || b.pseudo == Some(PseudoElement::Marker) {
+                    continue;
+                }
+                if b.level == Level::Inline {
+                    return self.first_letter_in_line(container);
+                }
+                // An in-flow block-level box: the line is its first line, if it is a block
+                // container (flex, grid and table boxes, buttons and replaced elements have none).
+                if b.kind != BoxKind::Block || b.has(flags::BUTTON) || self.is_button(b.node, None)
+                {
+                    return None;
+                }
+                container = c;
+                continue 'blocks;
+            }
+            return None;
+        }
+    }
+
+    /// The text box holding the first letter among the inline content of `container`, looking
+    /// through inline boxes in tree order.
+    fn first_letter_in_line(&self, container: BoxId) -> Option<BoxId> {
+        use crate::first_letter::{length, Punctuation};
+        enum Step {
+            Found(BoxId),
+            Stop,
+            Go,
+        }
+        fn walk<S: Style>(
+            tree: &BoxTree<S>,
+            id: BoxId,
+            state: &mut Punctuation,
+            punctuation: &mut Option<BoxId>,
+        ) -> Step {
+            for &c in &tree.b(id).children {
+                let b = tree.b(c);
+                if b.pseudo == Some(PseudoElement::FirstLetter) {
+                    return Step::Stop;
+                }
+                if b.is_float() || b.is_out_of_flow() || b.pseudo == Some(PseudoElement::Marker) {
+                    continue;
+                }
+                match b.kind {
+                    BoxKind::Text => {
+                        let Some(t) = b.text() else {
+                            continue;
+                        };
+                        let preserve_breaks = !matches!(
+                            b.style.white_space_collapse(),
+                            WhiteSpaceCollapse::Collapse | WhiteSpaceCollapse::PreserveSpaces
+                        );
+                        if length(t, preserve_breaks, state) > 0 {
+                            if *state == Punctuation::Started {
+                                punctuation.get_or_insert(c);
+                            } else {
+                                return Step::Found(punctuation.unwrap_or(c));
+                            }
+                        } else if *state == Punctuation::Finished {
+                            return Step::Stop;
+                        }
+                    }
+                    BoxKind::Inline => match walk(tree, c, state, punctuation) {
+                        Step::Go => {}
+                        done => return done,
+                    },
+                    _ => return Step::Stop,
+                }
+            }
+            Step::Go
+        }
+        let mut state = Punctuation::NotStarted;
+        let mut punctuation = None;
+        match walk(self.tree, container, &mut state, &mut punctuation) {
+            Step::Found(t) => Some(t),
+            _ => None,
+        }
     }
 
     /// Wraps a run of inline-level and out-of-flow boxes among blocks in an anonymous block, unless it

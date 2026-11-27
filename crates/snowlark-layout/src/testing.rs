@@ -941,6 +941,25 @@ impl StyleSource for TestStyles {
         self.flat.get(&parent).cloned()
     }
 
+    fn on_first_line(
+        &self,
+        _element: Option<NodeId>,
+        style: &Arc<TestStyle>,
+        parent: &Arc<TestStyle>,
+    ) -> Arc<TestStyle> {
+        // (test styles do not record which properties were declared: the inherited text
+        // properties a `::first-line` can set all come from the line)
+        let mut s = (**style).clone();
+        s.font_size = parent.font_size;
+        s.font_weight = parent.font_weight;
+        s.color = parent.color;
+        s.line_height = parent.line_height;
+        s.letter_spacing = parent.letter_spacing;
+        s.word_spacing = parent.word_spacing;
+        s.text_transform = parent.text_transform;
+        Arc::new(s)
+    }
+
     fn pseudo_style(&self, element: NodeId, pseudo: PseudoElement) -> Option<Arc<TestStyle>> {
         if let Some(s) = self.pseudos.get(&(element, pseudo)) {
             return Some(s.clone());

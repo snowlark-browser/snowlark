@@ -27,6 +27,7 @@ mod cache;
 pub mod clip;
 pub mod controls;
 pub mod find;
+mod first_letter;
 mod flex_grid;
 mod floats;
 mod flow;
@@ -195,6 +196,13 @@ impl<S: Style> LayoutTree<S> {
         };
         let b = self.tree.b(id);
         if b.kind != BoxKind::Text {
+            return false;
+        }
+        // Text split for a `::first-letter` is split again from its new data.
+        if b.text_start() != 0
+            || b.parent
+                .is_some_and(|p| self.tree.b(p).pseudo == Some(style::PseudoElement::FirstLetter))
+        {
             return false;
         }
         // Text becoming (or ceasing to be) white space can change whether it has a box and which
@@ -1256,6 +1264,8 @@ mod tests;
 mod tests_api;
 #[cfg(test)]
 mod tests_find;
+#[cfg(test)]
+mod tests_first_letter;
 #[cfg(test)]
 mod tests_flex;
 #[cfg(test)]

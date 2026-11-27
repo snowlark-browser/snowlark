@@ -46,8 +46,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **`content-visibility`.** `content-visibility: hidden` and `<details>` work, but `content-visibility: auto` is not
   implemented, skipped content is still laid out eagerly, and find-in-page and `hidden=until-found` do not reveal
   closed content. (ref 106)
-- **Inline-level and block-in-inline details.** `::first-line` and `::first-letter` are not implemented, nor are `ruby`,
-  `initial-letter` or `hanging-punctuation`. `alignment-baseline` and `dominant-baseline` values beyond what
+- **Inline-level and block-in-inline details.** `ruby`, `initial-letter` and `hanging-punctuation` are not
+  implemented. A right-to-left word whose first letter is styled by `::first-letter` is shaped in two pieces, so
+  Arabic loses its joining form there (ref 876). `alignment-baseline` and `dominant-baseline` values beyond what
   `vertical-align` offers are open. (ref 36)
 - **Buttons.** `ruby-*` and `run-in` displays are not parsed. (ref 216)
 - **Geometry under transforms.** For Intersection Observer, a frame's container is placed by its untransformed content
@@ -93,7 +94,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   compositing reason, and running filter animations on the compositor. (ref 40)
 - **Backgrounds and borders.** Open: `background-clip: border-area`, `text` layers drawn above the box's other
   layers whatever their order and not on the root's canvas, border images from SVGs without a natural
-  size, box-shadow and background slicing across fragments, backgrounds on `::first-line`/`::first-letter`, and
+  size, box-shadow and background slicing across fragments, backgrounds on `::first-line`, and
   gradient interpolation color spaces for some cases. (ref 35)
 - **CSS images.** Open: `object`/`embed` showing an SVG document under `object-fit`, `image-resolution`,
   `object-fit: contain scale-down`, `image()` orientation tags, and `conic-gradient` stops that mix angles and
@@ -139,7 +140,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 ## DOM and HTML
 
 - **Two web-platform tests stop the page.** `acid3/numbered-tests.html` panics on a node used after its tree was freed, and a test that sets an `HTMLOptionsCollection`'s `length` to a huge value does not return in time. (ref 749)
-- **Text controls.** A textarea does not scroll its own long text, by script or by the user (ref 65).
 - **Selection across shadow trees.** A selection cannot keep its two ends in different trees, so dragging across a
   shadow boundary and `getComposedRanges()` crossing ranges do not work as in other browsers. (ref 62)
 - **Google's sign-in button.** The "Continue with Google" button that Google's sign-in script builds can stay empty

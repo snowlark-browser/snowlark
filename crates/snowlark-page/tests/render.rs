@@ -2716,6 +2716,41 @@ fn textarea_scroll_height_counts_its_lines() {
     assert_eq!(r, "20 20|20 20|100 100|28 28");
 }
 
+/// A textarea is a scroll container (its `overflow: visible` computes to `auto`, as in the engines
+/// in use) whose scrolling area is its lines (CSSOM View §6): `scrollTop` moves them, clamped to
+/// the last line, and they are painted where it moved them.
+#[test]
+fn a_textarea_scrolls_its_lines() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        "<!doctype html><style>body { margin: 0 } textarea { display: block; width: 300px; \
+         border: 0; padding: 0; font: 14px/20px monospace }</style>\
+         <textarea id=t rows=2>1\n2\n3\n4\n5\n6\n7\n8\n9\n10</textarea>",
+    );
+    let painted = |page: &mut Page| {
+        page.update_the_rendering();
+        let list = page
+            .engine()
+            .paint(snowlark_paint::Point::ZERO, 1.0)
+            .unwrap();
+        format!("{:?}", list.items)
+    };
+    let top = painted(&mut page);
+    let r = eval(
+        &mut page,
+        "const s = getComputedStyle(t); const a = [s.overflowX, s.overflowY];
+         t.scrollTop = 40; a.push(t.scrollTop);
+         a.push(t.scrollHeight, t.clientHeight); a.join('|')",
+    );
+    assert_eq!(r, "auto|auto|40|200|40");
+    let scrolled = painted(&mut page);
+    assert_ne!(scrolled, top);
+    assert_eq!(eval(&mut page, "t.scrollTop = 1000; t.scrollTop"), "160");
+    eval(&mut page, "t.scrollTop = 0; 'ok'");
+    assert_eq!(painted(&mut page), top);
+}
+
 /// HTML §15.5.15: a textarea "is expected to render as an inline-block box", so with only the UA
 /// sheet it computes `display: inline-block` and CSSOM View §6 gives it client and scroll sizes
 /// (an inline box would read 0 for all of them, and a field grown to its `scrollHeight` collapse).

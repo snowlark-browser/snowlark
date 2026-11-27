@@ -59,7 +59,8 @@ pub(crate) trait Sink<S: Style> {
     );
     /// A text fragment of `size` (in the text's own frame: see [`TextFragment::flip`]) at `at`.
     fn text(&mut self, size: Size, t: &TextFragment<S>, at: Point);
-    fn replaced(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point);
+    /// A replaced element's content; `scroll`: how far it is scrolled (a textarea's lines).
+    fn replaced(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point, scroll: Point);
     /// A selected replaced element's highlight, over its content (CSS Pseudo-Elements 4 §3.6.4);
     /// `line` is the line box it is on, in the coordinates of `at`.
     fn selected_replaced(
@@ -1582,7 +1583,10 @@ impl<K> Painter<'_, K> {
         if let Some(b) = f.as_box() {
             if let BoxContent::Replaced { .. } = b.content {
                 if b.style.visibility() == Visibility::Visible {
-                    self.sink.replaced(f, b, at);
+                    let scroll = self
+                        .own_scroll(b)
+                        .map_or(Point::ZERO, |s| self.snapped_scroll(s));
+                    self.sink.replaced(f, b, at, scroll);
                     // (an atomic inline's highlight is painted from its line, which it reaches)
                     if b.flags & fragment_flags::ATOMIC_INLINE == 0 {
                         self.sink.selected_replaced(f, b, at, None);
@@ -2684,7 +2688,7 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
             .fill_rect(Rect::new(lo.0, lo.1, hi.0 - lo.0, hi.1 - lo.1), color);
     }
 
-    fn replaced(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point) {
+    fn replaced(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point, scroll: Point) {
         if self.text_clip {
             return;
         }
@@ -2706,6 +2710,7 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                             control.as_deref(),
                             clip.translate(at.x, at.y),
                             at,
+                            scroll,
                         );
                     } else {
                         // A vertical control: the horizontal one turned a quarter turn (mirrored
@@ -2724,6 +2729,7 @@ impl<S: Style> Sink<S> for DisplayListSink<'_> {
                             c,
                             control.as_deref(),
                             flip.inverse().rect(*clip, f.size),
+                            Point::ZERO,
                             Point::ZERO,
                         );
                         self.out.pop_transform();
@@ -4718,7 +4724,7 @@ impl<S: Style> Sink<S> for CaretSink<'_> {
         }
     }
 
-    fn replaced(&mut self, _f: &Fragment<S>, _b: &BoxFragment<S>, _at: Point) {}
+    fn replaced(&mut self, _f: &Fragment<S>, _b: &BoxFragment<S>, _at: Point, _scroll: Point) {}
 
     fn collapsed_borders(&mut self, _segments: &[CollapsedBorderSegment], _at: Point) {}
 
@@ -4944,7 +4950,7 @@ impl<S: Style> Sink<S> for HitSink {
         self.path.pop();
     }
 
-    fn replaced(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point) {
+    fn replaced(&mut self, f: &Fragment<S>, b: &BoxFragment<S>, at: Point, _scroll: Point) {
         // (an inert replaced element's content, an SVG document fragment or a nested document,
         // is inert with it: HTML §6.3)
         if b.style.inert() {
