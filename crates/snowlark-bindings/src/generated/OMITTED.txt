@@ -37,6 +37,8 @@ CSSFontFeatureValuesRule.ornaments: interface CSSFontFeatureValuesMap is not gen
 CSSFontFeatureValuesRule.styleset: interface CSSFontFeatureValuesMap is not generated
 CSSFontFeatureValuesRule.stylistic: interface CSSFontFeatureValuesMap is not generated
 CSSFontFeatureValuesRule.swash: interface CSSFontFeatureValuesMap is not generated
+Clients.matchAll(options): interface Client is not generated
+Clients.openWindow(url): interface WindowClient is not generated
 DataTransferItem.getAsFileSystemHandle(): interface FileSystemHandle is not generated
 DataTransferItem.webkitGetAsEntry(): interface FileSystemEntry is not generated
 Document.caretPositionFromPoint(x, y, options): interface CaretPosition is not generated
@@ -99,7 +101,6 @@ Navigator.preferences: interface PreferenceManager is not generated
 Navigator.presentation: interface Presentation is not generated
 Navigator.requestMIDIAccess(options): interface MIDIAccess is not generated
 Navigator.serial: interface Serial is not generated
-Navigator.serviceWorker: interface ServiceWorkerContainer is not generated
 Navigator.storageBuckets: interface StorageBucketManager is not generated
 Navigator.usb: interface USB is not generated
 Navigator.virtualKeyboard: interface VirtualKeyboard is not generated
@@ -113,6 +114,15 @@ PerformanceNavigationTiming.notRestoredReasons: interface NotRestoredReasons is 
 SVGPathElement.getPointAtLength: not shipped (a later level's proposal)
 SVGPathElement.getTotalLength: not shipped (a later level's proposal)
 SVGPathElement.pathLength: not shipped (a later level's proposal)
+ServiceWorkerGlobalScope.cookieStore: interface CookieStore is not generated
+ServiceWorkerRegistration.backgroundFetch: interface BackgroundFetchManager is not generated
+ServiceWorkerRegistration.cookies: interface CookieStoreManager is not generated
+ServiceWorkerRegistration.index: interface ContentIndex is not generated
+ServiceWorkerRegistration.navigationPreload: interface NavigationPreloadManager is not generated
+ServiceWorkerRegistration.paymentManager: interface PaymentManager is not generated
+ServiceWorkerRegistration.periodicSync: interface PeriodicSyncManager is not generated
+ServiceWorkerRegistration.pushManager: interface PushManager is not generated
+ServiceWorkerRegistration.sync: interface SyncManager is not generated
 StorageManager.getDirectory(): interface FileSystemDirectoryHandle is not generated
 VTTCue.region: interface VTTRegion is not generated
 WebGL2RenderingContext.drawingBufferStorage: sized drawing buffer formats are not implemented
@@ -142,6 +152,5 @@ WorkerNavigator.hid: interface HID is not generated
 WorkerNavigator.locks: interface LockManager is not generated
 WorkerNavigator.ml: interface ML is not generated
 WorkerNavigator.serial: interface Serial is not generated
-WorkerNavigator.serviceWorker: interface ServiceWorkerContainer is not generated
 WorkerNavigator.storageBuckets: interface StorageBucketManager is not generated
 WorkerNavigator.usb: interface USB is not generated

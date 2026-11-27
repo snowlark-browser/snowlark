@@ -36,6 +36,9 @@ pub struct PageOptions {
     /// The Cache API's storage the page shares with others (a browser's tabs, persisted in its
     /// profile); `None`: one of its own, in memory (its frames and workers share it).
     pub caches: Option<crate::CacheBackend>,
+    /// The service worker registrations the page shares with others (a browser's tabs);
+    /// `None`: a registry of its own, in memory, fetching through the page's network.
+    pub service_workers: Option<crate::ServiceWorkerBackend>,
     /// The `localStorage` service the page shares with others (a browser's tabs, persisted in its
     /// profile); `None`: one of its own, in memory (its frames share it).
     pub web_storage: Option<std::sync::Arc<dyn crate::web_storage::WebStorage>>,
@@ -65,6 +68,7 @@ impl Default for PageOptions {
             broadcast: None,
             idb: None,
             caches: None,
+            service_workers: None,
             web_storage: None,
             input: snowlark_style::InputDevices::MOUSE,
             password_forms: std::env::var("SNOWLARK_PASSWORD_FORMS").is_ok_and(|v| v == "1"),
@@ -215,6 +219,9 @@ impl Page {
         }
         if let Some(caches) = options.caches {
             engine.set_cache_backend(caches);
+        }
+        if let Some(sw) = options.service_workers {
+            engine.set_service_worker_backend(sw);
         }
         {
             let mut st = engine.render.borrow_mut();
@@ -387,7 +394,21 @@ impl Page {
         engine.set_broadcast_hub(init.broadcast.clone());
         engine.set_idb_backend(init.idb.clone());
         engine.set_cache_backend(init.caches.clone());
+        if let Some(b) = init.sw_backend.clone() {
+            engine.set_service_worker_backend(b);
+        }
         let global = engine.create_worker_global(doc, &init.name, init.url.clone());
+        // A service worker's global is a ServiceWorkerGlobalScope (Service Workers §4.1).
+        let kind = match &init.service_worker {
+            Some(start) => {
+                engine.set_service_worker_own(start);
+                if let crate::engine::Object::WorkerGlobal(g) = &mut *engine.obj_mut(global) {
+                    g.service_worker = true;
+                }
+                snowlark_bindings::generated::GlobalKind::ServiceWorker
+            }
+            None => snowlark_bindings::generated::GlobalKind::DedicatedWorker,
+        };
         engine.event_loop.borrow_mut().waker = init.waker.clone();
         *engine.worker_scope.borrow_mut() = Some(crate::worker::WorkerScope {
             to_parent: init.to_parent,
@@ -431,23 +452,14 @@ impl Page {
             );
             crate::engine::gc::install(scope);
             let origin = engine.origin_of_document(doc);
-            let realm = crate::engine::frames::create_realm_for(
-                scope,
-                global,
-                &origin,
-                snowlark_bindings::generated::GlobalKind::DedicatedWorker,
-                None,
-            );
+            let realm = crate::engine::frames::create_realm_for(scope, global, &origin, kind, None);
             // (a worker that is not a secure context has none of its global's `[SecureContext]`
             // constructs)
             use snowlark_bindings::generated::WindowOrWorkerGlobalScopeImpl;
             if !WindowOrWorkerGlobalScopeImpl::is_secure_context(&*engine, global) {
                 let context = v8::Local::new(scope, &realm);
                 let scope = &mut v8::ContextScope::new(scope, context);
-                snowlark_bindings::generated::hide_secure_context(
-                    scope,
-                    snowlark_bindings::generated::GlobalKind::DedicatedWorker,
-                );
+                snowlark_bindings::generated::hide_secure_context(scope, kind);
             }
             engine.set_top_realm(realm);
         }

@@ -5375,6 +5375,106 @@ impl ToJs for SelectionMode {
     }
 }
 
+/// `enum ServiceWorkerState` (service-workers.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ServiceWorkerState {
+    /// `"parsed"`
+    Parsed,
+    /// `"installing"`
+    Installing,
+    /// `"installed"`
+    Installed,
+    /// `"activating"`
+    Activating,
+    /// `"activated"`
+    Activated,
+    /// `"redundant"`
+    Redundant,
+}
+
+impl ServiceWorkerState {
+    pub const VALUES: &'static [&'static str] = &[
+        "parsed",
+        "installing",
+        "installed",
+        "activating",
+        "activated",
+        "redundant",
+    ];
+    const ALL: &'static [ServiceWorkerState] = &[
+        ServiceWorkerState::Parsed,
+        ServiceWorkerState::Installing,
+        ServiceWorkerState::Installed,
+        ServiceWorkerState::Activating,
+        ServiceWorkerState::Activated,
+        ServiceWorkerState::Redundant,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "ServiceWorkerState").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for ServiceWorkerState {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
+/// `enum ServiceWorkerUpdateViaCache` (service-workers.idl).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ServiceWorkerUpdateViaCache {
+    /// `"imports"`
+    Imports,
+    /// `"all"`
+    All,
+    /// `"none"`
+    None,
+}
+
+impl ServiceWorkerUpdateViaCache {
+    pub const VALUES: &'static [&'static str] = &["imports", "all", "none"];
+    const ALL: &'static [ServiceWorkerUpdateViaCache] = &[
+        ServiceWorkerUpdateViaCache::Imports,
+        ServiceWorkerUpdateViaCache::All,
+        ServiceWorkerUpdateViaCache::None,
+    ];
+    /// The IDL value.
+    pub fn as_str(self) -> &'static str {
+        Self::VALUES[self as usize]
+    }
+
+    /// The variant of an IDL value.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::VALUES
+            .iter()
+            .position(|v| *v == value)
+            .map(|i| Self::ALL[i])
+    }
+
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        rt::to_enum(scope, v, Self::VALUES, "ServiceWorkerUpdateViaCache").map(|i| Self::ALL[i])
+    }
+}
+
+impl ToJs for ServiceWorkerUpdateViaCache {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        self.as_str().to_js(scope)
+    }
+}
+
 /// `enum ShadowRootMode` (dom.idl).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ShadowRootMode {
@@ -19548,6 +19648,125 @@ impl ToJs for EventListenerOptions {
     }
 }
 
+/// `dictionary ExtendableEventInit : EventInit` (service-workers.idl).
+#[derive(Clone)]
+pub struct ExtendableEventInit {
+    /// `boolean bubbles = false`
+    pub bubbles: bool,
+    /// `boolean cancelable = false`
+    pub cancelable: bool,
+    /// `boolean composed = false`
+    pub composed: bool,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for ExtendableEventInit {
+    fn default() -> Self {
+        ExtendableEventInit {
+            bubbles: false,
+            cancelable: false,
+            composed: false,
+        }
+    }
+}
+
+impl ExtendableEventInit {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "ExtendableEventInit")?;
+        let m_bubbles = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("bubbles");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_cancelable = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("cancelable");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        let m_composed = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("composed");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    false
+                } else {
+                    Some(rt::to_boolean(scope, v))?
+                }
+            }
+            None => false,
+        };
+        Some(ExtendableEventInit {
+            bubbles: m_bubbles,
+            cancelable: m_cancelable,
+            composed: m_composed,
+        })
+    }
+}
+
+impl ToJs for ExtendableEventInit {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.bubbles.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("bubbles");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.cancelable.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("cancelable");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.composed.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("composed");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
 /// `dictionary FederatedCredentialInit : CredentialData` (credential-management.idl).
 #[derive(Clone)]
 pub struct FederatedCredentialInit {
@@ -21896,6 +22115,63 @@ impl ToJs for GetHTMLOptions {
                 scope,
                 rt::cached_name(scope, {
                     static K: rt::Name = rt::Name::new("shadowRoots");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary GetNotificationOptions` (notifications.idl).
+#[derive(Clone)]
+pub struct GetNotificationOptions {
+    /// `DOMString tag = ""`
+    pub tag: String,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for GetNotificationOptions {
+    fn default() -> Self {
+        GetNotificationOptions {
+            tag: String::from(""),
+        }
+    }
+}
+
+impl GetNotificationOptions {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "GetNotificationOptions")?;
+        let m_tag = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("tag");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    String::from("")
+                } else {
+                    rt::to_dom_string(scope, v)?
+                }
+            }
+            None => String::from(""),
+        };
+        Some(GetNotificationOptions { tag: m_tag })
+    }
+}
+
+impl ToJs for GetNotificationOptions {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        {
+            let v = self.tag.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("tag");
                     &K
                 })
                 .into(),
@@ -34188,8 +34464,8 @@ pub struct MessageEventInit {
     pub origin: String,
     /// `sequence<MessagePort> ports = []`
     pub ports: Vec<Handle>,
-    /// `(Window or MessagePort)? source = null`
-    pub source: Option<WindowOrMessagePort>,
+    /// `(Window or MessagePort or ServiceWorker)? source = null`
+    pub source: Option<WindowOrMessagePortOrServiceWorker>,
 }
 
 // The member defaults, written out (some equal the types' defaults).
@@ -34337,7 +34613,7 @@ impl MessageEventInit {
                         if v.is_null_or_undefined() {
                             Some(None)
                         } else {
-                            (WindowOrMessagePort::from_js(scope, v)).map(Some)
+                            (WindowOrMessagePortOrServiceWorker::from_js(scope, v)).map(Some)
                         }
                     }?
                 }
@@ -43415,6 +43691,125 @@ impl ToJs for ReadableWritablePair {
                 scope,
                 rt::cached_name(scope, {
                     static K: rt::Name = rt::Name::new("writable");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        Some(o.into())
+    }
+}
+
+/// `dictionary RegistrationOptions` (service-workers.idl).
+#[derive(Clone)]
+pub struct RegistrationOptions {
+    /// `USVString scope`
+    pub scope: Option<String>,
+    /// `WorkerType type = "classic"`
+    pub type_: WorkerType,
+    /// `ServiceWorkerUpdateViaCache updateViaCache = "imports"`
+    pub update_via_cache: ServiceWorkerUpdateViaCache,
+}
+
+// The member defaults, written out (some equal the types' defaults).
+#[allow(clippy::derivable_impls)]
+impl Default for RegistrationOptions {
+    fn default() -> Self {
+        RegistrationOptions {
+            scope: None,
+            type_: WorkerType::Classic,
+            update_via_cache: ServiceWorkerUpdateViaCache::Imports,
+        }
+    }
+}
+
+impl RegistrationOptions {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        let obj = rt::dictionary_object(scope, v, "RegistrationOptions")?;
+        let m_scope = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("scope");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    None
+                } else {
+                    Some(rt::to_usv_string(scope, v)?)
+                }
+            }
+            None => None,
+        };
+        let m_type_ = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("type");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    WorkerType::Classic
+                } else {
+                    WorkerType::from_js(scope, v)?
+                }
+            }
+            None => WorkerType::Classic,
+        };
+        let m_update_via_cache = match obj {
+            Some(o) => {
+                let v = rt::get_named_member(scope, o, {
+                    static K: rt::Name = rt::Name::new("updateViaCache");
+                    &K
+                })?;
+                if v.is_undefined() {
+                    ServiceWorkerUpdateViaCache::Imports
+                } else {
+                    ServiceWorkerUpdateViaCache::from_js(scope, v)?
+                }
+            }
+            None => ServiceWorkerUpdateViaCache::Imports,
+        };
+        Some(RegistrationOptions {
+            scope: m_scope,
+            type_: m_type_,
+            update_via_cache: m_update_via_cache,
+        })
+    }
+}
+
+impl ToJs for RegistrationOptions {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        let o = v8::Object::new(scope);
+        if let Some(x) = &self.scope {
+            let v = x.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("scope");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.type_.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("type");
+                    &K
+                })
+                .into(),
+                v,
+            )?;
+        }
+        {
+            let v = self.update_via_cache.to_js(scope)?;
+            o.create_data_property(
+                scope,
+                rt::cached_name(scope, {
+                    static K: rt::Name = rt::Name::new("updateViaCache");
                     &K
                 })
                 .into(),
@@ -58147,6 +58542,49 @@ impl ToJs for SanitizerOrSanitizerConfigOrSanitizerPresets {
     }
 }
 
+/// `(ServiceWorkerRegistration or undefined)`
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum ServiceWorkerRegistrationOrUndefined {
+    ServiceWorkerRegistration(Handle),
+    Undefined(()),
+}
+
+impl ServiceWorkerRegistrationOrUndefined {
+    pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
+        if rt::unwrap_value(
+            v,
+            ids::SERVICE_WORKER_REGISTRATION,
+            ids::SERVICE_WORKER_REGISTRATION_END,
+        )
+        .is_some()
+        {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::SERVICE_WORKER_REGISTRATION,
+                ids::SERVICE_WORKER_REGISTRATION_END,
+                "The value",
+                "ServiceWorkerRegistration",
+            ))
+            .map(ServiceWorkerRegistrationOrUndefined::ServiceWorkerRegistration);
+        }
+        rt::type_error(
+            scope,
+            "The value is not of type '(ServiceWorkerRegistration or undefined)'",
+        )
+    }
+}
+
+impl ToJs for ServiceWorkerRegistrationOrUndefined {
+    fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
+        match self {
+            ServiceWorkerRegistrationOrUndefined::ServiceWorkerRegistration(x) => x.to_js(scope),
+            ServiceWorkerRegistrationOrUndefined::Undefined(x) => x.to_js(scope),
+        }
+    }
+}
+
 /// `(SetHTMLUnsafeOptions or TrustedHTMLParserOptions)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -59885,15 +60323,16 @@ impl ToJs for ViewTransitionUpdateCallbackOrStartViewTransitionOptions {
     }
 }
 
-/// `(Window or MessagePort)`
+/// `(Window or MessagePort or ServiceWorker)`
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum WindowOrMessagePort {
+pub enum WindowOrMessagePortOrServiceWorker {
     Window(Handle),
     MessagePort(Handle),
+    ServiceWorker(Handle),
 }
 
-impl WindowOrMessagePort {
+impl WindowOrMessagePortOrServiceWorker {
     pub(crate) fn from_js(scope: &v8::PinScope<'_, '_>, v: v8::Local<v8::Value>) -> Option<Self> {
         if rt::unwrap_value(v, ids::WINDOW, ids::WINDOW_END).is_some() {
             return (rt::to_interface(
@@ -59904,7 +60343,7 @@ impl WindowOrMessagePort {
                 "The value",
                 "Window",
             ))
-            .map(WindowOrMessagePort::Window);
+            .map(WindowOrMessagePortOrServiceWorker::Window);
         }
         if rt::unwrap_value(v, ids::MESSAGE_PORT, ids::MESSAGE_PORT_END).is_some() {
             return (rt::to_interface(
@@ -59915,17 +60354,32 @@ impl WindowOrMessagePort {
                 "The value",
                 "MessagePort",
             ))
-            .map(WindowOrMessagePort::MessagePort);
+            .map(WindowOrMessagePortOrServiceWorker::MessagePort);
         }
-        rt::type_error(scope, "The value is not of type '(Window or MessagePort)'")
+        if rt::unwrap_value(v, ids::SERVICE_WORKER, ids::SERVICE_WORKER_END).is_some() {
+            return (rt::to_interface(
+                scope,
+                v,
+                ids::SERVICE_WORKER,
+                ids::SERVICE_WORKER_END,
+                "The value",
+                "ServiceWorker",
+            ))
+            .map(WindowOrMessagePortOrServiceWorker::ServiceWorker);
+        }
+        rt::type_error(
+            scope,
+            "The value is not of type '(Window or MessagePort or ServiceWorker)'",
+        )
     }
 }
 
-impl ToJs for WindowOrMessagePort {
+impl ToJs for WindowOrMessagePortOrServiceWorker {
     fn to_js<'s>(&self, scope: &v8::PinScope<'s, '_>) -> Option<v8::Local<'s, v8::Value>> {
         match self {
-            WindowOrMessagePort::Window(x) => x.to_js(scope),
-            WindowOrMessagePort::MessagePort(x) => x.to_js(scope),
+            WindowOrMessagePortOrServiceWorker::Window(x) => x.to_js(scope),
+            WindowOrMessagePortOrServiceWorker::MessagePort(x) => x.to_js(scope),
+            WindowOrMessagePortOrServiceWorker::ServiceWorker(x) => x.to_js(scope),
         }
     }
 }

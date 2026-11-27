@@ -55,6 +55,7 @@ mod refresh;
 pub mod render;
 mod resizer;
 mod script;
+mod service_worker;
 mod speculative;
 mod undo;
 pub mod web_storage;
@@ -75,4 +76,5 @@ pub use render::{RenderSetup, RenderState};
 pub use snowlark_idb::Backend as IdbBackend;
 /// The Cache API's storage a browser's pages share (`snowlark_sw::CacheBackend`).
 pub use snowlark_sw::CacheBackend;
+pub use snowlark_sw::ServiceWorkerBackend;
 pub use speculative::EarlyStats;

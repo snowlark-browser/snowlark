@@ -874,6 +874,7 @@ impl Engine {
             || self.media_pending()
             || self.websockets_pending()
             || self.idb_pending()
+            || self.service_workers_pending()
             || self.audio_pending()
             || self.canvas_frames_pending()
             || self.fullscreen_events_pending()

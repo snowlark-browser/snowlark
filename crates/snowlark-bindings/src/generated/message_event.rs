@@ -45,9 +45,9 @@ pub trait MessageEventImpl {
     }
     /// readonly attribute MessageEventSource? source;
     #[cfg(not(feature = "stubs"))]
-    fn source(&self, this: Handle) -> Option<WindowOrMessagePort>;
+    fn source(&self, this: Handle) -> Option<WindowOrMessagePortOrServiceWorker>;
     #[cfg(feature = "stubs")]
-    fn source(&self, this: Handle) -> Option<WindowOrMessagePort> {
+    fn source(&self, this: Handle) -> Option<WindowOrMessagePortOrServiceWorker> {
         rt::stub("MessageEvent.source")
     }
     /// readonly attribute FrozenArray<MessagePort> ports;
@@ -69,7 +69,7 @@ pub trait MessageEventImpl {
         data: JsValue,
         origin: &str,
         last_event_id: &str,
-        source: Option<WindowOrMessagePort>,
+        source: Option<WindowOrMessagePortOrServiceWorker>,
         ports: Vec<Handle>,
     ) -> Result<()>;
     #[cfg(feature = "stubs")]
@@ -83,7 +83,7 @@ pub trait MessageEventImpl {
         data: JsValue,
         origin: &str,
         last_event_id: &str,
-        source: Option<WindowOrMessagePort>,
+        source: Option<WindowOrMessagePortOrServiceWorker>,
         ports: Vec<Handle>,
     ) -> Result<()> {
         rt::stub("MessageEvent.init_message_event")
@@ -238,7 +238,7 @@ pub(crate) fn op_init_message_event<D: Dom, const LO: u16, const HI: u16>(call: 
                     if v.is_null_or_undefined() {
                         Some(None)
                     } else {
-                        (WindowOrMessagePort::from_js(scope, v)).map(Some)
+                        (WindowOrMessagePortOrServiceWorker::from_js(scope, v)).map(Some)
                     }
                 }?
             } else {

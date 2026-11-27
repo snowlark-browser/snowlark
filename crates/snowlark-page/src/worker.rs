@@ -52,6 +52,8 @@ pub enum FromWorker {
 pub struct WorkerGlobalData {
     pub name: String,
     pub url: url::Url,
+    /// A `ServiceWorkerGlobalScope` (a `DedicatedWorkerGlobalScope` otherwise).
+    pub service_worker: bool,
 }
 
 /// The parent side's `Worker` object.
@@ -116,14 +118,25 @@ pub struct WorkerInit {
     pub idb: crate::IdbBackend,
     /// The Cache API's storage of the creator's event loop.
     pub caches: crate::CacheBackend,
+    /// The service worker registrations of the creator's event loop.
+    pub sw_backend: Option<snowlark_sw::ServiceWorkerBackend>,
+    /// A service worker's version and script: the global is a `ServiceWorkerGlobalScope`.
+    pub service_worker: Option<crate::service_worker::SwStart>,
 }
 
 /// The worker thread: its page, the main script, then the event loop until terminated or closed.
-fn worker_main(init: WorkerInit) {
+pub(crate) fn worker_main(mut init: WorkerInit) {
     let to_parent = init.to_parent.clone();
     let parent_waker = init.parent_waker.clone();
+    let source = init
+        .service_worker
+        .as_mut()
+        .map(|s| std::mem::take(&mut s.source));
     let mut page = crate::page::Page::new_worker(init);
-    let ok = page.with(|e, cx| e.run_worker_main_script(cx));
+    let ok = match source {
+        Some(source) => page.with(|e, cx| e.run_service_worker_script(cx, &source)),
+        None => page.with(|e, cx| e.run_worker_main_script(cx)),
+    };
     if !ok {
         let _ = to_parent.send(FromWorker::LoadFailed);
         parent_waker.wake();
@@ -542,6 +555,11 @@ impl WorkerNavigatorImpl for Engine {
     fn media_capabilities(&self, this: Handle) -> Handle {
         Engine::media_capabilities(self, this)
     }
+    /// Service Workers §3.4 `navigator.serviceWorker` in a worker.
+    fn service_worker(&self, this: Handle) -> Handle {
+        let global = self.navigator_window(this);
+        self.service_worker_container(global)
+    }
 }
 
 impl WorkerImpl for Engine {
@@ -661,6 +679,8 @@ impl WorkerImpl for Engine {
                 broadcast: self.broadcast_hub(),
                 idb: self.idb_backend_for_worker(),
                 caches: self.cache_backend(),
+                sw_backend: Some(self.sw_backend()),
+                service_worker: None,
                 to_parent,
                 inbox,
                 creator,

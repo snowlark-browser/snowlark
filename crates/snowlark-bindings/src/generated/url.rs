@@ -1140,7 +1140,7 @@ pub(crate) fn template<'s, D: Dom>(
         );
         rt::operation(scope, &proto, "toJSON", f, false);
     }
-    {
+    if options.exposes(&["DedicatedWorker", "SharedWorker", "Window"]) {
         let f = rt::method(
             scope,
             rt::builder(super::url::static_op_create_object_url::<D, LO, HI>),
@@ -1150,7 +1150,7 @@ pub(crate) fn template<'s, D: Dom>(
         );
         rt::operation(scope, &t, "createObjectURL", f, false);
     }
-    {
+    if options.exposes(&["DedicatedWorker", "SharedWorker", "Window"]) {
         let f = rt::method(
             scope,
             rt::builder(super::url::static_op_revoke_object_url::<D, LO, HI>),

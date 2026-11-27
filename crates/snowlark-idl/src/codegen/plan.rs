@@ -53,10 +53,11 @@ pub const SECURITY_CHECKED: &[&str] = &["Window", "Location", "EventTarget"];
 /// null signal drops the input Request's).
 pub const NULL_PRESENT: &[&str] = &["signal"];
 
-/// The global names whose realms the bindings serve: a Window, and a dedicated worker's global scope
-/// (`[Global=(Worker,DedicatedWorker)]`). Interfaces and members exposed in any of them are generated;
-/// each realm exposes the interface objects of its own globals.
-pub const GLOBALS: &[&str] = &["Window", "Worker", "DedicatedWorker"];
+/// The global names whose realms the bindings serve: a Window, a dedicated worker's global scope
+/// (`[Global=(Worker,DedicatedWorker)]`) and a service worker's (`[Global=(Worker,ServiceWorker)]`).
+/// Interfaces and members exposed in any of them are generated; each realm exposes the interface
+/// objects of its own globals.
+pub const GLOBALS: &[&str] = &["Window", "Worker", "DedicatedWorker", "ServiceWorker"];
 
 /// Reflected attributes whose rules are in the HTML prose but not (yet) in its IDL: (interface,
 /// attribute, extended attribute, default).
@@ -71,8 +72,12 @@ pub fn exposed_any(set: &BTreeSet<String>) -> bool {
 }
 
 /// The global names of each kind of realm the bindings install into (as the generated
-/// `GlobalKind::exposes` matches them): a Window, a dedicated worker.
-const REALMS: &[&[&str]] = &[&["Window"], &["Worker", "DedicatedWorker"]];
+/// `GlobalKind::exposes` matches them): a Window, a dedicated worker, a service worker.
+const REALMS: &[&[&str]] = &[
+    &["Window"],
+    &["Worker", "DedicatedWorker"],
+    &["Worker", "ServiceWorker"],
+];
 
 /// A member's exposure set when it is narrower than its interface's in one of the generated kinds of
 /// realm (Web IDL §3.3.6: a member is exposed only where both it and its interface are).
@@ -307,6 +312,13 @@ pub const SCOPE: &[&str] = &[
     "XMLHttpRequest",
     "WorkerGlobalScope",
     "DedicatedWorkerGlobalScope",
+    // Service Workers: registration and the lifecycle (fetch events and clients come later).
+    "ServiceWorkerGlobalScope",
+    "ServiceWorkerContainer",
+    "ServiceWorkerRegistration",
+    "ServiceWorker",
+    "ExtendableEvent",
+    "Clients",
     "WorkerLocation",
     "WorkerNavigator",
     "Worker",

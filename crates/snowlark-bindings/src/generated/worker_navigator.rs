@@ -36,6 +36,13 @@ pub trait WorkerNavigatorImpl {
     fn permissions(&self, this: Handle) -> Handle {
         rt::stub("WorkerNavigator.permissions")
     }
+    /// [SecureContext, SameObject] readonly attribute ServiceWorkerContainer serviceWorker;
+    #[cfg(not(feature = "stubs"))]
+    fn service_worker(&self, this: Handle) -> Handle;
+    #[cfg(feature = "stubs")]
+    fn service_worker(&self, this: Handle) -> Handle {
+        rt::stub("WorkerNavigator.service_worker")
+    }
 }
 
 /// Getter of `[SameObject] readonly attribute MediaCapabilities mediaCapabilities;`.
@@ -102,6 +109,38 @@ pub(crate) fn attr_permissions_get<D: Dom, const LO: u16, const HI: u16>(
     rv.set(js);
 }
 
+/// Getter of `[SecureContext, SameObject] readonly attribute ServiceWorkerContainer serviceWorker;`.
+pub(crate) fn attr_service_worker_get<D: Dom, const LO: u16, const HI: u16>(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let _prof = rt::prof::enter(scope, "get WorkerNavigator.serviceWorker");
+    // SAFETY: this member's template has a receiver signature, which V8 checked before the call.
+    let this = unsafe { rt::receiver(&args.this()) };
+    if let Some(v) = rt::same_object_get(scope, args.this(), {
+        static K: rt::Name = rt::Name::new("WorkerNavigator.serviceWorker");
+        &K
+    }) {
+        rv.set(v);
+        return;
+    }
+    let st = rt::state(scope);
+    let dom = st.engine::<D>();
+    let v = <D as WorkerNavigatorImpl>::service_worker(dom, this);
+    let Some(js) = v.to_js(scope) else { return };
+    rt::same_object_set(
+        scope,
+        args.this(),
+        {
+            static K: rt::Name = rt::Name::new("WorkerNavigator.serviceWorker");
+            &K
+        },
+        js,
+    );
+    rv.set(js);
+}
+
 /// Builds the interface object template of `WorkerNavigator` (Web IDL §3.7), inheriting from `parent`.
 pub(crate) fn template<'s, D: Dom>(
     scope: &v8::PinScope<'s, '_>,
@@ -146,6 +185,18 @@ pub(crate) fn template<'s, D: Dom>(
         );
         let s = None;
         rt::accessor(scope, proto, "permissions", g, s, false);
+    }
+    if options.secure_context {
+        let g = rt::getter(
+            scope,
+            rt::builder(super::worker_navigator::attr_service_worker_get::<D, LO, HI>),
+            "serviceWorker",
+            Some(sig),
+            None,
+            options,
+        );
+        let s = None;
+        rt::accessor(scope, proto, "serviceWorker", g, s, false);
     }
     if options.secure_context {
         let g = rt::getter(

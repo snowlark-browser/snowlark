@@ -181,21 +181,26 @@ impl Plan<'_> {
         o.push_str("/// Web IDL \"perform a security check\" (§3.7.6) for a member of the interface `LO` that is not a\n/// cross-origin one: false, with a `SecurityError` thrown, when `this` is a Window or Location the\n/// current realm may not touch. Folds to nothing for the other interfaces.\n#[inline(always)]\npub(crate) fn security_check<const LO: u16>(scope: &mut v8::PinScope<'_, '_>, this: v8::Local<v8::Object>) -> bool {\n    if LO == ids::WINDOW {\n        rt::window_security_check(scope, this)\n    } else if LO == ids::LOCATION {\n        rt::location_security_check(scope, this)\n    } else if LO == ids::EVENT_TARGET {\n        rt::proto_id(&this) != ids::WINDOW || rt::window_security_check(scope, this)\n    } else {\n        true\n    }\n}\n\n");
 
         // The global templates.
-        o.push_str("/// The kinds of realm the bindings install into, by their global object's interface.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum GlobalKind {\n    /// A `Window` (`[Exposed=Window]`).\n    Window,\n    /// A `DedicatedWorkerGlobalScope` (`[Exposed=Worker]` and `[Exposed=DedicatedWorker]`).\n    DedicatedWorker,\n}\n\nimpl GlobalKind {\n    /// Whether an interface exposed in `names` (`*` for all) is exposed in this kind of realm.\n    pub fn exposes(self, names: &[&str]) -> bool {\n        names.iter().any(|n| match self {\n            GlobalKind::Window => *n == \"*\" || *n == \"Window\",\n            GlobalKind::DedicatedWorker => *n == \"*\" || *n == \"Worker\" || *n == \"DedicatedWorker\",\n        })\n    }\n}\n\n");
+        o.push_str("/// The kinds of realm the bindings install into, by their global object's interface.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum GlobalKind {\n    /// A `Window` (`[Exposed=Window]`).\n    Window,\n    /// A `DedicatedWorkerGlobalScope` (`[Exposed=Worker]` and `[Exposed=DedicatedWorker]`).\n    DedicatedWorker,\n    /// A `ServiceWorkerGlobalScope` (`[Exposed=Worker]` and `[Exposed=ServiceWorker]`).\n    ServiceWorker,\n}\n\nimpl GlobalKind {\n    /// Whether an interface exposed in `names` (`*` for all) is exposed in this kind of realm.\n    pub fn exposes(self, names: &[&str]) -> bool {\n        names.iter().any(|n| match self {\n            GlobalKind::Window => *n == \"*\" || *n == \"Window\",\n            GlobalKind::DedicatedWorker => *n == \"*\" || *n == \"Worker\" || *n == \"DedicatedWorker\",\n            GlobalKind::ServiceWorker => *n == \"*\" || *n == \"Worker\" || *n == \"ServiceWorker\",\n        })\n    }\n}\n\n");
         let window = self.ifaces.iter().find(|i| i.global && i.name == "Window");
         let worker = self
             .ifaces
             .iter()
             .find(|i| i.global && i.name == "DedicatedWorkerGlobalScope");
+        let service_worker = self
+            .ifaces
+            .iter()
+            .find(|i| i.global && i.name == "ServiceWorkerGlobalScope");
         let id_of = |g: Option<&IfacePlan>| match g {
             Some(g) => format!("Some(ids::{})", upper(&g.name)),
             None => "None".into(),
         };
         writeln!(
             o,
-            "/// The prototype id of the global object's interface for a kind of realm.\npub fn global_interface_id(kind: GlobalKind) -> Option<u16> {{\n    match kind {{\n        GlobalKind::Window => {},\n        GlobalKind::DedicatedWorker => {},\n    }}\n}}\n\n/// The object template of a realm's global object: the instance template of its `[Global]` interface, so\n/// the global object's prototype chain and members are the interface's.\npub fn global_template_for<'s>(scope: &v8::PinScope<'s, '_, ()>, kind: GlobalKind) -> Option<v8::Local<'s, v8::ObjectTemplate>> {{\n    let st = rt::state_of(scope)?;\n    Some(st.template(scope, global_interface_id(kind)?)?.instance_template(scope))\n}}\n\n/// [`global_template_for`] a Window.\npub fn global_template<'s>(scope: &v8::PinScope<'s, '_, ()>) -> Option<v8::Local<'s, v8::ObjectTemplate>> {{\n    global_template_for(scope, GlobalKind::Window)\n}}\n",
+            "/// The prototype id of the global object's interface for a kind of realm.\npub fn global_interface_id(kind: GlobalKind) -> Option<u16> {{\n    match kind {{\n        GlobalKind::Window => {},\n        GlobalKind::DedicatedWorker => {},\n        GlobalKind::ServiceWorker => {},\n    }}\n}}\n\n/// The object template of a realm's global object: the instance template of its `[Global]` interface, so\n/// the global object's prototype chain and members are the interface's.\npub fn global_template_for<'s>(scope: &v8::PinScope<'s, '_, ()>, kind: GlobalKind) -> Option<v8::Local<'s, v8::ObjectTemplate>> {{\n    let st = rt::state_of(scope)?;\n    Some(st.template(scope, global_interface_id(kind)?)?.instance_template(scope))\n}}\n\n/// [`global_template_for`] a Window.\npub fn global_template<'s>(scope: &v8::PinScope<'s, '_, ()>) -> Option<v8::Local<'s, v8::ObjectTemplate>> {{\n    global_template_for(scope, GlobalKind::Window)\n}}\n",
             id_of(window),
-            id_of(worker)
+            id_of(worker),
+            id_of(service_worker)
         )
         .unwrap();
         if let Some(g) = window {
@@ -405,6 +410,7 @@ impl Plan<'_> {
         for (kind, global_name) in [
             ("Window", "Window"),
             ("DedicatedWorker", "DedicatedWorkerGlobalScope"),
+            ("ServiceWorker", "ServiceWorkerGlobalScope"),
         ] {
             let mut names = BTreeSet::new();
             let mut at = Some(global_name.to_string());
@@ -429,7 +435,11 @@ impl Plan<'_> {
         // namespace object.
         let globals: BTreeSet<String> = {
             let mut g = BTreeSet::new();
-            for start in ["Window", "DedicatedWorkerGlobalScope"] {
+            for start in [
+                "Window",
+                "DedicatedWorkerGlobalScope",
+                "ServiceWorkerGlobalScope",
+            ] {
                 let mut at = Some(start.to_string());
                 while let Some(name) = at {
                     let Some(ip) = self.ifaces.iter().find(|i| i.name == name) else {

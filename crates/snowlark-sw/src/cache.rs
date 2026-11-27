@@ -294,7 +294,7 @@ impl std::fmt::Debug for LocalCacheStorage {
 }
 
 /// A storage key as a folder name: bytes other than ASCII letters, digits, `.` and `-` as `%XX`.
-fn folder_name(key: &str) -> String {
+pub(crate) fn folder_name(key: &str) -> String {
     let mut s = String::with_capacity(key.len() * 2);
     for b in key.bytes() {
         if b.is_ascii_alphanumeric() || b == b'.' || b == b'-' {
@@ -307,7 +307,7 @@ fn folder_name(key: &str) -> String {
 }
 
 /// The storage key a folder name stands for.
-fn key_of_folder(name: &str) -> Option<String> {
+pub(crate) fn key_of_folder(name: &str) -> Option<String> {
     let bytes = name.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;

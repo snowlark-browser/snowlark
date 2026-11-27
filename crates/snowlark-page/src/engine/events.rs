@@ -229,6 +229,8 @@ pub struct UiFields {
 pub enum EventExt {
     None,
     Custom(Option<super::held::Held<v8::Value>>),
+    /// An ExtendableEvent's extend lifetime promises (Service Workers §4.4).
+    Extendable(std::rc::Rc<crate::service_worker::Extensions>),
     Ui(Box<UiFields>),
     Error {
         message: String,
@@ -2890,7 +2892,7 @@ impl snowlark_bindings::generated::MessageEventImpl for Engine {
             _ => String::new(),
         }))
     }
-    fn source(&self, this: Handle) -> Option<g::WindowOrMessagePort> {
+    fn source(&self, this: Handle) -> Option<g::WindowOrMessagePortOrServiceWorker> {
         let source = self.ev(this, |e| match &e.ext {
             EventExt::Message { source, .. } => *source,
             _ => None,
@@ -2916,7 +2918,7 @@ impl snowlark_bindings::generated::MessageEventImpl for Engine {
         data: JsValue,
         origin: &str,
         last_event_id: &str,
-        source: Option<g::WindowOrMessagePort>,
+        source: Option<g::WindowOrMessagePortOrServiceWorker>,
         ports: Vec<Handle>,
     ) -> rt::Result<()> {
         if self.ev(this, |e| e.dispatching) {
@@ -2958,19 +2960,24 @@ impl snowlark_bindings::generated::MessageEventImpl for Engine {
 }
 
 /// The handle behind a `MessageEventSource`.
-fn source_handle(s: g::WindowOrMessagePort) -> Handle {
+fn source_handle(s: g::WindowOrMessagePortOrServiceWorker) -> Handle {
     match s {
-        g::WindowOrMessagePort::Window(h) | g::WindowOrMessagePort::MessagePort(h) => h,
+        g::WindowOrMessagePortOrServiceWorker::Window(h)
+        | g::WindowOrMessagePortOrServiceWorker::MessagePort(h)
+        | g::WindowOrMessagePortOrServiceWorker::ServiceWorker(h) => h,
     }
 }
 
 impl Engine {
     /// A message event's source as the union the bindings return.
-    fn message_event_source(&self, h: Handle) -> g::WindowOrMessagePort {
-        if super::handle_node(h).is_none() && matches!(&*self.obj(h), Object::MessagePort(_)) {
-            g::WindowOrMessagePort::MessagePort(h)
+    fn message_event_source(&self, h: Handle) -> g::WindowOrMessagePortOrServiceWorker {
+        if super::handle_node(h).is_none() && matches!(&*self.obj(h), Object::ServiceWorker(_)) {
+            g::WindowOrMessagePortOrServiceWorker::ServiceWorker(h)
+        } else if super::handle_node(h).is_none() && matches!(&*self.obj(h), Object::MessagePort(_))
+        {
+            g::WindowOrMessagePortOrServiceWorker::MessagePort(h)
         } else {
-            g::WindowOrMessagePort::Window(h)
+            g::WindowOrMessagePortOrServiceWorker::Window(h)
         }
     }
 

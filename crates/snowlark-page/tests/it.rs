@@ -98,6 +98,7 @@ mod script_animation_frames;
 mod scroll_anchoring;
 mod scroll_snap;
 mod selector_queries;
+mod service_worker;
 mod session_history;
 mod shadow_dom;
 mod shadow_input;

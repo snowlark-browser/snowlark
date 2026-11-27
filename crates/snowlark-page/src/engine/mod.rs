@@ -138,6 +138,19 @@ pub fn handle_node(h: Handle) -> Option<NodeId> {
 /// A platform object that is not a node.
 pub enum Object {
     Window,
+    /// Service Workers §3.4: a global's `navigator.serviceWorker`, and its `ready` promise once read.
+    ServiceWorkerContainer {
+        global: Handle,
+        ready: Option<rt::JsPromise>,
+    },
+    /// Service Workers §3.2: a registration as one global sees it.
+    ServiceWorkerRegistration(Box<crate::service_worker::RegistrationData>),
+    /// Service Workers §3.1: a service worker as one global sees it.
+    ServiceWorker(Box<crate::service_worker::WorkerData>),
+    /// Service Workers §4.3: a service worker global's `clients`.
+    Clients {
+        global: Handle,
+    },
     /// `new EventTarget()`.
     EventTarget,
     InputDeviceCapabilities(bool),
@@ -698,6 +711,8 @@ pub struct Engine {
     pub(crate) idb: RefCell<idb::IdbState>,
     /// The Cache API's storage (the embedder's, shared by its pages; a worker shares its parent's).
     pub(crate) caches: RefCell<Option<snowlark_sw::CacheBackend>>,
+    /// This event loop's service worker registrations, objects and running workers.
+    pub(crate) sw: RefCell<crate::service_worker::SwState>,
     pub(crate) audio: RefCell<audio::AudioState>,
     /// Set when an event listener threw (DOM's "legacyOutputDidListenersThrowFlag", which
     /// IndexedDB reads around its dispatches).
@@ -838,6 +853,7 @@ impl Engine {
             svg: RefCell::default(),
             idb: RefCell::default(),
             caches: RefCell::default(),
+            sw: RefCell::default(),
             audio: RefCell::default(),
             listener_threw: Cell::new(false),
             images: RefCell::new(img::Images::default()),
@@ -1141,6 +1157,10 @@ impl Engine {
             Object::BatteryManager { .. } => InterfaceId::BatteryManager,
             Object::StorageManager { .. } => InterfaceId::StorageManager,
             Object::CacheStorage { .. } => InterfaceId::CacheStorage,
+            Object::ServiceWorkerContainer { .. } => InterfaceId::ServiceWorkerContainer,
+            Object::ServiceWorkerRegistration(_) => InterfaceId::ServiceWorkerRegistration,
+            Object::ServiceWorker(_) => InterfaceId::ServiceWorker,
+            Object::Clients { .. } => InterfaceId::Clients,
             Object::Cache { .. } => InterfaceId::Cache,
             Object::MediaCapabilities { .. } => InterfaceId::MediaCapabilities,
             Object::Notification(_) => InterfaceId::Notification,
@@ -1280,6 +1300,7 @@ impl Engine {
             Object::FormData(_) => InterfaceId::FormData,
             Object::Xhr(_) => InterfaceId::XMLHttpRequest,
             Object::XhrUpload => InterfaceId::XMLHttpRequestUpload,
+            Object::WorkerGlobal(g) if g.service_worker => InterfaceId::ServiceWorkerGlobalScope,
             Object::WorkerGlobal(_) => InterfaceId::DedicatedWorkerGlobalScope,
             Object::WorkerLocation(_) => InterfaceId::WorkerLocation,
             Object::WorkerNavigator => InterfaceId::WorkerNavigator,

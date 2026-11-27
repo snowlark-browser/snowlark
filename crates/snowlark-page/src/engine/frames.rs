@@ -647,6 +647,7 @@ impl Engine {
         let global = self.alloc(Object::WorkerGlobal(crate::worker::WorkerGlobalData {
             name: name.to_owned(),
             url,
+            service_worker: false,
         }));
         let mut f = self.frames.borrow_mut();
         let id = f.list.len();
@@ -838,6 +839,8 @@ impl Engine {
             // The kept realm takes the new document's origin as its security token.
             self.set_window_origin(cx, id, origin);
             self.publish_window_document(cx.scope(), old_window);
+            // (the old document's service worker client goes, the new one comes)
+            self.sw_sync_clients();
             self.content_document_created(cx, doc);
             return;
         }
@@ -881,6 +884,8 @@ impl Engine {
                 .retired_pending
                 .push((old_window, old_doc));
         }
+        // (the old document's service worker client goes, the new one comes)
+        self.sw_sync_clients();
         // Content blocking: the document's cosmetic filters and scriptlets, before anything of it
         // is parsed or run.
         self.content_document_created(cx, doc);
@@ -1804,6 +1809,7 @@ impl Engine {
             self.eme_document_unloaded(d);
         }
         self.render_detach_documents(&docs);
+        self.sw_sync_clients();
     }
 
     /// The iframe's `src`/`srcdoc` changed (HTML §4.8.5 attribute change steps).

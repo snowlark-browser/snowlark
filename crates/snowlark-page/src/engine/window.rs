@@ -2083,6 +2083,11 @@ impl NavigatorImpl for Engine {
     fn media_capabilities(&self, this: Handle) -> Handle {
         Engine::media_capabilities(self, this)
     }
+    /// Service Workers §3.4 `navigator.serviceWorker`.
+    fn service_worker(&self, this: Handle) -> Handle {
+        let global = self.navigator_window(this);
+        self.service_worker_container(global)
+    }
     /// Pointer Events §11: the touch contacts the device supports, the same device knowledge as
     /// the `pointer` media feature and the legacy touch event APIs' exposure.
     fn max_touch_points(&self, _this: Handle) -> i32 {

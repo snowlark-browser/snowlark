@@ -9,8 +9,15 @@
 //! - [`cache`]: the Cache API's storage (§5.4 to §5.5): each storage key's name to cache map, the
 //!   request-response lists, the "Query Cache" and "Batch Cache Operations" algorithms, kept in
 //!   memory or in a folder per key.
+//! - [`registry`]: the service worker registrations (§3.4, §8): their job queues, the Register,
+//!   Update, Install, Activate and Unregister algorithms, and the security checks of registration.
+//! - [`host`]: the registry on a thread of its own behind the message-shaped [`ServiceWorkerHost`].
 
 pub mod cache;
+pub mod host;
+pub mod registry;
+
+pub use host::{Fetch, LocalServiceWorkers, NoticeSink, ServiceWorkerBackend, ServiceWorkerHost};
 
 pub use cache::{
     BatchOp, CacheError, CacheId, CacheStorageService, CachedRequest, CachedResponse,
