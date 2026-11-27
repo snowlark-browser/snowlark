@@ -11,7 +11,8 @@ for anything important yet.
 Build:   {DATE}, revision {SHA}
 System:  Linux, 64-bit (x86-64), on a Wayland desktop (GNOME, KDE Plasma, Sway and others;
          X11 desktops through XWayland are not supported yet)
-Needs:   the system's fontconfig, FreeType, HarfBuzz, xkbcommon, Wayland client and EGL libraries
+Needs:   the system's fontconfig, FreeType, HarfBuzz, xkbcommon, Wayland client, EGL and D-Bus
+         libraries
          (installed on every desktop distribution)
 
 
@@ -25,8 +26,9 @@ through the system's OpenGL.
 Settings, history and bookmarks are at snowlark://settings, snowlark://history and
 snowlark://bookmarks. The open source software in Snowlark is listed at snowlark://credits.
 
-Not there yet on Linux: video and audio, file dialogs, dragging out of the window, saving
-passwords, the desktop's dark setting, updates.
+Not there yet on Linux: video and audio, file dialogs, dragging out of the window, updates.
+Passwords are saved only where the desktop runs a keyring (the Secret Service: GNOME Keyring,
+KWallet, KeePassXC); without one, Snowlark says so and saves none.
 
 
 Your data

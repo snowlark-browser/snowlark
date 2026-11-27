@@ -24,6 +24,8 @@
 //! programs ([`drag`]), and showing pixels from the CPU ([`Window::present`], `wl_shm` buffers). Not
 //! yet: the compositor's GPU path, drags out, fractional scales.
 
+#[path = "appearance.rs"]
+mod appearance;
 #[path = "clipboard.rs"]
 mod clipboard;
 #[path = "drag.rs"]
@@ -796,10 +798,10 @@ pub fn local_offset_ms(utc_ms: i64) -> i64 {
     }
 }
 
-/// Whether the desktop prefers dark: its setting (the desktop portal's `color-scheme`) is not read
-/// yet, so light.
+/// Whether the desktop prefers dark (the desktop portal's `color-scheme`, else GTK's setting:
+/// [`appearance`]); its windows hear [`Event::ThemeChanged`] when it changes.
 pub fn system_uses_dark_theme() -> bool {
-    false
+    appearance::prefers_dark()
 }
 
 /// The caret's blink interval: the toolkits' default (GTK's `gtk-cursor-blink-time`, 1200 ms for a
@@ -1809,6 +1811,20 @@ fn run_on(
     };
     GLOBALS.with(|s| *s.borrow_mut() = Some(g));
     clipboard::connect(conn, qh, &globals);
+    // The desktop's light or dark preference, followed on a thread of its own.
+    if let Ok((ping, source)) = make_ping() {
+        let told = state
+            .loop_handle
+            .insert_source(source, |_, _, state: &mut State| {
+                let ids: Vec<u64> = state.wins.keys().copied().collect();
+                for id in ids {
+                    state.send(id, Event::ThemeChanged);
+                }
+            });
+        if told.is_ok() {
+            appearance::watch(ping);
+        }
+    }
     let mut result = Ok(());
     while !state.done {
         if let Err(e) = event_loop.dispatch(None, &mut state) {

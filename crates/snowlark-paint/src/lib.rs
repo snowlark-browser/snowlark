@@ -58,6 +58,9 @@ pub mod compositor;
 pub mod cursors;
 #[cfg(windows)]
 pub mod demo;
+#[cfg(not(windows))]
+#[path = "linux/desktop_bus.rs"]
+mod desktop_bus;
 mod drag_data;
 #[cfg_attr(not(windows), path = "linux/drop_target.rs")]
 pub mod drop_target;

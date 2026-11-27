@@ -38,6 +38,11 @@ skia-safe = { version = "0.158", features = ["gl"] }
 smithay-client-toolkit = { version = "0.21", default-features = false, features = ["calloop", "xkbcommon"] }
 # The C library's local time (`linux/window.rs` `local_offset_ms`).
 libc = "0.2"
+# The desktop's session bus (`linux/desktop_bus.rs`): the desktop portal and the Secret Service, through
+# the system's libdbus-1 (docs/linux.md, "Decisions").
+dbus = "0.9"
+# The password store key's seal (`linux/os_crypt.rs`, AES-256-GCM; DPAPI on Windows).
+ring = "0.17"
 
 [target.'cfg(windows)'.dependencies]
 windows-core = "0.62"

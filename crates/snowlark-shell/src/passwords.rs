@@ -29,6 +29,10 @@ const PASSWORD_PREFIX: &[u8] = b"v10";
 pub trait KeyWrap: Send {
     fn wrap(&self, key: &[u8]) -> Option<Vec<u8>>;
     fn unwrap(&self, wrapped: &[u8]) -> Option<Vec<u8>>;
+    /// Why nothing can be wrapped now, if so (for the user).
+    fn unavailable(&self) -> Option<&'static str> {
+        None
+    }
 }
 
 /// The Windows Data Protection API at user scope.
@@ -40,6 +44,16 @@ impl KeyWrap for Dpapi {
     }
     fn unwrap(&self, wrapped: &[u8]) -> Option<Vec<u8>> {
         snowlark_paint::os_crypt::unprotect(wrapped)
+    }
+    fn unavailable(&self) -> Option<&'static str> {
+        use snowlark_paint::os_crypt::{available, Unavailable};
+        match available() {
+            Ok(()) => None,
+            Err(Unavailable::NoService) => {
+                Some("No keyring (Secret Service) is running on this desktop to keep it safe.")
+            }
+            Err(Unavailable::Refused) => Some("The desktop's keyring was not unlocked."),
+        }
     }
 }
 
@@ -172,6 +186,23 @@ impl PasswordStore {
             }
         }
         self.key.as_ref()
+    }
+
+    /// Why a login cannot be saved now (no key can be made or read), for the user; `None` when it
+    /// can.
+    pub fn cannot_save(&mut self) -> Option<&'static str> {
+        if self.data.key.is_empty() {
+            // (no key yet: it is made at the first save, if it can be)
+            return self.wrap.unavailable();
+        }
+        if self.key().is_some() {
+            return None;
+        }
+        Some(
+            self.wrap
+                .unavailable()
+                .unwrap_or("The key the passwords are encrypted with is not available."),
+        )
     }
 
     /// Whether the stored passwords cannot be decrypted by this user.
@@ -564,6 +595,33 @@ mod tests {
         fn unwrap(&self, w: &[u8]) -> Option<Vec<u8>> {
             (w.first() == Some(&self.0)).then(|| w[1..].iter().map(|b| b ^ self.0).collect())
         }
+    }
+
+    /// An OS with nowhere to keep a key (Linux without a Secret Service).
+    struct NoKeyring;
+    impl KeyWrap for NoKeyring {
+        fn wrap(&self, _: &[u8]) -> Option<Vec<u8>> {
+            None
+        }
+        fn unwrap(&self, _: &[u8]) -> Option<Vec<u8>> {
+            None
+        }
+        fn unavailable(&self) -> Option<&'static str> {
+            Some("No keyring.")
+        }
+    }
+
+    #[test]
+    fn a_store_with_nowhere_to_keep_its_key_says_why_and_saves_nothing() {
+        let mut s = PasswordStore::in_memory(Box::new(NoKeyring));
+        assert_eq!(s.cannot_save(), Some("No keyring."));
+        assert_eq!(s.save_login(SITE, "alice", "", "", "secret"), None);
+        assert!(s.list().is_empty());
+        // (where the key can be kept, nothing is said)
+        let mut ok = PasswordStore::in_memory(Box::new(Fake(5)));
+        assert_eq!(ok.cannot_save(), None);
+        ok.save_login(SITE, "alice", "", "", "secret").unwrap();
+        assert_eq!(ok.cannot_save(), None);
     }
 
     fn temp_file(name: &str) -> PathBuf {

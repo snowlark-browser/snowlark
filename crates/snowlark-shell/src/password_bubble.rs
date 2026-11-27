@@ -34,6 +34,8 @@ pub struct PasswordBubble {
     pub username: String,
     /// The site as the prompt names it (the host).
     pub host: String,
+    /// The login cannot be saved, for this reason: the prompt says so, with nothing to choose.
+    pub cannot_save: Option<&'static str>,
 }
 
 impl PasswordBubble {
@@ -45,6 +47,7 @@ impl PasswordBubble {
             update,
             username: username.to_owned(),
             host: host.to_owned(),
+            cannot_save: None,
         };
         b.place(area);
         b
@@ -81,6 +84,8 @@ impl PasswordBubble {
         let (a, d) = self.button_rects(fonts);
         if self.close_rect().contains(p) {
             Some(PasswordHit::Close)
+        } else if self.cannot_save.is_some() {
+            None
         } else if a.contains(p) {
             Some(PasswordHit::Accept)
         } else if d.contains(p) {
@@ -103,7 +108,9 @@ impl PasswordBubble {
         });
         b.fill_rounded_rect(r, Radii::uniform(10.0), t.bubble_border);
         b.fill_rounded_rect(r.inflate(-1.0, -1.0), Radii::uniform(9.0), t.dropdown);
-        let title = if self.update.is_some() {
+        let title = if self.cannot_save.is_some() {
+            "Password not saved"
+        } else if self.update.is_some() {
             "Update password?"
         } else {
             "Save password?"
@@ -144,6 +151,19 @@ impl PasswordBubble {
             t.text_dim,
             r.width - 36.0,
         );
+        if let Some(why) = self.cannot_save {
+            fonts.label_in(
+                b,
+                Face::Ui,
+                why,
+                r.x + 18.0,
+                r.y + 84.0,
+                13.0,
+                t.text,
+                r.width - 36.0,
+            );
+            return;
+        }
         let (accept, decline) = self.labels();
         let (a, d) = self.button_rects(fonts);
         widgets::draw_button(
@@ -199,5 +219,21 @@ mod tests {
                 Some(PasswordHit::Close)
             );
         }
+    }
+
+    /// A login that cannot be saved: the prompt only closes.
+    #[test]
+    fn a_prompt_that_cannot_save_only_closes() {
+        let f = Fonts::new(Arc::new(snowlark_paint::TextEngine::new().unwrap()));
+        let mut b = PasswordBubble::new(None, "alice", "login.example", Size::new(1000.0, 600.0));
+        b.cannot_save = Some("No keyring.");
+        let (a, d) = b.button_rects(&f);
+        assert_eq!(b.hit(Point::new(a.x + 5.0, a.y + 5.0), &f), None);
+        assert_eq!(b.hit(Point::new(d.x + 5.0, d.y + 5.0), &f), None);
+        let c = b.close_rect();
+        assert_eq!(
+            b.hit(Point::new(c.x + 5.0, c.y + 5.0), &f),
+            Some(PasswordHit::Close)
+        );
     }
 }

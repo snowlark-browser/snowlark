@@ -117,9 +117,15 @@ pub fn passwords_html(
         ),
         Some(store) => {
             if store.unreadable() {
-                message.push_str(
-                    "<p class=note>The saved passwords cannot be read by this Windows user.</p>",
-                );
+                message.push_str(if cfg!(windows) {
+                    "<p class=note>The saved passwords cannot be read by this Windows user.</p>"
+                } else {
+                    "<p class=note>The saved passwords cannot be read: the desktop's keyring does not have their key.</p>"
+                });
+            } else if let Some(why) = store.cannot_save() {
+                message.push_str("<p class=note>Passwords are not saved. ");
+                message.push_str(why);
+                message.push_str("</p>");
             }
             let words: Vec<String> = search_fold(query)
                 .split_whitespace()
@@ -396,7 +402,9 @@ mod tests {
             !passwords_html(Some(&mut on_disk), &[], None, "", false, true)
                 .contains("cannot be read")
         );
-        assert!(page.contains("The saved passwords cannot be read by this Windows user."));
+        assert!(page.contains("The saved passwords cannot be read"));
+        // (a store that can keep its key says nothing of saving; one that cannot, why)
+        assert!(!page.contains("Passwords are not saved"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

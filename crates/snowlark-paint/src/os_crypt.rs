@@ -30,6 +30,18 @@ unsafe fn take(out: CRYPT_INTEGER_BLOB) -> Vec<u8> {
     }
 }
 
+/// Why data cannot be protected (Linux's reasons: the Data Protection API is always there).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unavailable {
+    NoService,
+    Refused,
+}
+
+/// Whether data can be protected: always, on Windows.
+pub fn available() -> Result<(), Unavailable> {
+    Ok(())
+}
+
 /// `data` encrypted so that only the current Windows user on this machine can decrypt it.
 pub fn protect(data: &[u8]) -> Option<Vec<u8>> {
     let input = blob(data);

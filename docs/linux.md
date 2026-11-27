@@ -41,9 +41,10 @@ menus and the internal pages, composited on the CPU. `snowlark-tab` and `snowlar
 pass their tests but those that need a Windows window, a GPU device, the password store's key or shared video
 textures. The window has the desktop's clipboard (text and markup, both ways), the desktop's cursors and more
 windows (new and Incognito windows, undocked developer tools, popups), input methods (text-input-v3) and drops
-from other programs (files, links, text). Not there yet in the window: file dialogs, drags out of the window,
-the input method's candidate position, the desktop's dark setting, the password store (no key: Linux's Secret Service is
-not used yet, so no password is saved), updates (releases there are not signed). The chrome's icons are Unicode symbols where Windows' icon font is missing. The profile is
+from other programs (files, links, text), the desktop's dark setting (the portal's, else GTK's) and the password store's
+key from the Secret Service (without one no password is saved, and the prompt and the passwords page say why). Not there
+yet in the window: file dialogs, drags out of the window, the input method's candidate position, updates (releases
+there are not signed). The chrome's icons are Unicode symbols where Windows' icon font is missing. The profile is
 `~/.config/snowlark` (`XDG_CONFIG_HOME`). What is missing behaves as on a system without it: a media element fails with
 `MEDIA_ERR_SRC_NOT_SUPPORTED`, `MediaSource` cannot attach, canvases draw on the CPU, and HTML's "PDF viewer supported" is false (so `navigator.pdfViewerEnabled` is false and
 `navigator.plugins` empty).
@@ -88,7 +89,7 @@ slower.
 
 ```sh
 apt-get install -y build-essential clang lld pkg-config curl ca-certificates git python3 cmake ninja-build \
-    libfontconfig-dev libfreetype-dev libharfbuzz-dev libwayland-dev libxkbcommon-dev \
+    libfontconfig-dev libfreetype-dev libharfbuzz-dev libwayland-dev libxkbcommon-dev libdbus-1-dev \
     fonts-liberation fonts-dejavu-core fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal \
     --default-toolchain stable -c rustfmt -c clippy
@@ -208,8 +209,13 @@ releases; a machine without network access builds it from source, which needs `p
   library) or says what is missing. Not yet: drags out (no platform has them yet), fractional scales, the
   compositor's GPU path.
 - `vsync`: begin frames from a timer at the refresh interval on a fixed timebase (the window's own frames
-  follow the desktop's frame callbacks); `os_crypt`: nothing can be protected yet (the Secret Service is not
-  used); `drop_target`: the drag types (the window's `drag` module takes drops).
+  follow the desktop's frame callbacks); `os_crypt`: a secret the Secret Service keeps (an item of the default
+  collection, `application: snowlark`, `purpose: safe-storage`, made once with 32 random bytes; the collection
+  unlocked or made through the keyring's prompt) seals data with AES-256-GCM under its SHA-256; without a
+  Secret Service nothing is protected and `available()` says why; `drop_target`: the drag types (the window's
+  `drag` module takes drops). The session bus is reached through the system's libdbus-1 (`dbus` crate,
+  `desktop_bus.rs`); the dark setting is the desktop portal's `org.freedesktop.appearance` `color-scheme`,
+  followed through `SettingChanged` on a thread of its own, else GTK's (`GTK_THEME`, `settings.ini`).
 
 - `compositor`: the window's compositor on the CPU, with the Windows half's `Compositor` and `ContentPass`: each
   frame is the whole client area (the chrome in its top rows), drawn with Skia's CPU backend (tiles copied, tiles
@@ -269,7 +275,7 @@ Sizes: **S** is days, **M** one to two weeks, **L** several weeks of work.
 | Sandbox | (M6 of `docs/process-isolation.md`: Windows not started either) | restricted token, job, mitigations | user, PID and network namespaces plus a seccomp-bpf syscall filter on every renderer; files and fonts reach the renderer only as descriptors from the browser | `seccompiler` (Firecracker's BPF compiler), `rustix` for namespaces; the font path needs a broker | L |
 | Crash dumps | `win/crash_dump.rs` | `MiniDumpWriteDump` | minidumps written by a handler process through `ptrace` | `minidump-writer` and `crash-handler` (Rust, from the Sentry/Mozilla crash tooling) | M |
 | Profile folder | `snowlark-shell` `profile.rs` | `%LOCALAPPDATA%` | `$XDG_CONFIG_HOME/snowlark` for settings, `$XDG_DATA_HOME`, `$XDG_CACHE_HOME` for caches | `dirs` or a few lines of std | S |
-| Password store key | `snowlark-paint` `os_crypt.rs` | DPAPI | the Secret Service over D-Bus (GNOME Keyring, KWallet); without one, a key in the profile, said so in the UI | `secret-service` or `oo7` (Rust, D-Bus) | S |
+| Password store key | `snowlark-paint` `os_crypt.rs` | DPAPI | the Secret Service over D-Bus (GNOME Keyring, KWallet); without one, no password is saved, said so in the UI | the `dbus` crate over the system's libdbus-1 (chosen) | S |
 | Files written in place | shell `restore.rs`, `profile.rs` (`OpenOptionsExt`) | share modes | `rename` over the old file; `flock` | std | S |
 | Open a download | shell `downloads_ui.rs` (`CommandExt`) | `ShellExecute`, Explorer | `xdg-open`, the FileManager1 D-Bus interface to show it in its folder | std `Command`; `zbus` | S |
 | PDF viewer | `snowlark-paint` `pdf.rs` | `Windows.Data.Pdf` | PDFium | `pdfium-render` (PDFium as a shared library); `hayro` (Rust, young) | M |
@@ -332,6 +338,9 @@ before Linux builds are offered to users, as on Windows.
 6. **Packaging: a `.tar.gz` preview first** (unpack and run, with the same signed update check as the Windows
    zip), Flatpak after it, distribution packages (deb, rpm) later.
 7. **DRM on Linux: none** for now.
+8. **D-Bus through the system's libdbus-1** (the `dbus` crate), for the desktop portal and the Secret Service:
+   every Linux desktop has it, and it is what other browsers link. A password store with no Secret Service saves no
+   passwords (and says why) rather than keep its key where any program of the user could read it.
 
 Each new large dependency these bring (Skia, FreeType, HarfBuzz, fontconfig, FFmpeg) is added in the stage that
 needs it.

@@ -78,7 +78,9 @@ impl Browser {
             .and_then(|u| u.host_str().map(str::to_owned))
             .unwrap_or_else(|| p.origin.clone());
         let area = self.content_dips();
-        self.password_bubble = Some((PasswordBubble::new(update, &p.username, &host, area), p));
+        let mut bubble = PasswordBubble::new(update, &p.username, &host, area);
+        bubble.cannot_save = store.lock().unwrap().cannot_save();
+        self.password_bubble = Some((bubble, p));
         self.overlay_dirty = true;
     }
 
