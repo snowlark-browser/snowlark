@@ -32,7 +32,7 @@ use url::Url;
 
 use crate::config::{resolve_host, NetConfig, TlsTrust};
 use crate::headers::{isomorphic_decode, isomorphic_encode, HeaderList};
-use crate::response::{ConnectionInfo, FetchTiming, NetError, NetErrorKind};
+use crate::response::{CertVerifier, ConnectionInfo, FetchTiming, NetError, NetErrorKind, TlsInfo};
 
 type ReqBody = Full<Bytes>;
 
@@ -87,11 +87,11 @@ struct PoolKey {
 struct Idle {
     sender: http1::SendRequest<ReqBody>,
     since: Instant,
-    tls_version: Option<String>,
+    tls_info: Option<Arc<TlsInfo>>,
 }
 
 struct Pool {
-    h2: Option<(http2::SendRequest<ReqBody>, Option<String>)>,
+    h2: Option<(http2::SendRequest<ReqBody>, Option<Arc<TlsInfo>>)>,
     idle: Vec<Idle>,
     permits: Arc<Semaphore>,
     /// Requests waiting for a slot under the limit, for [`Transport::pool_report`].
@@ -107,11 +107,11 @@ enum Conn {
     H1 {
         sender: http1::SendRequest<ReqBody>,
         permit: OwnedSemaphorePermit,
-        tls_version: Option<String>,
+        tls_info: Option<Arc<TlsInfo>>,
     },
     H2 {
         sender: http2::SendRequest<ReqBody>,
-        tls_version: Option<String>,
+        tls_info: Option<Arc<TlsInfo>>,
     },
 }
 
@@ -143,7 +143,7 @@ pub(crate) struct H1Return {
     key: PoolKey,
     sender: http1::SendRequest<ReqBody>,
     _permit: OwnedSemaphorePermit,
-    tls_version: Option<String>,
+    tls_info: Option<Arc<TlsInfo>>,
 }
 
 impl H1Return {
@@ -157,7 +157,7 @@ impl H1Return {
             pool.idle.push(Idle {
                 sender: self.sender,
                 since: Instant::now(),
-                tls_version: self.tls_version,
+                tls_info: self.tls_info,
             });
         }
     }
@@ -181,6 +181,8 @@ pub(crate) struct Transport {
     tls_http1: tokio_rustls::TlsConnector,
     pools: Mutex<HashMap<PoolKey, Pool>>,
     config: Arc<NetConfig>,
+    /// What verifies the servers' certificate chains, as each connection's [`TlsInfo`] says.
+    verifier: CertVerifier,
 }
 
 /// A TLS stream on which the peer closing the connection without a `close_notify` alert reads as the
@@ -372,11 +374,17 @@ impl Transport {
             .map_err(|e| NetError::new(NetErrorKind::Tls, format!("TLS setup failed: {e}")))?;
         let mut http1 = (*tls).clone();
         http1.alpn_protocols = vec![b"http/1.1".to_vec()];
+        let verifier = match &config.tls {
+            TlsTrust::Platform => CertVerifier::System,
+            TlsTrust::PlatformWithExtraRoots(_) => CertVerifier::SystemWithExtraRoots,
+            TlsTrust::Custom(_) => CertVerifier::Custom,
+        };
         Ok(Arc::new(Transport {
             tls: tokio_rustls::TlsConnector::from(tls),
             tls_http1: tokio_rustls::TlsConnector::from(Arc::new(http1)),
             pools: Mutex::new(HashMap::new()),
             config,
+            verifier,
         }))
     }
 
@@ -446,7 +454,7 @@ impl Transport {
                 if !sender.is_closed() {
                     return Ok(Conn::H2 {
                         sender: sender.clone(),
-                        tls_version: tls.clone(),
+                        tls_info: tls.clone(),
                     });
                 }
                 pool.h2 = None;
@@ -466,7 +474,7 @@ impl Transport {
                     if !sender.is_closed() {
                         return Ok(Conn::H2 {
                             sender: sender.clone(),
-                            tls_version: tls.clone(),
+                            tls_info: tls.clone(),
                         });
                     }
                 }
@@ -511,7 +519,7 @@ impl Transport {
                     return Ok(Conn::H1 {
                         sender: idle.sender,
                         permit,
-                        tls_version: idle.tls_version,
+                        tls_info: idle.tls_info,
                     })
                 }
                 _ => continue,
@@ -600,7 +608,7 @@ impl Transport {
             return Ok(Conn::H1 {
                 sender,
                 permit,
-                tls_version: None,
+                tls_info: None,
             });
         }
         let host = key
@@ -635,7 +643,7 @@ impl Transport {
         // (the TLS handshake is part of connecting: connectEnd is after it)
         timing.connect_end = Some(Instant::now());
         let (_, session) = tls.get_ref();
-        let tls_version = session.protocol_version().map(|v| format!("{v:?}"));
+        let tls_info = Some(Arc::new(TlsInfo::of(session, self.verifier)));
         let h2 = session.alpn_protocol() == Some(b"h2");
         if h2 {
             let (sender, conn) = http2::Builder::new(TokioExecutor::new())
@@ -649,12 +657,9 @@ impl Transport {
             drop(permit);
             let mut pools = self.pools.lock().unwrap();
             if let Some(pool) = pools.get_mut(key) {
-                pool.h2 = Some((sender.clone(), tls_version.clone()));
+                pool.h2 = Some((sender.clone(), tls_info.clone()));
             }
-            return Ok(Conn::H2 {
-                sender,
-                tls_version,
-            });
+            return Ok(Conn::H2 { sender, tls_info });
         }
         if let Some(pool) = self.pools.lock().unwrap().get_mut(key) {
             pool.known_http1 = true;
@@ -671,7 +676,7 @@ impl Transport {
         Ok(Conn::H1 {
             sender,
             permit,
-            tls_version,
+            tls_info,
         })
     }
 
@@ -684,14 +689,14 @@ impl Transport {
             Ok(Conn::H1 {
                 sender,
                 permit,
-                tls_version,
-            }) => self.pool_idle(&key, sender, permit, tls_version),
+                tls_info,
+            }) => self.pool_idle(&key, sender, permit, tls_info),
             Err(new) => match self.connect(&key, new, &mut FetchTiming::default()).await {
                 Ok(Conn::H1 {
                     sender,
                     permit,
-                    tls_version,
-                }) => self.pool_idle(&key, sender, permit, tls_version),
+                    tls_info,
+                }) => self.pool_idle(&key, sender, permit, tls_info),
                 // (an HTTP/2 connection is pooled as it is set up)
                 Ok(Conn::H2 { .. }) | Err(_) => {}
             },
@@ -703,13 +708,13 @@ impl Transport {
         key: &PoolKey,
         sender: http1::SendRequest<ReqBody>,
         permit: OwnedSemaphorePermit,
-        tls_version: Option<String>,
+        tls_info: Option<Arc<TlsInfo>>,
     ) {
         if let Some(pool) = self.pools.lock().unwrap().get_mut(key) {
             pool.idle.push(Idle {
                 sender,
                 since: Instant::now(),
-                tls_version,
+                tls_info,
             });
         }
         drop(permit);
@@ -757,8 +762,8 @@ impl Transport {
                 format!("TLS handshake with {host} failed: {e}"),
             )
         })?;
-        let tls_version = tls.get_ref().1.protocol_version().map(|v| format!("{v:?}"));
-        self.upgrade_over(UncleanCloseIsEof(tls), req, slot, tls_version, timing)
+        let tls_info = Some(Arc::new(TlsInfo::of(tls.get_ref().1, self.verifier)));
+        self.upgrade_over(UncleanCloseIsEof(tls), req, slot, tls_info, timing)
             .await
     }
 
@@ -767,7 +772,7 @@ impl Transport {
         io: T,
         req: &WireRequest,
         slot: &UpgradeSlot,
-        tls_version: Option<String>,
+        tls_info: Option<Arc<TlsInfo>>,
         mut timing: FetchTiming,
     ) -> Result<WireResponse, NetError>
     where
@@ -807,11 +812,7 @@ impl Transport {
             reason,
             headers,
             body: resp.into_body(),
-            connection: ConnectionInfo {
-                protocol: "http/1.1".into(),
-                tls_version,
-                reused: false,
-            },
+            connection: ConnectionInfo::new("http/1.1", tls_info, false),
             release: None,
             timing,
         })
@@ -832,16 +833,7 @@ impl Transport {
                         .await?,
                     false,
                 ),
-                Ok(Conn::H2 {
-                    sender,
-                    tls_version,
-                }) => (
-                    Conn::H2 {
-                        sender,
-                        tls_version,
-                    },
-                    true,
-                ),
+                Ok(Conn::H2 { sender, tls_info }) => (Conn::H2 { sender, tls_info }, true),
                 Err(new) => (self.connect(&key, new, &mut timing).await?, false),
             };
             let timeout = self.config.response_timeout;
@@ -854,7 +846,7 @@ impl Transport {
             match conn {
                 Conn::H2 {
                     mut sender,
-                    tls_version,
+                    tls_info,
                 } => {
                     let request = build_request(req, true)?;
                     timing.request_start = Some(Instant::now());
@@ -868,11 +860,7 @@ impl Transport {
                                 reason,
                                 headers,
                                 body: resp.into_body(),
-                                connection: ConnectionInfo {
-                                    protocol: "h2".into(),
-                                    tls_version,
-                                    reused,
-                                },
+                                connection: ConnectionInfo::new("h2", tls_info, reused),
                                 timing,
                                 release: None,
                             });
@@ -889,7 +877,7 @@ impl Transport {
                 Conn::H1 {
                     mut sender,
                     permit,
-                    tls_version,
+                    tls_info,
                 } => {
                     let request = build_request(req, false)?;
                     timing.request_start = Some(Instant::now());
@@ -907,18 +895,18 @@ impl Transport {
                                 reason,
                                 headers,
                                 body: resp.into_body(),
-                                connection: ConnectionInfo {
-                                    protocol: "http/1.1".into(),
-                                    tls_version: tls_version.clone(),
+                                connection: ConnectionInfo::new(
+                                    "http/1.1",
+                                    tls_info.clone(),
                                     reused,
-                                },
+                                ),
                                 timing,
                                 release: Some(H1Return {
                                     transport: self.clone(),
                                     key: key.clone(),
                                     sender,
                                     _permit: permit,
-                                    tls_version,
+                                    tls_info,
                                 }),
                             });
                         }

@@ -480,6 +480,7 @@ impl Browser {
             passwords_verified_ms: None,
             passwords_notice: None,
             off_the_record,
+            certificates: Default::default(),
         }));
         // (content blocking: the windows' one, `App::new`)
         let blocker = app.blocker.clone();

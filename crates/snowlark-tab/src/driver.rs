@@ -92,6 +92,8 @@ pub enum InternalKind {
     Downloads,
     /// The saved passwords page.
     Passwords,
+    /// The certificate viewer.
+    Certificate,
     /// Not one of those (an address the browser has no page at, or another scheme).
     Other,
 }

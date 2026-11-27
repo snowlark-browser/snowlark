@@ -44,9 +44,85 @@ impl ResponseType {
 pub struct ConnectionInfo {
     /// "http/1.1", "h2", or "" for non-network responses.
     pub protocol: String,
-    /// "TLSv1_3" etc. for https.
-    pub tls_version: Option<String>,
     pub reused: bool,
+    /// The TLS session of an https response, with the server's certificate chain: for the browser's
+    /// own use (the site information panel, the trace). It never crosses to a renderer, which has
+    /// no use for it.
+    #[serde(skip)]
+    pub tls: Option<std::sync::Arc<TlsInfo>>,
+}
+
+impl ConnectionInfo {
+    /// A response's connection: its protocol, its TLS session (https), and whether it was reused.
+    pub(crate) fn new(
+        protocol: &str,
+        tls: Option<std::sync::Arc<TlsInfo>>,
+        reused: bool,
+    ) -> ConnectionInfo {
+        ConnectionInfo {
+            protocol: protocol.to_owned(),
+            reused,
+            tls,
+        }
+    }
+
+    /// "TLSv1_3" etc. for an https response (in the browser's half).
+    pub fn tls_version(&self) -> Option<&str> {
+        self.tls.as_deref().map(|t| t.version.as_str())
+    }
+}
+
+/// A TLS session as the browser shows it: what was negotiated, and the certificate chain the server
+/// presented, which the connection's verifier accepted (a connection whose chain is refused is never
+/// made, so every `TlsInfo` is of a verified chain).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TlsInfo {
+    /// "TLSv1_3", "TLSv1_2".
+    pub version: String,
+    /// The cipher suite's IANA name ("TLS13_AES_128_GCM_SHA256").
+    pub cipher_suite: String,
+    /// The key exchange group ("X25519", "X25519MLKEM768"), when the version names one.
+    pub key_exchange: Option<String>,
+    /// The certificates the server sent, DER, the server's own first, then the intermediates in the
+    /// order sent (RFC 8446 §4.4.2). The root the verifier found in its store is not among them.
+    pub certificates: Vec<Vec<u8>>,
+    /// What verified the chain.
+    pub verifier: CertVerifier,
+}
+
+/// What verified a connection's certificate chain.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CertVerifier {
+    /// The operating system's verifier and certificate store.
+    System,
+    /// The operating system's, with extra roots the configuration added (a test server's CA).
+    SystemWithExtraRoots,
+    /// A configuration of the embedder's own (tests).
+    Custom,
+}
+
+impl TlsInfo {
+    /// The session of a connection whose handshake completed.
+    pub(crate) fn of(session: &rustls::ClientConnection, verifier: CertVerifier) -> TlsInfo {
+        TlsInfo {
+            version: session
+                .protocol_version()
+                .map(|v| format!("{v:?}"))
+                .unwrap_or_default(),
+            cipher_suite: session
+                .negotiated_cipher_suite()
+                .map(|s| format!("{:?}", s.suite()))
+                .unwrap_or_default(),
+            key_exchange: session
+                .negotiated_key_exchange_group()
+                .map(|g| format!("{:?}", g.name())),
+            certificates: session
+                .peer_certificates()
+                .map(|chain| chain.iter().map(|c| c.as_ref().to_vec()).collect())
+                .unwrap_or_default(),
+            verifier,
+        }
+    }
 }
 
 /// Fetch's "fetch timing info" (Fetch §2.2.5) as far as the network layer measures it, in monotonic

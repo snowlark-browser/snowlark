@@ -27,6 +27,12 @@ serde ={ version = "1", features = ["derive"] }
 serde_json = "1"
 # (an update's SHA-256)
 sha2 = "0.10"
+# (the certificate viewer: X.509 certificates read, with the names of their OIDs)
+x509-cert = { version = "0.2", default-features = false, features = ["std"] }
+const-oid = { version = "0.9", features = ["db"] }
 
 [dev-dependencies]
 postcard = { version = "1", default-features = false, features = ["use-std"] }
+# (a local https server for the certificate chain's tests)
+rcgen = "0.13"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

@@ -98,6 +98,8 @@ pub(crate) mod glyph {
     /// expand buttons).
     pub const PANE_ARROW_LEFT: char = '\u{E8A0}';
     pub const PANE_ARROW_RIGHT: char = '\u{E89F}';
+    /// A certificate (the site information panel's "Certificate is valid").
+    pub const CERTIFICATE: char = '\u{EB95}';
 
     /// The Unicode symbol drawn for an icon where the icon font is missing (on Linux), found by the
     /// text engine's fallback among the system's fonts (the lock and the shield only in colour
@@ -151,6 +153,7 @@ pub(crate) mod glyph {
             MUTE => '\u{2298}',
             PANE_ARROW_LEFT => '\u{21E4}',
             PANE_ARROW_RIGHT => '\u{21E5}',
+            CERTIFICATE => '\u{2399}',
             other => other,
         }
     }
@@ -203,6 +206,7 @@ pub(crate) mod glyph {
             MUTE,
             PANE_ARROW_LEFT,
             PANE_ARROW_RIGHT,
+            CERTIFICATE,
         ];
         for c in all {
             assert!(

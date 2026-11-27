@@ -40,6 +40,8 @@ pub struct InternalState {
     pub passwords_notice: Option<String>,
     /// An Incognito window's pages: its new tab page is the Incognito one.
     pub off_the_record: bool,
+    /// The certificate chains the site information panel opened the certificate viewer for.
+    pub certificates: crate::cert_viewer::Chains,
 }
 
 /// The browser's own pages, made from `state` (and the cookie store for the sites with data, and
@@ -81,6 +83,8 @@ impl BrowserPages {
             InternalKind::Downloads
         } else if crate::passwords_page::is_passwords_url(url) {
             InternalKind::Passwords
+        } else if crate::cert_viewer::is_certificate_url(url) {
+            InternalKind::Certificate
         } else {
             InternalKind::Other
         }
@@ -110,10 +114,22 @@ impl BrowserPages {
             InternalKind::Bookmarks => crate::bookmarks_page::shown_url(url),
             InternalKind::Downloads => crate::downloads_page::shown_url(url),
             InternalKind::Passwords => crate::passwords_page::shown_url(url),
-            InternalKind::Other => url.clone(),
+            InternalKind::Certificate | InternalKind::Other => url.clone(),
         };
         let html = match Self::kind_of(&shown) {
             InternalKind::Other => None,
+            InternalKind::Certificate => {
+                let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+                let (id, tab, chosen) = crate::cert_viewer::view_of(&shown);
+                Some(crate::cert_viewer::certificate_html(
+                    id.and_then(|id| st.certificates.get(id)),
+                    id.unwrap_or(0),
+                    tab,
+                    chosen,
+                    st.dark,
+                    &window::local_offset_ms,
+                ))
+            }
             InternalKind::Credits => {
                 let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
                 Some(crate::credits::credits_html(&st.settings, st.dark))

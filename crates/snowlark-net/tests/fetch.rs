@@ -714,6 +714,44 @@ fn http2_requests_carry_no_connection_specific_fields() {
     }
 }
 
+/// Each https response carries its connection's TLS session: the chain the server presented, which
+/// the verifier accepted, on a new connection and on one reused from the pool, over HTTP/1.1 and
+/// HTTP/2; an http response carries none.
+#[test]
+fn responses_carry_the_verified_certificate_chain() {
+    let certs = test_certs();
+    let sent: Vec<Vec<u8>> = certs.chain.iter().map(|c| c.as_ref().to_vec()).collect();
+    assert!(!sent.is_empty());
+    for alpn in [&b"http/1.1"[..], &b"h2"[..]] {
+        let server = TestServer::start_tls(server_tls(&certs, &[alpn]), |_| TestResponse::ok("ok"));
+        let net = net(Some(client_trust(&certs)));
+        for reused in [false, true] {
+            let r = net
+                .client()
+                .fetch(Request::navigation(url(&format!(
+                    "https://a.test:{}/",
+                    server.port()
+                ))))
+                .read_all()
+                .unwrap();
+            let c = &r.head.connection;
+            assert_eq!(c.reused, reused, "{alpn:?}");
+            let tls = c.tls.as_deref().expect("an https response's TLS session");
+            assert_eq!(tls.certificates, sent, "{alpn:?}");
+            assert_eq!(tls.verifier, snowlark_net::CertVerifier::Custom);
+            assert_eq!(c.tls_version(), Some(tls.version.as_str()));
+            assert!(tls.cipher_suite.starts_with("TLS"), "{}", tls.cipher_suite);
+        }
+    }
+    let plain = TestServer::start(|_| TestResponse::ok("ok"));
+    let r = net(None)
+        .client()
+        .fetch(Request::navigation(url(&plain.url("/"))))
+        .read_all()
+        .unwrap();
+    assert!(r.head.connection.tls.is_none());
+}
+
 #[test]
 fn http1_over_tls_and_certificate_errors() {
     let certs = test_certs();
@@ -730,7 +768,7 @@ fn http1_over_tls_and_certificate_errors() {
         .read_all()
         .unwrap();
     assert_eq!(r.head.connection.protocol, "http/1.1");
-    assert!(r.head.connection.tls_version.is_some());
+    assert!(r.head.connection.tls_version().is_some());
     // a host the certificate doesn't name
     let err = net
         .client()

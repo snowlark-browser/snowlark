@@ -33,6 +33,7 @@ pub mod bookmarks_page;
 pub mod browser;
 #[cfg_attr(not(windows), path = "cdm_none.rs")]
 pub mod cdm;
+pub mod cert_viewer;
 pub mod chrome;
 pub mod clear_data;
 pub mod composite;

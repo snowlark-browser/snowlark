@@ -13,7 +13,7 @@ use snowlark_paint::Point;
 use super::commands::{Command, DialogKind};
 use super::Browser;
 use crate::dialog::Dialog;
-use crate::site_info::{SiteHit, SiteInfo};
+use crate::site_info::{Page, SiteHit, SiteInfo};
 use crate::tab::TabCommand;
 
 /// The site of a host: its registrable domain ("wikipedia.org" for "www.wikipedia.org").
@@ -32,6 +32,7 @@ impl Browser {
         };
         let url = e.tab.state.url.clone();
         let error_page = e.tab.state.error_page;
+        let tls = e.tab.tls().cloned();
         let host = snowlark_net::Url::parse(&url)
             .ok()
             .and_then(|u| u.host_str().map(str::to_owned))
@@ -46,6 +47,7 @@ impl Browser {
         self.site_info = Some(SiteInfo::new(
             &url,
             error_page,
+            tls,
             cookies,
             x,
             self.content_dips(),
@@ -93,6 +95,15 @@ impl Browser {
         let host = s.host.clone();
         match s.hit(cp, &self.fonts) {
             Some(SiteHit::Close) => self.close_site_info(),
+            Some(SiteHit::Connection) => self.site_info_page(Page::Security),
+            Some(SiteHit::Back) => self.site_info_page(Page::Main),
+            Some(SiteHit::Certificate) => {
+                let tls = s.tls.clone();
+                self.close_site_info();
+                if let Some(tls) = tls {
+                    self.open_certificate(&host, tls);
+                }
+            }
             Some(SiteHit::Clear) => {
                 self.close_site_info();
                 self.confirm_clear(Some(host));
@@ -105,6 +116,29 @@ impl Browser {
         }
         self.swallow_release = true;
         true
+    }
+
+    /// Turns the panel to `page`.
+    fn site_info_page(&mut self, page: Page) {
+        if let Some(s) = &mut self.site_info {
+            s.show(page, &self.fonts);
+            self.overlay_dirty = true;
+            self.chrome_dirty = true;
+        }
+    }
+
+    /// Opens the certificate viewer for `host`'s verified chain in a new tab next to the page
+    /// (the browser's own pages are tabs).
+    fn open_certificate(&mut self, host: &str, tls: std::sync::Arc<snowlark_net::TlsInfo>) {
+        let page = self
+            .internal
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .certificates
+            .add(host, tls);
+        if let Ok(u) = snowlark_net::Url::parse(&page) {
+            self.open_tab(u, crate::tabs::Placement::Foreground);
+        }
     }
 
     /// Asks before clearing the data of `site` (a host), or of every site.

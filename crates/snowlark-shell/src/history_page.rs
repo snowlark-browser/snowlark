@@ -139,7 +139,7 @@ const MONTHS: [&str; 12] = [
 ];
 
 /// "Thursday, November 12, 2026".
-fn friendly_date(day: i64) -> String {
+pub(crate) fn friendly_date(day: i64) -> String {
     let (y, m, d) = civil_from_days(day);
     format!(
         "{}, {} {d}, {y}",
@@ -165,7 +165,7 @@ pub fn day_title(day: i64, today: i64) -> String {
 }
 
 /// "3:45 PM" for a local time in milliseconds.
-fn time_of_day(local_ms: i64) -> String {
+pub(crate) fn time_of_day(local_ms: i64) -> String {
     let mins = local_ms.rem_euclid(86_400_000) / 60_000;
     let (h, m) = (mins / 60, mins % 60);
     let h12 = if h % 12 == 0 { 12 } else { h % 12 };

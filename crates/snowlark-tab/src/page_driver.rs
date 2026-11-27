@@ -1732,7 +1732,7 @@ mod tests {
                         InternalKind::Bookmarks => Some("<title>Bookmarks</title>"),
                         InternalKind::Downloads => Some("<title>Downloads</title>"),
                         InternalKind::Passwords => Some("<title>Passwords</title>"),
-                        InternalKind::Other => None,
+                        InternalKind::Certificate | InternalKind::Other => None,
                     };
                     InternalAnswer::Page {
                         html: html.map(str::to_owned),

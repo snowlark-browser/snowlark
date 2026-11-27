@@ -258,6 +258,10 @@ pub struct TabHost {
     view: Option<Option<snowlark_tab::renderer_process::ViewHandle>>,
     /// A view's renderer process: its opener's ([`TabHost::view`]).
     view_process: Option<Arc<snowlark_ipc::Process>>,
+    /// The TLS session (the verified certificate chain) of the response the top level's document
+    /// was made from, with that response's URL: taken from the navigation's response and kept
+    /// here, never asked of the renderer.
+    tls: Option<(Url, Arc<snowlark_net::TlsInfo>)>,
 }
 
 /// A navigation that commits in a renderer the tab does not have yet: the new renderer's site,
@@ -429,6 +433,7 @@ impl TabHost {
             swap: None,
             view: None,
             view_process: None,
+            tls: None,
         }
     }
 
@@ -872,9 +877,15 @@ impl TabHost {
     }
 
     /// Commits a fetched response in the tab's renderer: the entry, then the body handed over.
-    fn commit_fetched(&mut self, nav: Navigation, head: ResponseHead) {
+    fn commit_fetched(&mut self, nav: Navigation, mut head: ResponseHead) {
         self.commit_entry(&nav, head.url());
         self.http_error = head.status >= 400;
+        // (the session is the browser's: the renderer gets the head without it)
+        self.tls = head
+            .connection
+            .tls
+            .take()
+            .map(|t| (head.url().cloned().unwrap_or_else(|| nav.url.clone()), t));
         let body = self.hand_over(nav.stream);
         let view_source = nav.view_source.then(|| nav.url.clone());
         self.send(TabCommand::Commit(Box::new(Commit {
@@ -899,6 +910,7 @@ impl TabHost {
     /// (`NavigationRequest::OnRequestFailedInternal`, `CommitErrorPage`).
     fn fail(&mut self, nav: Navigation, error: snowlark_net::NetError) {
         self.commit_entry(&nav, None);
+        self.tls = None;
         let view_source = nav.view_source.then(|| nav.url.clone());
         self.send(TabCommand::Commit(Box::new(Commit {
             navigation: nav.number,
@@ -954,6 +966,18 @@ impl TabHost {
             Some(p) => Some(p.hand_over(stream)),
             None => self.net.as_ref().and_then(|n| n.hand_over(stream)),
         }
+    }
+
+    /// The TLS session the shown document's response came over, with the certificate chain the
+    /// network verified: while the tab shows a URL of that response's origin (a same-document
+    /// navigation keeps it), and never for an error page or a page the renderer made itself.
+    pub fn tls(&self) -> Option<&Arc<snowlark_net::TlsInfo>> {
+        let (url, tls) = self.tls.as_ref()?;
+        if self.state.error_page {
+            return None;
+        }
+        let shown = Url::parse(&self.state.url).ok()?;
+        (shown.scheme() == "https" && shown.origin() == url.origin()).then_some(tls)
     }
 
     /// Whether a navigation the host began is not decided on yet (its response is awaited).
@@ -1793,6 +1817,164 @@ mod tests {
             &head(200, &[("content-disposition", "inline; filename=x")]),
             "text/html"
         ));
+    }
+
+    /// A local https server for `a.test` (and `b.test`) with a certificate a test CA issued: the
+    /// chain it presents (leaf, CA), the network's trust in that CA, and its port. It answers every
+    /// connection with a small page.
+    fn tls_server() -> (Vec<Vec<u8>>, snowlark_net::TlsTrust, u16) {
+        use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, KeyPair};
+        use rustls::pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer};
+        use std::io::{Read, Write};
+        let ca_key = KeyPair::generate().unwrap();
+        let mut ca = CertificateParams::new(Vec::<String>::new()).unwrap();
+        ca.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        ca.distinguished_name
+            .push(DnType::CommonName, "Snowlark Test CA");
+        let ca = ca.self_signed(&ca_key).unwrap();
+        let key = KeyPair::generate().unwrap();
+        let mut leaf = CertificateParams::new(vec!["a.test".into(), "b.test".into()]).unwrap();
+        leaf.distinguished_name.push(DnType::CommonName, "a.test");
+        leaf.distinguished_name
+            .push(DnType::OrganizationName, "Snowlark Tests");
+        let leaf = leaf.signed_by(&key, &ca, &ca_key).unwrap();
+        let chain = vec![leaf.der().clone(), ca.der().clone()];
+        let provider = Arc::new(rustls::crypto::ring::default_provider());
+        let server = Arc::new(
+            rustls::ServerConfig::builder_with_provider(provider.clone())
+                .with_safe_default_protocol_versions()
+                .unwrap()
+                .with_no_client_auth()
+                .with_single_cert(
+                    chain.clone(),
+                    PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key.serialize_der())),
+                )
+                .unwrap(),
+        );
+        let mut roots = rustls::RootCertStore::empty();
+        roots.add(ca.der().clone()).unwrap();
+        let client = rustls::ClientConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for tcp in listener.incoming().flatten() {
+                let server = server.clone();
+                std::thread::spawn(move || {
+                    let conn = rustls::ServerConnection::new(server).unwrap();
+                    let mut s = rustls::StreamOwned::new(conn, tcp);
+                    let mut got = Vec::new();
+                    let mut buf = [0u8; 1024];
+                    while !got.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match s.read(&mut buf) {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => got.extend_from_slice(&buf[..n]),
+                        }
+                    }
+                    let _ = s.write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi",
+                    );
+                    s.conn.send_close_notify();
+                    let _ = s.flush();
+                });
+            }
+        });
+        (
+            chain.iter().map(|c| c.as_ref().to_vec()).collect(),
+            snowlark_net::TlsTrust::Custom(Arc::new(client)),
+            port,
+        )
+    }
+
+    /// The network's verified chain reaches the browser half with the navigation's response: the
+    /// host keeps it for the document it commits (for the site information panel) while the tab
+    /// shows that origin, and the renderer's copy of the head has none.
+    #[test]
+    fn the_certificate_chain_stays_with_the_browser() {
+        let (chain, trust, port) = tls_server();
+        let net = snowlark_net::NetThread::start(snowlark_net::NetConfig {
+            tls: trust,
+            host_rules: snowlark_net::HostRule::parse_list("MAP *.test 127.0.0.1"),
+            ..snowlark_net::NetConfig::default()
+        })
+        .unwrap();
+        let (mut h, rx, events) = host_with_net(&net);
+        assert!(h.tls().is_none());
+        let url = u(&format!("https://a.test:{port}/page"));
+        h.navigate(url.clone());
+        decide(&mut h, &events);
+        let c = committed(&rx);
+        let CommitResponse::Fetched { head } = &c.params.response else {
+            panic!("not fetched: {:?}", c.params.response);
+        };
+        assert!(head.connection.tls.is_none(), "the renderer's head");
+        let tls = h.tls().expect("the document's TLS session").clone();
+        assert_eq!(tls.certificates, chain);
+        assert_eq!(tls.verifier, snowlark_net::CertVerifier::Custom);
+        // (what the viewer reads of it)
+        let leaf = crate::cert_viewer::parse(&tls.certificates[0]).unwrap();
+        assert_eq!(leaf.subject.common_name.as_deref(), Some("a.test"));
+        assert_eq!(leaf.subject.organization.as_deref(), Some("Snowlark Tests"));
+        assert_eq!(leaf.issuer.common_name.as_deref(), Some("Snowlark Test CA"));
+        assert_eq!(
+            crate::cert_viewer::issuer_of(&tls.certificates[0]).as_deref(),
+            Some("Snowlark Test CA")
+        );
+        let mut chains = crate::cert_viewer::Chains::default();
+        let page = chains.add("a.test", tls.clone());
+        let (id, ..) = crate::cert_viewer::view_of(&u(&page));
+        for tab in [
+            crate::cert_viewer::Tab::General,
+            crate::cert_viewer::Tab::Details,
+        ] {
+            let html = crate::cert_viewer::certificate_html(
+                chains.get(id.unwrap()),
+                id.unwrap(),
+                tab,
+                0,
+                false,
+                &|_| 0,
+            );
+            assert!(html.contains("Certificate Viewer: a.test"), "{html}");
+            assert!(html.contains("Snowlark Test CA"), "{html}");
+        }
+        // a same-document navigation keeps it; another origin, or an error page, has none
+        h.state.url = format!("https://a.test:{port}/other#x");
+        assert!(h.tls().is_some());
+        h.state.url = format!("https://b.test:{port}/");
+        assert!(h.tls().is_none());
+        h.state.url = url.to_string();
+        h.state.error_page = true;
+        assert!(h.tls().is_none());
+        h.state.error_page = false;
+        // a failed navigation leaves none
+        h.navigate(u("https://a.test:1/"));
+        decide(&mut h, &events);
+        assert!(matches!(
+            committed(&rx).params.response,
+            CommitResponse::Failed(_)
+        ));
+        h.state.url = url.to_string();
+        assert!(h.tls().is_none());
+    }
+
+    /// The TLS session never crosses a process: a head through the wire format has none.
+    #[test]
+    fn a_head_on_the_wire_has_no_tls_session() {
+        let mut head = ResponseHead::new(200, "OK");
+        head.connection.tls = Some(Arc::new(snowlark_net::TlsInfo {
+            version: "TLSv1_3".into(),
+            cipher_suite: "TLS13_AES_128_GCM_SHA256".into(),
+            key_exchange: Some("X25519".into()),
+            certificates: vec![vec![1, 2, 3]],
+            verifier: snowlark_net::CertVerifier::System,
+        }));
+        let bytes = postcard::to_allocvec(&head).unwrap();
+        let back: ResponseHead = postcard::from_bytes(&bytes).unwrap();
+        assert!(back.connection.tls.is_none());
     }
 
     #[test]

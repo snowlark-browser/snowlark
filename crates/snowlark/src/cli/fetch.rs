@@ -61,7 +61,7 @@ pub fn run(args: &[String]) -> i32 {
                     println!(
                         "via {}{}{}",
                         c.protocol,
-                        c.tls_version.as_deref().map(|v| format!(", {v}")).unwrap_or_default(),
+                        c.tls_version().map(|v| format!(", {v}")).unwrap_or_default(),
                         if head.redirected() {
                             format!(", {} redirect(s)", head.url_list.len() - 1)
                         } else {

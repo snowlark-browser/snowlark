@@ -70,7 +70,7 @@ pub use request::{
     RedirectMode, Referrer, ReferrerPolicy, Request, RequestOrigin, ResponseTainting,
 };
 pub use response::{
-    BlockReason, ConnectionInfo, FetchTiming, NetError, NetErrorKind, Response, ResponseHead,
-    ResponseType,
+    BlockReason, CertVerifier, ConnectionInfo, FetchTiming, NetError, NetErrorKind, Response,
+    ResponseHead, ResponseType, TlsInfo,
 };
 pub use url::{Origin, Url};
