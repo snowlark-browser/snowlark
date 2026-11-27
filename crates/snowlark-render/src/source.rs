@@ -541,11 +541,23 @@ impl<'a> DocumentStyles<'a> {
     /// HTML §15.4.4: an `img` that represents its `alt` text (its image failed for good, and the
     /// `alt` attribute is not empty) and has no dimensions of its own (`width` and `height` both
     /// `auto`, the dimension attributes among them) is a non-replaced element showing that text.
-    /// With dimensions it stays a replaced box of that size, as other engines draw it.
+    /// With dimensions it stays a replaced box of that size, as other engines draw it. HTML §15.5:
+    /// an `input` in the Image Button state that does not represent an image is rendered the same
+    /// way, with its `alt` text.
     fn img_alt_text(&self, el: NodeId) -> Option<String> {
-        if !self.dom.is_html_element_named(el, &local_name!("img"))
-            || !matches!(self.images.get(&el), Some(ImageState::Failed))
-        {
+        let img = self.dom.is_html_element_named(el, &local_name!("img"));
+        let image_button = !img
+            && self.dom.is_html_element_named(el, &local_name!("input"))
+            && self
+                .dom
+                .get_attribute(el, "type")
+                .is_some_and(|t| t.eq_ignore_ascii_case("image"));
+        let shows_alt = if img {
+            matches!(self.images.get(&el), Some(ImageState::Failed))
+        } else {
+            image_button && !matches!(self.images.get(&el), Some(ImageState::Loaded(_)))
+        };
+        if !shows_alt {
             return None;
         }
         let alt = self

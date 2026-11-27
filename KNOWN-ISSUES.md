@@ -145,6 +145,10 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   shadow boundary and `getComposedRanges()` crossing ranges do not work as in other browsers. (ref 62)
 - **Google's sign-in button.** The "Continue with Google" button that Google's sign-in script builds can stay empty
   (seen on reddit). (ref 46)
+- **Image buttons.** An `input type=image` shows its `alt` text but never loads the image its `src` names.
+  (ref 889)
+- **Permissions Policy header.** The `Permissions-Policy` response header is not applied (an iframe's `allow`
+  attribute is), and there is no `autoplay` policy feature. (ref 888)
 
 ## Scripting and bindings
 
@@ -246,9 +250,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   and 12-bit VP9 are reported as unsupported. (ref 98)
 - **Slow main script on return visits.** From the third visit on, YouTube's main script runs slowly because cached code
   still takes a path that recollects source positions. (ref 220)
-- **Very short clips.** A two-frame autoplaying MP4 stays at `HAVE_METADATA` (no `loadeddata` or `canplay`) yet
-  plays to its end, fires `ended` twice and rejects its `play()` promise with `AbortError`. Its load also waits
-  until the element is in a document. (ref 709)
 - **Long lines in some text areas.** Text typed into some text areas (GitHub's comment box) runs off the
   right edge instead of wrapping. (ref 723)
 

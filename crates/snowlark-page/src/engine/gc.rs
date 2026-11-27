@@ -1142,6 +1142,13 @@ impl Engine {
         }
         {
             let from = at(&r);
+            self.media_gc_pins(&mut r.nodes)?;
+            mark(&mut t, &r, from, &|| {
+                "media elements (loading, playing, seeking)".into()
+            });
+        }
+        {
+            let from = at(&r);
             let st = self.render.try_borrow().ok()?;
             r.nodes.extend(st.document);
             r.nodes.extend(&st.pending_scroll);

@@ -37,7 +37,19 @@ pub fn write_test_clip(
     fps: u32,
     audio: bool,
 ) -> windows::core::Result<()> {
-    write_clip(path, width, height, seconds, fps, audio, false)
+    write_clip(path, width, height, seconds * fps, fps, audio, false)
+}
+
+/// Writes rames frames of a width × height pattern at ps, without sound: clips shorter
+/// than a second.
+pub fn write_video_frames(
+    path: &Path,
+    width: u32,
+    height: u32,
+    frames: u32,
+    fps: u32,
+) -> windows::core::Result<()> {
+    write_clip(path, width, height, frames, fps, false, false)
 }
 
 /// As [`write_test_clip`], as fragmented MP4 (an initialization segment, `ftyp` and `moov`, then
@@ -50,14 +62,14 @@ pub fn write_fragmented_test_clip(
     fps: u32,
     audio: bool,
 ) -> windows::core::Result<()> {
-    write_clip(path, width, height, seconds, fps, audio, true)
+    write_clip(path, width, height, seconds * fps, fps, audio, true)
 }
 
 fn write_clip(
     path: &Path,
     width: u32,
     height: u32,
-    seconds: u32,
+    frames: u32,
     fps: u32,
     audio: bool,
     fragmented: bool,
@@ -121,7 +133,7 @@ fn write_clip(
         writer.BeginWriting()?;
         let frame_len = 10_000_000i64 / fps as i64;
         let size = width * height * 4;
-        for n in 0..seconds * fps {
+        for n in 0..frames {
             let (b, g, r) = pattern_color(n / fps);
             let bar = (n % fps) * width / fps;
             let buffer = MFCreateMemoryBuffer(size)?;
@@ -150,7 +162,7 @@ fn write_clip(
         }
         if let Some(stream) = sound {
             // One-second buffers of a 440 Hz sine, stereo.
-            for s in 0..seconds {
+            for s in 0..frames / fps {
                 let frames = rate as usize;
                 let bytes = (frames * 4) as u32;
                 let buffer = MFCreateMemoryBuffer(bytes)?;

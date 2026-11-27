@@ -976,6 +976,24 @@ fn a_broken_image_shows_its_alt_text() {
     }
 }
 
+/// HTML §15.5: an `input` in the Image Button state that does not represent an image shows its
+/// `alt` text as an `img` does (it was an empty box, 0×0, which pointer input could not reach);
+/// one with an empty `alt` or dimensions of its own shows none, nor does another input type.
+#[test]
+fn an_image_button_without_an_image_shows_its_alt_text() {
+    let d = doc(
+        "<!DOCTYPE html><input id=a type=image alt='Go'><input id=u type=IMAGE alt=Up>\
+        <input id=e type=image alt=''><input id=w type=image style='width: 20px' alt=x>\
+        <input id=b type=button alt=x>",
+    );
+    let src = d.source();
+    assert_eq!(src.alt_text(d.id("a")).as_deref(), Some("Go"));
+    assert_eq!(src.alt_text(d.id("u")).as_deref(), Some("Up"));
+    for id in ["e", "w", "b"] {
+        assert_eq!(src.alt_text(d.id(id)), None, "#{id}");
+    }
+}
+
 #[test]
 fn anonymous_boxes_inherit_and_set_display() {
     let d = doc("<!DOCTYPE html><style>

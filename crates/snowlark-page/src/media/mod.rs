@@ -1016,7 +1016,22 @@ impl Engine {
                 self.media_el(el, |m| m.player_seeked = true);
                 self.media_seek_check(el);
             }
-            PlayerEvent::Ended => self.media_reached_end(cx, el),
+            PlayerEvent::Ended => {
+                let (metadata, ready, seeking, again) = self.media_el(el, |m| {
+                    (m.metadata, m.ready, m.seeking, m.ended_seen && m.paused)
+                });
+                // (the player can report the end twice; the element ended once)
+                if again {
+                    return;
+                }
+                // HTML: playback advances only while potentially playing (HAVE_FUTURE_DATA or
+                // more), so a player that played to the end had the data: a clip too short for
+                // a frame or a playing report reaches the ready states first.
+                if metadata && ready < HAVE_FUTURE_DATA && !seeking {
+                    self.media_set_ready(cx, el, HAVE_ENOUGH_DATA);
+                }
+                self.media_reached_end(cx, el);
+            }
             PlayerEvent::Failed { code, message } => {
                 if trace_on() {
                     eprintln!("[media] {code:?}: {message}");
@@ -1954,6 +1969,18 @@ impl Engine {
         };
         if is_media {
             if !self.dom().is_connected(el) {
+                // HTML: setting `src` runs the load algorithm, connected or not. An element made
+                // with its attributes (the parser, `innerHTML`) ran no attribute change steps, so
+                // the first insertion of one with `src`, even into a disconnected tree, runs the
+                // load its attribute would have.
+                let fresh = !self.media.borrow().elements.contains_key(&el);
+                let load = fresh && self.dom().get_attribute(el, "src").is_some() && {
+                    let doc = self.dom().node_document(el);
+                    self.is_active_document(doc)
+                };
+                if load {
+                    self.media_load(cx, el);
+                }
                 return;
             }
             self.media_poster_check(el);
@@ -2081,6 +2108,23 @@ impl Engine {
             }
             _ => {}
         }
+    }
+
+    /// The media elements the wrapper GC must keep (HTML §4.8.11.18: a media element must not stop
+    /// playing because all references to it are gone): one that delays the load event, is
+    /// fetching, could play (not paused, not ended, no error), is seeking, or has `play()`
+    /// promises waiting. `None` while the state is borrowed.
+    pub(crate) fn media_gc_pins(&self, out: &mut Vec<NodeId>) -> Option<()> {
+        let m = self.media.try_borrow().ok()?;
+        out.extend(m.elements.iter().filter_map(|(&n, e)| {
+            let busy = e.delaying_load
+                || e.network == NETWORK_LOADING
+                || (!e.paused && !e.ended_seen && e.error.is_none())
+                || e.seeking
+                || !e.pending_play.is_empty();
+            busy.then_some(n)
+        }));
+        Some(())
     }
 
     /// Freed nodes: their players go.

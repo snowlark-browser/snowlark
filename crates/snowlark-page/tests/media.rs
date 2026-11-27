@@ -1266,3 +1266,80 @@ fn no_cue_is_active_after_the_media_is_unloaded() {
         "3,0"
     );
 }
+
+/// HTML ready states and "reaches the end": a clip too short for the player to report a frame or
+/// playing (two frames) still passes HAVE_CURRENT_DATA and HAVE_FUTURE_DATA before it ends, so its
+/// `play()` promise resolves, and it ends once. Made with its attributes in a disconnected tree
+/// (`innerHTML`), it loads before it is inserted, as setting `src` does.
+#[test]
+fn a_two_frame_clip_reaches_the_ready_states_and_ends_once() {
+    let dir = std::env::temp_dir().join(format!("snowlark-page-media-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let clip = dir.join("two-frames.mp4");
+    snowlark_media::win::encode::write_video_frames(&clip, 64, 64, 2, 30).unwrap();
+    let src = url::Url::from_file_path(&clip).unwrap();
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = page(&net, "<body></body>", AutoplayPolicy::Allowed);
+    eval(
+        &mut page,
+        &format!(
+            "window.log = [];
+             window.t = document.createElement('div');
+             t.innerHTML = '<video playsinline preload muted src=\"{src}\"></video>';
+             window.v = t.firstChild;
+             for (const n of ['loadstart','loadedmetadata','loadeddata','canplay','playing','pause','ended'])
+               v.addEventListener(n, () => log.push(n + (v.isConnected ? '' : '-d')));"
+        ),
+    );
+    assert!(
+        wait_for(&mut page, "log.includes('loadstart-d')", 5),
+        "{}",
+        eval(&mut page, "log.join()")
+    );
+    eval(
+        &mut page,
+        "window.result = '';
+         document.body.append(t);
+         v.play().then(() => result = 'resolved', e => result = 'rejected ' + e.name);",
+    );
+    assert!(
+        wait_for(&mut page, "log.includes('ended') && result != ''", 20),
+        "{}",
+        eval(&mut page, "log.join()")
+    );
+    settle(&mut page, 300);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(
+        eval(
+            &mut page,
+            "[result, log.filter(e => e == 'ended').length, log.includes('loadeddata'),
+              log.includes('canplay'), log.includes('playing'), v.readyState, v.ended].join()"
+        ),
+        "resolved,1,true,true,true,4,true",
+        "{}",
+        eval(&mut page, "log.join()")
+    );
+}
+
+/// HTML §4.8.11.18: a media element must not stop playing because all references to it are gone.
+/// A disconnected video that script no longer reaches keeps loading through collections, and its
+/// `play()` promise resolves.
+#[test]
+fn an_unreferenced_video_keeps_loading_and_playing() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = page(&net, "<body></body>", AutoplayPolicy::Allowed);
+    eval(
+        &mut page,
+        "window.result = '';
+         (() => {
+           const v = document.createElement('video');
+           v.src = 'pattern.mp4';
+           v.play().then(() => result = 'resolved', e => result = 'rejected ' + e.name);
+         })();",
+    );
+    for _ in 0..4 {
+        assert!(page.collect_garbage());
+    }
+    assert!(wait_for(&mut page, "result != ''", 20), "no result");
+    assert_eq!(eval(&mut page, "result"), "resolved");
+}
