@@ -47,6 +47,7 @@ enum Msg {
     Disconnect(ConnId),
     Fetched(u64, Result<snowlark_net::Response, String>),
     ClearKey(String),
+    ClearSite(Option<String>),
 }
 
 /// How a registry fetches a job's script.
@@ -92,6 +93,12 @@ impl LocalServiceWorkers {
 
     fn send(&self, m: Msg) {
         let _ = self.tx.lock().expect("the registry's channel").send(m);
+    }
+
+    /// Removes the registrations of every storage key of `site` (a host: it and its
+    /// subdomains), or of every key (clearing site data).
+    pub fn clear_site(&self, site: Option<&str>) {
+        self.send(Msg::ClearSite(site.map(str::to_owned)));
     }
 }
 
@@ -154,6 +161,16 @@ fn run(rx: mpsc::Receiver<Msg>, back: mpsc::Sender<Msg>, fetch: Fetch, folder: O
             }
             Some(Msg::Fetched(job, result)) => registry.fetched(job, result, now),
             Some(Msg::ClearKey(key)) => registry.clear_key(&key),
+            Some(Msg::ClearSite(site)) => {
+                for key in registry.keys() {
+                    if site
+                        .as_deref()
+                        .is_none_or(|s| crate::cache::key_in_site(&key, s))
+                    {
+                        registry.clear_key(&key);
+                    }
+                }
+            }
             None => {}
         }
         next_tick = registry.tick(now);

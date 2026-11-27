@@ -325,7 +325,7 @@ pub(crate) fn key_of_folder(name: &str) -> Option<String> {
 }
 
 /// Whether storage key `key` (an origin) belongs to `site` (a host: it and its subdomains).
-fn key_in_site(key: &str, site: &str) -> bool {
+pub(crate) fn key_in_site(key: &str, site: &str) -> bool {
     let Ok(u) = url::Url::parse(key) else {
         return false;
     };

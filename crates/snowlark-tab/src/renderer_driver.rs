@@ -763,6 +763,7 @@ mod tests {
             web_storage: snowlark_page::web_storage::WebStorageHost::new(),
             idb: snowlark_page::IdbBackend::in_memory(),
             caches: snowlark_page::CacheBackend::in_memory(),
+            service_workers: None,
             cdm: None,
         })
     }

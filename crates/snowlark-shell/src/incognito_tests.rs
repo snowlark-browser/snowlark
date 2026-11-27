@@ -113,6 +113,9 @@ fn context_of(
         web_storage: p.local_storage.host(),
         idb: p.idb.clone(),
         caches: snowlark_page::CacheBackend::new(p.caches.clone()),
+        service_workers: Some(snowlark_page::ServiceWorkerBackend::new(
+            p.service_workers.clone(),
+        )),
         cdm: None,
     };
     (ctx, rx, comp_rx)

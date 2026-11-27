@@ -227,6 +227,9 @@ pub(crate) fn run_with(port: RendererPort, factory: fn() -> crate::driver::Drive
         web_storage: services.storage.clone(),
         idb: snowlark_page::IdbBackend::new(services.idb.clone()),
         caches: snowlark_page::CacheBackend::new(services.caches.clone()),
+        service_workers: Some(snowlark_page::ServiceWorkerBackend::new(
+            services.service_workers.clone(),
+        )),
         cdm: Some(services.cdm.clone() as Arc<dyn snowlark_page::media::cdm::Cdm>),
     };
     let tab = crate::tab::spawn_assigned(context, own, rx, factory(), Assign::Later(start));

@@ -492,6 +492,14 @@ impl Registry {
             .collect()
     }
 
+    /// The storage keys that have registrations, sorted.
+    pub fn keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self.registrations.values().map(|r| r.key.clone()).collect();
+        keys.sort_unstable();
+        keys.dedup();
+        keys
+    }
+
     /// Removes every registration of a storage key (clearing site data).
     pub fn clear_key(&mut self, key: &str) {
         let ids: Vec<RegistrationId> = self
@@ -574,6 +582,24 @@ impl Registry {
         let Some(key) = self.conns.get(&conn).map(|c| c.key.clone()) else {
             return;
         };
+        // (a registration or a version of another storage key is not this connection's to name)
+        let named = match &call {
+            Call::Update { registration, .. } | Call::Unregister { registration, .. } => {
+                Some(*registration)
+            }
+            Call::Evaluated { version, .. }
+            | Call::EventDone { version, .. }
+            | Call::SkipWaiting { version }
+            | Call::Stopped { version }
+            | Call::Claim { version } => self.versions.get(version).map(|v| v.registration),
+            _ => None,
+        };
+        if named
+            .and_then(|r| self.registrations.get(&r))
+            .is_some_and(|r| r.key != key)
+        {
+            return;
+        }
         match call {
             Call::Register {
                 client,

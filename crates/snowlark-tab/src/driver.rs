@@ -228,6 +228,7 @@ pub struct DriverContext {
     pub idb: snowlark_page::IdbBackend,
     /// The browser's Cache API storage (its pages' caches, persisted in the profile).
     pub caches: snowlark_page::CacheBackend,
+    pub service_workers: Option<snowlark_page::ServiceWorkerBackend>,
     /// The browser's key systems (none: Clear Key only).
     pub cdm: Option<Arc<dyn snowlark_page::media::cdm::Cdm>>,
 }

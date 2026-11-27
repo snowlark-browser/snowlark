@@ -280,6 +280,7 @@ fn child_main() {
             linger()
         }
         "caches" => caches_child(&port),
+        "sw-as" => service_workers_child(&port, &std::env::var(ARG).unwrap()),
         "caches-as" => {
             let caches = cache::RemoteCaches::new(port.clone());
             match snowlark_sw::CacheStorageService::call(
@@ -488,6 +489,10 @@ pub(crate) fn local() -> Local {
             videos: None,
             site_lock: site_lock::Mode::Shadow,
             cdm: None,
+            service_workers: Arc::new(snowlark_sw::LocalServiceWorkers::new(
+                Some(net.client().backend().clone()),
+                None,
+            )),
         },
         idb,
         broadcast,
@@ -703,6 +708,8 @@ fn a_renderer_locked_to_a_site_keeps_to_its_own_keys() {
     for (role, forged, honest, answered) in [
         ("idb-as", "https://b.test", "https://a.test", None),
         ("caches-as", "https://b.test", "https://a.test", Some(7)),
+        // (a client URL of another site on a connection of its own key)
+        ("sw-as", "https://b.test/", "https://a.test/page", Some(7)),
         ("broadcast-as", "https://b.test", "https://sub.a.test", None),
         (
             "code-cache-as",
@@ -3082,6 +3089,45 @@ fn caches_child(port: &RendererPort) -> i32 {
     match found {
         Reply::Responses(r) if r.len() == 1 && r[0].body.as_deref() == Some(&body[..]) => 7,
         _ => 3,
+    }
+}
+
+/// The service worker registry's child: a connection of `https://a.test` announces a client at
+/// `url` and asks for its registration; the answer comes down the pipe (7: none, as it should).
+fn service_workers_child(port: &RendererPort, url: &str) -> i32 {
+    use snowlark_sw::registry::{Answer, Call, Notice};
+    use snowlark_sw::ServiceWorkerHost;
+    let services = Arc::new(RemoteServices::new(port));
+    {
+        let (services, port) = (services.clone(), port.clone());
+        thread::spawn(move || services.run(&port));
+    }
+    let (tx, rx) = mpsc::channel();
+    let sink = Arc::new(move |n: Notice| {
+        let _ = tx.send(n);
+    });
+    let host = &services.service_workers;
+    let conn = host.connect("https://a.test".into(), true, sink);
+    let url = snowlark_net::Url::parse(url).unwrap();
+    host.call(
+        conn,
+        0,
+        Call::Client {
+            client: 1,
+            url: url.clone(),
+            secure: true,
+        },
+    );
+    host.call(conn, 1, Call::GetRegistration { client_url: url });
+    match rx.recv_timeout(WAIT) {
+        Ok(Notice::Answer {
+            call: 1,
+            answer: Answer::Lookup(None),
+        }) => {
+            host.disconnect(conn);
+            7
+        }
+        _ => linger(),
     }
 }
 

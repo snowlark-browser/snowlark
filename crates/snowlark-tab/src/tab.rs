@@ -365,6 +365,7 @@ pub struct TabContext {
     /// The browser's IndexedDB backend (shared by its tabs).
     pub idb: snowlark_page::IdbBackend,
     pub caches: snowlark_page::CacheBackend,
+    pub service_workers: Option<snowlark_page::ServiceWorkerBackend>,
     /// The browser's key systems (none: pages are offered Clear Key only). Message-shaped: a
     /// renderer process reaches the browser's through its pipe.
     pub cdm: Option<Arc<dyn snowlark_page::media::cdm::Cdm>>,
@@ -386,6 +387,7 @@ pub(crate) struct RendererContext {
     pub web_storage: Arc<dyn snowlark_page::web_storage::WebStorage>,
     pub idb: snowlark_page::IdbBackend,
     pub caches: snowlark_page::CacheBackend,
+    pub service_workers: Option<snowlark_page::ServiceWorkerBackend>,
     pub cdm: Option<Arc<dyn snowlark_page::media::cdm::Cdm>>,
 }
 
@@ -408,6 +410,7 @@ impl From<TabContext> for RendererContext {
             web_storage: c.web_storage,
             idb: c.idb,
             caches: c.caches,
+            service_workers: c.service_workers,
             cdm: c.cdm,
         }
     }
@@ -1142,6 +1145,7 @@ fn run(
         web_storage: ctx.web_storage.clone(),
         idb: ctx.idb.clone(),
         caches: ctx.caches.clone(),
+        service_workers: ctx.service_workers.clone(),
         cdm: ctx.cdm.clone(),
     });
     *id_slot = id;

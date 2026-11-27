@@ -29,6 +29,7 @@ pub mod idb;
 pub mod net;
 pub mod site_lock;
 pub mod storage;
+pub mod sw;
 pub mod video;
 
 use std::sync::Arc;
@@ -57,6 +58,7 @@ pub enum Up {
     AudioOut(audio_out::Up),
     Video(video::Up),
     Cdm(cdm::Up),
+    ServiceWorker(sw::Up),
     /// The tab's events, its messages to the compositor and its frames.
     Tab(crate::renderer_process::TabUp),
 }
@@ -72,6 +74,7 @@ pub enum Down {
     Audio(audio::Down),
     AudioOut(audio_out::Down),
     Cdm(cdm::Down),
+    ServiceWorker(sw::Down),
     /// The tab's start, its commands, and frames its raster thread has taken.
     Tab(crate::renderer_process::TabDown),
 }
@@ -104,6 +107,7 @@ pub struct RemoteServices {
     pub audio_out: Arc<audio_out::RemoteOutputs>,
     pub video: Arc<video::RemoteVideo>,
     pub cdm: Arc<cdm::RemoteCdm>,
+    pub service_workers: Arc<sw::RemoteServiceWorkers>,
 }
 
 impl RemoteServices {
@@ -122,6 +126,7 @@ impl RemoteServices {
             audio_out: Arc::new(audio_out::RemoteOutputs::new(port.clone())),
             video: Arc::new(video::RemoteVideo::new(port.clone())),
             cdm: Arc::new(cdm::RemoteCdm::new(port.clone())),
+            service_workers: Arc::new(sw::RemoteServiceWorkers::new(port.clone())),
         }
     }
 
@@ -136,6 +141,7 @@ impl RemoteServices {
             Down::Audio(m) => self.audio.dispatch(m),
             Down::AudioOut(m) => self.audio_out.dispatch(m),
             Down::Cdm(m) => self.cdm.dispatch(m),
+            Down::ServiceWorker(m) => self.service_workers.dispatch(m),
             // (a renderer with no tab hears none of the tab's messages)
             Down::Tab(_) => {}
         }
@@ -197,6 +203,8 @@ pub struct LocalServices {
     pub videos: Option<Arc<snowlark_paint::video::VideoStore>>,
     /// The browser's key systems (none: none are offered).
     pub cdm: Option<Arc<dyn snowlark_page::media::cdm::Cdm>>,
+    /// The profile's service worker registrations.
+    pub service_workers: Arc<dyn snowlark_sw::ServiceWorkerHost>,
 }
 
 /// The browser's end for one renderer. Dropping it undoes what the renderer left behind in the
@@ -215,6 +223,7 @@ pub struct ServiceHost {
     audio_out: audio_out::AudioOutHost,
     video: video::VideoHost,
     cdm: Arc<cdm::CdmHost>,
+    service_workers: sw::ServiceWorkerHostSide,
 }
 
 impl ServiceHost {
@@ -266,6 +275,11 @@ impl ServiceHost {
             audio_out: audio_out::AudioOutHost::new(port.clone(), local.audio_out.clone()),
             video: video::VideoHost::new(port.clone(), videos),
             cdm: cdm::CdmHost::new(port.clone(), local.cdm.clone(), local.site_lock),
+            service_workers: sw::ServiceWorkerHostSide::new(
+                port.clone(),
+                local.service_workers.clone(),
+                local.site_lock,
+            ),
             port,
         }
     }
@@ -349,6 +363,7 @@ impl ServiceHost {
                 Up::AudioOut(m) => self.audio_out.serve(m, replier),
                 Up::Video(m) => self.video.serve(m, replier),
                 Up::Cdm(m) => self.cdm.serve(m, replier),
+                Up::ServiceWorker(m) => self.service_workers.serve(m, replier),
                 Up::Tab(m) => tab(m, replier),
             };
             if let Err(e) = served {

@@ -64,6 +64,10 @@ impl Remote {
             audio_out: None,
             videos: None,
             cdm: None,
+            service_workers: Arc::new(snowlark_sw::LocalServiceWorkers::new(
+                Some(net.backend().clone()),
+                None,
+            )),
         };
         Ok(Some(Remote {
             local,

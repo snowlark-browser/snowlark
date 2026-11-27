@@ -118,6 +118,22 @@ pub struct SwState {
     controllers: HashMap<NodeId, VersionInfo>,
 }
 
+impl Drop for SwState {
+    /// The event loop is gone: the service workers it ran end, and its connections close, which
+    /// is a client unload for each of its clients (§8 Handle Service Worker Client Unload).
+    fn drop(&mut self) {
+        for (tx, waker) in std::mem::take(&mut self.running).into_values() {
+            let _ = tx.send(crate::worker::ToWorker::Terminate);
+            waker.wake();
+        }
+        if let Some(backend) = &self.backend {
+            for conn in std::mem::take(&mut self.conns).into_values() {
+                backend.disconnect(conn);
+            }
+        }
+    }
+}
+
 fn job_error(e: JobError) -> Error {
     let name = match e.name.as_str() {
         "TypeError" => return Error::Type(e.message.into()),

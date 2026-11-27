@@ -1338,6 +1338,14 @@ fn start_process(
         audio_out: context.audio_out.clone(),
         videos: context.videos.clone(),
         cdm: context.cdm.clone(),
+        // (a context without the profile's registry: one of the renderer's own, in memory)
+        service_workers: match &context.service_workers {
+            Some(sw) => sw.host().clone(),
+            None => Arc::new(snowlark_sw::LocalServiceWorkers::new(
+                Some(context.net.backend().clone()),
+                None,
+            )),
+        },
     };
     let window = WindowEnds {
         gpu: context.gpu,

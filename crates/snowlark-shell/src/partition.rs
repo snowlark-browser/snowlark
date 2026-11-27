@@ -15,6 +15,7 @@
 //! | `sessionStorage` | each tab's, memory | the same |
 //! | IndexedDB | `IndexedDB\`, quota from the volume | memory, quota from the machine's memory |
 //! | Cache API (`caches`) | `CacheStorage\` | memory |
+//! | service worker registrations | `ServiceWorker\` | memory |
 //! | script code cache | `code-cache\` | none |
 //! | `BroadcastChannel` | its own hub | its own hub |
 //! | history | `history.json` | none kept |
@@ -47,6 +48,9 @@ pub struct Partition {
     /// The Cache API's caches: a folder per storage key in the profile's `CacheStorage`, or memory.
     pub caches: Arc<snowlark_sw::LocalCacheStorage>,
     pub broadcast: snowlark_page::BroadcastHub,
+    /// The service worker registrations: those with an active worker kept per storage key in the
+    /// profile's `ServiceWorker` folder, or in memory. Their scripts are fetched through `net`.
+    pub service_workers: Arc<snowlark_sw::LocalServiceWorkers>,
     /// The pages visited, shared with the history page and the address bar.
     pub history: Arc<Mutex<History>>,
     /// The key systems' module state: per origin in the profile's `cdm` folder, or a temporary
@@ -67,9 +71,11 @@ impl Partition {
             })
             .expect("network thread");
         let history = History::load(&profile.history_file(), profile.legacy_history().as_deref());
+        let net = net_thread.client();
         Partition {
             dir: Some(profile.dir.clone()),
-            net: net_thread.client(),
+            service_workers: service_workers(&net, Some(profile.dir.join("ServiceWorker"))),
+            net,
             _net_thread: net_thread,
             local_storage: LocalStorage::open(profile.local_storage_dir()),
             // (IndexedDB's databases live in the profile, a folder per origin; each origin's
@@ -96,9 +102,11 @@ impl Partition {
         let quota = ipc_os::physical_memory().map_or(snowlark_idb::QUOTA, |memory| {
             snowlark_idb::quota_in_memory(memory, random_unit())
         });
+        let net = net_thread.client();
         Partition {
             dir: None,
-            net: net_thread.client(),
+            service_workers: service_workers(&net, None),
+            net,
             _net_thread: net_thread,
             local_storage: LocalStorage::in_memory(),
             idb: snowlark_page::IdbBackend::in_memory_with_quota(quota),
@@ -126,6 +134,17 @@ impl Partition {
             None => Arc::new(crate::tab_host::NoCodeCache),
         }
     }
+}
+
+/// A partition's service worker registry, fetching through `net`, kept in `folder` (none: memory).
+fn service_workers(
+    net: &NetClient,
+    folder: Option<std::path::PathBuf>,
+) -> Arc<snowlark_sw::LocalServiceWorkers> {
+    Arc::new(snowlark_sw::LocalServiceWorkers::new(
+        Some(net.backend().clone()),
+        folder,
+    ))
 }
 
 /// A number in [0, 1) that differs from run to run (from the standard library's random hash keys).
