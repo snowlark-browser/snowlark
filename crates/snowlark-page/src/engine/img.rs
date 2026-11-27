@@ -488,6 +488,20 @@ impl Engine {
         });
         if applied {
             self.sync_img_renderer(el);
+            if let ImageStatus::Loaded {
+                width: Some(w),
+                height: Some(h),
+                ..
+            } = status
+            {
+                // (an image document's own image: its title and look, before `load`)
+                let size = (w.round() as u32, h.round() as u32);
+                self.queue_task(TaskSource::DomManipulation, move |e, cx| {
+                    if e.dom().is_alive(el) && e.img(el, |d| d.generation) == gen {
+                        e.image_document_loaded(cx, el, size);
+                    }
+                });
+            }
             self.queue_img_event(el, gen, ok);
             self.settle_decodes(el);
         }

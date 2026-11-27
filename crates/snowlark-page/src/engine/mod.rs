@@ -55,6 +55,7 @@ pub(crate) mod held;
 pub(crate) mod history;
 pub(crate) mod html;
 pub(crate) mod idb;
+pub(crate) mod image_document;
 mod image_map;
 pub(crate) mod imagebitmap;
 pub(crate) mod img;
@@ -624,6 +625,8 @@ pub struct Engine {
     /// Every control with page state is synced at the next rendering update (a renderer was made,
     /// which has none of their states).
     pub(crate) controls_resync: Cell<bool>,
+    /// The top-level image documents (`image_document`), by document.
+    pub(crate) image_documents: RefCell<HashMap<NodeId, image_document::ImageDocument>>,
     /// The focused elements the last rendering update synced (focus leaving a field changes what it
     /// shows).
     pub(crate) controls_focused: RefCell<Vec<NodeId>>,
@@ -804,6 +807,7 @@ impl Engine {
             controls_waiting: RefCell::default(),
             controls_synced: Cell::new(0),
             controls_resync: Cell::new(true),
+            image_documents: RefCell::default(),
             controls_focused: RefCell::default(),
             password_forms: RefCell::default(),
             form_states_dirty: RefCell::default(),

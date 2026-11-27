@@ -147,6 +147,28 @@ fn overflow_visible_draws_outside_the_svg() {
     }
 }
 
+/// A dashed stroke scaled by `pathLength` whose color is a `color-mix()` of system colors (the
+/// signature on jhey.dev): one dash as long as the path draws all of it.
+#[test]
+fn a_path_length_dash_with_a_mixed_system_color_draws() {
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    for color in ["color-mix(in lch, canvasText, canvas 30%)", "black"] {
+        let mut r = render(
+            &net,
+            &format!(
+                "<svg width=100 height=100 viewBox='0 0 100 100' fill=none style='color: {color}'>
+                   <path pathLength=1 d='M10 50 H90' stroke=currentColor stroke-width=10
+                         style='stroke-dasharray: 1.025; stroke-dashoffset: 0' />
+                 </svg>"
+            ),
+        );
+        let px = pixels(&mut r);
+        for x in [15, 50, 85] {
+            assert_like(&px, x, 50, color, |c| c.r < 128 && c.a == 255);
+        }
+    }
+}
+
 #[test]
 fn group_opacity_composites_once_and_clip_paths_clip() {
     let net = NetThread::start(NetConfig::default()).unwrap();

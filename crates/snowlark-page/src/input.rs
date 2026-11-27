@@ -1424,6 +1424,10 @@ impl Engine {
                         detail,
                         None,
                     );
+                    // (an image document zooms its image on any click on it)
+                    if self.dom().is_alive(c) {
+                        self.image_document_clicked(cx, c, p.x as f64, p.y as f64);
+                    }
                     // A media element's user agent controls act on a click nothing canceled.
                     if clicked && c == t && self.dom().is_alive(c) {
                         if let Some(at) = hit.and_then(|h| h.content) {

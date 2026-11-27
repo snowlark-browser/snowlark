@@ -295,7 +295,7 @@ pub enum OnReady {
 }
 
 /// URL §1.3 "percent-decode", then UTF-8 decode without BOM or failure.
-fn percent_decoded(s: &str) -> String {
+pub(crate) fn percent_decoded(s: &str) -> String {
     let b = s.as_bytes();
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;
@@ -2246,7 +2246,7 @@ impl Engine {
                         }
                     }
                     if mime.starts_with("image/") {
-                        format!("<body style=\"margin: 0px;\"><img src=\"{src}\">")
+                        self.image_document_markup(doc, &src)
                     } else {
                         format!("<body><video controls autoplay name=media><source src=\"{src}\" type=\"{mime}\"></video>")
                     }

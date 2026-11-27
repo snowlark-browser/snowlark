@@ -283,6 +283,117 @@ fn svg_value(v: &str) -> String {
     out
 }
 
+/// The color functions of CSS Color 4 and 5 that SVG's image renderer does not read (it reads hex,
+/// named, `rgb()` and `hsl()` colors, those of SVG 1.1).
+const MODERN_COLORS: [&str; 9] = [
+    "lab(",
+    "lch(",
+    "oklab(",
+    "oklch(",
+    "color(",
+    "hwb(",
+    "color-mix(",
+    "light-dark(",
+    "contrast-color(",
+];
+
+/// `v`, a computed value, with each color written in a function the image renderer does not read
+/// (a `color-mix()` computes to the mix in its interpolation space, `lch(...)`) written as the
+/// sRGB color it converts to (CSS Color 4 §12, the values clamped to the sRGB gamut as the paint
+/// operations clamp them), `rgba(r, g, b, a)`: `None` when there is none. A color that still
+/// depends on `currentcolor` is left as it is.
+fn srgb_colors(v: &str) -> Option<String> {
+    if !v.contains('(') {
+        return None;
+    }
+    let b = v.as_bytes();
+    let starts = |i: usize, name: &str| {
+        b.len() - i >= name.len() && b[i..i + name.len()].eq_ignore_ascii_case(name.as_bytes())
+    };
+    // (the index after the `)` that closes the one at `open`)
+    let close = |open: usize| {
+        let mut depth = 0usize;
+        for (j, &c) in b.iter().enumerate().skip(open) {
+            match c {
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(j + 1);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    };
+    let mut out = String::new();
+    let (mut i, mut written) = (0, 0);
+    while i < b.len() {
+        let at_word = i == 0 || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'-');
+        if !at_word {
+            i += 1;
+            continue;
+        }
+        // (a URL is not a color, whatever it spells)
+        if starts(i, "url(") {
+            i = v[i..].find(')').map_or(b.len(), |e| i + e + 1);
+            continue;
+        }
+        let Some(name) = MODERN_COLORS.iter().find(|m| starts(i, m)) else {
+            i += 1;
+            continue;
+        };
+        let Some(end) = close(i + name.len() - 1) else {
+            break;
+        };
+        if let Some(srgb) = srgb_color(&v[i..end]) {
+            out.push_str(&v[written..i]);
+            out.push_str(&srgb);
+            written = end;
+        }
+        i = end;
+    }
+    if written == 0 {
+        return None;
+    }
+    out.push_str(&v[written..]);
+    Some(out)
+}
+
+/// One color, as [`srgb_colors`] writes it.
+fn srgb_color(text: &str) -> Option<String> {
+    use style::parser::ParserContext;
+    use style::values::computed::Color;
+    let url = style::stylesheets::UrlExtraData::from(
+        snowlark_net::Url::parse("about:blank").expect("a valid URL"),
+    );
+    let context = ParserContext::new(
+        style::stylesheets::Origin::Author,
+        &url,
+        Some(style::stylesheets::CssRuleType::Style),
+        style_traits::ParsingMode::DEFAULT,
+        style::context::QuirksMode::NoQuirks,
+        Default::default(),
+        None,
+        None,
+        Default::default(),
+    );
+    let mut parser = cssparser::Parser::new(text);
+    let computed =
+        style::values::specified::Color::parse_and_compute(&context, &mut parser, None).ok()?;
+    let Color::Absolute(absolute) = computed else {
+        return None;
+    };
+    let c = crate::adapter::to_color(&absolute);
+    Some(if c.a == 255 {
+        format!("rgb({}, {}, {})", c.r, c.g, c.b)
+    } else {
+        let alpha = f32::from(c.a) / 255.0;
+        format!("rgba({}, {}, {}, {alpha})", c.r, c.g, c.b)
+    })
+}
+
 /// What a serialization knows of external references.
 pub(crate) struct External<'a> {
     pub resources: &'a HashMap<String, SvgResource>,
@@ -730,9 +841,17 @@ impl Writer<'_> {
             .or_insert_with(|| vec![None; PROPERTIES.len()].into_boxed_slice());
         slots[i]
             .get_or_insert_with(|| {
-                ids().copied[i]
+                let v = ids().copied[i]
                     .as_ref()
-                    .map(|id| snowlark_style::computed::computed_property(values, id))
+                    .map(|id| snowlark_style::computed::computed_property(values, id))?;
+                let colors = matches!(
+                    PROPERTIES[i].0,
+                    "color" | "fill" | "stroke" | "stop-color" | "flood-color" | "lighting-color"
+                );
+                Some(match colors.then(|| srgb_colors(&v)).flatten() {
+                    Some(srgb) => srgb,
+                    None => v,
+                })
             })
             .clone()
     }
@@ -1834,6 +1953,26 @@ mod tests {
                 assert!(is_initial_serialization(name, &v), "{name}: {v}");
             }
         }
+    }
+
+    #[test]
+    fn modern_colors_are_written_in_srgb() {
+        assert_eq!(srgb_colors("rgb(1, 2, 3)"), None);
+        assert_eq!(srgb_colors("none"), None);
+        assert_eq!(
+            srgb_colors("lch(30 0.00000357628 none)").as_deref(),
+            Some("rgb(71, 71, 71)")
+        );
+        assert_eq!(
+            srgb_colors("color(srgb 1 0 0 / 0.5)").as_deref(),
+            Some("rgba(255, 0, 0, 0.5019608)")
+        );
+        assert_eq!(
+            srgb_colors("url(\"#lab(x)\") oklch(0.628 0.2577 29.23)").as_deref(),
+            Some("url(\"#lab(x)\") rgb(255, 0, 0)")
+        );
+        // (`currentcolor` is not known here)
+        assert_eq!(srgb_colors("color-mix(in srgb, currentcolor, red)"), None);
     }
 
     #[test]

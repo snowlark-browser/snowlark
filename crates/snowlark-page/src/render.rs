@@ -1306,6 +1306,7 @@ impl Engine {
                 .unwrap_or(false);
             if resized {
                 any_resized = true;
+                self.image_document_resized(cx, doc);
                 if let Some(w) = self.window_of_document(doc) {
                     self.fire_event(cx, w, "resize", false, false);
                     // CSSOM View §13.1 "run the resize steps": the visual viewport's size changed

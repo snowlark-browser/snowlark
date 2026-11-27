@@ -63,6 +63,7 @@ mod geometry;
 mod hidden_load;
 mod hit_replaced;
 mod html_parsing_methods;
+mod image_document;
 mod image_map;
 mod ime;
 mod indexeddb;

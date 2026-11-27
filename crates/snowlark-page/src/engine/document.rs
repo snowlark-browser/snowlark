@@ -331,6 +331,44 @@ impl Engine {
         }
         Ok(())
     }
+
+    /// Setting `document.title` of `doc` (HTML §3.1.3).
+    pub(crate) fn set_document_title(
+        &self,
+        cx: &mut Cx,
+        doc: NodeId,
+        value: &str,
+    ) -> rt::Result<()> {
+        let (title, head) = {
+            let dom = self.dom();
+            let Some(root) = dom.document_element(doc) else {
+                return Ok(());
+            };
+            if dom.namespace(root) != &ns!(html) {
+                return Ok(());
+            }
+            let title = dom
+                .descendants(doc)
+                .find(|&d| dom.is_html_element_named(d, &local_name!("title")));
+            (title, dom.head(doc))
+        };
+        let title = match title {
+            Some(t) => t,
+            None => {
+                let Some(head) = head else {
+                    return Ok(());
+                };
+                let t = self
+                    .dom_mut()
+                    .create_html_element(doc, local_name!("title"));
+                self.dom_mut().append_child(head, t).js()?;
+                t
+            }
+        };
+        self.dom_mut().string_replace_all(value, title);
+        self.after_mutation(cx);
+        Ok(())
+    }
 }
 
 impl DocumentImpl for Engine {
@@ -582,36 +620,7 @@ impl DocumentImpl for Engine {
     }
 
     fn set_title(&self, cx: &mut Cx, this: Handle, value: &str) -> rt::Result<()> {
-        let doc = self.d(this);
-        let (title, head) = {
-            let dom = self.dom();
-            let Some(root) = dom.document_element(doc) else {
-                return Ok(());
-            };
-            if dom.namespace(root) != &ns!(html) {
-                return Ok(());
-            }
-            let title = dom
-                .descendants(doc)
-                .find(|&d| dom.is_html_element_named(d, &local_name!("title")));
-            (title, dom.head(doc))
-        };
-        let title = match title {
-            Some(t) => t,
-            None => {
-                let Some(head) = head else {
-                    return Ok(());
-                };
-                let t = self
-                    .dom_mut()
-                    .create_html_element(doc, local_name!("title"));
-                self.dom_mut().append_child(head, t).js()?;
-                t
-            }
-        };
-        self.dom_mut().string_replace_all(value, title);
-        self.after_mutation(cx);
-        Ok(())
+        self.set_document_title(cx, self.d(this), value)
     }
 
     fn dir(&self, this: Handle) -> DomStr<'_> {

@@ -19,9 +19,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - A point over an `svg` with `pointer-events: none` but none of its shapes still targets the `svg` instead of what
   is beneath it (ref 839).
 - Dragging a selection beside an inline `svg` heading extends it to the next line's text (ref 840).
-- An inline `svg` path with `pathLength` and dashes draws no stroke when its color is a `color-mix()` of system
-  colors, as jhey.dev's signature (ref 855).
-- An image opened on its own shows in the top-left corner instead of centred (ref 853).
 - **Grid gaps.** `display: grid-lanes` (masonry) is not implemented. Subgrids in another writing mode or direction than
   their parent are laid out as ordinary grids, a subgrid's items share baselines only within it, and a subgrid's
   `repeat(auto-fill, ...)` line names are taken once. Column flex containers compute no baselines, so `last baseline` alignment falls back

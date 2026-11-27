@@ -19,16 +19,21 @@ fn eval(page: &mut Page, js: &str) -> String {
     }
 }
 
+/// A 1 by 1 PNG of one opaque blue pixel.
+const PNG: &[u8] = &[
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+    0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x60, 0x60, 0xf8, 0xff,
+    0x1f, 0x00, 0x03, 0x02, 0x01, 0xff, 0xe6, 0x77, 0x0b, 0xae, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+    0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+];
+
 /// A page on `http://localhost:<port>/` with four images loaded: `same` (same origin), `cross`
 /// (from `127.0.0.1`, no CORS), `shared` (cross-origin, CORS-shared and fetched in CORS mode) and
-/// `sharedNoCors` (CORS-shared, but fetched without CORS mode).
+/// `sharedNoCors` (CORS-shared, but fetched without CORS mode). Panics unless all four loaded:
+/// an image that is not available draws nothing and so cannot taint.
 fn page_with_images(net: &NetThread) -> Page {
-    let dir = std::env::temp_dir().join(format!("snowlark-origin-clean-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let file = dir.join("a.png");
-    snowlark_paint::image::encode_png(1, 1, &[0, 0, 255, 255], &file).unwrap();
-    let port = crate::webgl::serve_png(std::fs::read(&file).unwrap());
-    let _ = std::fs::remove_dir_all(&dir);
+    let port = crate::webgl::serve_png(PNG.to_vec());
     let mut page = Page::new(PageOptions {
         net: Some(net.client()),
         viewport: (800, 600),
@@ -57,10 +62,17 @@ fn page_with_images(net: &NetThread) -> Page {
                  sharedNoCors = load('http://127.0.0.1:{port}/shared.png?plain'); 0"
         ),
     );
-    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
     while eval(&mut page, "window.n") != "4" && std::time::Instant::now() < deadline {
         page.run_for(Duration::from_millis(20));
     }
+    let loaded = "[same, cross, shared, sharedNoCors]
+                  .map(i => i.complete && i.naturalWidth == 1).join()";
+    assert_eq!(
+        eval(&mut page, loaded),
+        "true,true,true,true",
+        "the images load"
+    );
     page
 }
 
