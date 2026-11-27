@@ -116,6 +116,8 @@ pub(crate) fn to_json(jwk: &JsonWebKey) -> String {
         ("kty", &jwk.kty),
         ("n", &jwk.n),
         ("p", &jwk.p),
+        ("priv", &jwk.priv_),
+        ("pub", &jwk.pub_),
         ("q", &jwk.q),
         ("qi", &jwk.qi),
         ("use", &jwk.use_),

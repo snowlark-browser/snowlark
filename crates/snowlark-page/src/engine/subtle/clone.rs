@@ -90,6 +90,7 @@ pub(crate) fn serialize(key: &KeyData) -> Vec<u8> {
             w.u8(index(&HASHES, hash));
         }
         KeyAlg::Ec { curve, .. } => w.u8(index(&CURVES, curve)),
+        KeyAlg::Kmac { length, .. } => w.u32(*length),
         KeyAlg::Plain { .. } => {}
     }
     match &*key.material {
@@ -109,6 +110,7 @@ pub(crate) fn serialize(key: &KeyData) -> Vec<u8> {
         Material::EcPublic(pk) => w.bytes(&pk.sec1()),
         Material::EcPrivate(sk) => w.bytes(&sk.bytes()),
         Material::OkpPublic(b) | Material::OkpPrivate(b) => w.bytes(b),
+        Material::PqPublic(b) | Material::PqPrivate(b) => w.bytes(b),
     }
     w.0
 }
@@ -143,10 +145,16 @@ pub(crate) fn deserialize(bytes: &[u8]) -> Option<KeyData> {
             alg: a,
             curve: *CURVES.get(r.u8()? as usize)?,
         },
+        a @ (Alg::Kmac128 | Alg::Kmac256) => KeyAlg::Kmac {
+            alg: a,
+            length: r.u32()?,
+        },
         a => KeyAlg::Plain { alg: a },
     };
     let material = match (&algorithm, ty) {
-        (KeyAlg::Aes { .. } | KeyAlg::Hmac { .. }, _) => Material::Secret(r.bytes()?.to_vec()),
+        (KeyAlg::Aes { .. } | KeyAlg::Hmac { .. } | KeyAlg::Kmac { .. }, _) => {
+            Material::Secret(r.bytes()?.to_vec())
+        }
         (KeyAlg::Plain { alg }, KeyType::Secret) if !alg.is_okp() => {
             Material::Secret(r.bytes()?.to_vec())
         }
@@ -163,6 +171,12 @@ pub(crate) fn deserialize(bytes: &[u8]) -> Option<KeyData> {
         }
         (KeyAlg::Ec { curve, .. }, KeyType::Private) => {
             Material::EcPrivate(EcPrivate::from_bytes(*curve, r.bytes()?)?)
+        }
+        (KeyAlg::Plain { alg }, KeyType::Public) if alg.is_pq() => {
+            Material::PqPublic(r.bytes()?.to_vec())
+        }
+        (KeyAlg::Plain { alg }, KeyType::Private) if alg.is_pq() => {
+            Material::PqPrivate(r.bytes()?.to_vec())
         }
         (KeyAlg::Plain { .. }, KeyType::Public) => Material::OkpPublic(r.bytes()?.try_into().ok()?),
         (KeyAlg::Plain { .. }, KeyType::Private) => {

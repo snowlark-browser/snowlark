@@ -10,7 +10,7 @@ use snowlark_bindings::generated::{KeyFormat, KeyType};
 
 use super::alg::*;
 use super::key::{Exported, Generated, KeyData, KeyInput, Material};
-use super::{aead, aes, ec, mac, okp, rsa, xof};
+use super::{aead, aes, ec, kmac, mac, okp, pq, rsa, xof};
 
 pub(crate) fn encrypt(n: &Normalized, key: &KeyData, data: &[u8]) -> CryptoResult<Vec<u8>> {
     match n.alg {
@@ -33,9 +33,11 @@ pub(crate) fn decrypt(n: &Normalized, key: &KeyData, data: &[u8]) -> CryptoResul
 pub(crate) fn sign(n: &Normalized, key: &KeyData, data: &[u8]) -> CryptoResult<Vec<u8>> {
     match n.alg {
         Alg::Hmac => Ok(mac::sign(key, data)),
+        Alg::Kmac128 | Alg::Kmac256 => kmac::sign(n, key, data),
         Alg::RsassaPkcs1 | Alg::RsaPss => rsa::sign(n, key, data),
         Alg::Ecdsa => ec::sign(n, key, data),
         Alg::Ed25519 => okp::sign(key, data),
+        a if a.is_ml_dsa() => pq::sign(n, key, data),
         _ => Err(not_supported("The algorithm does not sign")),
     }
 }
@@ -48,9 +50,11 @@ pub(crate) fn verify(
 ) -> CryptoResult<bool> {
     match n.alg {
         Alg::Hmac => Ok(mac::verify(key, signature, data)),
+        Alg::Kmac128 | Alg::Kmac256 => kmac::verify(n, key, signature, data),
         Alg::RsassaPkcs1 | Alg::RsaPss => rsa::verify(n, key, signature, data),
         Alg::Ecdsa => ec::verify(n, key, signature, data),
         Alg::Ed25519 => okp::verify(key, signature, data),
+        a if a.is_ml_dsa() => pq::verify(n, key, signature, data),
         _ => Err(not_supported("The algorithm does not verify")),
     }
 }
@@ -67,6 +71,7 @@ pub(crate) fn derive_bits(
         (Alg::X25519, Some(public)) => okp::derive_bits(n, key, public, length),
         (Alg::Hkdf, _) => mac::hkdf(n, key, length),
         (Alg::Pbkdf2, _) => mac::pbkdf2(n, key, length),
+        (Alg::Argon2d | Alg::Argon2i | Alg::Argon2id, _) => kmac::argon2(n, key, length),
         _ => Err(not_supported("The algorithm does not derive bits")),
     }
 }
@@ -95,10 +100,12 @@ pub(crate) fn generate(
     match n.alg {
         a if a.is_aes() => aes::generate(n, extractable, usages).map(Generated::Key),
         Alg::Hmac => mac::generate(n, extractable, usages).map(Generated::Key),
+        Alg::Kmac128 | Alg::Kmac256 => kmac::generate(n, extractable, usages).map(Generated::Key),
         Alg::ChaCha20Poly1305 => aead::generate(extractable, usages).map(Generated::Key),
         a if a.is_rsa() => rsa::generate(n, extractable, usages),
         a if a.is_ec() => ec::generate(n, extractable, usages),
         a if a.is_okp() => okp::generate(n, extractable, usages),
+        a if a.is_pq() => pq::generate(n, extractable, usages),
         _ => Err(not_supported("The algorithm does not generate keys")),
     }
 }
@@ -108,7 +115,7 @@ pub(crate) fn generate(
 fn format_for(alg: Alg, format: KeyFormat) -> KeyFormat {
     match format {
         KeyFormat::RawSecret if alg.is_symmetric() && !alg.is_modern_secret() => KeyFormat::Raw,
-        KeyFormat::RawPublic if !alg.is_symmetric() => KeyFormat::Raw,
+        KeyFormat::RawPublic if !alg.is_symmetric() && !alg.is_pq() => KeyFormat::Raw,
         f => f,
     }
 }
@@ -134,12 +141,19 @@ pub(crate) fn import(
     match n.alg {
         Alg::AesOcb => aes::import(n, modern_secret_format(format)?, input, extractable, usages),
         Alg::ChaCha20Poly1305 => aead::import(format, input, extractable, usages),
+        Alg::Kmac128 | Alg::Kmac256 => {
+            kmac::import(n, modern_secret_format(format)?, input, extractable, usages)
+        }
+        Alg::Argon2d | Alg::Argon2i | Alg::Argon2id => {
+            kmac::import_argon2(n, modern_secret_format(format)?, input, extractable, usages)
+        }
         a if a.is_aes() => aes::import(n, format, input, extractable, usages),
         Alg::Hmac => mac::import(n, format, input, extractable, usages),
         Alg::Hkdf | Alg::Pbkdf2 => mac::import_kdf(n, format, input, extractable, usages),
         a if a.is_rsa() => rsa::import(n, format, input, extractable, usages),
         a if a.is_ec() => ec::import(n, format, input, extractable, usages),
         a if a.is_okp() => okp::import(n, format, input, extractable, usages),
+        a if a.is_pq() => pq::import(n, format, input, extractable, usages),
         _ => Err(not_supported("The algorithm does not import keys")),
     }
 }
@@ -150,12 +164,42 @@ pub(crate) fn export(key: &KeyData, format: KeyFormat) -> CryptoResult<Exported>
     match key.algorithm.alg() {
         Alg::AesOcb => aes::export(key, modern_secret_format(format)?),
         Alg::ChaCha20Poly1305 => aead::export(key, format),
+        Alg::Kmac128 | Alg::Kmac256 => kmac::export(key, modern_secret_format(format)?),
         a if a.is_aes() => aes::export(key, format),
         Alg::Hmac => mac::export(key, format),
         a if a.is_rsa() => rsa::export(key, format),
         a if a.is_ec() => ec::export(key, format),
         a if a.is_okp() => okp::export(key, format),
+        a if a.is_pq() => pq::export(key, format),
         _ => Err(not_supported("The algorithm does not export keys")),
+    }
+}
+
+/// The encapsulate operation: (shared key, ciphertext).
+pub(crate) fn encapsulate(n: &Normalized, key: &KeyData) -> CryptoResult<(Vec<u8>, Vec<u8>)> {
+    match n.alg {
+        a if a.is_kem() => pq::encapsulate(n, key),
+        _ => Err(not_supported("The algorithm does not encapsulate")),
+    }
+}
+
+/// The decapsulate operation: the shared key.
+pub(crate) fn decapsulate(
+    n: &Normalized,
+    key: &KeyData,
+    ciphertext: &[u8],
+) -> CryptoResult<Vec<u8>> {
+    match n.alg {
+        a if a.is_kem() => pq::decapsulate(n, key, ciphertext),
+        _ => Err(not_supported("The algorithm does not decapsulate")),
+    }
+}
+
+/// The get shared key length operation, in bits.
+pub(crate) fn shared_key_length(n: &Normalized) -> CryptoResult<u32> {
+    match n.alg {
+        a if a.is_kem() => Ok(pq::shared_key_length()),
+        _ => Err(not_supported("The algorithm has no shared key length")),
     }
 }
 
@@ -164,7 +208,8 @@ pub(crate) fn key_length(n: &Normalized) -> CryptoResult<Option<u32>> {
     match n.alg {
         a if a.is_aes() => aes::key_length(n),
         Alg::Hmac => mac::key_length(n),
-        Alg::Hkdf | Alg::Pbkdf2 => Ok(None),
+        Alg::Hkdf | Alg::Pbkdf2 | Alg::Argon2d | Alg::Argon2i | Alg::Argon2id => Ok(None),
+        Alg::Kmac128 | Alg::Kmac256 => kmac::key_length(n),
         Alg::ChaCha20Poly1305 => Ok(Some(256)),
         _ => Err(not_supported("The algorithm has no key length")),
     }
@@ -172,7 +217,7 @@ pub(crate) fn key_length(n: &Normalized) -> CryptoResult<Option<u32>> {
 
 /// Whether the algorithm derives a public key from a private key (Modern Algorithms §3.2.5).
 pub(crate) fn has_public_keys(alg: Alg) -> bool {
-    alg.is_rsa() || alg.is_ec() || alg.is_okp()
+    alg.is_rsa() || alg.is_ec() || alg.is_okp() || alg.is_pq()
 }
 
 /// The usages a public key of the algorithm supports.
@@ -181,6 +226,7 @@ fn public_usages(alg: Alg) -> Usages {
         Alg::RsaOaep => Usages::ENCRYPT.or(Usages::WRAP_KEY),
         Alg::RsassaPkcs1 | Alg::RsaPss | Alg::Ecdsa => Usages::VERIFY,
         a if a.is_okp() => okp::public_usages(a),
+        a if a.is_pq() => pq::public_usages(a),
         _ => Usages::default(),
     }
 }
@@ -196,6 +242,9 @@ pub(crate) fn public_key(key: &KeyData, usages: Requested) -> CryptoResult<KeyDa
         Material::RsaPrivate(sk) => Material::RsaPublic(sk.to_public_key()),
         Material::EcPrivate(sk) => Material::EcPublic(sk.public()),
         Material::OkpPrivate(d) => Material::OkpPublic(okp::public_of(alg, d)),
+        Material::PqPrivate(seed) => Material::PqPublic(
+            pq::public_of(alg, seed).ok_or_else(|| operation("The key has no public key"))?,
+        ),
         _ => return Err(operation("The key has no public key")),
     };
     Ok(KeyData::new(
@@ -276,6 +325,15 @@ pub(crate) fn supported(
         }
         (Op::ImportKey, Params::Hmac { length, .. }) => *length != Some(0),
         (Op::GetKeyLength, _) => key_length(n).is_ok(),
+        (Op::GenerateKey | Op::ImportKey, Params::KmacKey { length: Some(l) }) => {
+            l.is_multiple_of(8) && *l != 0
+        }
+        (Op::Sign | Op::Verify, Params::Kmac { output_length, .. }) => {
+            output_length.is_multiple_of(8)
+        }
+        (Op::DeriveBits, Params::Argon2 { .. }) => kmac::argon2_checks(&n.params, length).is_ok(),
+        // ML-DSA's sign and verify throw an OperationError for a context over 255 bytes.
+        (Op::Sign | Op::Verify, Params::Context { context: Some(c) }) => c.len() <= 255,
         _ => true,
     }
 }

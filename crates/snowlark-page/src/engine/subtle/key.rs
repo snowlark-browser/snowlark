@@ -29,6 +29,8 @@ pub(crate) enum KeyAlg {
     },
     /// `EcKeyAlgorithm`.
     Ec { alg: Alg, curve: Curve },
+    /// `KmacKeyAlgorithm`.
+    Kmac { alg: Alg, length: u32 },
     /// `KeyAlgorithm` (HKDF, PBKDF2, Ed25519, X25519).
     Plain { alg: Alg },
 }
@@ -39,6 +41,7 @@ impl KeyAlg {
             KeyAlg::Aes { alg, .. }
             | KeyAlg::Rsa { alg, .. }
             | KeyAlg::Ec { alg, .. }
+            | KeyAlg::Kmac { alg, .. }
             | KeyAlg::Plain { alg } => alg,
             KeyAlg::Hmac { .. } => Alg::Hmac,
         }
@@ -68,6 +71,10 @@ pub(crate) enum Material {
     OkpPublic([u8; 32]),
     /// An Ed25519 seed or an X25519 scalar.
     OkpPrivate([u8; 32]),
+    /// An ML-KEM encapsulation key, an ML-DSA public key or a hybrid KEM public key, as encoded.
+    PqPublic(Vec<u8>),
+    /// The seed of an ML-KEM, ML-DSA or hybrid KEM private key (64, 32 and 32 bytes).
+    PqPrivate(Vec<u8>),
 }
 
 impl std::fmt::Debug for Material {
@@ -80,6 +87,8 @@ impl std::fmt::Debug for Material {
             Material::EcPrivate(_) => "EcPrivate",
             Material::OkpPublic(_) => "OkpPublic",
             Material::OkpPrivate(_) => "OkpPrivate",
+            Material::PqPublic(_) => "PqPublic",
+            Material::PqPrivate(_) => "PqPrivate",
         })
     }
 }

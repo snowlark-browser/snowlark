@@ -190,10 +190,11 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Web Audio output device change.** An `AudioContext` stops with an `error` event when the default output device
   changes or is removed, instead of moving to the new device. (ref 125)
 
-- **Web Cryptography's newer algorithms, the rest.** AES-OCB, ChaCha20-Poly1305 and the SHA-3, cSHAKE, TurboSHAKE and
-  KangarooTwelve digests work. ML-KEM, ML-DSA, the hybrid KEMs, KMAC and Argon2 are not there yet (the algorithm names
-  are refused with a NotSupportedError), and neither are `encapsulateKey`, `encapsulateBits`, `decapsulateKey` and
-  `decapsulateBits`. AES-OCB takes initialization vectors of 6 to 15 bytes. (ref 762)
+- **Web Cryptography's newer algorithms, the rest.** AES-OCB, ChaCha20-Poly1305, the SHA-3 family, ML-KEM,
+  MLKEM768-X25519, ML-DSA, KMAC and Argon2 work, with `encapsulateKey`, `encapsulateBits`, `decapsulateKey` and
+  `decapsulateBits`. The hybrid KEMs MLKEM768-P256 and MLKEM1024-P384 are not there yet (refused with a
+  NotSupportedError). AES-OCB takes initialization vectors of 6 to 15 bytes; Argon2 takes at most 1 GiB of memory.
+  (ref 762)
 
 ## SVG
 

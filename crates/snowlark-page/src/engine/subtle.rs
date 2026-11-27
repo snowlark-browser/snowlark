@@ -19,26 +19,27 @@ mod clone;
 mod ec;
 mod jwk;
 mod key;
+mod kmac;
 mod mac;
 mod normalize;
 mod okp;
 mod ops;
+mod pq;
 mod rsa;
 mod xof;
 
 use snowlark_bindings::generated::{
     ArrayBufferOrInt8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView,
     ArrayBufferOrInt8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataViewOrJsonWebKey as KeyDataUnion,
-    CryptoKeyImpl, CryptoKeyPair, JsonWebKey, KeyFormat, KeyType, KeyUsage, ObjectOrString,
-    RsaOtherPrimesInfo, SubtleCryptoImpl,
+    CryptoKeyImpl, CryptoKeyPair, EncapsulatedBits, EncapsulatedKey, JsonWebKey, KeyFormat,
+    KeyType, KeyUsage, ObjectOrString, RsaOtherPrimesInfo, SubtleCryptoImpl,
 };
-use snowlark_bindings::rt::{self, Cx, Error, ExceptionName, Handle, JsObject, JsPromise, Result};
+use snowlark_bindings::rt::{self, Cx, Error, Handle, JsObject, JsPromise, Result};
 
 use self::alg::*;
 use self::key::{Exported, Generated, KeyAlg, KeyData, KeyInput};
 use self::normalize::normalize;
 use super::blob::{array_buffer, uint8_array};
-use super::element::rejected;
 use super::encoding::buffer_bytes;
 use super::{Engine, Object};
 
@@ -49,15 +50,6 @@ pub struct KeyObj {
     data: KeyData,
     algorithm_cached: Option<v8::Global<v8::Object>>,
     usages_cached: Option<v8::Global<v8::Object>>,
-}
-
-/// A promise rejected with "NotSupportedError": the operation's algorithms are not implemented.
-fn not_supported_promise(cx: &mut Cx) -> Result<JsPromise> {
-    rejected(
-        cx,
-        ExceptionName::NotSupportedError,
-        "This Web Cryptography operation is not supported",
-    )
 }
 
 fn buffer_object(b: &BufferSource) -> &JsObject {
@@ -290,6 +282,41 @@ impl Engine {
 }
 
 impl Engine {
+    /// Modern Algorithms §3.2.6 for "encapsulateKey" and "decapsulateKey": the algorithm has a shared
+    /// key length, and the shared key's algorithm imports a "raw-secret" of that many bits.
+    fn check_shared_key_support(
+        &self,
+        cx: &mut Cx,
+        operation: &str,
+        algorithm: &ObjectOrString,
+        additional: &ObjectOrString,
+    ) -> bool {
+        let Some(n) = try_normalize(cx, Op::GetSharedKeyLength, algorithm) else {
+            return false;
+        };
+        let Ok(bits) = ops::shared_key_length(&n) else {
+            return false;
+        };
+        let Some(import) = try_normalize(cx, Op::ImportKey, additional) else {
+            return false;
+        };
+        if !ops::supported(Op::ImportKey, &import, None, None) {
+            return false;
+        }
+        let none = Requested {
+            set: Usages::default(),
+            other: false,
+            empty: true,
+        };
+        let data = KeyInput::Bytes(vec![0; (bits / 8) as usize]);
+        if ops::import(&import, KeyFormat::RawSecret, data, false, none).is_err() {
+            return false;
+        }
+        self.check_support(cx, operation, algorithm, None)
+    }
+}
+
+impl Engine {
     /// `crypto.subtle`: one SubtleCrypto per Crypto object.
     pub(crate) fn subtle_handle(&self, crypto: Handle) -> Handle {
         self.window_singleton(crypto, "subtle", || Object::SubtleCrypto)
@@ -337,6 +364,26 @@ impl Engine {
     fn derive(&self, n: &Normalized, key: &KeyData, length: Option<u32>) -> Result<Vec<u8>> {
         let public = self.ecdh_public(n)?;
         ops::derive_bits(n, key, length, public.as_ref())
+    }
+
+    /// The shared key of an encapsulation: the "raw-secret" import of its bits (Modern Algorithms
+    /// §3.2.1 and §3.2.3).
+    fn shared_key(
+        &self,
+        import: &Normalized,
+        shared: Vec<u8>,
+        extractable: bool,
+        usages: Requested,
+    ) -> Result<Handle> {
+        let key = ops::import(
+            import,
+            KeyFormat::RawSecret,
+            KeyInput::Bytes(shared),
+            extractable,
+            usages,
+        )?;
+        let key = finish_import(key, extractable, usages)?;
+        Ok(self.new_key(key))
     }
 
     /// Resolves with what generateKey produced.
@@ -414,8 +461,9 @@ impl SubtleCryptoImpl for Engine {
             "wrapKey" if !self.check_support(cx, "exportKey", additional, None) => {
                 return Ok(false)
             }
-            // No algorithm encapsulates.
-            "encapsulateKey" | "decapsulateKey" => return Ok(false),
+            "encapsulateKey" | "decapsulateKey" => {
+                return Ok(self.check_shared_key_support(cx, operation, &algorithm, additional));
+            }
             _ => {}
         }
         let mut operation = operation;
@@ -722,52 +770,98 @@ impl SubtleCryptoImpl for Engine {
         resolved(cx, h)
     }
 
+    /// Modern Algorithms §3.2.1 `encapsulateKey(encapsulationAlgorithm, encapsulationKey,
+    /// sharedKeyAlgorithm, extractable, keyUsages)`.
     fn encapsulate_key(
         &self,
         cx: &mut Cx,
         _this: Handle,
-        _encapsulation_algorithm: ObjectOrString,
-        _encapsulation_key: Handle,
-        _shared_key_algorithm: ObjectOrString,
-        _extractable: bool,
-        _key_usages: Vec<KeyUsage>,
+        encapsulation_algorithm: ObjectOrString,
+        encapsulation_key: Handle,
+        shared_key_algorithm: ObjectOrString,
+        extractable: bool,
+        key_usages: Vec<KeyUsage>,
     ) -> Result<JsPromise> {
-        not_supported_promise(cx)
+        let n = normalize(cx, Op::Encapsulate, &encapsulation_algorithm)?;
+        let import = normalize(cx, Op::ImportKey, &shared_key_algorithm)?;
+        let usages = Requested::new(&key_usages);
+        let key = self.key_data(encapsulation_key)?;
+        check_key(&n, &key, Usages::ENCAPSULATE_KEY)?;
+        let (shared, ciphertext) = ops::encapsulate(&n, &key)?;
+        let shared_key = self.shared_key(&import, shared, extractable, usages)?;
+        let ciphertext = array_buffer(cx, ciphertext);
+        resolved(
+            cx,
+            EncapsulatedKey {
+                shared_key: Some(shared_key),
+                ciphertext: Some(ciphertext),
+            },
+        )
     }
 
+    /// Modern Algorithms §3.2.2 `encapsulateBits(encapsulationAlgorithm, encapsulationKey)`.
     fn encapsulate_bits(
         &self,
         cx: &mut Cx,
         _this: Handle,
-        _encapsulation_algorithm: ObjectOrString,
-        _encapsulation_key: Handle,
+        encapsulation_algorithm: ObjectOrString,
+        encapsulation_key: Handle,
     ) -> Result<JsPromise> {
-        not_supported_promise(cx)
+        let n = normalize(cx, Op::Encapsulate, &encapsulation_algorithm)?;
+        let key = self.key_data(encapsulation_key)?;
+        check_key(&n, &key, Usages::ENCAPSULATE_BITS)?;
+        let (shared, ciphertext) = ops::encapsulate(&n, &key)?;
+        let shared_key = array_buffer(cx, shared);
+        let ciphertext = array_buffer(cx, ciphertext);
+        resolved(
+            cx,
+            EncapsulatedBits {
+                shared_key: Some(shared_key),
+                ciphertext: Some(ciphertext),
+            },
+        )
     }
 
+    /// Modern Algorithms §3.2.3 `decapsulateKey(decapsulationAlgorithm, decapsulationKey, ciphertext,
+    /// sharedKeyAlgorithm, extractable, keyUsages)`.
     fn decapsulate_key(
         &self,
         cx: &mut Cx,
         _this: Handle,
-        _decapsulation_algorithm: ObjectOrString,
-        _decapsulation_key: Handle,
-        _ciphertext: BufferSource,
-        _shared_key_algorithm: ObjectOrString,
-        _extractable: bool,
-        _key_usages: Vec<KeyUsage>,
+        decapsulation_algorithm: ObjectOrString,
+        decapsulation_key: Handle,
+        ciphertext: BufferSource,
+        shared_key_algorithm: ObjectOrString,
+        extractable: bool,
+        key_usages: Vec<KeyUsage>,
     ) -> Result<JsPromise> {
-        not_supported_promise(cx)
+        let n = normalize(cx, Op::Decapsulate, &decapsulation_algorithm)?;
+        let import = normalize(cx, Op::ImportKey, &shared_key_algorithm)?;
+        let ciphertext = copy_bytes(cx, &ciphertext);
+        let usages = Requested::new(&key_usages);
+        let key = self.key_data(decapsulation_key)?;
+        check_key(&n, &key, Usages::DECAPSULATE_KEY)?;
+        let shared = ops::decapsulate(&n, &key, &ciphertext)?;
+        let shared_key = self.shared_key(&import, shared, extractable, usages)?;
+        resolved(cx, shared_key)
     }
 
+    /// Modern Algorithms §3.2.4 `decapsulateBits(decapsulationAlgorithm, decapsulationKey,
+    /// ciphertext)`.
     fn decapsulate_bits(
         &self,
         cx: &mut Cx,
         _this: Handle,
-        _decapsulation_algorithm: ObjectOrString,
-        _decapsulation_key: Handle,
-        _ciphertext: BufferSource,
+        decapsulation_algorithm: ObjectOrString,
+        decapsulation_key: Handle,
+        ciphertext: BufferSource,
     ) -> Result<JsPromise> {
-        not_supported_promise(cx)
+        let n = normalize(cx, Op::Decapsulate, &decapsulation_algorithm)?;
+        let ciphertext = copy_bytes(cx, &ciphertext);
+        let key = self.key_data(decapsulation_key)?;
+        check_key(&n, &key, Usages::DECAPSULATE_BITS)?;
+        let shared = ops::decapsulate(&n, &key, &ciphertext)?;
+        resolved_bytes(cx, shared)
     }
 
     /// Modern Algorithms §3.2.5 `getPublicKey(key, keyUsages)`.
@@ -843,6 +937,10 @@ fn algorithm_object(cx: &mut Cx, alg: &KeyAlg) -> Result<v8::Global<v8::Object>>
         }
         KeyAlg::Ec { curve, .. } => {
             set_member(scope, o, "namedCurve", rt::name(scope, curve.name()).into());
+        }
+        KeyAlg::Kmac { length, .. } => {
+            let v = v8::Integer::new_from_unsigned(scope, *length);
+            set_member(scope, o, "length", v.into());
         }
         KeyAlg::Plain { .. } => {}
     }

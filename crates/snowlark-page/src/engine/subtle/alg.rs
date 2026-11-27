@@ -42,10 +42,23 @@ pub(crate) enum Alg {
     TurboShake256,
     Kt128,
     Kt256,
+    // The post-quantum algorithms (kept at the end: serialized keys store an index into `ALL`).
+    MlKem512,
+    MlKem768,
+    MlKem1024,
+    XWing,
+    MlDsa44,
+    MlDsa65,
+    MlDsa87,
+    Kmac128,
+    Kmac256,
+    Argon2d,
+    Argon2i,
+    Argon2id,
 }
 
 impl Alg {
-    pub(crate) const ALL: [Alg; 29] = [
+    pub(crate) const ALL: [Alg; 41] = [
         Alg::RsassaPkcs1,
         Alg::RsaPss,
         Alg::RsaOaep,
@@ -75,6 +88,18 @@ impl Alg {
         Alg::TurboShake256,
         Alg::Kt128,
         Alg::Kt256,
+        Alg::MlKem512,
+        Alg::MlKem768,
+        Alg::MlKem1024,
+        Alg::XWing,
+        Alg::MlDsa44,
+        Alg::MlDsa65,
+        Alg::MlDsa87,
+        Alg::Kmac128,
+        Alg::Kmac256,
+        Alg::Argon2d,
+        Alg::Argon2i,
+        Alg::Argon2id,
     ];
 
     /// The recognized algorithm name.
@@ -109,7 +134,39 @@ impl Alg {
             Alg::TurboShake256 => "TurboSHAKE256",
             Alg::Kt128 => "KT128",
             Alg::Kt256 => "KT256",
+            Alg::MlKem512 => "ML-KEM-512",
+            Alg::MlKem768 => "ML-KEM-768",
+            Alg::MlKem1024 => "ML-KEM-1024",
+            Alg::XWing => "MLKEM768-X25519",
+            Alg::MlDsa44 => "ML-DSA-44",
+            Alg::MlDsa65 => "ML-DSA-65",
+            Alg::MlDsa87 => "ML-DSA-87",
+            Alg::Kmac128 => "KMAC128",
+            Alg::Kmac256 => "KMAC256",
+            Alg::Argon2d => "Argon2d",
+            Alg::Argon2i => "Argon2i",
+            Alg::Argon2id => "Argon2id",
         }
+    }
+
+    /// ML-KEM (FIPS 203).
+    pub(crate) fn is_ml_kem(self) -> bool {
+        matches!(self, Alg::MlKem512 | Alg::MlKem768 | Alg::MlKem1024)
+    }
+
+    /// The key encapsulation mechanisms: ML-KEM and the hybrid KEM.
+    pub(crate) fn is_kem(self) -> bool {
+        self.is_ml_kem() || self == Alg::XWing
+    }
+
+    /// ML-DSA (FIPS 204).
+    pub(crate) fn is_ml_dsa(self) -> bool {
+        matches!(self, Alg::MlDsa44 | Alg::MlDsa65 | Alg::MlDsa87)
+    }
+
+    /// The post-quantum algorithms, whose keys are `Material::PqPublic` and `PqPrivate` (a seed).
+    pub(crate) fn is_pq(self) -> bool {
+        self.is_kem() || self.is_ml_dsa()
     }
 
     pub(crate) fn is_aes(self) -> bool {
@@ -122,7 +179,16 @@ impl Alg {
     /// The Modern Algorithms' secret-key algorithms, which import and export only "raw-secret" (the
     /// older ones also take "raw").
     pub(crate) fn is_modern_secret(self) -> bool {
-        matches!(self, Alg::AesOcb | Alg::ChaCha20Poly1305)
+        matches!(
+            self,
+            Alg::AesOcb
+                | Alg::ChaCha20Poly1305
+                | Alg::Kmac128
+                | Alg::Kmac256
+                | Alg::Argon2d
+                | Alg::Argon2i
+                | Alg::Argon2id
+        )
     }
 
     /// The digest algorithms with no parameters or with output-length parameters of the Modern
@@ -160,7 +226,15 @@ impl Alg {
         self.is_aes()
             || matches!(
                 self,
-                Alg::Hmac | Alg::Hkdf | Alg::Pbkdf2 | Alg::ChaCha20Poly1305
+                Alg::Hmac
+                    | Alg::Hkdf
+                    | Alg::Pbkdf2
+                    | Alg::ChaCha20Poly1305
+                    | Alg::Kmac128
+                    | Alg::Kmac256
+                    | Alg::Argon2d
+                    | Alg::Argon2i
+                    | Alg::Argon2id
             )
     }
 }
@@ -180,6 +254,11 @@ pub(crate) enum Op {
     ImportKey,
     ExportKey,
     GetKeyLength,
+    // The key encapsulation operations (Modern Algorithms §3.3): encapsulateKey and encapsulateBits
+    // are "encapsulate", decapsulateKey and decapsulateBits "decapsulate".
+    Encapsulate,
+    Decapsulate,
+    GetSharedKeyLength,
 }
 
 impl Op {
@@ -197,6 +276,8 @@ impl Op {
             "generateKey" => Op::GenerateKey,
             "importKey" => Op::ImportKey,
             "exportKey" => Op::ExportKey,
+            "encapsulateKey" | "encapsulateBits" => Op::Encapsulate,
+            "decapsulateKey" | "decapsulateBits" => Op::Decapsulate,
             _ => return None,
         })
     }
@@ -227,6 +308,10 @@ pub(crate) enum DictType {
     CShakeParams,
     TurboShakeParams,
     KangarooTwelveParams,
+    ContextParams,
+    KmacParams,
+    KmacKeyParams,
+    Argon2Params,
 }
 
 /// supportedAlgorithms\[op\]\[alg\] (§18.4.2): the dictionary type each algorithm's "Registration" table
@@ -274,6 +359,17 @@ pub(crate) fn registered(op: Op, alg: Alg) -> Option<DictType> {
         (CShake128 | CShake256, Digest) => D::CShakeParams,
         (TurboShake128 | TurboShake256, Digest) => D::TurboShakeParams,
         (Kt128 | Kt256, Digest) => D::KangarooTwelveParams,
+        (
+            MlKem512 | MlKem768 | MlKem1024 | XWing,
+            Encapsulate | Decapsulate | GetSharedKeyLength | GenerateKey | ImportKey | ExportKey,
+        ) => D::Algorithm,
+        (MlDsa44 | MlDsa65 | MlDsa87, Sign | Verify) => D::ContextParams,
+        (MlDsa44 | MlDsa65 | MlDsa87, GenerateKey | ImportKey | ExportKey) => D::Algorithm,
+        (Kmac128 | Kmac256, Sign | Verify) => D::KmacParams,
+        (Kmac128 | Kmac256, GenerateKey | ImportKey | GetKeyLength) => D::KmacKeyParams,
+        (Kmac128 | Kmac256, ExportKey) => D::Algorithm,
+        (Argon2d | Argon2i | Argon2id, DeriveBits) => D::Argon2Params,
+        (Argon2d | Argon2i | Argon2id, ImportKey | GetKeyLength) => D::Algorithm,
         _ => return None,
     })
 }
@@ -425,6 +521,29 @@ pub(crate) enum Params {
         output_length: u32,
         customization: Vec<u8>,
     },
+    /// `ContextParams`.
+    Context {
+        context: Option<Vec<u8>>,
+    },
+    /// `KmacKeyGenParams` and `KmacImportParams`.
+    KmacKey {
+        length: Option<u32>,
+    },
+    /// `KmacParams`.
+    Kmac {
+        output_length: u32,
+        customization: Vec<u8>,
+    },
+    /// `Argon2Params`.
+    Argon2 {
+        nonce: Vec<u8>,
+        parallelism: u32,
+        memory: u32,
+        passes: u32,
+        version: Option<u8>,
+        secret_value: Option<Vec<u8>>,
+        associated_data: Option<Vec<u8>>,
+    },
 }
 
 /// The result of "normalize an algorithm" (§18.4.4).
@@ -450,7 +569,6 @@ impl Normalized {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Usages(pub u16);
 
-#[allow(dead_code)] // the encapsulation usages are used by the KEM algorithms still to come
 impl Usages {
     pub(crate) const ENCRYPT: Usages = Usages(1);
     pub(crate) const DECRYPT: Usages = Usages(2);

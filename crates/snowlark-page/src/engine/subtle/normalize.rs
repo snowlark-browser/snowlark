@@ -340,6 +340,65 @@ pub(crate) fn normalize(cx: &mut Cx, op: Op, alg: &ObjectOrString) -> Result<Nor
                 customization: customization.map(|b| bytes(r.cx, b)).unwrap_or_default(),
             }
         }
+        DictType::KmacParams => {
+            let customization = match r.get("customization")? {
+                Some(v) => Some(r.buffer(v, "customization")?),
+                None => None,
+            };
+            let v = r.required("outputLength")?;
+            let output_length = r.unsigned_long(v)?;
+            Params::Kmac {
+                output_length,
+                customization: customization.map(|b| bytes(r.cx, b)).unwrap_or_default(),
+            }
+        }
+        DictType::KmacKeyParams => {
+            let length = match r.get("length")? {
+                Some(v) => Some(r.unsigned_long(v)?),
+                None => None,
+            };
+            Params::KmacKey { length }
+        }
+        DictType::Argon2Params => {
+            let associated = match r.get("associatedData")? {
+                Some(v) => Some(r.buffer(v, "associatedData")?),
+                None => None,
+            };
+            let v = r.required("memory")?;
+            let memory = r.unsigned_long(v)?;
+            let v = r.required("nonce")?;
+            let nonce = r.buffer(v, "nonce")?;
+            let v = r.required("parallelism")?;
+            let parallelism = r.unsigned_long(v)?;
+            let v = r.required("passes")?;
+            let passes = r.unsigned_long(v)?;
+            let secret = match r.get("secretValue")? {
+                Some(v) => Some(r.buffer(v, "secretValue")?),
+                None => None,
+            };
+            let version = match r.get("version")? {
+                Some(v) => Some(r.octet(v)?),
+                None => None,
+            };
+            Params::Argon2 {
+                nonce: bytes(r.cx, nonce),
+                parallelism,
+                memory,
+                passes,
+                version,
+                secret_value: secret.map(|b| bytes(r.cx, b)),
+                associated_data: associated.map(|b| bytes(r.cx, b)),
+            }
+        }
+        DictType::ContextParams => {
+            let context = match r.get("context")? {
+                Some(v) => Some(r.buffer(v, "context")?),
+                None => None,
+            };
+            Params::Context {
+                context: context.map(|c| bytes(r.cx, c)),
+            }
+        }
     };
     Ok(Normalized { alg, params })
 }
