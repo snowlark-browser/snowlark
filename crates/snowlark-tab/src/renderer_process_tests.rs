@@ -1102,7 +1102,7 @@ fn a_video_in_a_renderer_draws_in_the_browser() {
     while Instant::now() < until && (shown < 5 || drawn.is_none() || quads.is_empty()) {
         if let Ok(id) = frames_rx.recv_timeout(Duration::from_millis(20)) {
             store.latch(id);
-            if let Some((bitmap, w, h)) = store.front_of(id) {
+            if let Some((bitmap, w, h)) = store.front_of(id, false) {
                 shown += 1;
                 let frame = snowlark_paint::video::read_bitmap(&gpu, &bitmap, w, h).unwrap();
                 drawn = Some((id, frame));
@@ -1139,11 +1139,11 @@ fn a_video_in_a_renderer_draws_in_the_browser() {
     tab.renderer.sender().send(TabCommand::Close).unwrap();
     assert_eq!(tab.renderer.process().wait(WAIT), Some(0));
     let gone = Instant::now() + WAIT;
-    while store.front_of(id).is_some() && Instant::now() < gone {
+    while store.front_of(id, false).is_some() && Instant::now() < gone {
         thread::sleep(Duration::from_millis(10));
     }
     assert!(
-        store.front_of(id).is_none(),
+        store.front_of(id, false).is_none(),
         "the video outlived its renderer"
     );
 }

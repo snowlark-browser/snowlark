@@ -480,12 +480,14 @@ impl ContentPass<'_> {
     }
 
     /// Draws a video frame ([`crate::video::VideoStore::front_of`]) scaled into `dest`, within
-    /// `clip`.
+    /// `clip`. (`_flip_rows`: a canvas's frame through shared textures, which only a Windows
+    /// renderer sends.)
     pub fn video_frame(
         &mut self,
         front: &crate::video::VideoFront,
         dest: Rect,
         clip: Rect,
+        _flip_rows: bool,
     ) -> bool {
         let f = &front.0;
         let Some(image) = sk::images::raster_from_data(

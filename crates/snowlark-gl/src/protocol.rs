@@ -387,6 +387,30 @@ pub struct Readback {
     pub rgba: Vec<u8>,
 }
 
+/// Textures of another process (the browser's, which draws them) that a context's frames can be
+/// presented into instead of read back: each a `width` × `height` BGRA texture with a keyed mutex,
+/// as NT handles. A texture is written with its key at 0 and given up with key 1; the other side
+/// gives it back with key 0 once it no longer shows it.
+#[cfg(windows)]
+pub struct SharedTargets {
+    pub width: u32,
+    pub height: u32,
+    pub handles: Vec<std::os::windows::io::OwnedHandle>,
+}
+
+/// What [`Backend::present_shared`] did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SharedPresent {
+    /// The drawing buffer is in target `index` (rows bottom to top, as OpenGL stores them; its
+    /// alpha as the page wrote it, premultiplied), given up with key 1.
+    Presented(u32),
+    /// Every target is still the other side's: nothing was presented and the drawing buffer is as
+    /// it was (it was not composited, so it is not cleared either).
+    Busy,
+    /// No targets, or they cannot take this context's frames: present with [`Backend::present`].
+    Unavailable,
+}
+
 /// Where a page's contexts run: on its process's WebGL thread today ([`crate::Service`]), across a
 /// process boundary later. Every call is one message.
 pub trait Backend {
@@ -407,4 +431,24 @@ pub trait Backend {
     /// The drawing buffer for the rendering; then, unless the context preserves it, the buffer is
     /// cleared (WebGL 1.0 §2.2).
     fn present(&mut self, id: ContextId) -> Option<Readback>;
+    /// The context's frames go into `targets` from now on (`None`: no longer). Whether they were
+    /// opened for it: they are of the drawing buffer's size, and the context is one whose frames
+    /// can be copied into them (a WebGL 2.0 context with premultiplied alpha). A new size of the
+    /// drawing buffer lets them go.
+    #[cfg(windows)]
+    fn share_into(&mut self, _id: ContextId, _targets: Option<SharedTargets>) -> bool {
+        false
+    }
+    /// [`Backend::present`] into a free texture of [`Backend::share_into`]'s, with no readback:
+    /// the drawing buffer is copied on the GPU (its samples resolved) and, unless the context
+    /// preserves it, cleared.
+    fn present_shared(&mut self, _id: ContextId) -> SharedPresent {
+        SharedPresent::Unavailable
+    }
+    /// The last frame [`Backend::present_shared`] presented, read back as [`Backend::present`]
+    /// gives it (a copy the context keeps of each: a drawing buffer that is not preserved was
+    /// cleared after it). For a canvas whose frames leave the shared textures.
+    fn read_presented(&mut self, _id: ContextId) -> Option<Readback> {
+        None
+    }
 }

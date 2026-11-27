@@ -532,6 +532,8 @@ struct Doc {
     rendered: bool,
     /// The images showing `<canvas>` bitmaps.
     canvases: HashMap<NodeId, snowlark_paint::ImageId>,
+    /// The canvases whose frames reach the compositor on the GPU instead (their video ids).
+    canvas_videos: HashMap<NodeId, snowlark_paint::VideoId>,
     /// Form controls' state from the page.
     control_states: HashMap<NodeId, crate::controls::ControlState>,
     /// The top layer (CSS Position 4 §4.1) the page keeps for this document, bottom first.
@@ -1424,6 +1426,7 @@ impl Renderer {
             import_blockers: Vec::new(),
             rendered: false,
             canvases: HashMap::new(),
+            canvas_videos: HashMap::new(),
             media: HashMap::new(),
             video_frames: HashMap::new(),
             control_states: HashMap::new(),
@@ -4317,6 +4320,7 @@ impl Renderer {
         .with_top_layer(&doc.top_layer)
         .with_fullscreen(doc.fullscreen)
         .with_media(&doc.media, &doc.video_frames)
+        .with_canvas_videos(&doc.canvas_videos)
         .with_embed_types(&doc.embed_types)
         .with_embedded_documents(&doc.embedded_documents)
         .with_pdf_viewer(pdf_viewer)
@@ -5835,6 +5839,30 @@ impl Renderer {
                 doc.changes.restyled.push(ElementChange::reconstruct(node));
                 doc.needs_restyle = true;
             }
+        }
+    }
+
+    /// Whether the canvas element `node` shows its frames on the GPU ([`Renderer::set_canvas_video`]).
+    pub fn has_canvas_video(&self, node: NodeId) -> bool {
+        self.doc
+            .as_deref()
+            .is_some_and(|d| d.canvas_videos.contains_key(&node))
+    }
+
+    /// The canvas element `node` shows the compositor's frames of `video` (a WebGL canvas whose
+    /// drawing buffer reaches the compositor through shared textures), or, with `None`, its bitmap
+    /// again ([`Renderer::set_canvas_frame`]): its box is built again.
+    pub fn set_canvas_video(&mut self, node: NodeId, video: Option<snowlark_paint::VideoId>) {
+        let Some(doc) = self.doc.as_deref_mut() else {
+            return;
+        };
+        let changed = match video {
+            Some(v) => doc.canvas_videos.insert(node, v) != Some(v),
+            None => doc.canvas_videos.remove(&node).is_some(),
+        };
+        if changed {
+            doc.changes.restyled.push(ElementChange::reconstruct(node));
+            doc.needs_restyle = true;
         }
     }
 

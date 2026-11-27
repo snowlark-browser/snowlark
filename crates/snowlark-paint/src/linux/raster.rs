@@ -512,7 +512,11 @@ impl<'a> Painter<'a> {
                 self.image(image, &dest, &src, opacity, rendering);
             }
             Item::Video {
-                image, dest, clip, ..
+                image,
+                dest,
+                clip,
+                transparent,
+                ..
             } => {
                 let (dest, clip) = (self.snapped(&dest), self.snapped(&clip));
                 match image {
@@ -522,6 +526,8 @@ impl<'a> Painter<'a> {
                         self.image(image, &dest, &Rect::ZERO, 1.0, ImageRendering::Smooth);
                         canvas.restore();
                     }
+                    // (a canvas's frames: what is under them shows)
+                    None if transparent => {}
                     None => {
                         canvas.draw_rect(rect(&dest.intersect(&clip)), &fill(Color::BLACK));
                     }

@@ -61,6 +61,17 @@ pub const EGL_LOSE_CONTEXT_ON_RESET_EXT: EGLint = 0x31BF;
 pub const EGL_POWER_PREFERENCE_ANGLE: EGLint = 0x3482;
 pub const EGL_LOW_POWER_ANGLE: EGLint = 0x0001;
 pub const EGL_HIGH_POWER_ANGLE: EGLint = 0x0002;
+// EGL_EXT_device_query, EGL_ANGLE_device_d3d, EGL_ANGLE_d3d_texture_client_buffer.
+#[cfg(windows)]
+pub const EGL_DEVICE_EXT: EGLint = 0x322C;
+#[cfg(windows)]
+pub const EGL_D3D11_DEVICE_ANGLE: EGLint = 0x33A1;
+#[cfg(windows)]
+pub const EGL_D3D_TEXTURE_ANGLE: u32 = 0x33A3;
+
+/// `EGLAttrib`: a pointer-sized attribute value.
+#[cfg(windows)]
+pub type EGLAttrib = isize;
 
 macro_rules! entry_points {
     ($name:ident { $($f:ident: fn($($a:ty),*) $(-> $r:ty)?;)* }) => {
@@ -99,6 +110,13 @@ entry_points!(Egl {
     eglDestroySurface: fn(EGLDisplay, EGLSurface) -> EGLBoolean;
     eglMakeCurrent: fn(EGLDisplay, EGLSurface, EGLSurface, EGLContext) -> EGLBoolean;
     eglGetError: fn() -> EGLint;
+});
+
+#[cfg(windows)]
+entry_points!(EglD3d {
+    eglQueryDisplayAttribEXT: fn(EGLDisplay, EGLint, *mut EGLAttrib) -> EGLBoolean;
+    eglQueryDeviceAttribEXT: fn(*mut c_void, EGLint, *mut EGLAttrib) -> EGLBoolean;
+    eglCreatePbufferFromClientBuffer: fn(EGLDisplay, u32, *mut c_void, EGLConfig, *const EGLint) -> EGLSurface;
 });
 
 entry_points!(Gles {
@@ -324,6 +342,10 @@ entry_points!(Gles {
 pub struct Angle {
     pub egl: Egl,
     pub gl: Gles,
+    /// ANGLE's Direct3D 11 device and surfaces on Direct3D textures (`None` when an entry point is
+    /// missing): drawing buffers presented into shared textures.
+    #[cfg(windows)]
+    pub d3d: Option<EglD3d>,
 }
 
 /// The folders searched for ANGLE: the executable's, then its parent (test binaries run from
@@ -381,7 +403,8 @@ pub fn load() -> Result<Angle, String> {
             .map_or(std::ptr::null(), |f| f as *const c_void)
     };
     let gl = Gles::load(&mut from_gles)?;
-    Ok(Angle { egl, gl })
+    let d3d = EglD3d::load(&mut from_egl).ok();
+    Ok(Angle { egl, gl, d3d })
 }
 
 #[cfg(not(windows))]

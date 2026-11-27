@@ -82,12 +82,25 @@ fn word_shaped_text_draws_the_pixels_of_whole_runs() {
         let b = render(&text, &words);
         let inked = a.data.chunks(4).filter(|p| p[0] < 128).count();
         assert!(inked > 2000, "{family}: {inked}");
-        let differ = a
-            .data
-            .chunks(4)
-            .zip(b.data.chunks(4))
-            .filter(|(x, y)| x != y)
-            .count();
-        assert_eq!(differ, 0, "{family}: {differ} pixels differ");
+        // Which lines differ, and from where: a failure names the words to look at.
+        let mut lines: Vec<(usize, u32)> = Vec::new();
+        let mut differ = 0;
+        for (i, (x, y)) in a.data.chunks(4).zip(b.data.chunks(4)).enumerate() {
+            if x != y {
+                differ += 1;
+                let (px, py) = (i as u32 % a.width, i as u32 / a.width);
+                // (line i's baseline is at 30 + 34 i)
+                let line = (py.saturating_sub(8) / 34) as usize;
+                match lines.iter_mut().find(|(l, _)| *l == line) {
+                    Some((_, from)) => *from = (*from).min(px),
+                    None => lines.push((line, px)),
+                }
+            }
+        }
+        let at: Vec<String> = lines
+            .iter()
+            .map(|&(l, px)| format!("line {l} {:?} from x {px}", LINES.get(l)))
+            .collect();
+        assert_eq!(differ, 0, "{family}: {differ} pixels differ: {at:?}");
     }
 }

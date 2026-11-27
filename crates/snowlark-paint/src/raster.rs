@@ -1284,11 +1284,16 @@ impl<'a> Painter<'a> {
                     rendering,
                 } => self.image(image, &self.snapped(&dest), &src, opacity, rendering)?,
                 Item::Video {
-                    image, dest, clip, ..
+                    image,
+                    dest,
+                    clip,
+                    transparent,
+                    ..
                 } => {
                     let (dest, clip) = (self.snapped(&dest), self.snapped(&clip));
                     // The frame copied to memory, or black until there is one (a compositor draws
-                    // the GPU frame over it).
+                    // the GPU frame over it); a transparent one (a canvas's) leaves what is under
+                    // it.
                     let shown = dest.intersect(&clip);
                     match image {
                         Some(image) => {
@@ -1309,6 +1314,7 @@ impl<'a> Painter<'a> {
                                 self.close(open);
                             }
                         }
+                        None if transparent => {}
                         None => {
                             self.ctx
                                 .FillRectangle(&rect_f(&shown), self.brush(Color::BLACK));

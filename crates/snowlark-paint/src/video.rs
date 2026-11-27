@@ -125,7 +125,10 @@ struct SharedPool {
     width: u32,
     height: u32,
     keyed: Vec<IDXGIKeyedMutex>,
+    /// Each texture as an opaque bitmap (a video's frames).
     bitmaps: Vec<ID2D1Bitmap1>,
+    /// Each texture as a premultiplied one (a canvas's frames, drawn over what is under them).
+    premultiplied: Vec<ID2D1Bitmap1>,
 }
 
 // SAFETY: resources of the shared device (see `VideoSlot`); a pool's keyed mutexes are used only by
@@ -497,14 +500,29 @@ impl VideoStore {
         }
     }
 
-    /// The frame to draw for `id` (a slot's or a renderer's video): its bitmap and size.
-    pub fn front_of(&self, id: VideoId) -> Option<(ID2D1Bitmap1, u32, u32)> {
+    /// The frame to draw for `id` (a slot's or a renderer's video): its bitmap and size. A
+    /// `transparent` one (a renderer's canvas, [`crate::Item::Video`]) is premultiplied, a video's
+    /// opaque.
+    pub fn front_of(&self, id: VideoId, transparent: bool) -> Option<(ID2D1Bitmap1, u32, u32)> {
         if let Some(slot) = self.get(id) {
             return slot.front();
         }
         let imported = self.imported.lock().unwrap();
         let (pool, i) = imported.get(&id.0)?.front.as_ref()?;
-        Some((pool.bitmaps[*i].clone(), pool.width, pool.height))
+        let bitmaps = if transparent {
+            &pool.premultiplied
+        } else {
+            &pool.bitmaps
+        };
+        Some((bitmaps[*i].clone(), pool.width, pool.height))
+    }
+
+    /// In a renderer process: a new id among its videos for a canvas whose frames go to the browser
+    /// through the shared textures it asks for ([`VideoExport::pool`], [`VideoExport::frame`];
+    /// [`VideoExport::removed`] when it is gone), and the way there. `None` in any other store.
+    pub fn canvas_export(&self) -> Option<(VideoId, Arc<dyn VideoExport>)> {
+        let export = self.export.clone()?;
+        Some((VideoId(self.next.fetch_add(1, Ordering::Relaxed)), export))
     }
 }
 
@@ -529,7 +547,18 @@ fn make_shared(gpu: &Gpu, width: u32, height: u32) -> Result<(SharedPool, Vec<Ow
     };
     let mut keyed = Vec::with_capacity(POOL_TEXTURES);
     let mut bitmaps = Vec::with_capacity(POOL_TEXTURES);
+    let mut premultiplied = Vec::with_capacity(POOL_TEXTURES);
     let mut handles = Vec::with_capacity(POOL_TEXTURES);
+    let properties = |alpha| D2D1_BITMAP_PROPERTIES1 {
+        pixelFormat: D2D1_PIXEL_FORMAT {
+            format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            alphaMode: alpha,
+        },
+        dpiX: 96.0,
+        dpiY: 96.0,
+        bitmapOptions: D2D1_BITMAP_OPTIONS_NONE,
+        colorContext: ManuallyDrop::new(None),
+    };
     // SAFETY: texture creation with a valid description on the shared device; each bitmap wraps its
     // texture's surface and keeps it alive; each NT handle is new, owned and closed with its
     // `OwnedHandle`.
@@ -552,16 +581,11 @@ fn make_shared(gpu: &Gpu, width: u32, height: u32) -> Result<(SharedPool, Vec<Ow
             let surface: IDXGISurface = texture.cast()?;
             bitmaps.push(ctx.CreateBitmapFromDxgiSurface(
                 &surface,
-                Some(&D2D1_BITMAP_PROPERTIES1 {
-                    pixelFormat: D2D1_PIXEL_FORMAT {
-                        format: DXGI_FORMAT_B8G8R8A8_UNORM,
-                        alphaMode: D2D1_ALPHA_MODE_IGNORE,
-                    },
-                    dpiX: 96.0,
-                    dpiY: 96.0,
-                    bitmapOptions: D2D1_BITMAP_OPTIONS_NONE,
-                    colorContext: ManuallyDrop::new(None),
-                }),
+                Some(&properties(D2D1_ALPHA_MODE_IGNORE)),
+            )?);
+            premultiplied.push(ctx.CreateBitmapFromDxgiSurface(
+                &surface,
+                Some(&properties(D2D1_ALPHA_MODE_PREMULTIPLIED)),
             )?);
             keyed.push(texture.cast()?);
         }
@@ -573,6 +597,7 @@ fn make_shared(gpu: &Gpu, width: u32, height: u32) -> Result<(SharedPool, Vec<Ow
             height,
             keyed,
             bitmaps,
+            premultiplied,
         },
         handles,
     ))
@@ -1047,7 +1072,7 @@ mod tests {
         fn shows(&self, gpu: &Gpu, id: VideoId, bgr: [u8; 3]) {
             let id = self.ids.lock().unwrap()[&id.0];
             self.store.latch(id);
-            let (bitmap, w, h) = self.store.front_of(id).unwrap();
+            let (bitmap, w, h) = self.store.front_of(id, false).unwrap();
             let f = read_bitmap(gpu, &bitmap, w, h).unwrap();
             assert_eq!(&f.pixels[..3], &bgr, "the frame drawn");
         }
@@ -1105,7 +1130,7 @@ mod tests {
         let shows = |bgr: [u8; 3]| {
             let id = browser.ids.lock().unwrap()[&slot.id().0];
             browser.store.latch(id);
-            let (bitmap, w, h) = browser.store.front_of(id).unwrap();
+            let (bitmap, w, h) = browser.store.front_of(id, false).unwrap();
             let f = read_bitmap(&browser_gpu, &bitmap, w, h).unwrap();
             assert_eq!(&f.pixels[..3], &bgr, "the frame drawn");
         };
@@ -1132,14 +1157,17 @@ mod tests {
         renderer.frame_ready(slot.id());
         shows([0xFF, 0, 0]);
         let id = browser.ids.lock().unwrap()[&slot.id().0];
-        assert_eq!(browser.store.front_of(id).map(|f| (f.1, f.2)), Some((8, 2)));
+        assert_eq!(
+            browser.store.front_of(id, false).map(|f| (f.1, f.2)),
+            Some((8, 2))
+        );
         // A frame of no pool, or no texture, is refused.
         assert!(!browser.store.imported_frame(id, 1, 0));
         assert!(!browser.store.imported_frame(id, 2, POOL_TEXTURES as u32));
         assert!(!browser.store.imported_frame(VideoId(999), 2, 0));
         // Removed in the renderer, it is gone in the browser.
         renderer.remove(slot.id());
-        assert!(browser.store.front_of(id).is_none());
+        assert!(browser.store.front_of(id, false).is_none());
         assert!(browser.ids.lock().unwrap().is_empty());
     }
 

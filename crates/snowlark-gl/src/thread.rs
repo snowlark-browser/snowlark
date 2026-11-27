@@ -36,6 +36,10 @@ enum Request {
     Submit(Vec<(ContextId, Command)>),
     Query(ContextId, Query, Sender<Answer>),
     Present(ContextId, Sender<Answer>),
+    #[cfg(windows)]
+    ShareInto(ContextId, Option<SharedTargets>, Sender<Answer>),
+    PresentShared(ContextId, Sender<Answer>),
+    ReadPresented(ContextId, Sender<Answer>),
 }
 
 enum Answer {
@@ -43,6 +47,9 @@ enum Answer {
     Created(Result<Created, String>),
     Reply(Reply),
     Readback(Option<Readback>),
+    #[cfg(windows)]
+    Shared(bool),
+    PresentedShared(SharedPresent),
 }
 
 /// What the thread owns: the devices it opened (graphics card, WARP) and which one each context is
@@ -132,6 +139,21 @@ impl Host {
             }
             Request::Present(id, answer) => {
                 let rb = self.of(id).and_then(|d| d.present(id));
+                let _ = answer.send(Answer::Readback(rb));
+            }
+            #[cfg(windows)]
+            Request::ShareInto(id, targets, answer) => {
+                let ok = self.of(id).is_some_and(|d| d.share_into(id, targets));
+                let _ = answer.send(Answer::Shared(ok));
+            }
+            Request::PresentShared(id, answer) => {
+                let p = self
+                    .of(id)
+                    .map_or(SharedPresent::Unavailable, |d| d.present_shared(id));
+                let _ = answer.send(Answer::PresentedShared(p));
+            }
+            Request::ReadPresented(id, answer) => {
+                let rb = self.of(id).and_then(|d| d.read_presented(id));
                 let _ = answer.send(Answer::Readback(rb));
             }
         }
@@ -295,6 +317,35 @@ impl Backend for Service {
     fn present(&mut self, id: ContextId) -> Option<Readback> {
         let &g = self.ids.get(&id)?;
         match self.ask(Request::Present(g, self.answer.clone()))? {
+            Answer::Readback(rb) => rb,
+            _ => None,
+        }
+    }
+
+    #[cfg(windows)]
+    fn share_into(&mut self, id: ContextId, targets: Option<SharedTargets>) -> bool {
+        let Some(&g) = self.ids.get(&id) else {
+            return false;
+        };
+        matches!(
+            self.ask(Request::ShareInto(g, targets, self.answer.clone())),
+            Some(Answer::Shared(true))
+        )
+    }
+
+    fn present_shared(&mut self, id: ContextId) -> SharedPresent {
+        let Some(&g) = self.ids.get(&id) else {
+            return SharedPresent::Unavailable;
+        };
+        match self.ask(Request::PresentShared(g, self.answer.clone())) {
+            Some(Answer::PresentedShared(p)) => p,
+            _ => SharedPresent::Unavailable,
+        }
+    }
+
+    fn read_presented(&mut self, id: ContextId) -> Option<Readback> {
+        let &g = self.ids.get(&id)?;
+        match self.ask(Request::ReadPresented(g, self.answer.clone()))? {
             Answer::Readback(rb) => rb,
             _ => None,
         }

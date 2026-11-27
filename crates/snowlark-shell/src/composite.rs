@@ -1830,8 +1830,9 @@ fn draw_videos(
         let dest = q.dest.translate(dx, dy);
         match q.picture {
             Picture::Frames(video) => {
-                if let Some(front) = store.and_then(|s| s.front_of(video)) {
-                    pass.video_frame(&front, dest, visible);
+                if let Some(front) = store.and_then(|s| s.front_of(video, q.transparent)) {
+                    // (a canvas's frame is bottom row first, as OpenGL stores it)
+                    pass.video_frame(&front, dest, visible, q.transparent);
                 }
             }
             Picture::Protected(player) => {

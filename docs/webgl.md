@@ -121,10 +121,19 @@ touches restored (WebGL 1.0 §2.2). The client turns the pixels into the canvas'
 first; premultiplied by the client when `premultipliedAlpha` is false, opaque when `alpha` is false) and hands it to
 the renderer exactly as a 2D canvas's frame. `toDataURL()` reads the buffer without clearing it.
 
-The readback is the first stage's cost: a copy from the graphics card every frame a canvas draws. The next form
-shares the drawing buffer as a Direct3D 11 texture (ANGLE's `EGL_ANGLE_d3d_texture_client_buffer` or a shared
-handle with a keyed mutex, as video frames already reach the compositor), double-buffered so the page draws into
-one while the compositor samples the other.
+The readback costs a copy from the graphics card every frame a canvas draws. In a renderer process's window on
+Windows, a WebGL 2.0 canvas with premultiplied alpha skips it (`snowlark-page` `engine/webgl_shared.rs`,
+`snowlark-gl` `service/shared.rs`): the browser makes shared textures for the canvas as for a renderer's video
+(NT handles, keyed mutexes; `snowlark-paint` `video.rs`), the service opens them on ANGLE's own Direct3D 11 device
+(`EGL_EXT_device_query`) as pbuffers over the textures (`EGL_ANGLE_d3d_texture_client_buffer`), and a present is
+one `glBlitFramebuffer` with the texture as the draw surface and the drawing buffer as the read surface, which
+also resolves its samples. The texture holds the rows bottom first, as OpenGL stores them; the compositor draws the
+canvas as a transparent video item (premultiplied, rows flipped) at the display's rate, so neither a readback nor a
+repaint of the canvas's tiles happens per frame. Each present also copies the frame into a texture of the
+context's own: a canvas that a paint puts where a quad cannot show it (an opacity, filter or mask group, a shaped
+clip, a rotation) leaves the shared textures and shows that frame as its bitmap, read back once, and reads back
+from then on. WebGL 1.0 contexts (OpenGL ES 2.0 in ANGLE's WebGL mode has no blit), contexts without
+premultiplied alpha, `OffscreenCanvas`, the single process model and the headless modes read back.
 
 ## Texture uploads
 
@@ -207,7 +216,8 @@ a WebGL page waits for each canvas's frame at the rendering update, as it does f
 | S4 | Conformance: WPT `webgl/` and the Khronos WebGL conformance suite where it runs; `OffscreenCanvas` and WebGL in workers (done: WebGL 1 on an OffscreenCanvas in a window or a worker, `createImageBitmap`); the service in the GPU process | The conformance counts; WebGL with the renderer sandbox on |
 
 S2 so far: uploads from `ImageData`, images and canvases with the unpack parameters, and WebGL canvases in 2D
-ones (above); left: video frames, colour space conversion `NONE`, and the drawing buffer as a shared texture.
+ones (above), and the drawing buffer as a shared texture for WebGL 2.0 canvases in the window; left: video frames,
+colour space conversion `NONE`, and the shared texture for WebGL 1.0 contexts.
 
 Known gaps of S1 besides the later stages: GL objects are freed with the page, not when script drops the last
 reference; a canvas removed from the document keeps its context until the page goes.

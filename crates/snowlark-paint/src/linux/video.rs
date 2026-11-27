@@ -162,8 +162,9 @@ impl VideoStore {
     /// The compositor's thread, between frames: the newest frame is already the one drawn here.
     pub fn latch(&self, _id: VideoId) {}
 
-    /// The frame to draw for `id`.
-    pub fn front_of(&self, id: VideoId) -> Option<VideoFront> {
+    /// The frame to draw for `id` (`_transparent`: a canvas's frames, which only a Windows
+    /// renderer sends through shared textures).
+    pub fn front_of(&self, id: VideoId, _transparent: bool) -> Option<VideoFront> {
         let slot = self.get(id)?;
         let front = slot.front.lock().unwrap().clone();
         front.map(VideoFront)
@@ -434,12 +435,12 @@ mod tests {
         assert_ne!(a.id(), b.id());
         assert_eq!(store.len(), 2);
         assert_eq!(a.frame_count(), 0);
-        assert!(store.front_of(a.id()).is_none());
+        assert!(store.front_of(a.id(), false).is_none());
         a.present(2, 1, vec![1, 2, 3, 255, 4, 5, 6, 255]);
         assert_eq!(a.frame_count(), 1);
         assert_eq!(a.size(), Some((2, 1)));
         assert_eq!(*told.lock().unwrap(), vec![a.id()]);
-        let front = store.front_of(a.id()).unwrap();
+        let front = store.front_of(a.id(), false).unwrap();
         assert_eq!(front.0.pixels[4..], [4, 5, 6, 255]);
         let gpu = store.gpu().unwrap().clone();
         assert_eq!(a.read_front(&gpu).unwrap().unwrap().width, 2);
@@ -483,11 +484,11 @@ mod tests {
         assert_eq!(slot.id(), window, "one video on each side");
         for i in 0..5u8 {
             slot.present(2, 1, vec![i, 0, 0, 255, 0, i, 0, 255]);
-            let front = browser.front_of(window).unwrap();
+            let front = browser.front_of(window, false).unwrap();
             assert_eq!(front.0.pixels, [i, 0, 0, 255, 0, i, 0, 255]);
         }
         slot.present(1, 1, vec![9, 9, 9, 255]);
-        assert_eq!(browser.front_of(window).unwrap().0.width, 1);
+        assert_eq!(browser.front_of(window, false).unwrap().0.width, 1);
         assert!(
             !browser.imported_frame(window, 0, 0),
             "an old pool's buffer"

@@ -118,6 +118,8 @@ pub struct DocumentStyles<'a> {
     embedded_documents: Option<&'a HashMap<NodeId, NodeId>>,
     /// Media elements' state from the page, and the frames copied to memory.
     media: Option<MediaMaps<'a>>,
+    /// The canvases whose frames reach the compositor on the GPU, by element.
+    canvas_videos: Option<&'a HashMap<NodeId, snowlark_paint::VideoId>>,
     /// Anonymous box styles by (parent values address, kind); the entry holds the parent so the address
     /// stays its own.
     anonymous: RefCell<AnonymousCache>,
@@ -281,6 +283,7 @@ impl<'a> DocumentStyles<'a> {
             embed_types: None,
             embedded_documents: None,
             media: None,
+            canvas_videos: None,
             anonymous: RefCell::new(HashMap::new()),
             generated: OnceCell::new(),
             may_style_markers: OnceCell::new(),
@@ -400,6 +403,16 @@ impl<'a> DocumentStyles<'a> {
         self
     }
 
+    /// The canvases whose frames reach the compositor on the GPU (shared textures, not a
+    /// bitmap): each paints as its frames' video item.
+    pub fn with_canvas_videos(
+        mut self,
+        videos: &'a HashMap<NodeId, snowlark_paint::VideoId>,
+    ) -> Self {
+        self.canvas_videos = Some(videos);
+        self
+    }
+
     /// A media element's content (HTML §15.4.? "video", §4.8.11 controls): a video's natural size
     /// is its own once known, else its poster's, else none (the 300×150 default object size); it
     /// shows its poster until a frame shows. An `<audio>` with `controls` is its controls (300×54).
@@ -428,6 +441,7 @@ impl<'a> DocumentStyles<'a> {
                     protected: None,
                     frame_image: None,
                     controls,
+                    canvas: false,
                 })),
                 ..ReplacedContent::default()
             });
@@ -469,6 +483,7 @@ impl<'a> DocumentStyles<'a> {
                 },
                 frame_image: if show_frame { frame_image } else { None },
                 controls,
+                canvas: false,
             })),
             generated: None,
             svg_root: false,
@@ -671,18 +686,27 @@ impl<'a> DocumentStyles<'a> {
                 local_name!("audio") => return self.media_content(el, false),
                 local_name!("canvas") => {
                     // HTML §4.12.5: a canvas's natural size is its width and height attributes,
-                    // 300×150 by default. A canvas that drew shows its bitmap.
+                    // 300×150 by default. A canvas that drew shows its bitmap, or its frames on
+                    // the GPU (a WebGL canvas presenting into shared textures).
+                    let video = self.canvas_videos.and_then(|v| v.get(&el)).copied();
                     let image = match self.images.get(&el) {
-                        Some(ImageState::Loaded(i)) => Some(i.id),
+                        Some(ImageState::Loaded(i)) if video.is_none() => Some(i.id),
                         _ => None,
                     };
+                    let media = video.map(|video| {
+                        Arc::new(snowlark_layout::media::MediaContent {
+                            video: Some(video),
+                            canvas: true,
+                            ..Default::default()
+                        })
+                    });
                     return Some(ReplacedContent {
                         image,
                         natural_width: Some(attr_px("width").unwrap_or(300.0)),
                         natural_height: Some(attr_px("height").unwrap_or(150.0)),
                         natural_ratio: None,
                         control: None,
-                        media: None,
+                        media,
                         generated: None,
                         svg_root: false,
                     });

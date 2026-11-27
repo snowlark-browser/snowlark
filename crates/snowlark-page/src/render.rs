@@ -1692,8 +1692,11 @@ impl Engine {
         let doc = self.rendered_top()?;
         let list = self.paint_document(doc, Some(origin), scale);
         // (what a compositor runs from this frame on: `docs/compositor-animations.md`, S3)
-        if list.is_some() {
+        if let Some(_painted) = &list {
             self.note_compositor_frame();
+            // (WebGL canvases whose GPU frames this list puts where a quad cannot show them)
+            #[cfg(windows)]
+            self.canvases_off_quads(_painted);
         }
         list
     }

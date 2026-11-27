@@ -33,15 +33,20 @@ pub struct VideoQuad {
     pub clip: Rect,
     /// What the page paints over the video, and where its pixel (0, 0) is.
     pub patch: Option<(TiledFrame, (i32, i32))>,
+    /// A canvas's frames: premultiplied, drawn over the tiles under them ([`Item::Video`]).
+    pub transparent: bool,
 }
 
-/// The video items of a list: (index, video, device dest, device visible rect). Videos under a
-/// transform that is not a translation or scale are left to the tiles.
+/// The video items of a list: (index, video, device dest, device visible rect). Those a quad
+/// cannot show ([`DisplayList::video_quads`]: under a transform that is not a translation or
+/// scale, or a canvas's in a group) are left to the tiles.
 pub fn video_items(list: &DisplayList, scale: f32) -> Vec<(usize, Picture, Rect, Rect)> {
     let mut out = Vec::new();
-    if !list.items.iter().any(Item::is_video) {
+    let quads = list.video_quads();
+    if quads.is_empty() {
         return out;
     }
+    let mut quads = quads.into_iter();
     let mut transforms = vec![Matrix::scale(scale, scale)];
     let mut clips = vec![Rect::infinite()];
     for (i, item) in list.items.iter().enumerate() {
@@ -62,7 +67,8 @@ pub fn video_items(list: &DisplayList, scale: f32) -> Vec<(usize, Picture, Rect,
                 transforms.pop();
             }
             Item::Video { dest, clip, .. } | Item::ProtectedVideo { dest, clip, .. } => {
-                if !m.is_axis_aligned() {
+                // (the same items in the same order)
+                if !quads.next().is_some_and(|(at, ok)| at == i && ok) {
                     continue;
                 }
                 let picture = match item {
@@ -221,11 +227,19 @@ pub fn quads(
         } else {
             None
         };
+        let transparent = matches!(
+            list.items[index],
+            Item::Video {
+                transparent: true,
+                ..
+            }
+        );
         out.push(VideoQuad {
             picture,
             dest,
             clip: visible,
             patch,
+            transparent,
         });
     }
     out

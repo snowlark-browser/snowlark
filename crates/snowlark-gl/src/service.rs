@@ -21,6 +21,9 @@ use std::ptr::{null, null_mut};
 use crate::ffi::*;
 use crate::protocol::*;
 
+#[cfg(windows)]
+mod shared;
+
 // OpenGL ES 2.0 enums the service uses itself.
 const GL_FRAMEBUFFER: u32 = 0x8D40;
 const GL_FRAMEBUFFER_BINDING: u32 = 0x8CA6;
@@ -92,6 +95,11 @@ struct Context {
     names: HashMap<(Kind, u32), u32>,
     /// Client ids of fences to ANGLE's sync objects (pointers, kept as addresses).
     syncs: HashMap<u32, usize>,
+    /// A page error the service read before work of its own, for the page's next `getError`.
+    held_error: u32,
+    /// The shared textures the context presents into ([`Backend::share_into`]).
+    #[cfg(windows)]
+    shared: Option<shared::Targets>,
 }
 
 /// The displays [`Device::new`] tries, in order: each an attribute list for
@@ -1022,6 +1030,16 @@ impl Device {
 
     fn answer(&mut self, id: ContextId, q: &Query) -> Reply {
         use Query as Q;
+        if matches!(q, Q::Error) {
+            // (an error of the page's the service read before its own work comes first)
+            let held = self
+                .contexts
+                .get_mut(&id)
+                .map_or(0, |c| std::mem::take(&mut c.held_error));
+            if held != 0 {
+                return Reply::Int(held as i32);
+            }
+        }
         let gl = &self.angle.gl;
         let n = |kind, client| self.name(id, kind, client);
         // SAFETY (every call below): the context is current; out pointers are locals or buffers
@@ -1504,6 +1522,23 @@ impl Device {
         }
     }
 
+    /// The current context's pending error, read before work of the service's own.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    fn take_page_error(&self) -> u32 {
+        // SAFETY: no arguments; a context is current.
+        unsafe { (self.angle.gl.glGetError)() }
+    }
+
+    /// Keeps `error` (from [`Device::take_page_error`]) for the page's next `getError`.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    fn hold_page_error(&mut self, id: ContextId, error: u32) {
+        if let Some(c) = self.contexts.get_mut(&id) {
+            if c.held_error == 0 {
+                c.held_error = error;
+            }
+        }
+    }
+
     /// Clears the drawing buffer to its defaults (WebGL 1.0 §2.2: after the drawing buffer was
     /// presented), leaving every piece of state as the page set it.
     fn clear_drawing_buffer(&self, a: &Attributes) {
@@ -1663,6 +1698,9 @@ impl Backend for Device {
                 height,
                 names: HashMap::new(),
                 syncs: HashMap::new(),
+                held_error: 0,
+                #[cfg(windows)]
+                shared: None,
             },
         );
         self.current = None;
@@ -1695,6 +1733,11 @@ impl Backend for Device {
         c.surface = surface;
         c.width = width;
         c.height = height;
+        // (shared textures are of the old size)
+        #[cfg(windows)]
+        if let Some(t) = c.shared.take() {
+            self.release_targets(t);
+        }
         self.current = None;
         self.make_current(id);
         // SAFETY: the old surface is no longer current.
@@ -1705,6 +1748,24 @@ impl Backend for Device {
         let Some(c) = self.contexts.remove(&id) else {
             return;
         };
+        #[cfg(windows)]
+        let mut c = c;
+        #[cfg(windows)]
+        if let Some(t) = c.shared.take() {
+            if self.current == Some(id) {
+                // SAFETY: releasing the current context before its targets' surfaces go.
+                unsafe {
+                    (self.angle.egl.eglMakeCurrent)(
+                        self.display,
+                        null_mut(),
+                        null_mut(),
+                        null_mut(),
+                    )
+                };
+                self.current = None;
+            }
+            self.release_targets(t);
+        }
         let e = &self.angle.egl;
         // SAFETY: releasing the current context first; then the context's own objects.
         unsafe {
@@ -1802,6 +1863,31 @@ impl Backend for Device {
             height: h,
             rgba,
         })
+    }
+
+    #[cfg(windows)]
+    fn share_into(&mut self, id: ContextId, targets: Option<SharedTargets>) -> bool {
+        self.share_into_targets(id, targets)
+    }
+
+    fn present_shared(&mut self, id: ContextId) -> SharedPresent {
+        #[cfg(windows)]
+        return self.present_into_target(id);
+        #[cfg(not(windows))]
+        {
+            let _ = id;
+            SharedPresent::Unavailable
+        }
+    }
+
+    fn read_presented(&mut self, id: ContextId) -> Option<Readback> {
+        #[cfg(windows)]
+        return self.read_front(id);
+        #[cfg(not(windows))]
+        {
+            let _ = id;
+            None
+        }
     }
 }
 

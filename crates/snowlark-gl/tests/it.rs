@@ -5,6 +5,8 @@
 //! The crate's integration tests: one binary, each file a module.
 
 mod service;
+#[cfg(windows)]
+mod shared_present;
 mod threads;
 mod webgl2;
 

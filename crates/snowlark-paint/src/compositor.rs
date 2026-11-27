@@ -1152,19 +1152,21 @@ impl ContentPass<'_> {
     /// frame was drawn.
     pub fn video(&mut self, slot: &crate::video::VideoSlot, dest: Rect, clip: Rect) -> bool {
         match slot.front() {
-            Some(front) => self.video_frame(&front, dest, clip),
+            Some(front) => self.video_frame(&front, dest, clip, false),
             None => false,
         }
     }
 
     /// Draws a video frame (a bitmap of the shared device and its size, from
     /// [`crate::video::VideoStore::front_of`]) into `dest`, within `clip`, filtered linearly.
-    /// Returns whether it drew.
+    /// With `flip_rows`, the bitmap's rows are bottom to top (a canvas's frame as OpenGL stores
+    /// it). Returns whether it drew.
     pub fn video_frame(
         &mut self,
         front: &(ID2D1Bitmap1, u32, u32),
         dest: Rect,
         clip: Rect,
+        flip_rows: bool,
     ) -> bool {
         let (bitmap, w, h) = (&front.0, front.1, front.2);
         let (dest, clip) = (self.at(dest), self.at(clip));
@@ -1179,6 +1181,17 @@ impl ContentPass<'_> {
             self.ctx.SetTransform(&Matrix3x2::identity());
             self.ctx
                 .PushAxisAlignedClip(&rect_f(&clip), D2D1_ANTIALIAS_MODE_ALIASED);
+            if flip_rows {
+                // (y → top + bottom - y: the destination itself, upside down)
+                self.ctx.SetTransform(&Matrix3x2 {
+                    M11: 1.0,
+                    M12: 0.0,
+                    M21: 0.0,
+                    M22: -1.0,
+                    M31: 0.0,
+                    M32: 2.0 * dest.y + dest.height,
+                });
+            }
             self.ctx.DrawBitmap(
                 bitmap,
                 Some(&rect_f(&dest)),
@@ -1187,6 +1200,7 @@ impl ContentPass<'_> {
                 Some(&rect_f(&Rect::new(0.0, 0.0, w as f32, h as f32))),
                 None,
             );
+            self.ctx.SetTransform(&Matrix3x2::identity());
             self.ctx.PopAxisAlignedClip();
         }
         true

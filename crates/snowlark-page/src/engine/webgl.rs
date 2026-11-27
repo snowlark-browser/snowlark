@@ -35,6 +35,10 @@ use webgl2::Gl2State;
 mod webgl_ext;
 use webgl_ext::ExtState;
 
+#[cfg(windows)]
+#[path = "webgl_shared.rs"]
+mod webgl_shared;
+
 /// The OpenGL ES 2.0 and WebGL enums this file uses.
 mod c {
     pub const NO_ERROR: u32 = 0;
@@ -131,6 +135,12 @@ pub struct ContextObj {
     colorspace_conversion: u32,
     drawing_buffer_color_space: g::PredefinedColorSpace,
     unpack_color_space: g::PredefinedColorSpace,
+    /// Its frames go to the browser's shared textures ([`webgl_shared`]).
+    #[cfg(windows)]
+    shared: Option<webgl_shared::SharedOut>,
+    /// Its frames are read back for good (it has no shared textures, or left them).
+    #[cfg_attr(not(windows), allow(dead_code))]
+    shared_off: bool,
 }
 
 /// A `WebGLBuffer`, `WebGLFramebuffer`, `WebGLProgram`, `WebGLRenderbuffer`, `WebGLShader` or
@@ -965,6 +975,9 @@ impl Engine {
                 colorspace_conversion: c::BROWSER_DEFAULT_WEBGL,
                 drawing_buffer_color_space: g::PredefinedColorSpace::Srgb,
                 unpack_color_space: g::PredefinedColorSpace::Srgb,
+                #[cfg(windows)]
+                shared: None,
+                shared_off: false,
             },
         )))));
         let mut gl = self.gl.borrow_mut();
@@ -1016,12 +1029,9 @@ impl Engine {
             if lost {
                 continue;
             }
-            let (readback, reset) = {
-                let Some(mut b) = self.gl_backend() else {
-                    return;
-                };
-                let reset = b.query(id, &Query::ResetStatus).int() != 0;
-                (if reset { None } else { b.present(id) }, reset)
+            let reset = match self.gl_backend() {
+                Some(mut b) => b.query(id, &Query::ResetStatus).int() != 0,
+                None => return,
             };
             if reset {
                 // WebGL 1.0 §5.15.2: the context is lost; script sees it from now on.
@@ -1031,6 +1041,14 @@ impl Engine {
                 });
                 continue;
             }
+            // (a canvas in a renderer process's window: its frame on the GPU, no readback)
+            #[cfg(windows)]
+            if let CanvasOwner::Element(node) = el {
+                if self.present_webgl_shared(h, node) {
+                    continue;
+                }
+            }
+            let readback = self.gl_backend().and_then(|mut b| b.present(id));
             if let Some(rb) = readback {
                 let frame = to_frame(rb, &attrs);
                 match el {

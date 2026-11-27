@@ -601,11 +601,16 @@ pub enum Item {
     /// element's content box). A rasterizer draws `image` (the frame copied to memory, or nothing:
     /// black); a compositor that has the video's frames on the GPU draws the latest one over it, at
     /// the display's rate (see `snowlark-paint`'s `video`).
+    ///
+    /// A `transparent` one is a canvas's frames (premultiplied, drawn over what is under them):
+    /// without `image` a rasterizer draws nothing in its place, and a compositor draws it as a quad
+    /// only where it composites as a plain source-over draw ([`DisplayList::video_quad_ok`]).
     Video {
         video: VideoId,
         image: Option<ImageId>,
         dest: Rect,
         clip: Rect,
+        transparent: bool,
     },
     /// The picture of a protected player of the embedder's key system (`player`: the page's id
     /// of it) in `dest`, clipped to `clip`, as [`Item::Video`]. Its frames never reach the page or
@@ -885,6 +890,59 @@ impl std::error::Error for ListError {}
 impl DisplayList {
     pub fn new() -> DisplayList {
         DisplayList::default()
+    }
+
+    /// For each video item ([`Item::is_video`]), its index and whether a compositor can draw it as
+    /// a quad over the tiles: only under transforms that keep it axis-aligned, and a transparent
+    /// [`Item::Video`] (a canvas's frames) also only outside the groups that change how it
+    /// composites with what is under it (opacity, filters, masks, plus-lighter) and outside clips
+    /// that are not rectangles, all of which a quad drawn over the tiles would skip.
+    pub fn video_quads(&self) -> Vec<(usize, bool)> {
+        let mut out = Vec::new();
+        if !self.items.iter().any(Item::is_video) {
+            return out;
+        }
+        let mut transforms = vec![Matrix::IDENTITY];
+        // (per clip and group pushed: whether it is one a transparent quad cannot show)
+        let mut clips: Vec<bool> = Vec::new();
+        let mut groups = 0u32;
+        for (i, item) in self.items.iter().enumerate() {
+            match item {
+                Item::PushClipRect { .. } => clips.push(false),
+                Item::PushClipRoundedRect { .. } | Item::PushClipPath { .. } => clips.push(true),
+                Item::PopClip => {
+                    clips.pop();
+                }
+                Item::PushTransform { matrix } => {
+                    let m = matrix.then(transforms.last().unwrap());
+                    transforms.push(m);
+                }
+                Item::PopTransform => {
+                    transforms.pop();
+                }
+                Item::PushOpacity { .. }
+                | Item::PushFilter { .. }
+                | Item::PushMask { .. }
+                | Item::PushPlus => groups += 1,
+                Item::PopOpacity | Item::PopFilter | Item::PopMask | Item::PopPlus => {
+                    groups = groups.saturating_sub(1)
+                }
+                Item::Video { .. } | Item::ProtectedVideo { .. } => {
+                    let aligned = transforms.last().unwrap().is_axis_aligned();
+                    let plain = groups == 0 && !clips.iter().any(|&c| c);
+                    let transparent = matches!(
+                        item,
+                        Item::Video {
+                            transparent: true,
+                            ..
+                        }
+                    );
+                    out.push((i, aligned && (plain || !transparent)));
+                }
+                _ => {}
+            }
+        }
+        out
     }
 
     /// Empties the list, keeping the vectors' capacity.
@@ -2944,6 +3002,22 @@ impl DisplayListBuilder {
             image,
             dest,
             clip,
+            transparent: false,
+        });
+    }
+
+    /// A canvas's frames on the GPU into `dest`, clipped to `clip`: a transparent
+    /// [`Item::Video`], drawn over what is under it, with nothing in its place until a frame shows.
+    pub fn canvas_video(&mut self, video: VideoId, dest: Rect, clip: Rect) {
+        if dest.intersect(&clip).is_empty() {
+            return;
+        }
+        self.list.items.push(Item::Video {
+            video,
+            image: None,
+            dest,
+            clip,
+            transparent: true,
         });
     }
 
@@ -3939,10 +4013,12 @@ impl Enc<'_> {
                 image,
                 dest,
                 clip,
+                transparent,
             } => {
                 self.u8(23);
                 self.u32(video.0);
-                self.u8(image.is_some() as u8);
+                // (bit 0: an image; bit 1: transparent)
+                self.u8(image.is_some() as u8 | (*transparent as u8) << 1);
                 self.u32(image.map_or(0, |i| i.0));
                 self.rect(dest);
                 self.rect(clip);
@@ -4582,17 +4658,17 @@ impl<'a> Dec<'a> {
             23 => {
                 let video = VideoId(self.u32()?);
                 let p = self.pos;
-                let has = match self.u8()? {
-                    0 => false,
-                    1 => true,
-                    _ => return Err(ListError::BadTag(p)),
-                };
+                let flags = self.u8()?;
+                if flags > 3 {
+                    return Err(ListError::BadTag(p));
+                }
                 let image = ImageId(self.u32()?);
                 Item::Video {
                     video,
-                    image: has.then_some(image),
+                    image: (flags & 1 != 0).then_some(image),
                     dest: self.rect()?,
                     clip: self.rect()?,
+                    transparent: flags & 2 != 0,
                 }
             }
             33 => {
@@ -5184,6 +5260,44 @@ mod tests {
         let mut bytes = Vec::new();
         bad.encode(&mut bytes);
         assert_eq!(DisplayList::decode(&bytes), Err(ListError::BadValue(0)));
+    }
+
+    /// A canvas's frames are a transparent video item, which round-trips; a compositor draws it as
+    /// a quad only where it composites as a plain draw, a video wherever it stays axis-aligned.
+    #[test]
+    fn a_canvas_video_is_a_quad_only_outside_groups_and_shaped_clips() {
+        let r = Rect::new(0.0, 0.0, 100.0, 50.0);
+        let mut b = DisplayListBuilder::new();
+        b.canvas_video(VideoId(1), r, r);
+        b.push_opacity(0.5, r);
+        b.canvas_video(VideoId(2), r, r);
+        b.video(VideoId(3), None, r, r);
+        b.pop_opacity();
+        b.push_clip_rounded_rect(r, Radii::uniform(4.0));
+        b.canvas_video(VideoId(4), r, r);
+        b.pop_clip();
+        b.push_clip_rect(r);
+        b.push_transform(Matrix::translation(3.0, 4.0));
+        b.canvas_video(VideoId(5), r, r);
+        b.pop_transform();
+        b.push_transform(Matrix::rotation(0.3));
+        b.video(VideoId(6), None, r, r);
+        b.pop_transform();
+        b.pop_clip();
+        let list = b.build();
+        let ok: Vec<bool> = list.video_quads().into_iter().map(|(_, ok)| ok).collect();
+        assert_eq!(ok, [true, false, true, false, true, false]);
+        assert!(matches!(
+            list.items[0],
+            Item::Video {
+                transparent: true,
+                image: None,
+                ..
+            }
+        ));
+        let mut bytes = Vec::new();
+        list.encode(&mut bytes);
+        assert_eq!(DisplayList::decode(&bytes), Ok(list));
     }
 
     #[test]

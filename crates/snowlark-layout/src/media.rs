@@ -25,6 +25,8 @@ pub struct MediaContent {
     pub frame_image: Option<snowlark_paint::ImageId>,
     /// The user agent's controls (the `controls` attribute).
     pub controls: Option<MediaControls>,
+    /// `video` is a canvas's frames on the GPU (premultiplied, over what is under them).
+    pub canvas: bool,
 }
 
 /// The state the controls show.
@@ -207,6 +209,8 @@ pub fn paint(
 ) {
     if let Some(player) = media.protected {
         out.protected_video(player, rect, clip);
+    } else if let (Some(video), true) = (media.video, media.canvas) {
+        out.canvas_video(video, rect, clip);
     } else if let Some(video) = media.video {
         out.video(video, media.frame_image, rect, clip);
     }
@@ -386,6 +390,7 @@ mod tests {
             video: Some(VideoId(3)),
             protected: None,
             frame_image: None,
+            canvas: false,
             controls: Some(MediaControls {
                 paused: true,
                 time: 5.0,

@@ -12,8 +12,11 @@ pub mod protocol;
 mod service;
 mod thread;
 
+#[cfg(windows)]
+pub use protocol::SharedTargets;
 pub use protocol::{
     Attributes, Backend, Command, ContextId, Created, Kind, Pixels, Query, Readback, Reply,
+    SharedPresent,
 };
 pub use thread::Service;
 
