@@ -75,7 +75,7 @@ Any recent x86-64 distribution works, as does WSL 2 with Ubuntu. On Debian or Ub
 
 ```sh
 sudo apt-get install -y build-essential clang lld pkg-config curl ca-certificates git python3 cmake ninja-build \
-    libfontconfig-dev libfreetype-dev libharfbuzz-dev \
+    libfontconfig-dev libfreetype-dev libharfbuzz-dev libwayland-dev libxkbcommon-dev libdbus-1-dev \
     fonts-liberation fonts-dejavu-core fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
 ```
 
