@@ -1248,7 +1248,7 @@ impl CanvasFiltersImpl for Engine {
         DomStr::Owned(self.ctx(this, |c| c.canvas.state.filter.clone()))
     }
     fn set_filter(&self, _cx: &mut Cx, this: Handle, value: &str) -> rt::Result<()> {
-        self.ctx(this, |c| c.canvas.state.filter = value.to_owned());
+        self.ctx(this, |c| c.canvas.state.set_filter(value));
         Ok(())
     }
 }

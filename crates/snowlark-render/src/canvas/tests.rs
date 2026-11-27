@@ -544,6 +544,56 @@ fn axis_aligned_images_cover_whole_pixels() {
     }
 }
 
+/// HTML "Filters": `filter` takes `none` or a `<filter-value-list>` and ignores anything else, and a
+/// drawing operation's image goes through it: colors, a blur that spreads past the shape (in canvas
+/// pixels, not scaled by the transform), and a drop shadow.
+#[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "needs the GPU canvas: Windows only until Linux stage 5"
+)]
+fn the_filter_applies_to_each_operation() {
+    let mut s = State::default();
+    for (value, kept) in [
+        ("invert(1)", "invert(1)"),
+        ("inherit", "invert(1)"),
+        ("blur(-1px)", "invert(1)"),
+        ("bogus(1)", "invert(1)"),
+        ("", "invert(1)"),
+        ("blur(2px) saturate(150%)", "blur(2px) saturate(150%)"),
+        ("none", "none"),
+    ] {
+        s.set_filter(value);
+        assert_eq!(s.filter, kept, "after {value:?}");
+    }
+    assert!(s.filter_ops.is_none());
+
+    let mut c = Canvas2D::with_backend(100, 40, GPU);
+    c.state.fill = color("red");
+    c.state.set_filter("invert(1)");
+    c.fill_rect(0.0, 0.0, 10.0, 10.0);
+    assert_eq!(pixel(&mut c, 5, 5), [0, 255, 255, 255]);
+    // (blur: alpha past the edge; 2 px out of a 20 px square)
+    c.state.set_filter("blur(4px)");
+    c.state.transform = Transform::from_scale(2.0, 2.0);
+    c.fill_rect(15.0, 5.0, 10.0, 10.0);
+    c.state.transform = Transform::identity();
+    let a = pixel(&mut c, 28, 20)[3];
+    assert!(a > 40 && a < 200, "blur past the edge: {a}");
+    let far = pixel(&mut c, 30 - 16, 20)[3];
+    assert_eq!(far, 0, "a blur of 4 canvas pixels, not 8");
+    // (a drop shadow below the shape, which stays as it was)
+    c.state.set_filter("drop-shadow(0 10px 0 blue)");
+    c.fill_rect(70.0, 0.0, 10.0, 10.0);
+    assert_eq!(pixel(&mut c, 75, 5), [255, 0, 0, 255]);
+    assert_eq!(pixel(&mut c, 75, 15), [0, 0, 255, 255]);
+    // (and none again draws as before)
+    c.state.set_filter("none");
+    c.fill_rect(90.0, 0.0, 10.0, 10.0);
+    assert_eq!(pixel(&mut c, 95, 5), [255, 0, 0, 255]);
+    assert_eq!(pixel(&mut c, 95, 12)[3], 0);
+}
+
 #[test]
 #[cfg_attr(
     not(windows),

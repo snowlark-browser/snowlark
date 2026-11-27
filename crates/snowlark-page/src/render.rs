@@ -1081,6 +1081,8 @@ impl Engine {
         if !self.is_rendered_document(doc) {
             return None;
         }
+        // (SVG 2 §5.6: the `use` trees of what script changed)
+        self.svg_use_sync_for_read();
         self.sync_frame_viewport(doc);
         self.sync_frame_color_scheme(doc);
         // (script animations' current values: the model takes effect immediately)
@@ -1121,6 +1123,8 @@ impl Engine {
         f: impl FnOnce(&mut Renderer) -> R,
     ) -> Option<R> {
         let mut now = None;
+        // (SVG 2 §5.6: the `use` trees of what script changed)
+        self.svg_use_sync_for_read();
         if let Some(doc) = {
             let dom = self.dom();
             dom.is_alive(node).then(|| dom.node_document(node))

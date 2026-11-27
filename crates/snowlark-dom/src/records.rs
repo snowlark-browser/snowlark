@@ -305,6 +305,11 @@ impl Dom {
         self.reactions.len()
     }
 
+    /// The queued reactions from `start` on, left in the queue.
+    pub fn queued_reactions(&self, start: usize) -> &[Reaction] {
+        self.reactions.get(start..).unwrap_or(&[])
+    }
+
     /// Hands back a list [`Dom::take_reactions`] returned, once handled, so the queue reuses its
     /// buffer instead of allocating one per operation.
     pub fn recycle_reactions(&mut self, mut list: Vec<Reaction>) {

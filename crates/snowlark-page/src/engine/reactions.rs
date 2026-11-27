@@ -251,8 +251,10 @@ impl Engine {
             let parsed_from = self.parsed_from.replace(None);
             let mut reactions = self.dom_mut().take_reactions();
             let removed = self.dom_mut().take_removed_descendants();
-            if !reactions.is_empty() {
-                self.render_dom_changed(&reactions);
+            // (those of `use` trees built for a script's read reached the renderer then)
+            let seen = self.reactions_rendered.replace(0).min(reactions.len());
+            if reactions.len() > seen {
+                self.render_dom_changed(&reactions[seen..]);
             }
             self.distribute_mutation_records(cx);
             if reactions.is_empty() {

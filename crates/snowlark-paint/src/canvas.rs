@@ -1286,13 +1286,21 @@ impl GpuCanvas {
         draw: impl Fn(&mut GpuCanvas) -> Result<()>,
     ) -> Result<()> {
         self.begin();
-        let direct = p.op == CompositeOp::SourceOver && p.shadow.is_none();
-        if direct {
+        if p.is_direct() {
             self.apply_clip(p.clip)?;
             return draw(self);
         }
         self.in_scratch(&draw)?;
-        let scratch: ID2D1Image = self.scratch.clone().unwrap().cast()?;
+        let mut scratch: ID2D1Image = self.scratch.clone().unwrap().cast()?;
+        // HTML "Filters": the image goes through the filter before its shadow is made from it and
+        // before it is composited; the filter's lengths are canvas pixels, not the transform's.
+        if let Some(ops) = p.filter {
+            // SAFETY: the context is in drawing on this thread, and the scratch image is of its
+            // device.
+            scratch = unsafe {
+                crate::effects::apply(&self.ctx, ops, &scratch, &Matrix::IDENTITY, &mut |_| None)?
+            };
+        }
         let shadow = match p.shadow {
             Some(s) => Some(self.shadow_image(&scratch, &s)?),
             None => None,
@@ -1512,7 +1520,7 @@ impl GpuCanvas {
     /// Fills a device-space shape.
     pub fn fill(&mut self, shape: FillShape, paint: &CanvasPaint, p: &DrawParams) -> Result<()> {
         if let (FillShape::Circle(c, r), CanvasPaint::Solid(color)) = (shape, paint) {
-            if p.op == CompositeOp::SourceOver && p.shadow.is_none() && r <= MAX_SPRITE_RADIUS {
+            if p.is_direct() && r <= MAX_SPRITE_RADIUS {
                 self.begin();
                 self.apply_clip(p.clip)?;
                 return self.sprite(c, r, 0.0, straight(*color, p.alpha));
@@ -1594,10 +1602,7 @@ impl GpuCanvas {
         if width.is_nan() || width <= 0.0 {
             return Ok(());
         }
-        if p.op == CompositeOp::SourceOver
-            && p.shadow.is_none()
-            && radius + width / 2.0 <= MAX_SPRITE_RADIUS
-        {
+        if p.is_direct() && radius + width / 2.0 <= MAX_SPRITE_RADIUS {
             self.begin();
             self.apply_clip(p.clip)?;
             return self.sprite(center, radius, width, straight(color, p.alpha));

@@ -60,9 +60,9 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 ## CSS and style
 
-- **CSS Shapes.** Lines wrap around `shape-outside` shapes, images and gradients, but an animated `inset()` or
-  `polygon()` reads back in a longer form than other browsers give (all four `inset()` sides),
-  and text beside a rounded shape can end at a fraction of a pixel and leave a hairline gap. (ref 760)
+- **CSS Shapes.** Lines wrap around `shape-outside` shapes, images and gradients, but text beside a rounded shape
+  can end at a fraction of a pixel and leave a hairline gap, and a `path()` in `shape-outside` reads back with
+  relative commands where other browsers make them absolute. (ref 760)
 - **CSS Typed OM, the rest.** The style property maps and `CSSStyleValue` objects work, but properties the style
   system does not have yet (`text-emphasis-color`, `counter-set`, `page` and a few more) are not
   in the maps, a percentage `opacity` reads back as a number, `step-start` as `steps(1, start)`, and a
@@ -123,7 +123,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 
 - **System-font text is not byte-stable between runs.** The same frames can differ by a few bytes from one run to the
   next. The cause is not established. (ref 87)
-- **Canvas 2D.** `ctx.filter` keeps its value but is not applied. (ref 499) Text drawn on an `OffscreenCanvas`
+- **Canvas 2D.** `ctx.filter` applies filter functions, but a `url()` to an SVG `<filter>` filters nothing and
+  a length in `em` is refused. (ref 499) Text drawn on an `OffscreenCanvas`
   inside a worker does not appear, and `getContext('bitmaprenderer')` is not supported. (ref 735)
 - **Pixel snapping inside transforms.** Box edges inside a scale or rotate transform are not snapped to device pixels.
   (ref 34)
@@ -166,8 +167,6 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **Credential Management and Battery details.** Early rejections in Credential Management run in the queued task,
   `getBattery()` creates a fresh rejected promise per call in a cross-origin frame, `parse*OptionsFromJSON` rejects with
   the wrong error, and a truncated body over TLS has no test. (ref 83)
-- **`use` trees are stale for script reads.** In the task that changes a `<use>` target, `elementFromPoint()` and
-  `getBBox()` still see the old instance until the next rendering update. (ref 84)
 - **Missing or partial APIs.** `LargestContentfulPaint`, `performance.eventCounts` and Trusted Types on the
   attribute-node paths are not implemented. Frames share the top-level document's time origin. (ref 33)
 - **XPath resolvers from another realm.** When a namespace resolver made in another frame is not callable, the

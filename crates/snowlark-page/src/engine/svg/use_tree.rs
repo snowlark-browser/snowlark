@@ -336,30 +336,90 @@ impl Engine {
     pub(crate) fn svg_use_sync(&self, cx: &mut Cx) {
         self.use_retarget();
         for _ in 0..=MAX_DEPTH {
-            let dirty = std::mem::take(&mut self.svg.borrow_mut().uses.dirty);
-            if dirty.is_empty() {
+            if !self.use_build_dirty() {
                 return;
-            }
-            let mut ids = super::smil::Ids::default();
-            let mut targets = Vec::with_capacity(dirty.len());
-            {
-                let dom = self.dom();
-                let mut list: Vec<NodeId> = dirty
-                    .into_iter()
-                    .filter(|&u| dom.is_alive(u) && dom.is_connected(u))
-                    .collect();
-                list.sort_by_key(|n| n.to_bits());
-                for u in list {
-                    targets.push((u, self.use_target(&dom, u, &mut ids)));
-                }
-            }
-            for (u, target) in targets {
-                self.use_build(u, target);
             }
             self.process_reactions(cx);
         }
         // (nesting beyond the guard: left as it is)
         self.svg.borrow_mut().uses.dirty.clear();
+    }
+
+    /// [`Engine::svg_use_sync`] for a script's read of style or layout, which has no script context:
+    /// the trees that changed are built first, as a rendering update's style update would. Their
+    /// clones run no script and construct no custom element, so of their reactions only the
+    /// renderer's part and this module's bookkeeping (which finds the `use` elements they hold) are
+    /// needed now; the reactions stay queued, and the rest of their steps run when the queue is next
+    /// drained, which then skips the renderer's part.
+    pub(crate) fn svg_use_sync_for_read(&self) {
+        if !self.use_trees_dirty() {
+            return;
+        }
+        // (only from a queue the renderer has seen whole, and outside any borrow of the tree: a
+        // read inside a DOM operation sees the trees as they were)
+        match self.dom.try_borrow_mut() {
+            Ok(dom) if dom.pending_reactions() == self.reactions_rendered.get() => {}
+            _ => return,
+        }
+        self.use_retarget();
+        for _ in 0..=MAX_DEPTH {
+            let start = self.reactions_rendered.get();
+            if !self.use_build_dirty() {
+                return;
+            }
+            let batch: Vec<snowlark_dom::Reaction> = self.dom().queued_reactions(start).to_vec();
+            self.reactions_rendered.set(start + batch.len());
+            if batch.is_empty() {
+                continue;
+            }
+            self.render_dom_changed(&batch);
+            for r in batch {
+                match r {
+                    snowlark_dom::Reaction::Inserted {
+                        node, connected, ..
+                    } if self.dom().is_element(node) => self.use_inserted(node, connected),
+                    snowlark_dom::Reaction::Removed {
+                        node, old_parent, ..
+                    } if self.dom().is_alive(node) && self.dom().is_element(node) => {
+                        self.use_removed(node, old_parent)
+                    }
+                    snowlark_dom::Reaction::AttributeChanged {
+                        element,
+                        local_name,
+                        ..
+                    } if self.dom().is_alive(element) => {
+                        self.use_attribute_changed(element, &local_name)
+                    }
+                    _ => {}
+                }
+            }
+        }
+        self.svg.borrow_mut().uses.dirty.clear();
+    }
+
+    /// Builds the trees marked dirty, once (`false`: there were none).
+    fn use_build_dirty(&self) -> bool {
+        let dirty = std::mem::take(&mut self.svg.borrow_mut().uses.dirty);
+        if dirty.is_empty() {
+            return false;
+        }
+        let mut ids = super::smil::Ids::default();
+        let mut targets = Vec::with_capacity(dirty.len());
+        {
+            let dom = self.dom();
+            let mut list: Vec<NodeId> = dirty
+                .into_iter()
+                .filter(|&u| dom.is_alive(u) && dom.is_connected(u))
+                .collect();
+            list.sort_by_key(|n| n.to_bits());
+            for u in list {
+                targets.push((u, self.use_target(&dom, u, &mut ids)));
+            }
+        }
+        for (u, target) in targets {
+            self.use_build(u, target);
+        }
+        true
     }
 
     /// Makes `u`'s tree an instance of `target`.

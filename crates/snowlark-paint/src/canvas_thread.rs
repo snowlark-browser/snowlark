@@ -36,6 +36,7 @@ use crate::canvas::{
     CanvasClip, CanvasDevice, CanvasImage, CanvasPaint, CompositeOp, DrawParams, FillShape,
     GpuCanvas, GradientStop, LineCap, LineJoin, PathData, Rgba, Shadow, StrokeParams,
 };
+use crate::filter::FilterOp;
 use crate::geom::{Matrix, Point, Rect};
 use crate::gpu::Driver;
 use crate::text::{ShapedText, TextEngine};
@@ -58,6 +59,7 @@ struct Params {
     op: CompositeOp,
     clip: Option<Arc<CanvasClip>>,
     shadow: Option<Shadow>,
+    filter: Option<Arc<[FilterOp]>>,
     smoothing: bool,
 }
 
@@ -69,6 +71,7 @@ impl Params {
             op: p.op,
             clip: p.clip.cloned(),
             shadow: p.shadow,
+            filter: p.filter.cloned(),
             smoothing: p.smoothing,
         }
     }
@@ -80,6 +83,7 @@ impl Params {
             op: self.op,
             clip: self.clip.as_ref(),
             shadow: self.shadow,
+            filter: self.filter.as_ref(),
             smoothing: self.smoothing,
         }
     }
@@ -1114,6 +1118,7 @@ mod tests {
             op: CompositeOp::SourceOver,
             clip: None,
             shadow: None,
+            filter: None,
             smoothing: true,
         }
     }

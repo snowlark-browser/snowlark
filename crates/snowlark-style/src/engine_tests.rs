@@ -299,6 +299,46 @@ fn the_d_attribute_is_parsed_as_path_data() {
     assert_eq!(p.value_of(b, "d"), "path(\"m 1 2 h 3\")");
 }
 
+/// CSS Shapes 1 §3.1 and CSSOM's shortest serialization: `rect()` computes to the `inset()` it is,
+/// and a side computed by arithmetic (`100% - 80%`) that serializes as another side does is dropped
+/// as a side written so would be.
+#[test]
+fn computed_insets_serialize_their_shortest_form() {
+    let p = Page::new(
+        "<style>#a { clip-path: rect(50% 80% 70% 20%) } #b { shape-outside: rect(10% 90% 90% 10%) }
+         #c { clip-path: inset(10% 20% 30% 40%) }</style><div id=a></div><div id=b></div><div id=c></div>",
+    );
+    assert_eq!(p.value_of(p.q("#a"), "clip-path"), "inset(50% 20% 30%)");
+    assert_eq!(p.value_of(p.q("#b"), "shape-outside"), "inset(10%)");
+    assert_eq!(p.value_of(p.q("#c"), "clip-path"), "inset(10% 20% 30% 40%)");
+}
+
+/// CSS Shapes 2: `polygon()`'s `round` interpolates with none as zero, and a zero result is none, as
+/// a zero radius parses.
+#[test]
+fn an_interpolated_zero_polygon_radius_is_none() {
+    use style::values::animated::{Animate, Procedure};
+    use style::values::computed::LengthPercentage;
+    use style::values::generics::basic_shape::{FillRule, Polygon, PolygonCoord};
+    let px = |v: f32| LengthPercentage::new_length(style::values::computed::Length::new(v));
+    let with = |round: Option<f32>| Polygon {
+        fill: FillRule::Nonzero,
+        round: round.map(px),
+        coordinates: vec![
+            PolygonCoord(px(0.0), px(0.0)),
+            PolygonCoord(px(9.0), px(0.0)),
+        ]
+        .into(),
+    };
+    let (a, b) = (with(Some(0.0)), with(Some(20.0)));
+    let at = |p: f64| {
+        a.animate(&b, Procedure::Interpolate { progress: p })
+            .unwrap()
+    };
+    assert_eq!(at(0.0).round, None);
+    assert_eq!(at(0.5).round, Some(px(10.0)));
+}
+
 /// HTML §3.2.6.2: an element's `lang` (or `xml:lang`) is the content language of its text and its
 /// descendants' (stylo's internal `-x-lang`, which layout shapes and breaks lines with); a change
 /// shows at the next restyle, and `lang=""` makes the language unknown.

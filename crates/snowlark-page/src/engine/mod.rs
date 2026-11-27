@@ -478,6 +478,9 @@ pub struct Engine {
     /// Where the reactions of an operation that inserted only nodes it parsed (fragment parsing)
     /// start in the queue, until its batch is taken: see [`Engine::parsed_insertion`].
     pub(crate) parsed_from: Cell<Option<usize>>,
+    /// How many of the queued reactions the renderer has seen already (those of `use` trees built
+    /// for a script's read): see [`Engine::svg_use_sync_for_read`].
+    pub(crate) reactions_rendered: Cell<usize>,
     /// The last document URL parsed: the document, the URL string it had and the parsed URL (see
     /// [`Engine::parsed_document_url`]).
     pub(crate) document_url_cache: RefCell<Option<(NodeId, String, ::url::Url)>>,
@@ -729,6 +732,7 @@ impl Engine {
             slots: RefCell::new(shadow::Slots::default()),
             pending_slot_signal: Cell::new(false),
             parsed_from: Cell::new(None),
+            reactions_rendered: Cell::new(0),
             document_url_cache: RefCell::new(None),
             inserted_batch: RefCell::default(),
             details_pending: RefCell::default(),

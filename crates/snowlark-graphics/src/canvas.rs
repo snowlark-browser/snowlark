@@ -8,6 +8,7 @@
 
 use std::sync::Arc;
 
+use crate::filter::FilterOp;
 use crate::geom::{Matrix, Point, Rect};
 
 /// A straight (not premultiplied) RGBA colour, each channel 0..=1.
@@ -148,8 +149,19 @@ pub struct DrawParams<'a> {
     pub op: CompositeOp,
     pub clip: Option<&'a Arc<CanvasClip>>,
     pub shadow: Option<Shadow>,
+    /// `filter` (HTML "Filters"): the functions each operation's image goes through before its
+    /// shadow and compositing, lengths in canvas pixels whatever the transform. `None`: `none`.
+    pub filter: Option<&'a Arc<[FilterOp]>>,
     /// `imageSmoothingEnabled`.
     pub smoothing: bool,
+}
+
+impl DrawParams<'_> {
+    /// Whether an operation draws straight into the bitmap: source-over, with no shadow and no
+    /// filter (the others draw into a scratch image first).
+    pub fn is_direct(&self) -> bool {
+        self.op == CompositeOp::SourceOver && self.shadow.is_none() && self.filter.is_none()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

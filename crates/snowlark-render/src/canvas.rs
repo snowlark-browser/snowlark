@@ -145,8 +145,97 @@ pub struct State {
     pub text_baseline: String,
     pub direction: String,
     pub image_smoothing: bool,
+    /// `filter` as set ([`State::set_filter`]), and its functions (`None`: no filtering).
     pub filter: String,
+    pub filter_ops: Option<Arc<[snowlark_paint::FilterOp]>>,
     pub clip: Option<Arc<Clip>>,
+}
+
+impl State {
+    /// HTML "Filters", the `filter` setter: `none`, or a CSS `<filter-value-list>`; any other value
+    /// (a CSS-wide keyword among them) is ignored (`false`).
+    pub fn set_filter(&mut self, value: &str) -> bool {
+        let Some(ops) = parse_filter(value) else {
+            return false;
+        };
+        self.filter = value.to_owned();
+        self.filter_ops = (!ops.is_empty()).then(|| ops.into());
+        true
+    }
+}
+
+/// A `filter` value's functions: empty for `none`, `None` when it is not a `<filter-value-list>`.
+/// Lengths are canvas pixels; a font-relative length is not resolved and refuses the value, and a
+/// `url()` is accepted and filters nothing (the whole list then does not apply, as when the filter
+/// it names is not loaded).
+pub fn parse_filter(text: &str) -> Option<Vec<snowlark_paint::FilterOp>> {
+    use snowlark_paint::FilterOp;
+    use style::parser::{Parse, ParserContext};
+    use style::values::generics::effects::Filter as F;
+    let text = text.trim();
+    if text.eq_ignore_ascii_case("none") {
+        return Some(Vec::new());
+    }
+    let url = style::stylesheets::UrlExtraData::from(
+        snowlark_net::Url::parse("about:blank").expect("a valid URL"),
+    );
+    let context = ParserContext::new(
+        style::stylesheets::Origin::Author,
+        &url,
+        Some(style::stylesheets::CssRuleType::Style),
+        style_traits::ParsingMode::DEFAULT,
+        style::context::QuirksMode::NoQuirks,
+        Default::default(),
+        None,
+        None,
+        Default::default(),
+    );
+    let mut parser = cssparser::Parser::new(text);
+    let specified = parser
+        .parse_entirely(|p| {
+            let mut list = Vec::new();
+            while let Ok(f) =
+                p.try_parse(|p| style::values::specified::effects::Filter::parse(&context, p))
+            {
+                list.push(f);
+            }
+            Ok::<_, style_traits::ParseError>(list)
+        })
+        .ok()
+        .filter(|list| !list.is_empty())?;
+    let mut ops = Vec::with_capacity(specified.len());
+    let mut url_named = false;
+    for f in &specified {
+        let computed = f.to_computed_value_without_context().ok()?;
+        ops.push(match computed {
+            F::Blur(l) => FilterOp::Blur(l.0.px()),
+            F::Brightness(a) => FilterOp::Brightness(a.0),
+            F::Contrast(a) => FilterOp::Contrast(a.0),
+            F::Grayscale(a) => FilterOp::Grayscale(a.0),
+            F::HueRotate(a) => FilterOp::HueRotate(a.degrees()),
+            F::Invert(a) => FilterOp::Invert(a.0),
+            F::Opacity(a) => FilterOp::Opacity(a.0),
+            F::Saturate(a) => FilterOp::Saturate(a.0),
+            F::Sepia(a) => FilterOp::Sepia(a.0),
+            F::DropShadow(s) => FilterOp::DropShadow {
+                offset: snowlark_paint::Point::new(s.horizontal.px(), s.vertical.px()),
+                sigma: s.blur.0.px(),
+                // (`currentcolor`: the canvas has no element color to take; black)
+                color: crate::adapter::to_color(
+                    &s.color
+                        .resolve_to_absolute(&style::color::AbsoluteColor::BLACK),
+                ),
+            },
+            F::Url(_) => {
+                url_named = true;
+                continue;
+            }
+        });
+    }
+    if url_named {
+        ops.clear();
+    }
+    Some(ops)
 }
 
 impl Default for State {
@@ -174,6 +263,7 @@ impl Default for State {
             direction: "inherit".into(),
             image_smoothing: true,
             filter: "none".into(),
+            filter_ops: None,
             clip: None,
         }
     }
@@ -1146,6 +1236,7 @@ fn draw_params(s: &State) -> DrawParams<'_> {
         op: composite_op(s.composite),
         clip: s.clip.as_ref().and_then(|c| c.gpu.as_ref()),
         shadow: shadow(s),
+        filter: s.filter_ops.as_ref(),
         smoothing: s.image_smoothing,
     }
 }

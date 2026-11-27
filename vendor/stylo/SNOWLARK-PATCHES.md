@@ -223,7 +223,7 @@ The patches below were written on 0.22.0 and carried to 0.24.0 by a three-way me
 
 38. **`polygon(round <length>)` and fill rules of outlines** (`values/generics/basic_shape.rs`,
    `values/specified/basic_shape.rs`): `GenericPolygon::round`, CSS Shapes 2, which serializes after the
-   fill rule, interpolates with none as zero and is `None` at zero; `polygon()` and `shape()` keep a
+   fill rule, interpolates with none as zero and is `None` at zero (parsed or interpolated); `polygon()` and `shape()` keep a
    `<fill-rule>` in `offset-path` too (`path()` still takes none there). WPT css/motion/parsing.
 
 39. **Transitions skip unchanged properties before building their values** (`servo/animation.rs`
@@ -646,6 +646,12 @@ The patches below were written on 0.22.0 and carried to 0.24.0 by a three-way me
    of `visible` on an HTML `textarea` compute to `auto`, so its lines scroll inside its box (`scrollTop`, the
    wheel, the caret kept in view) as in the engines in use. Upstream leaves it to Gecko's anonymous editor
    root (`adjust_for_text_control_editing_root`), which the servo build has no counterpart of.
+
+106. **Four-side values shorten by what their sides serialize as** (`values/generics/rect.rs`, `Rect`'s `ToCss`):
+   two sides count as the same when they are equal or serialize the same, so a computed value made by arithmetic
+   (an interpolated `inset()`, whose `rect()` end gives `100% - 80%` as the f32 fraction 0.19999999) drops its
+   repeated sides as the value written would (CSSOM's shortest serialization; WPT
+   `css-shapes/animation/shape-outside-interpolation.html`).
 
 To move to a newer stylo: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `cargo test -p snowlark-style`.

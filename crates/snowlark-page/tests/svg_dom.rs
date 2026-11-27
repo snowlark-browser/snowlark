@@ -344,3 +344,55 @@ fn use_tree_follows_its_target() {
     let renamed = "document.getElementById('a').id = 't'";
     assert_eq!(hits(renamed, &[(5, 25), (75, 25)]), "true,false");
 }
+
+/// SVG 2 §5.6: a script's read of layout sees the `use` trees of what it changed in the same task,
+/// before any rendering update, after one has run as well as before; nested trees too.
+#[test]
+fn use_tree_follows_its_target_within_a_task() {
+    let net = snowlark_net::NetThread::start(snowlark_net::NetConfig::default()).unwrap();
+    let mut page = Page::new(PageOptions {
+        net: Some(net.client()),
+        viewport: (800, 600),
+        render: Some(snowlark_page::RenderSetup::new().unwrap()),
+        ..Default::default()
+    });
+    page.load_html(
+        "<!doctype html><style>body { margin: 0 }</style>
+         <svg width=400 height=100 style='display: block'>
+           <defs><g id=t><rect id=a width=10 height=50 /></g>
+             <g id=n><use href='#t' /></g></defs>
+           <use id=u href='#t' />
+           <use id=v href='#n' x=200 />
+         </svg>",
+        &url::Url::parse("http://example.test/").unwrap(),
+    );
+    assert!(page.run_until_settled(Duration::from_secs(5)));
+    page.update_the_rendering();
+    let mut read = |js: &str| page.eval(js, "t.js").unwrap();
+    assert_eq!(
+        read(
+            "a.setAttribute('width', 100);
+             [document.elementFromPoint(50, 25)?.id, u.getBBox().width,
+              document.elementFromPoint(250, 25)?.id, v.getBBox().width].join()"
+        ),
+        "u,100,v,100"
+    );
+    // (a new child of the target, read in the same task)
+    assert_eq!(
+        read(
+            "const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+             r.setAttribute('x', 120); r.setAttribute('width', 30); r.setAttribute('height', 50);
+             t.append(r);
+             [document.elementFromPoint(130, 25)?.id, u.getBBox().width].join()"
+        ),
+        "u,150"
+    );
+    // (and after the trees were built for a read, the next ones follow as well)
+    assert_eq!(
+        read(
+            "t.lastChild.remove(); a.setAttribute('width', 20);
+             [document.elementFromPoint(50, 25) === u, u.getBBox().width, v.getBBox().width].join()"
+        ),
+        "false,20,20"
+    );
+}
