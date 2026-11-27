@@ -715,13 +715,24 @@ def find_browser(explicit):
     return str(exe)
 
 
-def acquire_slot(kind='wpt', count=2):
+def wpt_slot_count():
+    """How many WPT runs may hold a slot at once: SNOWLARK_WPT_SLOTS (1 makes every run, gates included, wait
+    for the one before it), 2 by default."""
+    try:
+        return max(1, int(devenv.setting('SNOWLARK_WPT_SLOTS') or 2))
+    except ValueError:
+        return 2
+
+
+def acquire_slot(kind='wpt', count=None):
     """One of the machine-wide slots for heavy work (the same scheme dev.ps1 uses for builds and test runs, on
-    with SNOWLARK_SLOTS=1): at most `count` WPT runs at a time, so parallel runs don't oversubscribe the machine
-    and time each other's tests out. A slot is a byte lock on a file, released when the process ends, however
-    it ends; keep the returned file open. SNOWLARK_NO_SLOTS=1 skips the queue."""
+    with SNOWLARK_SLOTS=1): at most `count` (by default wpt_slot_count()) WPT runs at a time, so parallel runs
+    don't oversubscribe the machine and time each other's tests out. A slot is a byte lock on a file, released
+    when the process ends, however it ends; keep the returned file open. SNOWLARK_NO_SLOTS=1 skips the queue."""
     if not slots_enabled():
         return None
+    if count is None:
+        count = wpt_slot_count()
     import msvcrt
     directory = lock_dir()
     os.makedirs(directory, exist_ok=True)

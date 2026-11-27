@@ -3587,6 +3587,7 @@ dependencies = [
  "minidump-writer",
  "postcard",
  "serde",
+ "snowlark-sandbox",
  "windows",
 ]
 
@@ -3788,6 +3789,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "snowlark-sandbox"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "snowlark-shell"
 version = "0.1.0"
 dependencies = [
@@ -3860,6 +3868,7 @@ dependencies = [
  "snowlark-page",
  "snowlark-paint",
  "snowlark-render",
+ "snowlark-sandbox",
  "snowlark-style",
  "snowlark-sw",
 ]

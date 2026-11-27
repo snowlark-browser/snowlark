@@ -56,6 +56,7 @@ All optional. Set them in the environment, or as `KEY=VALUE` lines in a file `de
 | `SNOWLARK_VCVARS` | The `vcvars64.bat` to use. | the newest Visual Studio whose MSVC toolset has libraries |
 | `SNOWLARK_MIN_FREE_GB` | `dev.ps1` waits, and says so, while the build drive has less free space than this: a build that runs out of disk leaves a broken target directory that looks like a compile failure. | 25 |
 | `SNOWLARK_SLOTS` | `1` queues builds, test runs and WPT runs on machine-wide slots (3 builds, 2 test runs, 2 WPT runs; 8 cargo jobs each), for a machine where several checkouts build at once. `SNOWLARK_NO_SLOTS=1` turns it off for one command. | off |
+| `SNOWLARK_WPT_SLOTS` | How many WPT runs (gates included) may hold a slot at once when `SNOWLARK_SLOTS` is on; `1` runs them one after another. | `2` |
 | `SNOWLARK_V8_DIR` | The folder with `rusty_v8.lib` and `src_binding.rs` to link; the pinned library is downloaded into it when they are missing. | `<dev dir>\v8\<name in tools\v8-pgo\pin.txt>`, or `target\v8\<name>` without a dev folder |
 | `SNOWLARK_DAV1D_DIR` | The folder with the static `dav1d.lib` to link (`tools\dav1d\build.ps1` makes it). | `<dev dir>\dav1d\<name in tools\dav1d\pin.txt>` |
 | `SNOWLARK_V8_PREBUILT` | `1` leaves V8 to the `v8` crate (its own published library, where one exists for the version and features). | off |
@@ -136,6 +137,7 @@ Environment variables, in any mode that runs a page unless noted:
 | `SNOWLARK_PROFILE_DIR` | The profile folder (default `%LOCALAPPDATA%\Snowlark`). |
 | `SNOWLARK_NO_ACTIVATE=1` | The window never takes the foreground. |
 | `SNOWLARK_SCALE=1.5` | Draws the window as on a monitor at that display scale (0.5 to 4). |
+| `SNOWLARK_SANDBOX=1` | Linux: starts renderers sandboxed (namespaces, then a system call filter; `docs/process-isolation.md` §7). Sound and WebGL do not work in them yet. |
 | `SNOWLARK_PROCESS_MODEL=single` | Keeps every tab on a thread of the browser's process instead of a renderer process each (also `--process-model=single`). |
 | `SNOWLARK_IPC=loopback` | Puts every tab message through the wire format inside `send`, so the window and `snowlark-shell`'s tests run as if each crossed a process. |
 | `SNOWLARK_PLAYREADY=0` | Stops offering the `com.microsoft.playready.recommendation.3000` key system to pages in the window (offered by default where Windows has it: Windows 10 2004 or later, hardware DRM). The headless modes never offer it. |

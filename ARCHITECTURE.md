@@ -71,6 +71,8 @@ crates/
                    executor on ANGLE (OpenGL ES over Direct3D 11), loaded at run time.
   snowlark-ipc       The process boundary (docs/process-isolation.md section 7): pipes on one IO thread,
                    sections, handle passing, framing, send and call, Untrusted<T>, process launch, a loopback.
+  snowlark-sandbox   The page processes' sandbox (docs/process-isolation.md section 7): on Linux the user and
+                   network namespaces a renderer starts in and the seccomp-bpf filter it locks itself into.
   snowlark-idb       IndexedDB's storage, free of V8: keys and key paths, databases with object stores and
                    indexes, the backend a browser's event loops share (connection queues, versionchange,
                    transaction scheduling) and the per-database append-only log files on a disk thread.
@@ -176,7 +178,7 @@ proxy) across its navigations. They share the address space all the same. The mo
 `docs/process-isolation.md`.
 
 **Security defaults.** Mixed content blocked, HSTS persisted, file:// isolated, CSP enforced from the start,
-`unsafe` only in snowlark-js, snowlark-paint, snowlark-graphics's Windows clock (`ticks`), snowlark-media's Windows half, snowlark-ipc, snowlark-gl (its calls into ANGLE) and the generated
+`unsafe` only in snowlark-js, snowlark-paint, snowlark-graphics's Windows clock (`ticks`), snowlark-media's Windows half, snowlark-ipc, snowlark-sandbox, snowlark-gl (its calls into ANGLE) and the generated
 bindings, each `unsafe` block with a comment saying what invariant makes it sound.
 
 **Testing from day one.** `snowlark --wpt <list> <outdir>` runs web-platform-tests headless; `tools/wpt/run.py`

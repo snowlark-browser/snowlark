@@ -74,7 +74,8 @@ How it fits together:
   files when the wptserve that is running was started without HTTP/2), is not run, and `parity.py` counts it apart from
   failures. A process that prints nothing for five minutes is killed and its current test recorded as a `HANG`; the run
   goes on.
-- Machine-wide slots (`SNOWLARK_SLOTS`) can queue concurrent WPT runs so they do not oversubscribe a machine;
+- Machine-wide slots (`SNOWLARK_SLOTS`; `SNOWLARK_WPT_SLOTS` runs at once, 2 by default) can queue concurrent
+  WPT runs so they do not oversubscribe a machine;
   `SNOWLARK_NO_SLOTS=1` skips the queue.
 
 `snowlark --wpt` also has a site lock mode for checking the browser's process isolation against the suite: with

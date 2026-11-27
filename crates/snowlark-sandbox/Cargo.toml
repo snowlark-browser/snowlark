@@ -1,0 +1,12 @@
+[package]
+name = "snowlark-sandbox"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Snowlark's sandbox for page processes: namespaces and a system call filter on Linux"
+
+[lib]
+doctest = false
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"

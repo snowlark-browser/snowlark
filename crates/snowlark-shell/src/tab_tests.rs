@@ -900,6 +900,32 @@ fn a_tab_in_a_renderer_process_starts_again_in_a_new_one() {
     assert_eq!(code, Some(0), "the renderer did not end at the close");
 }
 
+/// A sandboxed renderer (`snowlark_sandbox`: its namespaces, then its system call filter once it
+/// has its tab) runs its page: script, layout and text from the font files it mapped before.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_sandboxed_renderer_runs_its_page() {
+    let (ctx, _net, rx, _comp_rx) = remote_context();
+    let url = Url::parse(
+        "data:text/html,<span id=s>Hello</span><script>document.title = [typeof WebAssembly, \
+         document.getElementById('s').getBoundingClientRect().width > 10].join(' ')</script>",
+    )
+    .unwrap();
+    let mut tab = TabHost::spawn(
+        1,
+        ctx,
+        Default::default(),
+        DEVICE,
+        url,
+        remote(child_launch().sandbox(true)),
+    );
+    let title = next_of(&rx, &mut tab, 1, |e| match e {
+        TabEvent::State(s) if !s.title.is_empty() => Some(s.title),
+        _ => None,
+    });
+    assert_eq!(title, "object true");
+}
+
 /// This test binary as a renderer process ([`renderer_child`]).
 fn child_launch() -> snowlark_ipc::Launch {
     snowlark_ipc::Launch::new(std::env::current_exe().unwrap())

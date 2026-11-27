@@ -192,6 +192,24 @@ what Media Foundation needs, which is why media gets its own process (low integr
 renderer so a compromised decoder sees one site's media). Arbitrary Code Guard cannot coexist with V8's JIT, so it
 could only be an opt-in strict mode that disables the JIT for chosen sites.
 
+**Linux** (`snowlark-sandbox`, `docs/linux.md` stage 8) has two layers. The launcher
+starts a sandboxed child (`snowlark_ipc::Launch::sandbox`) in a user namespace whose one user and group are the
+browser's (so the child holds no capability once it runs its program) and a network namespace with no device but a
+loopback that is down; a system without unprivileged user namespaces, or one whose security module takes their
+capabilities away, gets the second layer only. Once the renderer has made what needs the system (V8, the text
+engine's fontconfig configuration and its font database, which maps every system font file once, so faces are
+made from the mappings; the media libraries), it locks itself down (`snowlark_sandbox::lock_down`): no new
+privileges, and a seccomp-bpf filter on every thread that refuses, with `EPERM`, every call naming a file by its
+path, making, binding or connecting a socket (pairs of local sockets excepted), starting a process or program
+(`clone` only with `CLONE_THREAD`; `clone3` is `ENOSYS`, so the C library falls back to `clone`), signalling or
+tracing another process, changing credentials, and the kernel's rarer surfaces; a call for another architecture
+ends the process. What it reads afterwards it must hold already or receive as a descriptor from the browser (a font
+installed after the renderer started is in the next renderer). It is switched on with `SNOWLARK_SANDBOX=1` until
+the renderer's own opens go: sound (the sound server's socket) and WebGL (ANGLE's libraries and the GPU's device
+files). Not done yet: a PID namespace (the filter already keeps the renderer from signalling or
+tracing other processes), an allow-list filter in place of the deny-list, and `stat` calls with `AT_EMPTY_PATH` and
+a path (allowed, as the C library's `fstat` uses them: they show a file's metadata, not its contents).
+
 **Self-test.** `snowlark --sandbox-selftest` is planned to launch a renderer that tries to read a file in the
 profile, write to the temp folder, open a socket, start a process, open the browser's process handle, read the
 registry and send a window message; each must fail. It belongs in the merge gate once the sandbox exists.

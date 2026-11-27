@@ -178,6 +178,12 @@ pub fn renderer_launch(tab: Option<TabId>, crash_dumps: &std::path::Path) -> Lau
             launch = launch.allow_env(name);
         }
     }
+    // The renderer sandbox (`snowlark_sandbox`), for now only with `SNOWLARK_SANDBOX=1`: sound and
+    // WebGL still open sockets, libraries and devices from the renderer.
+    #[cfg(target_os = "linux")]
+    {
+        launch = launch.sandbox(std::env::var_os("SNOWLARK_SANDBOX").is_some_and(|v| v == "1"));
+    }
     launch
 }
 

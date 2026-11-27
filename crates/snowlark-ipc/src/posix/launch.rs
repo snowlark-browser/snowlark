@@ -13,7 +13,8 @@
 //!
 //! [`JobLimits`]: `commit` is the child's `RLIMIT_DATA` (its private writable memory, which is what
 //! a commit is: address space reserved but not yet writable is not counted), set as it starts.
-//! `no_children` is not enforced here yet: that needs the system call filter of a sandbox.
+//! `no_children` is not enforced by the launch: a sandboxed child's system call filter refuses new
+//! processes once it has locked itself down ([`Launch::sandbox`]).
 
 use std::ffi::{OsStr, OsString};
 use std::os::fd::{AsFd, AsRawFd, FromRawFd, OwnedFd, RawFd};
@@ -38,6 +39,14 @@ use crate::wire::{BuildId, Wire};
 const PIPE_VAR: &str = "SNOWLARK_IPC_PIPE";
 /// The variable that tells a child the browser's process id.
 const PARENT_VAR: &str = "SNOWLARK_IPC_PARENT";
+/// Set in a child started with [`Launch::sandbox`].
+const SANDBOX_VAR: &str = "SNOWLARK_SANDBOXED";
+
+/// Whether the browser started this process sandboxed ([`Launch::sandbox`]): it should lock
+/// itself down once it has made what needs the system.
+pub fn sandboxed() -> bool {
+    std::env::var_os(SANDBOX_VAR).is_some()
+}
 
 /// What is left of the environment by default: what fontconfig, temporary files and the locale
 /// read.
@@ -259,6 +268,8 @@ pub struct Launch {
     stderr: bool,
     /// Where a crash of the child is written as a minidump.
     dumps: Option<PathBuf>,
+    /// Whether the child runs sandboxed (`Launch::sandbox`).
+    sandbox: bool,
 }
 
 impl Launch {
@@ -270,6 +281,7 @@ impl Launch {
             limits: JobLimits::default(),
             stderr: true,
             dumps: None,
+            sandbox: false,
         };
         for name in BASE_ENV {
             launch = launch.allow_env(name);
@@ -310,6 +322,14 @@ impl Launch {
     /// [`crate::install_crash_handler`] reports its crash to the browser, which writes the dump).
     pub fn crash_dumps(mut self, dir: impl Into<PathBuf>) -> Launch {
         self.dumps = Some(dir.into());
+        self
+    }
+
+    /// Starts the child sandboxed: in a user and a network namespace of its own where the system
+    /// allows them (`snowlark_sandbox::Namespaces`), and told to lock itself down once it has made
+    /// what needs the system ([`sandboxed`], `snowlark_sandbox::lock_down`).
+    pub fn sandbox(mut self, on: bool) -> Launch {
+        self.sandbox = on;
         self
     }
 
@@ -381,6 +401,12 @@ impl Launch {
         if crash.is_some() {
             command.env(CRASH_VAR, CRASH_FD.to_string());
         }
+        if self.sandbox {
+            command.env(SANDBOX_VAR, "1");
+        }
+        // (made before the fork: the child only writes them)
+        let namespaces = (self.sandbox && snowlark_sandbox::Namespaces::available())
+            .then(snowlark_sandbox::Namespaces::new);
         if self.stderr {
             let out = std::io::stderr().as_fd().try_clone_to_owned();
             command
@@ -449,6 +475,11 @@ impl Launch {
                     for fd in first..limit.rlim_cur.min(1 << 20) as libc::c_int {
                         libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC);
                     }
+                }
+                if let Some(namespaces) = &namespaces {
+                    namespaces
+                        .enter()
+                        .map_err(std::io::Error::from_raw_os_error)?;
                 }
                 Ok(())
             });

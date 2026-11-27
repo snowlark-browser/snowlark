@@ -49,6 +49,8 @@ pub use loopback::{channel, Sender};
 pub use os::build_id;
 pub use os::crash_dump::{install_crash_handler, KEPT_DUMPS};
 pub use os::handle::RemoteHandle;
+#[cfg(target_os = "linux")]
+pub use os::launch::sandboxed;
 pub use os::launch::{
     connect_as, connect_to_browser, own_usage, thread_cpu, JobLimits, Launch, Process, Spawned,
     Usage,

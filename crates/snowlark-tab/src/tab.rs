@@ -1107,6 +1107,21 @@ fn run(
             }
         }
     };
+    // A sandboxed renderer locks itself down before its page: what needs the system (V8, the text
+    // engine's configuration, the media libraries) is made by now.
+    #[cfg(target_os = "linux")]
+    if snowlark_ipc::sandboxed() {
+        let _ = snowlark_media::support();
+        // (the system's font files, each mapped once: faces are made from the mappings)
+        let _ = text.font_database();
+        if !snowlark_sandbox::in_namespaces() {
+            eprintln!("[tab {id}] no namespaces for the sandbox here: the system call filter only");
+        }
+        if let Err(e) = snowlark_sandbox::lock_down() {
+            eprintln!("[tab {id}] the sandbox cannot lock this renderer down: {e}");
+            std::process::exit(1);
+        }
+    }
     // The page is made once the tab is known, not before: it asks the browser (the user agent,
     // which decides what its `about:blank` realm installs), and only the tab's host answers.
     let shared_text = text.clone();

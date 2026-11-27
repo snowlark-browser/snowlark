@@ -272,6 +272,38 @@ fn run_role(role: &str) -> i32 {
             std::thread::sleep(Duration::from_secs(600));
             0
         }
+        // (started sandboxed: locks itself down as a renderer does, then says what it was refused)
+        #[cfg(target_os = "linux")]
+        "sandboxed" => {
+            let c: Child = connect_to_browser(WAIT).unwrap();
+            let refused = |r: std::io::Result<()>| {
+                r.err().and_then(|e| e.raw_os_error()) == Some(libc::EPERM)
+            };
+            let mut bits = 0u64;
+            bits |= u64::from(snowlark_ipc::sandboxed());
+            bits |= u64::from(snowlark_sandbox::in_namespaces()) << 1;
+            bits |= u64::from(snowlark_sandbox::lock_down().is_ok()) << 2;
+            bits |= u64::from(refused(File::open("/etc/hostname").map(drop))) << 3;
+            let tcp = std::env::var("TCP").unwrap();
+            bits |= u64::from(refused(std::net::TcpStream::connect(tcp).map(drop))) << 4;
+            let spawn = std::process::Command::new("/bin/true").status().map(drop);
+            bits |= u64::from(refused(spawn)) << 5;
+            // (the channel to the browser still carries this)
+            c.send(&Up::Count(bits)).unwrap();
+            c.flush(WAIT).unwrap();
+            0
+        }
+        #[cfg(target_os = "linux")]
+        "crash-sandboxed" => {
+            if !snowlark_ipc::install_crash_handler() || snowlark_sandbox::lock_down().is_err() {
+                return 3;
+            }
+            // SAFETY: this is the point: an invalid write, which the process cannot survive.
+            unsafe {
+                std::ptr::write_volatile(std::hint::black_box(std::ptr::null_mut::<u8>()), 1)
+            };
+            4
+        }
         other => panic!("role {other}"),
     }
 }
@@ -948,7 +980,6 @@ fn closing_the_job_kills_the_child() {
 }
 
 /// A crash dump folder of its own for one test.
-#[cfg(windows)]
 fn dump_dir(name: &str) -> std::path::PathBuf {
     let dir =
         std::env::temp_dir().join(format!("snowlark-ipc-dumps-{}-{name}", std::process::id()));
@@ -1138,4 +1169,50 @@ fn ping() {
         at(1.0)
     );
     stop(&c, &p);
+}
+
+/// A child started sandboxed is in its namespaces where the system has them, and once locked down
+/// opens no file, connects no socket and starts no process; its channel to the browser still works.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_sandboxed_child_opens_no_file_connects_nowhere_and_starts_nothing() {
+    let tcp = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let (c, _p): (Browser, Arc<Process>) = launch("sandboxed")
+        .sandbox(true)
+        .env("TCP", tcp.local_addr().unwrap().to_string())
+        .spawn()
+        .unwrap()
+        .connect(policy(), 64 << 20, WAIT)
+        .unwrap();
+    let Ok(Received::Message(m)) = c.recv_timeout(WAIT) else {
+        panic!("no report");
+    };
+    let Up::Count(bits) = c.check(m).unwrap() else {
+        panic!("not a count");
+    };
+    let namespaces = u64::from(snowlark_sandbox::Namespaces::available()) << 1;
+    assert_eq!(bits, 1 | namespaces | 4 | 8 | 16 | 32, "{bits:b}");
+}
+
+/// The browser still writes a locked-down child's minidump.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_sandboxed_child_that_crashes_leaves_a_minidump() {
+    let dir = dump_dir("sandboxed");
+    let p = launch("crash-sandboxed")
+        .sandbox(true)
+        .crash_dumps(&dir)
+        .spawn()
+        .unwrap()
+        .process()
+        .clone();
+    let _ = p.wait(WAIT);
+    let start = Instant::now();
+    while p.crash_dump().is_none() && start.elapsed() < WAIT {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let dump = p.crash_dump().expect("no dump");
+    let bytes = std::fs::read(&dump).unwrap();
+    assert_eq!(&bytes[..4], b"MDMP");
+    let _ = std::fs::remove_dir_all(&dir);
 }

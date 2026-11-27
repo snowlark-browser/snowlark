@@ -25,6 +25,8 @@ libc = "0.2"
 [target.'cfg(target_os = "linux")'.dependencies]
 crash-handler = "0.8"
 minidump-writer = "0.14"
+# (`Launch::sandbox`: the namespaces a sandboxed child starts in)
+snowlark-sandbox = { path = "../snowlark-sandbox" }
 
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.62"

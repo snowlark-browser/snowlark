@@ -21,5 +21,8 @@ snowlark-render = { path = "../snowlark-render" }
 snowlark-style = { path = "../snowlark-style" }
 serde = { version = "1", features = ["derive"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+snowlark-sandbox = { path = "../snowlark-sandbox" }
+
 [lib]
 doctest = false
