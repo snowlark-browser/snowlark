@@ -9,6 +9,13 @@ only through Snowlark's own window (`snowlark-shell`). This design adds a crate,
 everything a page needs below the window, with a small public API over it; the browser window becomes its first
 user.
 
+**The browser comes first.** Snowlark is a browser; embedding is an addition for the applications that need it, and
+it must cost the browser and its users nothing: no change to what the browser does or shows, no slower page, start
+or frame, no larger memory use, no new setting a user has to know about. Every step below is checked against that
+before it merges (the workspace tests, the WPT gate, the micro benchmarks and a Speedometer comparison with the build
+before it), and a step that costs the browser something is changed until it does not, or left out. Embedding work is
+scheduled behind work on the browser itself.
+
 ## 1. The shape
 
 ```
@@ -41,8 +48,8 @@ work between application and engine is the design.
 ```rust
 let engine = snowlark_embed::Engine::builder()
     .profile(Profile::folder(app_data.join("web")))   // or Profile::in_memory()
-    .process_model(ProcessModel::Tab)                  // or ProcessModel::Single
-    .helper(Helper::Path(exe_dir.join("snowlark-helper.exe")))
+    .process_model(ProcessModel::Tab)                  // the default is ProcessModel::Single
+    // children start from this executable, whose main calls snowlark_embed::run_child() first (§4.2)
     .user_agent_suffix("ExampleApp/2.1")
     .waker(Arc::new(MyWaker(proxy)))
     .delegate(Rc::new(MyEngineDelegate))
@@ -108,7 +115,7 @@ What the application drives, and what carries it today:
 | `set_zoom(factor)` | new: page zoom, which changes the CSS pixel's size in device pixels |
 | `find(text, options)`, `find_next()`, `stop_finding()` | `TabCommand::Find` |
 | `evaluate(script, callback)` | new: runs a script in the top-level document's realm, answers with the result as JSON or the exception's message |
-| `post_message(json)`, and `MessagePort` the page receives | new: a channel between the page and the application, exposed to the page only when the application asks for it (§4) |
+| `add_user_script(source, when)` | new: a script the application runs in each document of the WebView, in an isolated world the page cannot see, at document start or end |
 | `mute(bool)`, `audible()` | `TabMuteControl`, `TabEvent::Audible` |
 | `screenshot(rect, callback)` | `Compositor::read_back` |
 | `clear_site_data(origin, kinds)` | `TabCommand::ClearSiteData` |
@@ -143,7 +150,8 @@ place on the UI thread: `allow()`, `deny()`, or a value; dropping it unanswered 
 | `certificate_error(request)` | the error page | the network's error page today |
 | `ime_area(rect)`: where the composition window goes | nothing | new |
 | `crashed(reason)`, `unresponsive()`, `responsive()` | nothing; the application calls `reload()` | `TabEvent::Crashed`, `Liveness` |
-| `message(json)` from the page's channel | nothing | new |
+| `console_message(level, text, source)` | nothing | new: the page's console output, which is also how a user script reports to the application |
+| `load_resource(request)` for the application's own schemes | an error page | new: the application answers requests to schemes it registered (`app:`), so its pages talk to it through ordinary fetches |
 
 `EngineDelegate` has what is not one page's: the GPU process's state (`GpuStatus`), a renderer or helper that would
 not start (§3), and the clipboard (the `Clipboard` trait the tabs use now, with the system's clipboard as the
@@ -224,8 +232,9 @@ policy tables, and is not sandboxed.
 | **An entry point** (`Helper::CurrentExe`) | The application calls `snowlark_embed::run_child()` first in `main`; it returns the child's exit code when the process was started as a child, else nothing and `main` goes on. | One executable, as the browser itself does. | Everything before the call, and every library the executable imports, runs in the renderer too; the strict sandbox stages are not possible. |
 | **One process** (`ProcessModel::Single`) | Every page on a thread of the application's process. | Content the application trusts (its own pages, a local help file), tests, platforms without the process layer. | No crash isolation and no sandbox: a page that crashes the engine crashes the application. |
 
-The default is the helper with `ProcessModel::Tab`. The entry point stays supported for applications that must be
-one file. The engine and its helper speak a protocol that is not versioned across builds, so the launch passes the
+The default for an application is the entry point with `ProcessModel::Single`: one executable and one process, the
+simplest thing to embed; an application turns on `ProcessModel::Tab` for crash isolation, and the helper comes with
+the sandbox stages that need it. The browser keeps its own process model and executable unchanged. The engine and its helper speak a protocol that is not versioned across builds, so the launch passes the
 engine's build id and a helper of another build ends at once with an exit code of its own, which the engine reports
 to `EngineDelegate` instead of showing every page as crashed.
 
@@ -263,7 +272,7 @@ Browser features stay off unless the application turns them on, so that an embed
 | The update check | never | the application updates itself |
 | Internal pages (`snowlark:`) | none; `about:blank` only | the application's schemes |
 | Key systems for protected media | off | `key_systems(...)` (Windows) |
-| The page–application channel (§2.3) | not exposed | `web_view(..).message_channel(name)`, which adds a global only to pages of the origins the application lists |
+| A channel between page and application | none: nothing page-visible is added | `evaluate`, user scripts in an isolated world, console messages and the application's own schemes (§2.3, §2.4) |
 
 ## 6. Packaging
 
@@ -301,12 +310,28 @@ Sizes: S is up to about a thousand lines changed, M a few thousand, L more, most
 |---|---|---|---|
 | 1 | **The crate split.** `snowlark-embed` with `tab_host`, `composite`, `gpu_compositor`, `gpu_process`, `begin_frames`, `session`, `scroll`, `partition`, `local_storage` and `cdm` moved from `snowlark-shell`; a surface in place of the window handle, a surface id in place of `WindowId`; the window-handle type out of `snowlark-paint::window`. The browser behaves as before. | L (moved) | The workspace tests, the frame comparison (`snowlark-tab/src/raster_pixels.rs`) and the window's tab and protocol tests pass unchanged; the browser opens, scrolls, plays video and survives a renderer and a GPU process crash. |
 | 2 | **The public API.** `Engine`, `WebView`, `Surface` and the delegates over what moved; the pump and waker; the input routing out of `browser/mod.rs`; the `host_layers` extension; the shell moved onto the API. | L | The shell uses only the public API and the extension; a test embeds a WebView with a pixel surface and loads, navigates, scrolls and reads back a frame. |
-| 3 | **What the delegates need from the engine.** Dialogs, permission requests, the file chooser, page zoom, `evaluate`, HTTP authentication, the page–application channel. Each is JS-visible or changes layout and comes with its WPT area. | M, one per feature | Each with tests and its WPT area's count; the browser window gets the UI for each as its own delegate. |
-| 4 | **Processes.** `snowlark-helper`, `run_child()`, the build id check, the crash-dump folder and child settings from the builder. | M | Renderer and GPU processes start from the helper and from the entry point; a helper of another build is reported, not shown as crashes. |
-| 5 | **A Windows sample.** `examples/embed-windows`: one WebView in a plain Win32 window made with the `windows` crate (not Snowlark's window code), with an address on the command line, Back and Forward, and resize. | S | It builds from a clean checkout with the documented steps and runs with the helper beside it. |
+| 3 | **What the delegates need from the engine.** Dialogs, permission requests, the file chooser, page zoom, `evaluate`, user scripts, the application's schemes, HTTP authentication. Each is JS-visible or changes layout and comes with its WPT area. | M, one per feature | Each with tests and its WPT area's count; the browser window gets the UI for each as its own delegate. |
+| 4 | **Processes.** `run_child()`, the build id check, the crash-dump folder and child settings from the builder; `snowlark-helper` later, with the sandbox stages that need it. | M | Renderer and GPU processes start from the application's executable through the entry point; a child of another build is reported, not shown as crashes. |
+| 5 | **A Windows sample.** `examples/embed-windows`: one WebView in a plain Win32 window made with the `windows` crate (not Snowlark's window code), with an address on the command line, Back and Forward, and resize. | S | It builds from a clean checkout with the documented steps and runs as one executable. |
 | 6 | **A Linux sample.** The same on Wayland with a subsurface, after the Linux window and compositor stages of `docs/linux.md`. | M | It runs on a Wayland desktop. |
 | 7 | **Documentation.** Rustdoc for every public item, an embedding guide (build, ship, the `[patch]` table, the helper, the V8 library), this document updated to what was built. | S | The guide's steps build the samples from nothing. |
 | 8 | **A release.** A tag with the helper, ANGLE's files, the V8 library's hash and the notices; crates.io once the patched crates have names of their own. | M | An application outside the repository builds against the tag. |
 
 Steps 1 and 2 come first and in order. Steps 3 and 4 are independent of each other; 5 needs 2 and 4; 6 needs 5 and
 the Linux window.
+
+## 8. Decisions
+
+- **Child processes** start from the application's own executable, which calls `run_child()` first in `main`
+  (§4.2); one process is an application's default. A helper executable is added only with the sandbox stages that
+  need it.
+- **The browser window is the first embedder**: it moves onto the public API (step 2), which proves the API, under
+  the rule that the browser loses nothing (above).
+- **Surfaces** are a trait with the platform surfaces and a pixel (CPU) surface; an application may implement its
+  own. On Linux the Wayland surface drawn on the CPU comes first, as the browser's compositor draws today; a GL
+  surface follows GPU drawing.
+- **Publishing**: crates.io, in 0.x releases versioned with the workspace, once the patched crates are published
+  under names of their own; until then a git dependency at a release's tag.
+- **Name**: `snowlark-embed`.
+- **Page and application** talk without anything page-visible: `evaluate`, user scripts in an isolated world, console
+  messages and the application's own schemes.
