@@ -80,6 +80,18 @@ pub trait FlexboxItemStyle: CoreStyle {
     fn is_collapsed(&self) -> bool {
         false
     }
+
+    /// Snowlark patch: a sizing keyword as the minimum size (`auto` when `min_size` applies)
+    #[inline(always)]
+    fn min_size_keyword(&self) -> Size<Dimension> {
+        Size::auto()
+    }
+
+    /// Snowlark patch: a sizing keyword as the maximum size (`auto` when `max_size` applies)
+    #[inline(always)]
+    fn max_size_keyword(&self) -> Size<Dimension> {
+        Size::auto()
+    }
 }
 
 use crate::geometry::AbsoluteAxis;

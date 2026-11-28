@@ -1286,3 +1286,56 @@ fn intrinsic_keywords_in_min_and_max_height_are_the_content_height() {
     // (`min-height` wins)
     assert_eq!(rect(&f, both).height, 40.0);
 }
+
+#[test]
+fn sizing_keywords_on_replaced_elements() {
+    // css-sizing/keyword-sizes-on-replaced-element.html (a 100x100 image): the min-content and
+    // max-content widths come from a definite height through the natural ratio, and in the block
+    // axis the keywords as min and max heights are the height `height: auto` gives (css-sizing-3
+    // §5.1).
+    let mut t = T::new();
+    let r0 = t.root();
+    let image = |t: &mut T, f: &dyn Fn(&mut TestStyle)| {
+        let el = t.doc.element(r0, "img", |s| {
+            s.display = Display::BLOCK;
+            f(s);
+        });
+        t.doc.replace(
+            el,
+            ReplacedContent::image(snowlark_paint::ImageId(1), 100.0, 100.0),
+        );
+        el
+    };
+    let width_keyword = image(&mut t, &|s| {
+        s.width = SizeValue::MinContent;
+        s.height = SizeValue::px(50.0);
+    });
+    let max_width_keyword = image(&mut t, &|s| {
+        s.max_width = MaxSizeValue::FitContent(None);
+        s.height = SizeValue::px(50.0);
+    });
+    let min_height = image(&mut t, &|s| {
+        s.height = SizeValue::px(0.0);
+        s.min_height = SizeValue::FitContent(None);
+    });
+    let min_height_wide = image(&mut t, &|s| {
+        s.height = SizeValue::px(0.0);
+        s.min_width = SizeValue::px(150.0);
+        s.min_height = SizeValue::MinContent;
+    });
+    let max_height_narrow = image(&mut t, &|s| {
+        s.height = SizeValue::px(500.0);
+        s.max_width = MaxSizeValue::px(50.0);
+        s.max_height = MaxSizeValue::MinContent;
+    });
+    let f = t.run(400.0, 900.0);
+    let size = |id| {
+        let r = rect(&f, id);
+        (r.width, r.height)
+    };
+    assert_eq!(size(width_keyword), (50.0, 50.0));
+    assert_eq!(size(max_width_keyword), (50.0, 50.0));
+    assert_eq!(size(min_height), (100.0, 100.0));
+    assert_eq!(size(min_height_wide), (150.0, 150.0));
+    assert_eq!(size(max_height_narrow), (50.0, 50.0));
+}

@@ -174,20 +174,30 @@ pub(crate) fn contribution<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) -> ContentSi
             }
         }
     };
-    let bound = |v: SizeValue| match v {
+    // A sizing keyword as a min or max width is the box's own min-content or max-content width;
+    // `fit-content` is the min-content width in the min-content contribution and the max-content
+    // width in the max-content one (css-sizing-3 §5.2). `stretch` is ignored here (`auto`/`none`).
+    let mut bound = |v: SizeValue, max_contribution: bool| match v {
         SizeValue::LengthPercentage(lp) if !lp.has_percent() => {
             Some(to_border_box(lp.length, pb, sizing))
         }
+        SizeValue::MinContent => Some(get().min + pb),
+        SizeValue::MaxContent => Some(get().max + pb),
+        SizeValue::FitContent(None) if max_contribution => Some(get().max + pb),
+        SizeValue::FitContent(None) => Some(get().min + pb),
         _ => None,
     };
-    let min = bound(style.min_width());
-    let max = match style.max_width() {
-        MaxSizeValue::LengthPercentage(lp) if !lp.has_percent() => {
-            Some(to_border_box(lp.length, pb, sizing))
-        }
-        _ => None,
+    let max_width = match style.max_width() {
+        MaxSizeValue::LengthPercentage(lp) => SizeValue::LengthPercentage(lp),
+        MaxSizeValue::MinContent => SizeValue::MinContent,
+        MaxSizeValue::MaxContent => SizeValue::MaxContent,
+        MaxSizeValue::FitContent(l) => SizeValue::FitContent(l),
+        _ => SizeValue::Auto,
     };
+    let (min_width, max_width) = (style.min_width(), max_width);
+    let (min, max) = (bound(min_width, false), bound(max_width, false));
     sizes.min = clamp(sizes.min, min, max);
+    let (min, max) = (bound(min_width, true), bound(max_width, true));
     sizes.max = clamp(sizes.max, min, max);
     sizes.add(margins)
 }

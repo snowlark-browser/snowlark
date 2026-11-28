@@ -74,6 +74,20 @@ the source; `git log -p vendor/taffy` shows the diff.
     `auto` (§5.1); that height is definite when the width is. Upstream sized it by its content alone,
     so a flex item that is a flex or grid container measured for its hypothetical cross size (§9.4)
     took no height from its ratio.
+15. **Sizing keywords as min and max sizes of flex items** (`style/mod.rs` `Style::min_size_keyword`,
+    `max_size_keyword`, `style/flex.rs`, `geometry.rs` `Size::set_abs`, `compute/flexbox.rs`
+    `resolve_min_max_keywords`, `determine_flex_base_size`, `determine_hypothetical_cross_size`,
+    `determine_used_cross_size`): `min-content`, `max-content`, `fit-content`, `fit-content(...)` and
+    `stretch` as `min-width`/`max-width`/`min-height`/`max-height` (CSS Sizing 3 §3.2, Sizing 4 §6.1).
+    `min_size`/`max_size` stay lengths; the keyword travels beside them and replaces them in flex
+    layout once resolved: widths from the item's measured intrinsic widths (fit-content against the
+    container's inner width less the margins), heights as the content height measured at the width
+    the item has then (the flex base size's in a column container, the resolved main size in a row
+    one), `stretch` as the container's inner size less the margins floored at the padding and border,
+    and in the cross axis against the flex line once its size is known (css-flexbox-1 §9.8: the line
+    is the item's available cross size). A `stretch` main size is the specified size suggestion of the
+    automatic minimum (§4.5). Grid and block layout ignore the keyword fields. Upstream took lengths
+    only, so the keywords behaved as `auto`.
 
 To move to a newer taffy: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `.\dev.ps1 test --release --package snowlark-layout`.

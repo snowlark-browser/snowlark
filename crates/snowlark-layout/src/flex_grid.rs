@@ -180,7 +180,8 @@ fn calc_handle(
 
 fn dimension(v: SizeValue, calcs: &mut Vec<LengthPercentage>) -> taffy::Dimension {
     match v {
-        SizeValue::Auto | SizeValue::Stretch => taffy::Dimension::auto(),
+        SizeValue::Auto => taffy::Dimension::auto(),
+        SizeValue::Stretch => taffy::Dimension::stretch(),
         SizeValue::LengthPercentage(l) => match l.percent {
             None if l.is_linear() => taffy::Dimension::length(l.length),
             Some(p) if l.length == 0.0 && l.is_linear() => taffy::Dimension::percent(p),
@@ -215,6 +216,31 @@ fn max_lpa(v: MaxSizeValue, calcs: &mut Vec<LengthPercentage>) -> taffy::LengthP
         }
         _ => taffy::LengthPercentageAuto::auto(),
     }
+}
+
+/// A sizing keyword as a min or max size (css-sizing-3 §3.2, css-sizing-4 §6.1), which flex
+/// layout resolves against the item's content and its container; `auto` for anything else.
+fn size_keyword(v: SizeValue, calcs: &mut Vec<LengthPercentage>) -> taffy::Dimension {
+    match v {
+        SizeValue::MinContent
+        | SizeValue::MaxContent
+        | SizeValue::FitContent(_)
+        | SizeValue::Stretch => dimension(v, calcs),
+        _ => taffy::Dimension::auto(),
+    }
+}
+
+fn max_size_keyword(v: MaxSizeValue, calcs: &mut Vec<LengthPercentage>) -> taffy::Dimension {
+    size_keyword(
+        match v {
+            MaxSizeValue::MinContent => SizeValue::MinContent,
+            MaxSizeValue::MaxContent => SizeValue::MaxContent,
+            MaxSizeValue::FitContent(l) => SizeValue::FitContent(l),
+            MaxSizeValue::Stretch => SizeValue::Stretch,
+            _ => SizeValue::Auto,
+        },
+        calcs,
+    )
 }
 
 fn align_items(a: Align) -> taffy::AlignItems {
@@ -479,6 +505,14 @@ fn taffy_style<S: Style>(b: &LayoutBox<S>, s: &S, calcs: &mut Vec<LengthPercenta
         max_size: taffy::Size {
             width: max_lpa(s.max_width(), calcs),
             height: max_lpa(s.max_height(), calcs),
+        },
+        min_size_keyword: taffy::Size {
+            width: size_keyword(s.min_width(), calcs),
+            height: size_keyword(s.min_height(), calcs),
+        },
+        max_size_keyword: taffy::Size {
+            width: max_size_keyword(s.max_width(), calcs),
+            height: max_size_keyword(s.max_height(), calcs),
         },
         aspect_ratio: match s.aspect_ratio() {
             AspectRatio {
@@ -823,7 +857,6 @@ fn order_children<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) {
     }
     tree.b_mut(id).cache.taffy.as_mut().unwrap().order = order;
     if cx.tree.b(id).kind == BoxKind::Flex {
-        intrinsic_width_bounds(cx, id);
         table_item_heights(cx, id);
     }
 }
@@ -862,48 +895,6 @@ fn table_item_heights<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) {
         let captions = crate::table::captions_height(cx, c, width);
         if let Some(node) = cx.tree.b_mut(c).cache.taffy.as_mut() {
             node.style.size.height = taffy::Dimension::length(height + captions);
-        }
-    }
-}
-
-/// `min-width`/`max-width: min-content | max-content` of flex items as lengths (taffy's min and max
-/// sizes are lengths): the item's intrinsic widths now (css-sizing-3 §3.2), refreshed at every layout
-/// of the container since they follow the item's content.
-fn intrinsic_width_bounds<S: Style>(cx: &mut Cx<'_, S>, id: BoxId) {
-    for i in 0..cx.tree.b(id).children.len() {
-        let c = cx.tree.b(id).children[i];
-        let style = &cx.style_here(c);
-        let intrinsic = |v: SizeValue| matches!(v, SizeValue::MinContent | SizeValue::MaxContent);
-        let (min, max) = (style.min_width(), style.max_width());
-        let max = match max {
-            MaxSizeValue::MinContent => SizeValue::MinContent,
-            MaxSizeValue::MaxContent => SizeValue::MaxContent,
-            _ => SizeValue::Auto,
-        };
-        if !intrinsic(min) && !intrinsic(max) {
-            continue;
-        }
-        let pb = Edges::of(style, 0.0).pb_h();
-        // Taffy adds a content-box item's padding and border to its min and max sizes.
-        let extra = match style.box_sizing() {
-            BoxSizing::BorderBox => pb,
-            BoxSizing::ContentBox => 0.0,
-        };
-        let sizes = cx.content_sizes(c);
-        let length = |v: SizeValue| match v {
-            SizeValue::MinContent => Some(taffy::LengthPercentageAuto::length(sizes.min + extra)),
-            SizeValue::MaxContent => Some(taffy::LengthPercentageAuto::length(sizes.max + extra)),
-            _ => None,
-        };
-        let (min, max) = (length(min), length(max));
-        let Some(node) = cx.tree.b_mut(c).cache.taffy.as_mut() else {
-            continue;
-        };
-        if let Some(v) = min {
-            node.style.min_size.width = v;
-        }
-        if let Some(v) = max {
-            node.style.max_size.width = v;
         }
     }
 }

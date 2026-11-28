@@ -760,6 +760,13 @@ pub struct Style<S: CheapCloneStr = DefaultCheapStr> {
     /// Controls the maximum size of the item
     #[cfg_attr(feature = "serde", serde(default = "style_helpers::auto"))]
     pub max_size: Size<LengthPercentageAuto>,
+    /// Snowlark patch: a sizing keyword (`min-content`, `max-content`, `fit-content`,
+    /// `fit-content(...)`, `stretch`) as the minimum size, `auto` otherwise. Flex layout resolves
+    /// it; elsewhere `min_size` (then `auto`) applies.
+    pub min_size_keyword: Size<Dimension>,
+    /// Snowlark patch: a sizing keyword as the maximum size, `auto` otherwise (see
+    /// `min_size_keyword`).
+    pub max_size_keyword: Size<Dimension>,
     /// Sets the preferred aspect ratio for the item
     ///
     /// The ratio is calculated as width divided by height.
@@ -987,6 +994,8 @@ impl<S: CheapCloneStr> Style<S> {
         size: Size::auto(),
         min_size: Size::auto(),
         max_size: Size::auto(),
+        min_size_keyword: Size::auto(),
+        max_size_keyword: Size::auto(),
         aspect_ratio: None,
         #[cfg(any(feature = "flexbox", feature = "grid"))]
         gap: Size::zero(),
@@ -1461,6 +1470,14 @@ impl<S: CheapCloneStr> FlexboxItemStyle for Style<S> {
     fn is_collapsed(&self) -> bool {
         self.item_is_collapsed
     }
+    #[inline(always)]
+    fn min_size_keyword(&self) -> Size<Dimension> {
+        self.min_size_keyword
+    }
+    #[inline(always)]
+    fn max_size_keyword(&self) -> Size<Dimension> {
+        self.max_size_keyword
+    }
 }
 
 #[cfg(feature = "flexbox")]
@@ -1484,6 +1501,14 @@ impl<T: FlexboxItemStyle> FlexboxItemStyle for &'_ T {
     #[inline(always)]
     fn is_collapsed(&self) -> bool {
         (*self).is_collapsed()
+    }
+    #[inline(always)]
+    fn min_size_keyword(&self) -> Size<Dimension> {
+        (*self).min_size_keyword()
+    }
+    #[inline(always)]
+    fn max_size_keyword(&self) -> Size<Dimension> {
+        (*self).max_size_keyword()
     }
 }
 
@@ -1818,6 +1843,8 @@ mod tests {
             size: Size::auto(),
             min_size: Size::auto(),
             max_size: Size::auto(),
+            min_size_keyword: Size::auto(),
+            max_size_keyword: Size::auto(),
             aspect_ratio: Default::default(),
             #[cfg(feature = "grid")]
             grid_template_rows: Default::default(),

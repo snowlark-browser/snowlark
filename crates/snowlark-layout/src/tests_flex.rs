@@ -458,6 +458,177 @@ fn intrinsic_min_and_max_width_keywords_of_items() {
 }
 
 #[test]
+fn sizing_keywords_as_min_and_max_sizes_of_items() {
+    // css-sizing/keyword-sizes-on-flex-item-001/002.html: `fit-content` and `stretch` as min and
+    // max widths, and every sizing keyword as a min or max height (css-sizing-3 §3.2, css-sizing-4
+    // §6.1): in the block axis min-content, max-content and fit-content are the content height at
+    // the item's width; stretch is the container's inner size less the item's margins.
+    for column in [false, true] {
+        let mut t = T::new();
+        let r0 = t.root();
+        let flex = t.doc.block(r0, |s| {
+            s.display = Display::FLEX;
+            if column {
+                s.flex_direction = FlexDirection::Column;
+            }
+            s.width = SizeValue::px(50.0);
+            s.height = SizeValue::px(100.0);
+        });
+        let item = |t: &mut T, f: &dyn Fn(&mut TestStyle)| {
+            let item = t.doc.block(flex, |s| {
+                s.flex_grow = 0.0;
+                s.flex_shrink = 0.0;
+                s.align_self = Align::FlexStart;
+                f(s);
+            });
+            t.doc.text(item, "aaa aaa");
+            item
+        };
+        let auto = item(&mut t, &|_| {});
+        let min_fit = item(&mut t, &|s| {
+            s.width = SizeValue::px(0.0);
+            s.min_width = SizeValue::FitContent(None);
+        });
+        let max_fit = item(&mut t, &|s| {
+            s.width = SizeValue::px(500.0);
+            s.max_width = MaxSizeValue::FitContent(None);
+        });
+        let min_stretch = item(&mut t, &|s| {
+            s.width = SizeValue::px(0.0);
+            s.min_width = SizeValue::Stretch;
+        });
+        let min_content_height = item(&mut t, &|s| {
+            s.height = SizeValue::px(0.0);
+            s.min_height = SizeValue::MinContent;
+        });
+        let max_content_height = item(&mut t, &|s| {
+            s.height = SizeValue::px(500.0);
+            s.max_height = MaxSizeValue::MaxContent;
+        });
+        let stretch_height = item(&mut t, &|s| {
+            s.height = SizeValue::px(0.0);
+            s.min_height = SizeValue::Stretch;
+        });
+        let f = t.run(400.0, 400.0);
+        let content = rect(&f, auto);
+        assert!(content.height > 0.0);
+        let at = |id| rect(&f, id);
+        // fit-content: the min-content width 30, the max-content width 70, the stretch size 50
+        assert_eq!(at(min_fit).width, 50.0, "column: {column}");
+        assert_eq!(at(max_fit).width, 50.0, "column: {column}");
+        assert_eq!(at(min_stretch).width, 50.0, "column: {column}");
+        assert_eq!(
+            at(min_content_height).height,
+            content.height,
+            "column: {column}"
+        );
+        assert_eq!(
+            at(max_content_height).height,
+            content.height,
+            "column: {column}"
+        );
+        assert_eq!(at(stretch_height).height, 100.0, "column: {column}");
+    }
+}
+
+#[test]
+fn stretch_as_min_and_max_cross_sizes_fills_the_flex_line() {
+    // css-sizing/keyword-sizes-on-flex-item-001.html "Indefinite stretch": in a row container
+    // whose height is not definite, `stretch` as a min or max height fills the flex line once its
+    // cross size is known (here the container's max-height clamps it to 100); the stretched
+    // size is never below the padding and border.
+    let mut t = T::new();
+    let r0 = t.root();
+    let flex = t.doc.block(r0, |s| {
+        s.display = Display::FLEX;
+        s.width = SizeValue::px(300.0);
+        s.max_height = MaxSizeValue::px(100.0);
+    });
+    let item = |t: &mut T, f: &dyn Fn(&mut TestStyle)| {
+        t.doc.block(flex, |s| {
+            s.flex_grow = 0.0;
+            s.flex_shrink = 0.0;
+            s.width = SizeValue::px(10.0);
+            s.margin = [LengthPercentageAuto::px(5.0); 4];
+            f(s);
+        })
+    };
+    let max = item(&mut t, &|s| {
+        s.height = SizeValue::px(500.0);
+        s.max_height = MaxSizeValue::Stretch;
+    });
+    let min = item(&mut t, &|s| {
+        s.height = SizeValue::px(0.0);
+        s.min_height = SizeValue::Stretch;
+    });
+    let f = t.run(400.0, 400.0);
+    assert_eq!(rect(&f, max).height, 90.0);
+    assert_eq!(rect(&f, min).height, 90.0);
+
+    // A container with no room: the stretched border box keeps its padding and border.
+    let mut t = T::new();
+    let r0 = t.root();
+    let flex = t.doc.block(r0, |s| {
+        s.display = Display::FLEX;
+        s.width = SizeValue::px(0.0);
+        s.height = SizeValue::px(0.0);
+    });
+    let item = t.doc.block(flex, |s| {
+        s.padding = [LengthPercentage::px(5.0); 4];
+        s.width = SizeValue::Stretch;
+        s.min_width = SizeValue::Stretch;
+        s.max_width = MaxSizeValue::Stretch;
+        s.height = SizeValue::Stretch;
+        s.min_height = SizeValue::Stretch;
+        s.max_height = MaxSizeValue::Stretch;
+    });
+    let f = t.run(400.0, 400.0);
+    let r = rect(&f, item);
+    assert_eq!((r.width, r.height), (10.0, 10.0));
+}
+
+#[test]
+fn sizing_keywords_as_min_and_max_widths_in_intrinsic_contributions() {
+    // css-sizing/keyword-sizes-for-intrinsic-contributions.html: a float's shrink-to-fit width
+    // takes its child's min and max width keywords (css-sizing-3 §5.2); `fit-content` is the
+    // min-content width in the min-content contribution, the max-content width in the other.
+    // "aaa aaa": min-content 30, max-content 70; the floats have 50px to fit into.
+    let mut t = T::new();
+    let r0 = t.root();
+    let wrapper = t.doc.block(r0, |s| s.width = SizeValue::px(50.0));
+    let float = |t: &mut T, f: &dyn Fn(&mut TestStyle)| {
+        let float = t.doc.block(wrapper, |s| {
+            s.float = Float::Left;
+            s.clear = Clear::Both;
+        });
+        let child = t.doc.block(float, |s| f(s));
+        t.doc.text(child, "aaa aaa");
+        float
+    };
+    let min_content = float(&mut t, &|s| {
+        s.width = SizeValue::px(0.0);
+        s.min_width = SizeValue::MinContent;
+    });
+    let min_fit = float(&mut t, &|s| {
+        s.width = SizeValue::px(0.0);
+        s.min_width = SizeValue::FitContent(None);
+    });
+    let max_min_content = float(&mut t, &|s| {
+        s.width = SizeValue::px(200.0);
+        s.max_width = MaxSizeValue::MinContent;
+    });
+    let max_fit = float(&mut t, &|s| {
+        s.width = SizeValue::px(200.0);
+        s.max_width = MaxSizeValue::FitContent(None);
+    });
+    let f = t.run(400.0, 400.0);
+    assert_eq!(rect(&f, min_content).width, 30.0);
+    assert_eq!(rect(&f, min_fit).width, 50.0);
+    assert_eq!(rect(&f, max_min_content).width, 30.0);
+    assert_eq!(rect(&f, max_fit).width, 50.0);
+}
+
+#[test]
 fn table_item_height_counts_its_captions() {
     // css-flexbox/table-as-item-stretch-cross-size-3.html: a table item's `height` is its table box's,
     // its captions count as the box's border and padding (css-flexbox-1 §4): 90px + a 10px caption.

@@ -38,6 +38,15 @@ impl<T> Size<T> {
         }
     }
 
+    /// Snowlark patch: set either the width or height depending on the AbsoluteAxis passed in
+    #[inline(always)]
+    pub fn set_abs(&mut self, axis: AbsoluteAxis, value: T) {
+        match axis {
+            AbsoluteAxis::Horizontal => self.width = value,
+            AbsoluteAxis::Vertical => self.height = value,
+        }
+    }
+
     /// Swap the width and height components
     #[inline(always)]
     pub fn transpose(self) -> Size<T> {

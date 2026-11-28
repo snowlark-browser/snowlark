@@ -113,6 +113,26 @@ fn used_size<S: Style>(
     fixed: (Option<f32>, Option<f32>),
     own_sizes: bool,
 ) -> (f32, f32) {
+    used_size_with(
+        tree, text, b, s, cb_width, cb_height, available, fixed, own_sizes, false,
+    )
+}
+
+/// [`used_size`]; with `auto_height`, as if `height` were `auto` and the min and max heights that
+/// are sizing keywords were not there (the size those keywords stand for).
+#[allow(clippy::too_many_arguments)]
+fn used_size_with<S: Style>(
+    tree: &BoxTree<S>,
+    text: &TextEngine,
+    b: &LayoutBox<S>,
+    s: &S,
+    cb_width: Option<f32>,
+    cb_height: Option<f32>,
+    available: f32,
+    fixed: (Option<f32>, Option<f32>),
+    own_sizes: bool,
+    auto_height: bool,
+) -> (f32, f32) {
     let edges = Edges::of(s, cb_width.unwrap_or(0.0));
     let pbh = edges.pb_h();
     let pbv = edges.pb_v();
@@ -120,7 +140,23 @@ fn used_size<S: Style>(
     let n = natural(tree, text, b, s);
     let content_w = |v: Option<f32>| v.map(|w| (w - pbh).max(0.0));
     let content_h = |v: Option<f32>| v.map(|h| (h - pbv).max(0.0));
-    let nat_w = n.width.unwrap_or(0.0);
+    // (`stretch` fills the containing block less the margins, css-sizing-4 §6)
+    let stretch_h = cb_height.map(|h| h - edges.margin_v());
+    let h = content_h(fixed.1.or_else(|| {
+        (own_sizes && !auto_height)
+            .then(|| match s.height() {
+                SizeValue::Stretch => stretch_h.map(|v| v.max(pbv)),
+                v => resolve_height(v, cb_height, pbv, sizing),
+            })
+            .flatten()
+    }));
+    // The min-content and max-content widths: the natural width, or a definite height through the
+    // natural ratio (css-sizing-3 §5.1).
+    let nat_w = h
+        .zip(n.ratio)
+        .map(|(h, r)| h * r)
+        .or(n.width)
+        .unwrap_or(0.0);
     let mut nothing = || ContentSizes {
         min: nat_w,
         max: nat_w,
@@ -129,16 +165,6 @@ fn used_size<S: Style>(
     let w = content_w(fixed.0.or_else(|| {
         own_sizes
             .then(|| resolve_width(s.width(), cb_width, pbh, sizing, stretch, &mut nothing))
-            .flatten()
-    }));
-    // (`stretch` fills the containing block less the margins, css-sizing-4 §6)
-    let stretch_h = cb_height.map(|h| h - edges.margin_v());
-    let h = content_h(fixed.1.or_else(|| {
-        own_sizes
-            .then(|| match s.height() {
-                SizeValue::Stretch => stretch_h.map(|v| v.max(pbv)),
-                v => resolve_height(v, cb_height, pbv, sizing),
-            })
             .flatten()
     }));
     // The default object size is physical: 300px wide, 150px tall.
@@ -201,7 +227,32 @@ fn used_size<S: Style>(
     let (min_w, max_w) = width_bounds(s, cb_width, pbh, stretch, &mut nothing);
     let (min_h, max_h) = height_bounds(s, cb_height, pbv, stretch_h);
     let (min_w, max_w) = (to_c(min_w, pbh).unwrap_or(0.0), to_c(max_w, pbh));
-    let (min_h, max_h) = (to_c(min_h, pbv).unwrap_or(0.0), to_c(max_h, pbv));
+    let (mut min_h, mut max_h) = (to_c(min_h, pbv).unwrap_or(0.0), to_c(max_h, pbv));
+    // `min-content`, `max-content` and `fit-content` as a min or max height are the height the box
+    // takes with `height: auto` (css-sizing-3 §5.1: in the block axis they behave as `auto`).
+    let content_keyword = |v: SizeValue| {
+        matches!(
+            v,
+            SizeValue::MinContent | SizeValue::MaxContent | SizeValue::FitContent(_)
+        )
+    };
+    let max_keyword = matches!(
+        s.max_height(),
+        MaxSizeValue::MinContent | MaxSizeValue::MaxContent | MaxSizeValue::FitContent(_)
+    );
+    let min_keyword = content_keyword(s.min_height());
+    // (`height_bounds` leaves the keywords out: without `auto_height` they are put back here)
+    if own_sizes && !auto_height && (min_keyword || max_keyword) {
+        let (_, auto) = used_size_with(
+            tree, text, b, s, cb_width, cb_height, available, fixed, own_sizes, true,
+        );
+        if min_keyword {
+            min_h = auto;
+        }
+        if max_keyword {
+            max_h = Some(auto);
+        }
+    }
     if let (None, None, Some(_)) = (w, h, n.ratio) {
         // §10.4's table: keep the ratio while satisfying the constraints.
         let max_w = max_w.unwrap_or(f32::INFINITY).max(min_w);
