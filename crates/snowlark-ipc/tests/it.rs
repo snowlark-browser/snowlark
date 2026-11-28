@@ -6,6 +6,7 @@
 //! real second process, `loopback` the same code in one.
 
 mod child;
+mod exit;
 mod link;
 mod loopback;
 

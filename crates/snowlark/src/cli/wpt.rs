@@ -116,7 +116,7 @@ fn watchdog(watch: Arc<Watch>, results: Results, epoch: Instant) {
                     &error_result("runner: the page hung and could not be stopped"),
                 ),
             );
-            std::process::exit(3);
+            snowlark_ipc::exit_now(3);
         }
     }
 }
@@ -312,7 +312,7 @@ pub fn run(args: &[String]) -> i32 {
                             &error_result(&format!("CRASH: {message}")),
                         ),
                     );
-                    std::process::exit(3);
+                    snowlark_ipc::exit_now(3);
                 }
                 if over {
                     append(
@@ -323,7 +323,7 @@ pub fn run(args: &[String]) -> i32 {
                             &error_result("runner: over the DOM node or heap limit"),
                         ),
                     );
-                    std::process::exit(3);
+                    snowlark_ipc::exit_now(3);
                 }
                 match done {
                     Some(r) => r,

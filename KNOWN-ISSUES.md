@@ -288,7 +288,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   `navigation-timing/test-document-open.html` and `fetch/api/abort/general.any.html` vary from run to run
   (ref 60, 563); a headless
   Speedometer run rarely stalls at the start of a suite (ref 305); and `tools/speedometer/quick_ab.py` can read one arm slower than the other for the same binary when the arms share a core (ref 509).
-- **A hang at exit.** Rarely, a headless process finishes its work and then never exits: its last thread spins in
-  a heap allocation while the graphics library unloads. (ref 923)
+- **A hang at exit.** A headless process was once seen to finish its work and then never exit, its last thread
+  spinning in a heap allocation while the graphics library unloaded. Headless and child processes no longer run
+  that unload code; the browser window's own process still does. (ref 923)
 - **Animated images in reftest captures.** A reftest capture shows an animated image's first frame even when the page
   waits for later ones (WPT `avif/animated-avif-timeout.html`). (ref 747)

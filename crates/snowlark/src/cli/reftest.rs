@@ -214,7 +214,7 @@ fn watchdog(watch: Arc<Watch>, results: Results, epoch: Instant) {
         }
         if elapsed > limit + 20_000 {
             append(&results, &line);
-            std::process::exit(3);
+            snowlark_ipc::exit_now(3);
         }
     }
 }
@@ -408,7 +408,7 @@ pub fn run(args: &[String]) -> i32 {
             &result_line(entry, t0.elapsed().as_millis(), &outcome, error.as_deref()),
         );
         if fatal {
-            std::process::exit(3);
+            snowlark_ipc::exit_now(3);
         }
     }
     0

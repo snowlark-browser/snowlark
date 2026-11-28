@@ -43,7 +43,9 @@ pub fn main() {
             .join()
             .unwrap_or(101);
         snowlark_js::write_pgo_profile();
-        std::process::exit(code);
+        // The mode's files are closed and its work is done: the end runs no library's unload code
+        // (ANGLE's could hang on a heap lock held by a thread the ordinary exit had stopped).
+        snowlark_ipc::exit_now(code);
     }
     let code = run(args, setup);
     snowlark_js::write_pgo_profile();

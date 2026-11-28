@@ -61,3 +61,21 @@ pub use untrusted::{
     Validate,
 };
 pub use wire::{BuildId, Wire};
+
+/// Ends this process with `code` once its output is out: Rust's stdout and stderr and the C
+/// runtime's streams are flushed, then the process ends at once (`TerminateProcess` on itself on
+/// Windows, `_exit` on Linux) instead of the ordinary exit. That one stops every other thread
+/// wherever it is, possibly inside the heap with its lock held, and then runs each loaded library's
+/// unload code, which can allocate and wait on that lock for ever; this runs none of it, nor C
+/// exit handlers or destructors.
+///
+/// For a process whose work is done and whose files are closed: a headless run once its results
+/// are written, a child process once it has nothing more to send. Nothing still buffered elsewhere
+/// (a `BufWriter` not dropped, a thread's unsent writes) is written.
+pub fn exit_now(code: i32) -> ! {
+    use std::io::Write;
+    let _ = std::io::stdout().lock().flush();
+    let _ = std::io::stderr().lock().flush();
+    os::exit::flush_c_streams();
+    os::exit::terminate(code)
+}

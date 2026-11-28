@@ -6,6 +6,7 @@
 
 pub mod cpu;
 pub mod crash_dump;
+pub(crate) mod exit;
 pub mod handle;
 pub(crate) mod io;
 pub mod launch;
