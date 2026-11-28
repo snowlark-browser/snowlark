@@ -705,6 +705,12 @@ pub struct Engine {
     /// While a message is serialized with a transfer list: each transferred port and the port it
     /// becomes ([`channel`]).
     pub(crate) transferring: RefCell<Vec<(Handle, Handle)>>,
+    /// The ports entangled with a port in another event loop, whose mailboxes each turn reads
+    /// ([`Engine::poll_ports`]).
+    pub(crate) remote_ports: RefCell<Vec<Handle>>,
+    /// While a message from another event loop is deserialized: the key of each port it
+    /// transferred and the port it became here ([`Engine::port_for_key`]).
+    pub(crate) ports_in: RefCell<Option<Vec<(u64, Handle)>>>,
     /// The SVG DOM's per-element state ([`svg`]).
     pub(crate) svg: RefCell<svg::SvgState>,
     /// IndexedDB: the backend, this loop's inbox, the live connections and transactions ([`idb`]).
@@ -850,6 +856,8 @@ impl Engine {
             broadcast: RefCell::new((None, None)),
             broadcasts: RefCell::new(Vec::new()),
             transferring: RefCell::new(Vec::new()),
+            remote_ports: RefCell::new(Vec::new()),
+            ports_in: RefCell::new(None),
             svg: RefCell::default(),
             idb: RefCell::default(),
             caches: RefCell::default(),

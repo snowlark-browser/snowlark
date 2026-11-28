@@ -259,15 +259,24 @@ impl Engine {
     fn queue_worker_message(&self, bytes: Vec<u8>, transferred: Vec<Transferred>) {
         self.queue_task(TaskSource::DomManipulation, move |e, cx| {
             let Some(global) = e.window() else { return };
-            match e.deserialize_with_transfer(cx, &bytes, transferred) {
-                Ok(data) => e.fire_port_message(cx, global, Some(data), "message"),
-                Err(()) => e.fire_port_message(cx, global, None, "messageerror"),
+            let (data, ports) = e.deserialize_from_elsewhere(cx, &bytes, transferred);
+            match data {
+                Ok(data) => e.fire_port_message(cx, global, Some(data), "message", ports),
+                Err(()) => e.fire_port_message(cx, global, None, "messageerror", ports),
             }
         });
     }
 
-    /// Fires a `message` (or `messageerror`) event with no source and no origin.
-    fn fire_port_message(&self, cx: &mut Cx, target: Handle, data: Option<JsValue>, type_: &str) {
+    /// Fires a `message` (or `messageerror`) event with no source and no origin, carrying the
+    /// ports the message transferred.
+    fn fire_port_message(
+        &self,
+        cx: &mut Cx,
+        target: Handle,
+        data: Option<JsValue>,
+        type_: &str,
+        ports: Vec<Handle>,
+    ) {
         let ev = self.trusted_event(
             InterfaceId::MessageEvent,
             type_,
@@ -278,7 +287,7 @@ impl Engine {
                 origin: String::new(),
                 last_event_id: String::new(),
                 source: None,
-                ports: Vec::new(),
+                ports,
             },
         );
         self.dispatch(cx, ev, target, false);
@@ -525,9 +534,12 @@ impl Engine {
                 _ if terminated => {}
                 FromWorker::Message(bytes, transferred) => {
                     self.queue_task(TaskSource::DomManipulation, move |e, cx| {
-                        match e.deserialize_with_transfer(cx, &bytes, transferred) {
-                            Ok(data) => e.fire_port_message(cx, worker, Some(data), "message"),
-                            Err(()) => e.fire_port_message(cx, worker, None, "messageerror"),
+                        let (data, ports) = e.deserialize_from_elsewhere(cx, &bytes, transferred);
+                        match data {
+                            Ok(data) => {
+                                e.fire_port_message(cx, worker, Some(data), "message", ports)
+                            }
+                            Err(()) => e.fire_port_message(cx, worker, None, "messageerror", ports),
                         }
                     });
                 }

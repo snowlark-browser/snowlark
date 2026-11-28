@@ -108,6 +108,8 @@ pub enum Transferred {
     /// receiving side makes a Module of without compiling again (WebAssembly JS API, Module's
     /// serialization steps: its bytes, within its agent cluster).
     WasmModule(v8::CompiledWasmModule),
+    /// A `MessagePort` ([`crate::engine::channel::PortTransfer`]).
+    Port(Box<crate::engine::channel::PortTransfer>),
 }
 
 impl Engine {
@@ -356,13 +358,20 @@ impl Engine {
         value: &JsValue,
         transfer: &[JsObject],
     ) -> rt::Result<(Vec<u8>, Vec<Transferred>)> {
+        crate::engine::channel::check_transferable(cx, transfer)?;
         let buffers = transfer_buffers(cx, transfer)?;
         let list = self.offscreen_transfer_list(cx, transfer)?;
         let bitmaps = self.bitmap_transfer_list(cx, transfer)?;
+        let ports = self.port_transfer_list(cx, transfer)?;
         let prev = self.transfer_out.replace(list.clone());
+        // (each port is written by its own handle: the key its transfer data carries)
+        let prev_ports = self
+            .transferring
+            .replace(ports.iter().map(|&p| (p, p)).collect());
         // (a dedicated worker is in its owner's agent cluster: WebAssembly modules go along)
         let (bytes, modules) =
             self.sharing_wasm_modules(list.len() as u32, || self.serialize_value(cx, value));
+        self.transferring.replace(prev_ports);
         self.transfer_out.replace(prev);
         let bytes = bytes?;
         // (the ImageBitmaps are checked and detached first: one that cannot be transferred
@@ -392,6 +401,12 @@ impl Engine {
             out.extend(data);
         }
         out.extend(modules.into_iter().map(Transferred::WasmModule));
+        // (the ports last: the indices before them are the serialization's)
+        out.extend(
+            ports
+                .into_iter()
+                .map(|p| Transferred::Port(Box::new(self.export_port(p)))),
+        );
         Ok((bytes, out))
     }
 
@@ -474,7 +489,7 @@ impl Engine {
                 height,
                 placeholder,
             } => Some(self.new_offscreen(width, height, placeholder)),
-            Transferred::WasmModule(_) => None,
+            Transferred::WasmModule(_) | Transferred::Port(_) => None,
         }
     }
 

@@ -1244,6 +1244,7 @@ impl Engine {
         let mut progressed = self.report_pending_violations(cx);
         progressed |= self.poll_api_fetches(cx);
         progressed |= self.poll_workers(cx);
+        progressed |= self.poll_ports();
         progressed |= self.poll_service_workers(cx);
         progressed |= self.poll_websockets(cx);
         progressed |= self.poll_broadcasts(cx);

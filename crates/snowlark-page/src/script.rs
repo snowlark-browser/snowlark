@@ -2304,9 +2304,15 @@ impl v8::ValueDeserializerImpl for CloneDelegate {
         if ok && tag == HOST_PORT {
             let (mut lo, mut hi) = (0u32, 0u32);
             if value_deserializer.read_uint32(&mut lo) && value_deserializer.read_uint32(&mut hi) {
-                let h = Handle::new(u64::from(lo) | (u64::from(hi) << 32));
+                let bits = u64::from(lo) | (u64::from(hi) << 32);
                 let st = rt::state(scope);
                 let engine = st.engine::<Engine>();
+                // (from another event loop: the port it transferred under that key, made here)
+                let h = match engine.port_for_key(bits) {
+                    None => Handle::new(bits),
+                    Some(Some(h)) => h,
+                    Some(None) => return None,
+                };
                 let received = {
                     let mut cx = Cx::new(scope);
                     engine.receive_port(&mut cx, h)

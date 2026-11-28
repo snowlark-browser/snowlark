@@ -909,6 +909,78 @@ fn fetch_and_xhr_reach_the_network() {
 }
 
 #[test]
+fn message_ports_go_to_workers_and_back() {
+    // HTML §9.4: a port transferred to another event loop stays entangled with its partner, takes
+    // the messages waiting for it along, and can carry other ports, both ways.
+    let base = serve(vec![
+        ("/index.html", "text/html", "<!doctype html>"),
+        (
+            "/w.js",
+            "text/javascript",
+            "onmessage = e => { const p = e.ports[0]; \
+               p.onmessage = m => m.ports.length ? m.ports[0].postMessage('on:' + m.data) : p.postMessage('echo:' + m.data); \
+               const c = new MessageChannel(); \
+               c.port1.onmessage = m => c.port1.postMessage('back:' + m.data); \
+               postMessage('here', [c.port2]); };",
+        ),
+    ]);
+    let net = snowlark_net::NetThread::start(snowlark_net::NetConfig::default()).unwrap();
+    let mut page = Page::new(PageOptions {
+        net: Some(net.client()),
+        ..Default::default()
+    });
+    page.navigate(url::Url::parse(&format!("{base}/index.html")).unwrap());
+    page.run_until_settled(Duration::from_secs(10));
+    eval(
+        &mut page,
+        r#"
+        var log = [];
+        const w = new Worker('/w.js');
+        w.onmessage = e => {
+            const p = e.ports[0];
+            p.onmessage = m => log.push(m.data);
+            p.postMessage('hi');
+        };
+        const ch = new MessageChannel();
+        ch.port1.postMessage('queued');
+        ch.port1.onmessage = e => log.push(e.data);
+        w.postMessage('port', [ch.port2]);
+        ch.port1.postMessage('after');
+        const ch2 = new MessageChannel();
+        ch2.port1.onmessage = e => log.push('ch2:' + e.data);
+        ch.port1.postMessage('x', [ch2.port2]);
+        try { w.postMessage('again', [ch.port2]); } catch (e) { log.push(e.name); }
+        // (an object that is not transferable: nothing is transferred)
+        const ch3 = new MessageChannel();
+        try { w.postMessage('bad', [ch3.port1, {length: 1}]); } catch (e) { log.push('bad:' + e.name); }
+        ch3.port1.postMessage('still here');
+        'ok'
+        "#,
+    );
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    page.run_until(deadline, |p| {
+        p.eval("String(log.length >= 6)", "t")
+            .is_ok_and(|v| v == "true")
+    });
+    let mut got: Vec<String> = eval(&mut page, "w.terminate(); log.join('|')")
+        .split('|')
+        .map(str::to_owned)
+        .collect();
+    got.sort();
+    assert_eq!(
+        got,
+        [
+            "DataCloneError",
+            "back:hi",
+            "bad:DataCloneError",
+            "ch2:on:x",
+            "echo:after",
+            "echo:queued"
+        ]
+    );
+}
+
+#[test]
 fn dedicated_workers_exchange_messages() {
     let base = serve(vec![
         ("/index.html", "text/html", "<!doctype html>"),
