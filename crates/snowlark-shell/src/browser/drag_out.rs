@@ -14,9 +14,13 @@
 //! other programs read, the window's drop target brings it back over the page, and the loop's end
 //! goes back to the tab ([`TabCommand::DragOutEnded`]) for the page's `dragend`.
 
-use snowlark_page::dnd::{DragOperation, DragOut as PageDragOut};
+use std::sync::Arc;
+
+use snowlark_net::{CacheMode, Client, Destination, FetchEvent, NetClient, Request, Url};
+use snowlark_page::dnd::{DragOperation, DragOut as PageDragOut, ImageFile};
 use snowlark_paint::drop_target::{
-    safe_file_name, DragFile, DragImage, DragLink, DragOut, DropEffect, DropEffects,
+    safe_file_name, DragFile, DragImage, DragLink, DragOut, DropEffect, DropEffects, FileContents,
+    LaterBytes,
 };
 use snowlark_paint::window::Window;
 use snowlark_paint::{
@@ -129,7 +133,11 @@ impl Browser {
             }
             return;
         }
-        let mut out = page_drag_data(drag);
+        let (mut out, fetch) = page_drag_data(drag);
+        if let Some((url, later)) = fetch {
+            let page = Url::parse(&self.active_url()).ok();
+            fetch_original(self.tab_ctx.net.clone(), page, url, later);
+        }
         out.image = match (&drag.image, &out.link) {
             (Some(i), _) => Some(DragImage {
                 width: i.width,
@@ -241,12 +249,54 @@ impl Browser {
     }
 }
 
+/// The largest dragged image file fetched.
+const MAX_IMAGE_FILE: usize = 256 << 20;
+
+/// Fetches the file a dragged image was decoded from again, as the page `page` loads it, into
+/// `later` (on a thread of its own): from the HTTP cache whatever its age (Fetch's "force-cache"),
+/// which still holds it unless it could not be stored, else from the network. Nothing on a
+/// network error, a status that is not ok, or a body over [`MAX_IMAGE_FILE`].
+pub(super) fn fetch_original(net: NetClient, page: Option<Url>, url: Url, later: LaterBytes) {
+    let spawned = std::thread::Builder::new()
+        .name("snowlark drag file".into())
+        .spawn({
+            let later = later.clone();
+            move || {
+                let client = Client::for_url(page.as_ref().unwrap_or(&url));
+                let mut request = Request::subresource(url, Destination::Image, Arc::new(client));
+                request.cache = CacheMode::ForceCache;
+                let mut stream = net.fetch(request);
+                let mut body = Vec::new();
+                let bytes = loop {
+                    match stream.next_blocking() {
+                        Some(FetchEvent::Head(h)) if !h.ok() => break None,
+                        Some(FetchEvent::Body(b)) => {
+                            if body.len() + b.len() > MAX_IMAGE_FILE {
+                                break None;
+                            }
+                            body.extend_from_slice(&b);
+                        }
+                        Some(FetchEvent::Done) => break Some(body),
+                        Some(FetchEvent::Error(_)) | None => break None,
+                        Some(_) => {}
+                    }
+                };
+                later.set(bytes);
+            }
+        });
+    if spawned.is_err() {
+        later.set(None);
+    }
+}
+
 /// What other programs get of a page's drag: the drag data store's first URL (`text/uri-list`,
 /// RFC 2483: one URL a line, `#` lines are comments) as a link, `text/plain` as the text (else the
 /// URL), `text/html` as HTML (else the link's or image's markup while the URL is the one the drag
 /// began with), an image's file in place of the link's shortcut, and the operations
-/// `effectAllowed` allows. The picture is the caller's.
-pub(super) fn page_drag_data(d: &PageDragOut) -> DragOut {
+/// `effectAllowed` allows. The picture is the caller's. An image's file that was fetched comes
+/// with the URL to fetch it again from and the contents that fetch fills
+/// ([`fetch_original`]): its name has its format's extension, a JPEG's `.jpg`.
+pub(super) fn page_drag_data(d: &PageDragOut) -> (DragOut, Option<(Url, LaterBytes)>) {
     let item = |t: &str| {
         d.items
             .iter()
@@ -271,24 +321,35 @@ pub(super) fn page_drag_data(d: &PageDragOut) -> DragOut {
     let html = item("text/html")
         .map(str::to_owned)
         .or_else(|| d.markup.clone().filter(|_| same));
-    let file = d.image.as_ref().map(|i| {
+    let mut fetch = None;
+    let file = d.image.as_ref().and_then(|i| {
         let stem = [i.stem.trim(), d.title.trim()]
             .into_iter()
             .find(|s| !s.is_empty())
             .unwrap_or("image");
-        DragFile {
-            name: safe_file_name(stem, "png"),
-            bytes: i.png.clone(),
-        }
+        let (ext, contents) = match &i.file {
+            ImageFile::Fetched { url, extension } => {
+                let url = Url::parse(url).ok()?;
+                let later = LaterBytes::new();
+                fetch = Some((url, later.clone()));
+                (extension.as_str(), FileContents::Later(later))
+            }
+            ImageFile::Png(png) => ("png", FileContents::Bytes(png.clone())),
+        };
+        Some(DragFile {
+            name: safe_file_name(stem, ext),
+            contents,
+        })
     });
-    DragOut {
+    let out = DragOut {
         text,
         link,
         html,
         file,
         effects: Some(DropEffects::from_effect_allowed(&d.allowed)),
         image: None,
-    }
+    };
+    (out, fetch)
 }
 
 #[cfg(test)]
@@ -313,7 +374,7 @@ mod tests {
             markup: Some(format!("<a href=\"{url}\">A page</a>")),
             image: None,
         };
-        let out = page_drag_data(&d);
+        let (out, _) = page_drag_data(&d);
         assert_eq!(out.text, url);
         assert_eq!(
             out.link,
@@ -351,7 +412,7 @@ mod tests {
             markup: Some("<a href=\"https://a.example/\">A</a>".into()),
             image: None,
         };
-        let out = page_drag_data(&d);
+        let (out, _) = page_drag_data(&d);
         // (another URL than the link's: not the link's title)
         assert_eq!(
             out.link,
@@ -370,7 +431,7 @@ mod tests {
             })
         );
         // A store emptied by `clearData()` offers no text.
-        let empty = page_drag_data(&PageDragOut {
+        let (empty, _) = page_drag_data(&PageDragOut {
             allowed: "move".into(),
             ..Default::default()
         });
@@ -380,12 +441,16 @@ mod tests {
     #[test]
     fn an_image_drag_offers_its_file() {
         let url = "https://a.example/cat.jpg";
-        let image = |stem: &str| DraggedImage {
+        let image = |stem: &str, file: ImageFile| DraggedImage {
             stem: stem.into(),
-            png: b"\x89PNG".to_vec(),
+            file,
             width: 1,
             height: 1,
             bgra: vec![0; 4],
+        };
+        let fetched = |ext: &str| ImageFile::Fetched {
+            url: url.into(),
+            extension: ext.into(),
         };
         let mut d = PageDragOut {
             items: items(&[("text/uri-list", url)]),
@@ -393,20 +458,94 @@ mod tests {
             url: Some(url.into()),
             title: "A cat?".into(),
             markup: Some(format!("<img src=\"{url}\" alt=\"A cat?\">")),
-            image: Some(image("cat")),
+            image: Some(image("cat", fetched("jpg"))),
         };
-        let out = page_drag_data(&d);
+        // The file it was fetched from, named by its format, its contents to be fetched again.
+        let (out, fetch) = page_drag_data(&d);
         let file = out.file.unwrap();
-        assert_eq!(
-            (file.name.as_str(), file.bytes.as_slice()),
-            ("cat.png", &b"\x89PNG"[..])
-        );
+        let (fetch_url, later) = fetch.expect("the file's fetch");
+        assert_eq!(fetch_url.as_str(), url);
+        assert_eq!(file.name, "cat.jpg");
+        assert_eq!(file.contents, FileContents::Later(later));
         assert_eq!(out.text, url);
         assert!(out.html.unwrap().starts_with("<img"));
+        // (the format decides the extension, not the URL)
+        d.image = Some(image("cat", fetched("webp")));
+        assert_eq!(page_drag_data(&d).0.file.unwrap().name, "cat.webp");
+        // An image that was not fetched: its pixels as a PNG, nothing to fetch.
+        d.image = Some(image("cat", ImageFile::Png(b"\x89PNG".to_vec())));
+        let (out, fetch) = page_drag_data(&d);
+        let file = out.file.unwrap();
+        assert!(fetch.is_none());
+        assert_eq!(
+            (file.name.as_str(), file.contents),
+            ("cat.png", FileContents::Bytes(b"\x89PNG".to_vec()))
+        );
         // (no name in the URL: the alt text, else "image")
-        d.image = Some(image(""));
-        assert_eq!(page_drag_data(&d).file.unwrap().name, "A cat-.png");
+        d.image = Some(image("", fetched("jpg")));
+        assert_eq!(page_drag_data(&d).0.file.unwrap().name, "A cat-.jpg");
         d.title.clear();
-        assert_eq!(page_drag_data(&d).file.unwrap().name, "image.png");
+        assert_eq!(page_drag_data(&d).0.file.unwrap().name, "image.jpg");
+    }
+
+    /// A server answering every request with `body` as a JPEG fresh for ten minutes, counting the
+    /// requests it answered.
+    fn serve_image(body: &'static [u8]) -> (String, Arc<std::sync::atomic::AtomicUsize>) {
+        use std::io::{BufRead, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let served = count.clone();
+        std::thread::spawn(move || {
+            for conn in listener.incoming() {
+                let Ok(mut conn) = conn else { continue };
+                let mut reader = std::io::BufReader::new(conn.try_clone().unwrap());
+                loop {
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                        break;
+                    }
+                }
+                served.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let head = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\n\
+                     Cache-Control: max-age=600\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = conn.write_all(head.as_bytes());
+                let _ = conn.write_all(body);
+            }
+        });
+        (base, count)
+    }
+
+    #[test]
+    fn a_dragged_images_file_comes_from_the_http_cache() {
+        use snowlark_net::{NetConfig, NetThread};
+        const JPEG: &[u8] = b"\xff\xd8\xff\xe0 original bytes";
+        let net = NetThread::start(NetConfig::default()).unwrap();
+        let (base, count) = serve_image(JPEG);
+        let url = Url::parse(&format!("{base}/cat.jpg")).unwrap();
+        let page = Url::parse(&format!("{base}/page.html")).unwrap();
+        // The page loads the image (as its documents do: an image request of the page's client).
+        let client = Arc::new(Client::for_url(&page));
+        let request = Request::subresource(url.clone(), Destination::Image, client);
+        let mut stream = net.client().fetch(request);
+        while !matches!(
+            stream.next_blocking(),
+            Some(FetchEvent::Done | FetchEvent::Error(_)) | None
+        ) {}
+        assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
+        // The drag's file: the same bytes, with no second request.
+        let later = LaterBytes::new();
+        fetch_original(net.client(), Some(page), url, later.clone());
+        let bytes = later.wait(std::time::Duration::from_secs(10));
+        assert_eq!(bytes.as_deref(), Some(JPEG));
+        assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
+        // A file that cannot be fetched gives nothing.
+        let later = LaterBytes::new();
+        let gone = Url::parse("http://127.0.0.1:1/x.jpg").unwrap();
+        fetch_original(net.client(), None, gone, later.clone());
+        assert!(later.wait(std::time::Duration::from_secs(30)).is_none());
     }
 }

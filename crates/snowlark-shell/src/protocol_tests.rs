@@ -547,7 +547,10 @@ every_variant!(tab_event: TabEvent, [
         markup: Some("<img src=\"x\" alt=\"A cat\">".into()),
         image: Some(snowlark_page::dnd::DraggedImage {
             stem: "cat".into(),
-            png: vec![0x89, b'P', b'N', b'G'],
+            file: snowlark_page::dnd::ImageFile::Fetched {
+                url: url().to_string(),
+                extension: "jpg".into(),
+            },
             width: 1,
             height: 1,
             bgra: vec![1, 2, 3, 4],

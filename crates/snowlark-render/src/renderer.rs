@@ -1868,8 +1868,15 @@ impl Renderer {
                         } else {
                             PixelAccess::None
                         };
+                        let file_type = if svg {
+                            Some("svg")
+                        } else {
+                            a.file_type
+                                .or_else(|| snowlark_paint::image::file_extension(&body))
+                        };
                         let loaded = loaded.map(|mut l| {
                             l.access = access;
+                            l.file_type = file_type;
                             l
                         });
                         match loaded {
@@ -6118,6 +6125,17 @@ impl Renderer {
             Some(ImageState::Loaded(i)) => i.access.readable(cors_mode),
             _ => false,
         }
+    }
+
+    /// The file an `<img>` shows was fetched from: its URL and the extension of its format. None
+    /// while it shows none, or one that was not fetched (an inline SVG, a bitmap made in memory).
+    pub fn image_file(&self, node: NodeId) -> Option<(String, &'static str)> {
+        let doc = self.doc.as_deref()?;
+        let ImageState::Loaded(i) = doc.img_state.get(&node)? else {
+            return None;
+        };
+        let (url, _) = doc.img_src.get(&node)?.as_ref()?;
+        Some((url.clone(), i.file_type?))
     }
 
     /// The decoded pixels an `<img>` shows (for `drawImage`).

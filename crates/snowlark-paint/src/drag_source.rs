@@ -8,7 +8,8 @@
 //! link formats), `text/x-moz-url` (URL and title) and an internet shortcut file
 //! (`FileGroupDescriptorW` and `FileContents`), which a file manager or the desktop makes into a
 //! shortcut; markup as `HTML Format` (`CF_HTML`) and `text/html`; a file made from what is
-//! dragged (an image's) by its contents, in place of the shortcut. The picture that follows the pointer is the shell's drag image helper's. The data
+//! dragged (an image's) by its contents, in place of the shortcut (contents still being fetched
+//! are waited for when a target reads them). The picture that follows the pointer is the shell's drag image helper's. The data
 //! object also keeps what a drop target or the helper stores in it (`SetData`).
 
 use std::cell::RefCell;
@@ -43,7 +44,12 @@ use windows::Win32::UI::Shell::{
 
 use crate::drag_data::{
     cf_html, shortcut_file_contents, shortcut_file_name, DragImage, DragOut, DropEffect,
+    FileContents, LaterBytes,
 };
+
+/// How long a drop target's read of a file whose contents are still being fetched waits for them
+/// (the window's thread waits with it).
+const LATER_WAIT: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// One format of the data object: its clipboard format, its index (`FileContents`' file; -1 for
 /// the rest), the media it is offered in and its bytes.
@@ -53,6 +59,8 @@ pub(crate) struct Entry {
     pub index: i32,
     pub tymed: u32,
     pub bytes: Vec<u8>,
+    /// Bytes still on their way: `bytes` once they arrive.
+    pub later: Option<LaterBytes>,
 }
 
 impl Entry {
@@ -62,6 +70,7 @@ impl Entry {
             index: -1,
             tymed: TYMED_HGLOBAL.0 as u32,
             bytes,
+            later: None,
         }
     }
 
@@ -92,26 +101,26 @@ fn bytesz(s: &str) -> Vec<u8> {
 /// the first it knows).
 pub(crate) fn entries(out: &DragOut) -> Vec<Entry> {
     let mut v = Vec::new();
-    let file_contents = |v: &mut Vec<Entry>, name: &str, flags: u32, bytes: Vec<u8>| {
+    let file_contents = |v: &mut Vec<Entry>, name: &str, flags: u32, contents: &FileContents| {
         v.push(Entry::new(
             registered(w!("FileGroupDescriptorW")),
             file_group_descriptor(name, flags),
         ));
+        let (bytes, later) = match contents {
+            FileContents::Bytes(b) => (b.clone(), None),
+            FileContents::Later(l) => (Vec::new(), Some(l.clone())),
+        };
         v.push(Entry {
             format: registered(w!("FileContents")),
             index: 0,
             tymed: (TYMED_HGLOBAL.0 | TYMED_ISTREAM.0) as u32,
             bytes,
+            later,
         });
     };
     // (a file is the most specific: an image's file, not a shortcut to its address)
     if let Some(file) = &out.file {
-        file_contents(
-            &mut v,
-            &file.name,
-            FD_PROGRESSUI.0 as u32,
-            file.bytes.clone(),
-        );
+        file_contents(&mut v, &file.name, FD_PROGRESSUI.0 as u32, &file.contents);
     }
     if let Some(link) = &out.link {
         v.push(Entry::new(
@@ -123,7 +132,7 @@ pub(crate) fn entries(out: &DragOut) -> Vec<Entry> {
                 &mut v,
                 &shortcut_file_name(link),
                 FD_LINKUI.0 as u32,
-                shortcut_file_contents(&link.url),
+                &FileContents::Bytes(shortcut_file_contents(&link.url)),
             );
         }
         v.push(Entry::new(
@@ -225,12 +234,15 @@ unsafe fn medium_bytes(medium: &STGMEDIUM) -> Option<Vec<u8>> {
 #[implement(IDataObject)]
 pub(crate) struct DataObject {
     entries: RefCell<Vec<Entry>>,
+    /// How long a read of contents still on their way waits ([`LATER_WAIT`]).
+    wait: std::time::Duration,
 }
 
 impl DataObject {
     pub(crate) fn new(out: &DragOut) -> DataObject {
         DataObject {
             entries: RefCell::new(entries(out)),
+            wait: LATER_WAIT,
         }
     }
 }
@@ -239,11 +251,22 @@ impl IDataObject_Impl for DataObject_Impl {
     fn GetData(&self, format: *const FORMATETC) -> windows::core::Result<STGMEDIUM> {
         // SAFETY: OLE passes a valid FORMATETC (or null, refused).
         let f = unsafe { format.as_ref() }.ok_or(E_INVALIDARG)?;
-        let entries = self.entries.borrow();
-        let e = entries
+        let i = self
+            .entries
+            .borrow()
             .iter()
-            .find(|e| e.matches(f))
+            .position(|e| e.matches(f))
             .ok_or(DV_E_FORMATETC)?;
+        // (contents still on their way: waited for, on this thread, as the target asks now)
+        let later = self.entries.borrow()[i].later.clone();
+        if let Some(later) = later {
+            let bytes = later.wait(self.wait).ok_or(DV_E_FORMATETC)?;
+            let mut entries = self.entries.borrow_mut();
+            entries[i].bytes = bytes.to_vec();
+            entries[i].later = None;
+        }
+        let entries = self.entries.borrow();
+        let e = &entries[i];
         if f.tymed & TYMED_HGLOBAL.0 as u32 != 0 {
             Ok(STGMEDIUM {
                 tymed: TYMED_HGLOBAL.0 as u32,
@@ -316,6 +339,7 @@ impl IDataObject_Impl for DataObject_Impl {
                 index: f.lindex,
                 tymed: m.tymed | TYMED_HGLOBAL.0 as u32,
                 bytes,
+                later: None,
             },
         );
         Ok(())
@@ -644,7 +668,7 @@ mod tests {
             html: Some("<img src=\"https://a.example/cat.jpg\" alt=\"A cat\">".into()),
             file: Some(DragFile {
                 name: "cat.png".into(),
-                bytes: b"\x89PNG".to_vec(),
+                contents: FileContents::Bytes(b"\x89PNG".to_vec()),
             }),
             ..Default::default()
         });
@@ -676,6 +700,59 @@ mod tests {
         assert_eq!(formats.last(), Some(&CF_TEXT.0));
         // (an element drag with no data offers nothing)
         assert!(entries(&DragOut::default()).is_empty());
+    }
+
+    #[test]
+    fn a_files_contents_still_on_their_way_are_waited_for_when_read() {
+        use crate::drag_data::DragFile;
+        // SAFETY: OLE on the test's thread.
+        let _ = unsafe { OleInitialize(None) };
+        let object = |later: &LaterBytes, wait_ms: u64| -> IDataObject {
+            let mut o = DataObject::new(&DragOut {
+                file: Some(DragFile {
+                    name: "cat.jpg".into(),
+                    contents: FileContents::Later(later.clone()),
+                }),
+                ..Default::default()
+            });
+            o.wait = std::time::Duration::from_millis(wait_ms);
+            o.into()
+        };
+        let contents = registered(w!("FileContents"));
+        let hg = TYMED_HGLOBAL.0 as u32;
+        // Offered at once (the descriptor too), read once they arrive.
+        let later = LaterBytes::new();
+        let data = object(&later, 10_000);
+        assert!(get(&data, registered(w!("FileGroupDescriptorW")), -1, hg).is_some());
+        let f = FORMATETC {
+            cfFormat: contents,
+            ptd: std::ptr::null_mut(),
+            dwAspect: DVASPECT_CONTENT.0,
+            lindex: 0,
+            tymed: hg,
+        };
+        // SAFETY: a valid FORMATETC.
+        assert_eq!(unsafe { data.QueryGetData(&f) }, S_OK);
+        let setter = later.clone();
+        let t = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            setter.set(Some(b"\xff\xd8\xffJPEG".to_vec()));
+        });
+        assert!(holds(
+            &get(&data, contents, 0, hg).unwrap(),
+            b"\xff\xd8\xffJPEG"
+        ));
+        t.join().unwrap();
+        // (kept: a second read, as a stream, has them at once)
+        assert_eq!(
+            get(&data, contents, 0, TYMED_ISTREAM.0 as u32).unwrap(),
+            b"\xff\xd8\xffJPEG"
+        );
+        // A fetch that failed, or bytes that do not come in time: the read fails.
+        let failed = LaterBytes::new();
+        failed.set(None);
+        assert!(get(&object(&failed, 10_000), contents, 0, hg).is_none());
+        assert!(get(&object(&LaterBytes::new(), 20), contents, 0, hg).is_none());
     }
 
     #[test]

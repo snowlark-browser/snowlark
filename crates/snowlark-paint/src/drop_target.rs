@@ -29,7 +29,7 @@ use crate::window::{Event, State};
 
 pub use crate::drag_data::{
     cf_html, safe_file_name, shortcut_file_contents, shortcut_file_name, DragData, DragFile,
-    DragImage, DragLink, DragOut, DropEffect, DropEffects,
+    DragImage, DragLink, DragOut, DropEffect, DropEffects, FileContents, LaterBytes,
 };
 
 /// Registers `hwnd` as a drop target (OLE is set up for the window's thread first).

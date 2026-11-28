@@ -35,6 +35,9 @@ pub struct LoadedImage {
     pub dark: Option<ImageId>,
     /// Who may read the image's pixels (HTML's origin-clean rules: WebGL texture uploads).
     pub access: PixelAccess,
+    /// The extension of the file it was decoded from (`jpg`, `svg`...), for an image fetched by
+    /// URL: the name its original bytes are saved under when it is dragged out.
+    pub file_type: Option<&'static str>,
 }
 
 /// Whether script may read an image's pixels: a same-origin image (or a `data:` one), or a
@@ -69,6 +72,7 @@ impl LoadedImage {
             cors_only: false,
             dark: None,
             access: PixelAccess::None,
+            file_type: None,
         }
     }
 
@@ -81,6 +85,7 @@ impl LoadedImage {
             cors_only: false,
             dark: None,
             access: PixelAccess::None,
+            file_type: None,
         }
     }
 
@@ -96,6 +101,7 @@ impl LoadedImage {
                 cors_only: false,
                 dark: None,
                 access: self.access,
+                file_type: self.file_type,
             },
             _ => self,
         }
@@ -127,6 +133,7 @@ impl LoadedImage {
             cors_only: self.cors_only,
             dark: self.dark,
             access: self.access,
+            file_type: self.file_type,
         }
     }
 }

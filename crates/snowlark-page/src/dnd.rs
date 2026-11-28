@@ -150,17 +150,34 @@ pub struct DragOut {
     pub image: Option<DraggedImage>,
 }
 
-/// A dragged image: a file of its pixels and the picture that follows the pointer.
+/// A dragged image: its file and the picture that follows the pointer.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DraggedImage {
     /// The file's name without its extension (from the URL's last path segment; may be empty).
     pub stem: String,
-    /// The image's pixels as a PNG file (the first frame of an animation).
-    pub png: Vec<u8>,
+    /// The file.
+    pub file: ImageFile,
     /// The picture: its size and premultiplied BGRA pixels, rows `width * 4` bytes apart.
     pub width: u32,
     pub height: u32,
     pub bgra: Vec<u8>,
+}
+
+/// A dragged image's file: the one it was decoded from, which the embedder fetches again (the
+/// page keeps no image's encoded bytes; the HTTP cache usually still holds them), or, for an
+/// image that was not fetched, its pixels as a PNG.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ImageFile {
+    /// The URL the image was fetched from and its format's file extension (`jpg`, `svg`...).
+    Fetched { url: String, extension: String },
+    /// The pixels as a PNG file (the first frame of an animation).
+    Png(Vec<u8>),
+}
+
+impl Default for ImageFile {
+    fn default() -> ImageFile {
+        ImageFile::Png(Vec::new())
+    }
 }
 
 /// The drag picture of an image is at most this many pixels a side.
@@ -452,16 +469,22 @@ impl Engine {
         }
     }
 
-    /// An image's file (its decoded pixels as a PNG) and its drag picture: the image scaled to
-    /// at most [`PICTURE_MAX`] pixels a side, at three quarters opacity. None while it has no
-    /// pixels.
+    /// An image's file (the one it was fetched from, else its decoded pixels as a PNG) and its
+    /// drag picture: the image scaled to at most [`PICTURE_MAX`] pixels a side, at three quarters
+    /// opacity. None while it has no pixels.
     fn dragged_image(&self, el: NodeId, url: Option<&str>) -> Option<DraggedImage> {
         use snowlark_render::canvas::skia as tiny_skia;
-        let image = self
-            .with_node_renderer(el, |r, _| r.image_pixels(el))
-            .flatten()?;
+        let (image, fetched) =
+            self.with_node_renderer(el, |r, _| (r.image_pixels(el), r.image_file(el)))?;
+        let image = image?;
         let pm = snowlark_render::canvas::pixmap_from_frame(image.default_frame())?;
-        let png = pm.encode_png().ok()?;
+        let file = match fetched {
+            Some((url, ext)) => ImageFile::Fetched {
+                url,
+                extension: ext.to_owned(),
+            },
+            None => ImageFile::Png(pm.encode_png().ok()?),
+        };
         let (w, h) = (pm.width() as f32, pm.height() as f32);
         let s = (PICTURE_MAX / w.max(h)).min(1.0);
         let (pw, ph) = (
@@ -482,7 +505,7 @@ impl Engine {
         }
         Some(DraggedImage {
             stem: url.map(file_stem).unwrap_or_default(),
-            png,
+            file,
             width: pw,
             height: ph,
             bgra,

@@ -46,6 +46,9 @@ pub(crate) struct Arrival {
     /// A bitmap image's pixels, decoded off the page thread (`None` when undecodable); the body is
     /// left empty then. Not set for other purposes or SVG images.
     pub decoded: Option<Option<snowlark_paint::image::DecodedImage>>,
+    /// The extension of the format a bitmap decoded off the page thread was in
+    /// ([`snowlark_paint::image::file_extension`]), as its body is empty then.
+    pub file_type: Option<&'static str>,
 }
 
 /// A bitmap image whose bytes arrived, decoding on a thread of its own.
@@ -54,6 +57,7 @@ struct Decoding {
     head: ResponseHead,
     pixels: std::sync::mpsc::Receiver<Option<snowlark_paint::image::DecodedImage>>,
     started: Instant,
+    file_type: Option<&'static str>,
 }
 
 struct InFlight {
@@ -122,6 +126,7 @@ impl Fetcher {
     /// work); the result arrives at a later [`Fetcher::poll`], which the decoder wakes.
     fn decode_off_thread(&mut self, url: Url, head: ResponseHead, body: Vec<u8>, started: Instant) {
         let (tx, rx) = std::sync::mpsc::channel();
+        let file_type = snowlark_paint::image::file_extension(&body);
         let wake = self.wake.clone();
         let notify = self.notify.clone();
         let spawned = std::thread::Builder::new()
@@ -140,6 +145,7 @@ impl Fetcher {
                 head,
                 pixels: rx,
                 started,
+                file_type,
             });
         }
     }
@@ -242,6 +248,7 @@ impl Fetcher {
                         result: Ok((d.head, Vec::new())),
                         elapsed: d.started.elapsed(),
                         decoded: Some(pixels),
+                        file_type: d.file_type,
                     });
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => i += 1,
@@ -253,6 +260,7 @@ impl Fetcher {
                         result: Ok((d.head, Vec::new())),
                         elapsed: d.started.elapsed(),
                         decoded: Some(None),
+                        file_type: d.file_type,
                     });
                 }
             }
@@ -298,6 +306,7 @@ impl Fetcher {
                         result,
                         elapsed: f.started.elapsed(),
                         decoded: None,
+                        file_type: None,
                     });
                 }
                 None => i += 1,

@@ -10,7 +10,7 @@
 use std::time::Duration;
 
 use snowlark_net::{NetConfig, NetThread};
-use snowlark_page::dnd::{DragOperation, DroppedFile, ExternalDrag};
+use snowlark_page::dnd::{DragOperation, DroppedFile, ExternalDrag, ImageFile};
 use snowlark_page::input::Modifiers;
 use snowlark_page::keyboard::KeyInput;
 use snowlark_page::{Page, PageOptions, RenderSetup};
@@ -421,10 +421,12 @@ fn a_system_drag_that_leaves_the_page_goes_on_until_the_drag_loop_ends() {
 #[test]
 fn link_and_image_drags_carry_a_title_markup_and_the_images_file() {
     const PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+    const SVG: &str = "%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%2210%22%3E%3Crect width=%2210%22 height=%2210%22 fill=%22green%22/%3E%3C/svg%3E";
     let mut page = page_with(&format!(
         "<!doctype html><style>body{{margin:0}}a,img{{display:block;width:100px;height:50px}}</style>\
          <a href='/x?y'> Some <b>link</b>\n text </a>\
-         <img alt='A \"cat\"' src='data:image/png;base64,{PNG}'>"
+         <img alt='A \"cat\"' src='data:image/png;base64,{PNG}'>\
+         <img src='data:image/svg+xml,{SVG}'>"
     ));
     let none = Modifiers::default();
     page.engine().set_system_drags(true);
@@ -449,9 +451,28 @@ fn link_and_image_drags_carry_a_title_markup_and_the_images_file() {
         .is_some_and(|m| m.starts_with("<img src=\"data:image/png;base64,")
             && m.ends_with(" alt=\"A &quot;cat&quot;\">")));
     let file = img.image.expect("the image's file");
-    assert!(file.png.starts_with(b"\x89PNG"));
+    // (the file it was fetched from, named by its format: the embedder fetches it again)
+    assert_eq!(
+        file.file,
+        ImageFile::Fetched {
+            url: format!("data:image/png;base64,{PNG}"),
+            extension: "png".into()
+        }
+    );
     assert_eq!(file.stem, "");
     // (its picture: the 1x1 image's pixel at three quarters opacity)
     assert_eq!((file.width, file.height, file.bgra.len()), (1, 1, 4));
     assert!((1..255).contains(&file.bgra[3]), "{:?}", file.bgra);
+    // An SVG image's file is the SVG document.
+    page.system_drag_ended(DragOperation::Copy);
+    page.pointer_pressed(Point::new(20.0, 125.0), 0, none, 1);
+    page.pointer_moved(Point::new(20.0, 225.0), none);
+    let svg = page.engine().take_drag_out().expect("an SVG image drag");
+    assert_eq!(
+        svg.image.expect("the SVG image's file").file,
+        ImageFile::Fetched {
+            url: format!("data:image/svg+xml,{SVG}"),
+            extension: "svg".into()
+        }
+    );
 }

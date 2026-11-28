@@ -6,6 +6,8 @@
 //! (re-exported by each platform's `drop_target`).
 
 use std::path::PathBuf;
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::Duration;
 
 /// A drag operation, as the drop target answers it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -49,11 +51,70 @@ pub struct DragOut {
 }
 
 /// A file a drag out of the window offers by its contents.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DragFile {
     /// Its name (a valid file name, [`safe_file_name`]).
     pub name: String,
-    pub bytes: Vec<u8>,
+    pub contents: FileContents,
+}
+
+/// A dragged file's contents: at hand, or still on their way (fetched while the drag runs).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FileContents {
+    Bytes(Vec<u8>),
+    Later(LaterBytes),
+}
+
+/// Bytes that arrive from another thread: [`LaterBytes::set`] once, [`LaterBytes::wait`] for
+/// them. Clones share them.
+#[derive(Clone, Default)]
+pub struct LaterBytes(Arc<(Mutex<Arrival>, Condvar)>);
+
+/// Whether the bytes arrived (outer) and what arrived (inner; `None`: they will not come).
+type Arrival = Option<Option<Arc<[u8]>>>;
+
+impl LaterBytes {
+    pub fn new() -> LaterBytes {
+        LaterBytes::default()
+    }
+
+    /// The bytes arrived (`None`: they never will, the fetch failed). Only the first call counts.
+    pub fn set(&self, bytes: Option<Vec<u8>>) {
+        let (slot, cv) = &*self.0;
+        let mut s = slot.lock().unwrap_or_else(|e| e.into_inner());
+        if s.is_none() {
+            *s = Some(bytes.map(Arc::from));
+            cv.notify_all();
+        }
+    }
+
+    /// The bytes, once they arrive, waiting at most `limit` for them; `None` when they will not
+    /// come or did not in time.
+    pub fn wait(&self, limit: Duration) -> Option<Arc<[u8]>> {
+        let (slot, cv) = &*self.0;
+        let s = slot.lock().unwrap_or_else(|e| e.into_inner());
+        let (s, _) = cv
+            .wait_timeout_while(s, limit, |s| s.is_none())
+            .unwrap_or_else(|e| e.into_inner());
+        s.clone().flatten()
+    }
+}
+
+impl PartialEq for LaterBytes {
+    fn eq(&self, other: &LaterBytes) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for LaterBytes {}
+
+impl std::fmt::Debug for LaterBytes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let arrived = self.0 .0.lock().map(|s| s.is_some()).unwrap_or(false);
+        f.debug_struct("LaterBytes")
+            .field("arrived", &arrived)
+            .finish()
+    }
 }
 
 /// The operations a drag out of the window allows.

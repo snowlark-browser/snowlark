@@ -125,6 +125,38 @@ pub fn decode(bytes: &[u8]) -> Result<DecodedImage> {
     decode_with_budget(bytes, ANIMATION_FRAMES_BYTES)
 }
 
+/// The file extension of the image format `bytes` are in, from their signature (MIME Sniffing
+/// §6.1's image type patterns, AVIF's `ftyp` brands and TIFF's byte order marks): what a file
+/// saved with these bytes is named with. `None` for a signature none of these have.
+pub fn file_extension(bytes: &[u8]) -> Option<&'static str> {
+    if let Some(format) = decoders::sniff(bytes) {
+        return Some(match format {
+            Format::Png => "png",
+            Format::Jpeg => "jpg",
+            Format::Gif => "gif",
+            Format::Webp => "webp",
+            Format::Avif => "avif",
+        });
+    }
+    if bytes.starts_with(b"BM") {
+        Some("bmp")
+    } else if bytes.starts_with(&[0, 0, 1, 0]) {
+        Some("ico")
+    } else if bytes.starts_with(&[0, 0, 2, 0]) {
+        Some("cur")
+    } else if bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*") {
+        Some("tif")
+    } else if bytes.len() >= 12
+        && &bytes[4..8] == b"ftyp"
+        && matches!(&bytes[8..12], b"avif" | b"avis")
+    {
+        // (AVIF in a build without its decoder)
+        Some("avif")
+    } else {
+        None
+    }
+}
+
 /// [`decode`] keeping an animation's frames when they take at most `budget` bytes.
 fn decode_with_budget(bytes: &[u8], budget: u64) -> Result<DecodedImage> {
     let Some(format) = decoders::sniff(bytes) else {
@@ -817,6 +849,24 @@ mod tests {
             height: h,
             pixels,
             delay_ms: 0,
+        }
+    }
+
+    #[test]
+    fn a_files_extension_comes_from_its_signature() {
+        let cases: [(&[u8], Option<&str>); 9] = [
+            (b"\xff\xd8\xff\xe0\0\x10JFIF", Some("jpg")),
+            (b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR", Some("png")),
+            (b"GIF89a\x01\0", Some("gif")),
+            (b"RIFF\x24\0\0\0WEBPVP8 ", Some("webp")),
+            (b"\0\0\0\x1cftypavif\0\0\0\0", Some("avif")),
+            (b"BM\x3a\0\0\0", Some("bmp")),
+            (b"\0\0\x01\0\x01\0", Some("ico")),
+            (b"II*\0\x08\0\0\0", Some("tif")),
+            (b"<svg xmlns", None),
+        ];
+        for (bytes, ext) in cases {
+            assert_eq!(file_extension(bytes), ext, "{bytes:?}");
         }
     }
 

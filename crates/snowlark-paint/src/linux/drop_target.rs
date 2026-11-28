@@ -7,5 +7,5 @@
 
 pub use crate::drag_data::{
     cf_html, safe_file_name, shortcut_file_contents, shortcut_file_name, DragData, DragFile,
-    DragImage, DragLink, DragOut, DropEffect, DropEffects,
+    DragImage, DragLink, DragOut, DropEffect, DropEffects, FileContents, LaterBytes,
 };
