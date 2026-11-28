@@ -7,7 +7,10 @@
 //! `ServiceWorkerGlobalScope` on a thread of its own, its states reach the page in order, and the
 //! registration's security checks reject what they must.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpListener;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use snowlark_page::{Page, PageOptions, ServiceWorkerBackend};
@@ -194,4 +197,157 @@ fn an_insecure_page_has_no_service_worker_container() {
     let mut page = page_at(&sw, "http://a.test/");
     let got = run_async(&mut page, "return 'serviceWorker' in navigator;");
     assert_eq!(got, "false");
+}
+
+/// A tiny HTTP/1.1 server answering `/<name>` from `files` (path, body; all JavaScript), and how
+/// many times each path was asked for (and, as `<path> sec-ch-ua`, with a `Sec-CH-UA` header).
+fn serve(files: Vec<(&'static str, &'static str)>) -> (String, Arc<Mutex<HashMap<String, usize>>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let hits = Arc::new(Mutex::new(HashMap::new()));
+    let counted = hits.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { continue };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut first = String::new();
+            if reader.read_line(&mut first).is_err() {
+                continue;
+            }
+            let path = first.split(' ').nth(1).unwrap_or("/").to_owned();
+            loop {
+                let mut h = String::new();
+                if reader.read_line(&mut h).is_err() || h == "\r\n" || h.is_empty() {
+                    break;
+                }
+                if h.to_ascii_lowercase().starts_with("sec-ch-ua:") {
+                    *counted
+                        .lock()
+                        .unwrap()
+                        .entry(format!("{path} sec-ch-ua"))
+                        .or_insert(0) += 1;
+                }
+            }
+            *counted.lock().unwrap().entry(path.clone()).or_insert(0) += 1;
+            let response = match files.iter().find(|(p, _)| *p == path) {
+                Some((_, body)) => format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/javascript\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                ),
+                None => "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    .into(),
+            };
+            let _ = stream.write_all(response.as_bytes());
+        }
+    });
+    (format!("http://{addr}"), hits)
+}
+
+/// A page at `origin` (a loopback origin is potentially trustworthy) over the network, with a
+/// registry of its own that fetches through it.
+fn served_page(origin: &str) -> (Page, snowlark_net::NetThread) {
+    let net = snowlark_net::NetThread::start(snowlark_net::NetConfig::default()).unwrap();
+    let client = net.client();
+    let sw = ServiceWorkerBackend::new(Arc::new(snowlark_sw::LocalServiceWorkers::new(
+        Some(client.backend().clone()),
+        None,
+    )));
+    let mut page = Page::new(PageOptions {
+        net: Some(client),
+        service_workers: Some(sw),
+        ..Default::default()
+    });
+    page.load_html(
+        "<!doctype html>",
+        &url::Url::parse(&format!("{origin}/index.html")).unwrap(),
+    );
+    page.run_until_settled(Duration::from_secs(5));
+    (page, net)
+}
+
+/// Registers `script` and waits for it to activate; returns what the worker put in the cache
+/// `t` under `/out`.
+const REGISTER_AND_READ: &str = r#"
+    const reg = await navigator.serviceWorker.register(SCRIPT, OPTIONS);
+    const w = reg.installing;
+    await new Promise(ok => {
+        if (w.state === 'activated') ok();
+        w.onstatechange = () => { if (w.state === 'activated') ok(); };
+    });
+    const r = await caches.match('/out', { cacheName: 't' });
+    return r ? await r.text() : 'no result';
+"#;
+
+fn register_and_read(page: &mut Page, script: &str, options: &str) -> String {
+    run_async(
+        page,
+        &REGISTER_AND_READ
+            .replace("SCRIPT", &format!("'{script}'"))
+            .replace("OPTIONS", options),
+    )
+}
+
+/// W3C Service Workers §6.3.2: while the worker is parsed or installing, `importScripts()`
+/// fetches into its script resource map; afterwards it runs only what the map has (a script
+/// imported before is not fetched again), and anything else is a network error.
+#[test]
+fn import_scripts_fills_the_workers_map_then_serves_only_from_it() {
+    let (origin, hits) = serve(vec![
+        (
+            "/sw.js",
+            r#"
+            importScripts('a.js');
+            const seen = [];
+            self.addEventListener('install', () => { importScripts('b.js'); seen.push(self.A, self.B); });
+            self.addEventListener('activate', e => {
+                try { importScripts('c.js'); seen.push('ran'); } catch (x) { seen.push(x.name); }
+                try { importScripts('a.js'); seen.push(self.A); } catch (x) { seen.push(x.name); }
+                e.waitUntil(caches.open('t').then(c => c.put('/out', new Response(seen.join()))));
+            });
+            "#,
+        ),
+        ("/a.js", "self.A = (self.A || 0) + 1;"),
+        ("/b.js", "self.B = 'b';"),
+        ("/c.js", "self.C = 'c';"),
+    ]);
+    let (mut page, _net) = served_page(&origin);
+    let got = register_and_read(&mut page, "/sw.js", "{}");
+    assert_eq!(got, "1,b,NetworkError,2");
+    let hits = hits.lock().unwrap();
+    assert_eq!(hits.get("/a.js"), Some(&1), "{hits:?}");
+    assert_eq!(hits.get("/c.js"), None, "{hits:?}");
+    // (a service worker's script fetch carries no client hints, as the engine family's does not;
+    // the scripts it imports do)
+    assert_eq!(hits.get("/sw.js sec-ch-ua"), None, "{hits:?}");
+    assert_eq!(hits.get("/a.js sec-ch-ua"), Some(&1), "{hits:?}");
+}
+
+/// A module service worker (`type: "module"`): its static imports load, `importScripts()` and
+/// `import()` are TypeErrors in it (HTML), and a graph with top-level await is refused (§8 Update
+/// step 8, "Is Async Module").
+#[test]
+fn a_module_worker_runs_its_graph_without_import_scripts_or_dynamic_import() {
+    let (origin, _) = serve(vec![
+        (
+            "/m.js",
+            r#"
+            import { v } from './dep.js';
+            const seen = [v];
+            try { importScripts('dep.js'); seen.push('ran'); } catch (x) { seen.push(x.name); }
+            self.addEventListener('install', e => e.waitUntil(
+                import('./dep.js').then(() => 'ran', x => x.name)
+                    .then(d => caches.open('t').then(c => c.put('/out', new Response(seen.concat(d).join()))))));
+            "#,
+        ),
+        ("/dep.js", "export const v = 'dep';"),
+        ("/tla.js", "await 0;"),
+    ]);
+    let (mut page, _net) = served_page(&origin);
+    let got = register_and_read(&mut page, "/m.js", "{ type: 'module' }");
+    assert_eq!(got, "dep,TypeError,TypeError");
+    let got = run_async(
+        &mut page,
+        "return navigator.serviceWorker.register('/tla.js', { type: 'module', scope: '/tla/' }).then(() => 'registered', e => e.name);",
+    );
+    assert_eq!(got, "TypeError");
 }

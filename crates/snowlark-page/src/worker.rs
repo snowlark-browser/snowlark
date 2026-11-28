@@ -313,6 +313,30 @@ impl Engine {
         url: &url::Url,
         destination: snowlark_net::Destination,
     ) -> Option<(String, String, snowlark_net::ResponseHead)> {
+        let (body, final_url, head) = self.fetch_worker_script_bytes(url, destination, false)?;
+        let (text, _, _) = encoding_rs::UTF_8.decode(&body);
+        Some((text.into_owned(), final_url.to_string(), head))
+    }
+
+    /// A service worker's imported script (W3C Service Workers §6.3.2 steps 7-11): its bytes and
+    /// final URL, or `None` for a bad import script response. `no_cache`: the registration's
+    /// update via cache mode is "none".
+    pub(crate) fn fetch_imported_script(
+        &self,
+        url: &url::Url,
+        destination: snowlark_net::Destination,
+        no_cache: bool,
+    ) -> Option<(Vec<u8>, url::Url)> {
+        let (body, final_url, _) = self.fetch_worker_script_bytes(url, destination, no_cache)?;
+        Some((body, final_url))
+    }
+
+    fn fetch_worker_script_bytes(
+        &self,
+        url: &url::Url,
+        destination: snowlark_net::Destination,
+        no_cache: bool,
+    ) -> Option<(Vec<u8>, url::Url, snowlark_net::ResponseHead)> {
         let net = self.hooks.borrow().net.clone()?;
         let doc = self.document()?;
         let mut hold = None;
@@ -334,11 +358,18 @@ impl Engine {
             hold = blob_url_entry;
             net.fetch(req)
         } else {
-            let req = snowlark_net::Request::subresource(
+            let mut req = snowlark_net::Request::subresource(
                 url.clone(),
                 destination,
                 self.request_client(doc),
             );
+            if destination == snowlark_net::Destination::ServiceWorker {
+                // (a module of a service worker's graph: HTML "fetch a single module script")
+                req.mode = snowlark_net::Mode::Cors;
+            }
+            if no_cache {
+                req.cache = snowlark_net::CacheMode::NoCache;
+            }
             self.policy_fetch(doc, req, None, None)?
         };
         let mut head = None;
@@ -371,8 +402,7 @@ impl Engine {
         if checked && !snowlark_net::mime::is_javascript_essence(&mime) {
             return None;
         }
-        let (text, _, _) = encoding_rs::UTF_8.decode(&body);
-        Some((text.into_owned(), final_url.to_string(), head))
+        Some((body, final_url, head))
     }
 
     /// Runs the worker's main script. Returns false when it could not be fetched.
@@ -432,7 +462,12 @@ impl Engine {
     }
 
     /// A classic script that rethrows what it throws (for `importScripts`).
-    fn run_classic_rethrowing(&self, cx: &mut Cx, source: &str, url: &str) -> rt::Result<()> {
+    pub(crate) fn run_classic_rethrowing(
+        &self,
+        cx: &mut Cx,
+        source: &str,
+        url: &str,
+    ) -> rt::Result<()> {
         let referrer = self.referrer_id(url, &Default::default());
         self.enter_script();
         let r = {
@@ -755,6 +790,9 @@ impl WorkerGlobalScopeImpl for Engine {
                 base.join(&s)
                     .map_err(|_| exception(ExceptionName::SyntaxError, "Invalid script URL"))?,
             );
+        }
+        if self.is_service_worker_global() {
+            return self.sw_import_scripts(cx, parsed);
         }
         for url in parsed {
             let Some((source, final_url, _)) =

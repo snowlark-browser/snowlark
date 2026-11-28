@@ -558,6 +558,240 @@ fn an_install_that_never_settles_fails_after_its_timeout() {
     assert!(matches!(answer(&r.take_effects(), 3), Some(Answer::Lookups(v)) if v.is_empty()));
 }
 
+fn imported(r: &mut Registry, v: VersionId, at: &str, body: &str) {
+    r.call(
+        PAGE,
+        50,
+        Call::Imported {
+            version: v,
+            script: ImportedScript {
+                url: url(at),
+                final_url: url(at),
+                source: body.as_bytes().to_vec(),
+            },
+        },
+        Instant::now(),
+    );
+}
+
+/// Registers a worker that imports `a.js` ("A") and `b.js` ("B") while it is parsed, and runs it to
+/// `activated`.
+fn install_with_imports(r: &mut Registry) -> VersionId {
+    let now = Instant::now();
+    register(r, 1, "https://a.test/w.js", "https://a.test/");
+    let (job, _) = fetch_of(&r.take_effects());
+    r.fetched(
+        job,
+        Ok(response("https://a.test/w.js", "text/javascript", "1", &[])),
+        now,
+    );
+    let v = started(&r.take_effects()).expect("started");
+    imported(r, v, "https://a.test/a.js", "A");
+    imported(r, v, "https://b.test/b.js", "B");
+    for (n, call) in [
+        (
+            2,
+            Call::Evaluated {
+                version: v,
+                ok: true,
+            },
+        ),
+        (
+            3,
+            Call::EventDone {
+                version: v,
+                event: Lifecycle::Install,
+                ok: true,
+            },
+        ),
+        (
+            4,
+            Call::EventDone {
+                version: v,
+                event: Lifecycle::Activate,
+                ok: true,
+            },
+        ),
+    ] {
+        r.call(PAGE, n, call, now);
+        r.take_effects();
+    }
+    v
+}
+
+fn update(r: &mut Registry, call: CallId) {
+    let rid = r.match_registration(KEY, &url("https://a.test/x")).unwrap();
+    r.call(
+        PAGE,
+        call,
+        Call::Update {
+            client: client(),
+            registration: rid,
+        },
+        Instant::now(),
+    );
+}
+
+/// The import fetches among `effects`: (job, index, URL).
+fn import_fetches(effects: &[Effect]) -> Vec<(u64, usize, Url)> {
+    effects
+        .iter()
+        .filter_map(|e| match e {
+            Effect::FetchImport {
+                job,
+                index,
+                request,
+            } => Some((*job, *index, request.url().clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn imported_scripts_are_kept_with_the_worker_and_its_stored_registration() {
+    let mut r = registry();
+    let v = install_with_imports(&mut r);
+    // (an installed worker adds nothing to its map: §6.3.2 step 4)
+    imported(&mut r, v, "https://a.test/late.js", "L");
+    let stored = r.stored(KEY);
+    let urls: Vec<&str> = stored[0].imports.iter().map(|s| s.url.as_str()).collect();
+    assert_eq!(urls, ["https://a.test/a.js", "https://b.test/b.js"]);
+    // A worker started again is given its map.
+    let mut again = registry();
+    again.restore(KEY, stored, Instant::now());
+    let rid = again
+        .match_registration(KEY, &url("https://a.test/"))
+        .unwrap();
+    let vid = again.registrations[&rid].active.unwrap();
+    assert!(again.start(vid, None, Instant::now()));
+    let imports = notices(&again.take_effects())
+        .into_iter()
+        .find_map(|n| match n {
+            Notice::Start { imports, .. } => Some(imports),
+            _ => None,
+        })
+        .expect("a start");
+    assert_eq!(imports.len(), 2);
+}
+
+#[test]
+fn an_install_drops_the_imports_its_worker_did_not_use() {
+    let mut r = registry();
+    install_with_imports(&mut r);
+    // An update whose import changed: the new worker starts with the updated map, uses only
+    // `a.js`, and its install drops `b.js`.
+    update(&mut r, 10);
+    let (job, _) = fetch_of(&r.take_effects());
+    r.fetched(
+        job,
+        Ok(response("https://a.test/w.js", "text/javascript", "1", &[])),
+        Instant::now(),
+    );
+    let fetches = import_fetches(&r.take_effects());
+    for (job, index, u) in fetches {
+        let body = if u.as_str().ends_with("a.js") {
+            "A2"
+        } else {
+            "B"
+        };
+        r.fetched_import(
+            job,
+            index,
+            Ok(response(u.as_str(), "text/javascript", body, &[])),
+            Instant::now(),
+        );
+    }
+    let e = r.take_effects();
+    let (v2, imports) = notices(&e)
+        .into_iter()
+        .find_map(|n| match n {
+            Notice::Start {
+                version, imports, ..
+            } => Some((version.id, imports)),
+            _ => None,
+        })
+        .expect("a new worker");
+    assert_eq!(imports.len(), 2);
+    assert_eq!(imports[0].source, b"A2");
+    r.call(
+        PAGE,
+        51,
+        Call::UsedImport {
+            version: v2,
+            url: url("https://a.test/a.js"),
+        },
+        Instant::now(),
+    );
+    for (n, call) in [
+        (
+            12,
+            Call::Evaluated {
+                version: v2,
+                ok: true,
+            },
+        ),
+        (
+            13,
+            Call::EventDone {
+                version: v2,
+                event: Lifecycle::Install,
+                ok: true,
+            },
+        ),
+    ] {
+        r.call(PAGE, n, call, Instant::now());
+        r.take_effects();
+    }
+    let kept: Vec<&str> = r.versions[&v2]
+        .imports
+        .iter()
+        .map(|s| s.url.as_str())
+        .collect();
+    assert_eq!(kept, ["https://a.test/a.js"]);
+}
+
+#[test]
+fn an_update_checks_the_imported_scripts_bytes() {
+    let mut r = registry();
+    install_with_imports(&mut r);
+    // The same main script and imports: no new worker.
+    update(&mut r, 10);
+    let (job, request) = fetch_of(&r.take_effects());
+    assert_eq!(request.url().as_str(), "https://a.test/w.js");
+    r.fetched(
+        job,
+        Ok(response("https://a.test/w.js", "text/javascript", "1", &[])),
+        Instant::now(),
+    );
+    let fetches = import_fetches(&r.take_effects());
+    assert_eq!(fetches.len(), 2);
+    assert!(fetches
+        .iter()
+        .all(|(_, _, u)| u.as_str() != "https://a.test/w.js"));
+    for (job, index, u) in fetches {
+        let body = if u.as_str().ends_with("a.js") {
+            "A"
+        } else {
+            "B"
+        };
+        // (a bad response is left out of the check)
+        let mime = if u.as_str().ends_with("b.js") {
+            "text/plain"
+        } else {
+            "text/javascript"
+        };
+        r.fetched_import(
+            job,
+            index,
+            Ok(response(u.as_str(), mime, body, &[])),
+            Instant::now(),
+        );
+    }
+    let e = r.take_effects();
+    assert!(started(&e).is_none());
+    assert!(matches!(answer(&e, 10), Some(Answer::Registration(Ok(_)))));
+}
+
 #[test]
 fn stored_registrations_come_back_active() {
     let mut r = registry();

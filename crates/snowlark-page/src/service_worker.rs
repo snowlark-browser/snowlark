@@ -32,8 +32,9 @@ use snowlark_bindings::rt::{
 use snowlark_bindings::InterfaceId;
 use snowlark_dom::NodeId;
 use snowlark_sw::registry::{
-    Answer, Call, CallId, ClientId, ConnId, JobError, Lifecycle, Notice, RegistrationId,
-    RegistrationInfo, Slot, UpdateViaCache, VersionId, VersionInfo, WorkerState, WorkerType,
+    Answer, Call, CallId, ClientId, ConnId, ImportedScript, JobError, Lifecycle, Notice,
+    RegistrationId, RegistrationInfo, Slot, UpdateViaCache, VersionId, VersionInfo, WorkerState,
+    WorkerType,
 };
 use snowlark_sw::ServiceWorkerBackend;
 
@@ -75,6 +76,9 @@ pub struct SwStart {
     pub version: VersionInfo,
     pub registration: RegistrationInfo,
     pub source: Vec<u8>,
+    pub worker_type: WorkerType,
+    /// The rest of its script resource map.
+    pub imports: Vec<ImportedScript>,
 }
 
 /// What a call's answer settles.
@@ -108,6 +112,12 @@ pub struct SwState {
     running: HashMap<VersionId, (mpsc::Sender<crate::worker::ToWorker>, Arc<Waker>)>,
     /// On a service worker's thread: its version and registration as it started.
     own: Option<(VersionInfo, RegistrationInfo)>,
+    /// On a service worker's thread: its state as the registry last told it.
+    own_state: Option<WorkerState>,
+    /// On a service worker's thread: its script resource map (§2.1), its main script too.
+    own_map: HashMap<url::Url, ImportedScript>,
+    /// On a module service worker's thread: its type.
+    own_type: WorkerType,
     /// When the last notice was taken (a `ready` answer may follow a state change closely).
     last_notice: Option<std::time::Instant>,
     /// The service worker clients told to the registry: each window's document, with its number
@@ -373,7 +383,15 @@ impl Engine {
                     registration,
                     source,
                     worker_type,
-                } => self.start_service_worker(version, registration, source, worker_type),
+                    imports,
+                } => self.start_service_worker(version, registration, source, worker_type, imports),
+                // (its own state at once: `importScripts()` asks it synchronously)
+                Notice::State { version, state } if self.sw_own_version() == Some(version) => {
+                    self.sw.borrow_mut().own_state = Some(state);
+                    self.queue_task(TaskSource::DomManipulation, move |e, cx| {
+                        e.handle_notice(cx, Notice::State { version, state })
+                    })
+                }
                 Notice::Stop { version } => {
                     if let Some((tx, waker)) = self.sw.borrow_mut().running.remove(&version) {
                         let _ = tx.send(crate::worker::ToWorker::Terminate);
@@ -620,8 +638,8 @@ impl Engine {
         registration: RegistrationInfo,
         source: Vec<u8>,
         worker_type: WorkerType,
+        imports: Vec<ImportedScript>,
     ) {
-        let _ = worker_type;
         let (to_worker, inbox) = mpsc::channel();
         let (to_parent, _from_worker) = mpsc::channel();
         let waker = Arc::new(Waker::default());
@@ -653,6 +671,8 @@ impl Engine {
                 version,
                 registration,
                 source,
+                worker_type,
+                imports,
             }),
         };
         let started = std::thread::Builder::new()
@@ -669,6 +689,101 @@ impl Engine {
         let mut s = self.sw.borrow_mut();
         s.backend = Some(start.backend.clone());
         s.own = Some((start.version.clone(), start.registration.clone()));
+        s.own_state = Some(start.version.state);
+        s.own_type = start.worker_type;
+        s.own_map = start
+            .imports
+            .iter()
+            .map(|i| (i.url.clone(), i.clone()))
+            .collect();
+    }
+
+    fn sw_own_version(&self) -> Option<VersionId> {
+        self.sw.borrow().own.as_ref().map(|(v, _)| v.id)
+    }
+
+    /// Whether this event loop is a service worker's.
+    pub(crate) fn is_service_worker_global(&self) -> bool {
+        self.sw.borrow().own.is_some()
+    }
+
+    /// §6.3.2 `importScripts(urls)` in a service worker: each script from the worker's script
+    /// resource map or, while it is parsed or installing, fetched and put in it; run in order.
+    pub(crate) fn sw_import_scripts(&self, cx: &mut Cx, urls: Vec<url::Url>) -> rt::Result<()> {
+        // (HTML `importScripts()` step 1: none in a module worker)
+        if self.sw.borrow().own_type == WorkerType::Module {
+            return Err(Error::Type(
+                "importScripts() is not allowed in a module worker".into(),
+            ));
+        }
+        for url in urls {
+            let script = self.sw_imported_script(&url, false)?;
+            // (HTML "fetch a classic worker-imported script": UTF-8 decoded)
+            let (text, _, _) = encoding_rs::UTF_8.decode(&script.source);
+            self.run_classic_rethrowing(cx, &text, script.final_url.as_str())?;
+        }
+        Ok(())
+    }
+
+    /// §6.3.2 the "perform the fetch" steps for `url` (a classic import, or with `module` a
+    /// module of the worker's graph): the map's script, a fetched one, or a network error.
+    pub(crate) fn sw_imported_script(
+        &self,
+        url: &url::Url,
+        module: bool,
+    ) -> rt::Result<ImportedScript> {
+        let network_error =
+            || crate::engine::exception(ExceptionName::NetworkError, "Failed to load the script");
+        let (version, state, hit, uvc) = {
+            let s = self.sw.borrow();
+            let Some((v, r)) = s.own.as_ref() else {
+                return Err(network_error());
+            };
+            (
+                v.id,
+                s.own_state,
+                s.own_map.get(url).cloned(),
+                r.update_via_cache,
+            )
+        };
+        let installing = matches!(state, Some(WorkerState::Parsed | WorkerState::Installing));
+        // Steps 4-5.
+        if let Some(hit) = hit {
+            if installing {
+                self.sw_send_own(Call::UsedImport {
+                    version,
+                    url: url.clone(),
+                });
+            }
+            return Ok(hit);
+        }
+        if !installing {
+            return Err(network_error());
+        }
+        // Steps 7-11 (a bad import script response is a network error).
+        let destination = if module {
+            snowlark_net::Destination::ServiceWorker
+        } else {
+            snowlark_net::Destination::Script
+        };
+        let (source, final_url) = self
+            .fetch_imported_script(url, destination, uvc == UpdateViaCache::None)
+            .ok_or_else(network_error)?;
+        let script = ImportedScript {
+            url: url.clone(),
+            final_url,
+            source,
+        };
+        // Steps 12-14.
+        self.sw
+            .borrow_mut()
+            .own_map
+            .insert(url.clone(), script.clone());
+        self.sw_send_own(Call::Imported {
+            version,
+            script: script.clone(),
+        });
+        Ok(script)
     }
 
     /// Sends a call from the service worker's own connection with no promise.
@@ -697,18 +812,46 @@ impl Engine {
             ServiceWorkerGlobalScopeImpl::registration(self, global);
             ServiceWorkerGlobalScopeImpl::service_worker(self, global);
         }
+        // (its main script is in its script resource map: `importScripts()` and the module graph
+        // find it there)
+        let main = ImportedScript {
+            url: version.script_url.clone(),
+            final_url: version.script_url.clone(),
+            source: source.to_vec(),
+        };
+        let module = {
+            let mut s = self.sw.borrow_mut();
+            s.own_map.insert(main.url.clone(), main);
+            s.own_type == WorkerType::Module
+        };
+        if module {
+            // (its graph loads from the map on this event loop; the registry hears when it ran)
+            let url = version.script_url.clone();
+            self.load_module_graph_of_type(
+                cx,
+                &url,
+                "javascript",
+                crate::script::GraphDone::ServiceWorkerMain,
+            );
+            return true;
+        }
         let url = version.script_url.as_str();
         let referrer = self.referrer_id(url, &Default::default());
         // (an exception is reported at the global; the script then failed)
         let ok = self
             .run_classic_with(cx, &text, url, 0, referrer, false, None, None)
             .is_some();
-        self.microtask_checkpoint(cx);
-        self.sw_send_own(Call::Evaluated {
-            version: version.id,
-            ok,
-        });
+        self.service_worker_evaluated(cx, ok);
         ok
+    }
+
+    /// The worker's script ran (or failed to): the registry is told.
+    pub(crate) fn service_worker_evaluated(&self, cx: &mut Cx, ok: bool) {
+        self.microtask_checkpoint(cx);
+        let Some(version) = self.sw_own_version() else {
+            return;
+        };
+        self.sw_send_own(Call::Evaluated { version, ok });
     }
 
     fn sw_send_own_connect(&self) {
@@ -839,11 +982,10 @@ impl ServiceWorkerContainerImpl for Engine {
                     .join("./")
                     .map_err(|_| Error::Type("The scope is not a valid URL".into()))?,
             };
-            if options.type_ == snowlark_bindings::generated::WorkerType::Module {
-                return Err(Error::Type(
-                    "Module service workers are not supported yet".into(),
-                ));
-            }
+            let worker_type = match options.type_ {
+                snowlark_bindings::generated::WorkerType::Module => WorkerType::Module,
+                snowlark_bindings::generated::WorkerType::Classic => WorkerType::Classic,
+            };
             Ok(Call::Register {
                 client: e.sw_client(global)?,
                 script_url,
@@ -853,7 +995,7 @@ impl ServiceWorkerContainerImpl for Engine {
                     ServiceWorkerUpdateViaCache::All => UpdateViaCache::All,
                     ServiceWorkerUpdateViaCache::None => UpdateViaCache::None,
                 },
-                worker_type: WorkerType::Classic,
+                worker_type,
             })
         });
         Ok(p)

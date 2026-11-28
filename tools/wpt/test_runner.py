@@ -9,8 +9,10 @@ the URLs of the `.https.` and `.h2.` files, and the watch that stops a hung proc
 """
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -168,11 +170,56 @@ class Watch(unittest.TestCase):
         self.assertTrue(done.hung)
         self.assertNotEqual(done.returncode, 0)
 
+    def test_a_process_that_cannot_be_stopped_does_not_block_the_runner(self):
+        # As a process caught in its own exit: every attempt to stop it fails, and the runner must go on.
+        attempts = []
+
+        def no_effect(proc):
+            attempts.append(proc.pid)
+            return runner.stop_process(_Unstoppable(proc), grace=0.2, tries=2, kill=lambda pid: None)
+        started = time.time()
+        done, _ = self.run_python('import time; time.sleep(60)', stall=1, stop=no_effect)
+        self.assertLess(time.time() - started, 20)
+        self.assertTrue(done.hung and done.stuck)
+        self.assertIsNone(done.returncode)
+        self.assertEqual(len(attempts), 1)
+        os.kill(attempts[0], 9)  # (the test's own child)
+
+    def test_stopping_retries_until_the_process_ends(self):
+        proc = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])
+        kills = []
+
+        def second_time_lucky(pid):
+            kills.append(pid)
+            if len(kills) == 2:
+                os.kill(pid, 9)
+        self.assertTrue(runner.stop_process(_Unstoppable(proc), grace=0.5, tries=3, kill=second_time_lucky))
+        self.assertEqual(len(kills), 2)
+
+    def test_a_process_past_its_limit_is_stopped_though_it_keeps_writing(self):
+        code = 'import sys, time\nfor i in range(300):\n    sys.stderr.write("x\\n"); sys.stderr.flush(); time.sleep(0.1)\n'
+        done, _ = self.run_python(code, stall=5, limit=1.5)
+        self.assertTrue(done.hung)
+        self.assertFalse(done.stuck)
+        self.assertIn('after 1.5 s', done.reason)
+
     def test_a_process_that_keeps_writing_is_left_alone(self):
         code = 'import sys, time\nfor i in range(15):\n    sys.stderr.write("x\\n"); sys.stderr.flush(); time.sleep(0.2)\n'
         done, _ = self.run_python(code, stall=1.5)
         self.assertFalse(done.hung)
         self.assertEqual(done.returncode, 0)
+
+
+class _Unstoppable:
+    """A process whose own kill does nothing, as one stuck in its exit: only `kill` given to stop_process acts."""
+    def __init__(self, proc):
+        self._proc, self.pid = proc, proc.pid
+
+    def kill(self):
+        pass
+
+    def wait(self, timeout=None):
+        return self._proc.wait(timeout=timeout)
 
 
 if __name__ == '__main__':

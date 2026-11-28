@@ -46,6 +46,7 @@ enum Msg {
     Call(ConnId, CallId, Call),
     Disconnect(ConnId),
     Fetched(u64, Result<snowlark_net::Response, String>),
+    FetchedImport(u64, usize, Result<snowlark_net::Response, String>),
     ClearKey(String),
     ClearSite(Option<String>),
 }
@@ -160,6 +161,9 @@ fn run(rx: mpsc::Receiver<Msg>, back: mpsc::Sender<Msg>, fetch: Fetch, folder: O
                 sinks.remove(&conn);
             }
             Some(Msg::Fetched(job, result)) => registry.fetched(job, result, now),
+            Some(Msg::FetchedImport(job, index, result)) => {
+                registry.fetched_import(job, index, result, now)
+            }
             Some(Msg::ClearKey(key)) => registry.clear_key(&key),
             Some(Msg::ClearSite(site)) => {
                 for key in registry.keys() {
@@ -192,6 +196,21 @@ fn run(rx: mpsc::Receiver<Msg>, back: mpsc::Sender<Msg>, fetch: Fetch, folder: O
                         })
                         .expect("start a service worker script fetch");
                 }
+                Effect::FetchImport {
+                    job,
+                    index,
+                    request,
+                } => {
+                    let back = back.clone();
+                    let fetch = fetch.clone();
+                    std::thread::Builder::new()
+                        .name("service worker script".into())
+                        .spawn(move || {
+                            let result = fetch(*request);
+                            let _ = back.send(Msg::FetchedImport(job, index, result));
+                        })
+                        .expect("start a service worker script fetch");
+                }
                 Effect::Persist(key) => {
                     if let Some(dir) = &folder {
                         save(dir, &key, &registry.stored(&key));
@@ -207,7 +226,9 @@ fn run(rx: mpsc::Receiver<Msg>, back: mpsc::Sender<Msg>, fetch: Fetch, folder: O
     }
 }
 
-const FILE: &str = "registrations";
+/// (the stored form with each worker's imported scripts; an older profile's [`FILE_V1`] is read
+/// once and replaced by it)
+const FILE: &str = "registrations-2";
 
 fn save(dir: &std::path::Path, key: &str, stored: &[StoredRegistration]) {
     let folder = dir.join(crate::cache::folder_name(key));
@@ -223,8 +244,8 @@ fn save(dir: &std::path::Path, key: &str, stored: &[StoredRegistration]) {
     }
     // (written beside, then moved over the old file, so a cut write leaves the old one)
     let tmp = folder.join(format!("{FILE}.new"));
-    if std::fs::write(&tmp, bytes).is_ok() {
-        let _ = std::fs::rename(&tmp, folder.join(FILE));
+    if std::fs::write(&tmp, bytes).is_ok() && std::fs::rename(&tmp, folder.join(FILE)).is_ok() {
+        let _ = std::fs::remove_file(folder.join(FILE_V1));
     }
 }
 
@@ -237,14 +258,45 @@ fn load_all(dir: &std::path::Path) -> Vec<(String, Vec<StoredRegistration>)> {
         let Some(key) = e.file_name().to_str().and_then(crate::cache::key_of_folder) else {
             continue;
         };
-        let Ok(bytes) = std::fs::read(e.path().join(FILE)) else {
-            continue;
-        };
-        if let Ok(stored) = postcard::from_bytes::<Vec<StoredRegistration>>(&bytes) {
-            out.push((key, stored));
+        if let Ok(bytes) = std::fs::read(e.path().join(FILE)) {
+            if let Ok(stored) = postcard::from_bytes::<Vec<StoredRegistration>>(&bytes) {
+                out.push((key, stored));
+            }
+        } else if let Ok(bytes) = std::fs::read(e.path().join(FILE_V1)) {
+            if let Ok(old) = postcard::from_bytes::<Vec<StoredRegistrationV1>>(&bytes) {
+                out.push((
+                    key,
+                    old.into_iter().map(StoredRegistrationV1::upgrade).collect(),
+                ));
+            }
         }
     }
     out
+}
+
+/// The file of the stored form before imported scripts were kept (read, never written).
+const FILE_V1: &str = "registrations";
+
+#[derive(serde::Deserialize)]
+struct StoredRegistrationV1 {
+    scope: url::Url,
+    update_via_cache: crate::registry::UpdateViaCache,
+    script_url: url::Url,
+    worker_type: crate::registry::WorkerType,
+    source: Vec<u8>,
+}
+
+impl StoredRegistrationV1 {
+    fn upgrade(self) -> StoredRegistration {
+        StoredRegistration {
+            scope: self.scope,
+            update_via_cache: self.update_via_cache,
+            script_url: self.script_url,
+            worker_type: self.worker_type,
+            source: self.source,
+            imports: Vec::new(),
+        }
+    }
 }
 
 /// The handle to a profile's service worker registrations that pages and workers share.

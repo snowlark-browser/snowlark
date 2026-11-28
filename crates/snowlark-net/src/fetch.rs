@@ -1487,8 +1487,11 @@ impl NetState {
             let ua = self.user_agent();
             let ua = ua.for_url(request.url());
             headers.append("User-Agent", &ua.header_value());
-            // A Chromium user agent sends its client hints to every potentially trustworthy origin.
-            if is_url_potentially_trustworthy(request.url()) {
+            // A Chromium user agent sends its client hints to every potentially trustworthy origin,
+            // except with a service worker's script fetch (`Service-Worker: script`, which the
+            // registration makes outside any page).
+            if is_url_potentially_trustworthy(request.url()) && !headers.contains("service-worker")
+            {
                 for (name, value) in ua.profile().client_hint_headers() {
                     if !headers.contains(name) {
                         headers.append(name, &value);

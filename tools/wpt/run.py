@@ -441,12 +441,13 @@ def run_reftest_chunk(exe, chunk, results, work, index):
         if os.path.exists(part):
             os.remove(part)
         cmd = [exe, '--reftest', list_path, shots, part] + (['--font', AHEM] if os.path.exists(AHEM) else [])
-        try:
-            proc = subprocess.run(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                                  timeout=max(600, sum(t for *_, t in remaining) + 5 * len(remaining)))
-            stderr = proc.stderr.decode('utf-8', 'replace')
-        except subprocess.TimeoutExpired as e:
-            stderr = (e.stderr or b'').decode('utf-8', 'replace') + '\n[runner] the process timed out'
+        proc = run_watched(cmd, env, part, os.path.join(work, f'stderr-r{index}.txt'),
+                           limit=max(600, sum(t for *_, t in remaining) + 5 * len(remaining)))
+        stderr = proc.stderr.decode('utf-8', 'replace')
+        if proc.hung:
+            stderr += f'\n[runner] the process was stopped: {proc.reason}' + (' (and did not end)' if proc.stuck else '')
+        if proc.stuck:
+            env = browser_env(env, PROFILE_DIR=os.path.join(work, f'profile-r{index}-{len(remaining)}'))
         done = {}
         if os.path.exists(part):
             with open(part, encoding='utf-8') as f:
@@ -765,18 +766,56 @@ STALL_SECONDS = 300  # a test is stopped by the engine's watchdog after at most 
 
 
 class Finished:
-    """What run_watched returns: the process's stderr, its exit code and whether it was stopped for hanging."""
-    def __init__(self, stderr, returncode, hung):
-        self.stderr, self.returncode, self.hung = stderr, returncode, hung
+    """What run_watched returns: the process's stderr, its exit code (None when it could not be stopped), whether
+    it was stopped for hanging or for running past its limit, and whether it outlived every attempt to stop it."""
+    def __init__(self, stderr, returncode, hung, stuck=False, reason=''):
+        self.stderr, self.returncode, self.hung, self.stuck, self.reason = stderr, returncode, hung, stuck, reason
 
 
-def run_watched(cmd, env, progress_path, stderr_path, stall=STALL_SECONDS, poll=2.0):
+def kill_tree(pid):
+    """Ends a process and its children (Windows: taskkill /T /F; elsewhere the process alone)."""
+    if os.name == 'nt':
+        subprocess.run(['taskkill', '/PID', str(pid), '/T', '/F'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       timeout=60)
+    else:
+        try:
+            os.kill(pid, 9)
+        except OSError:
+            pass
+
+
+def stop_process(proc, grace=30.0, tries=3, kill=kill_tree):
+    """Stops `proc` and waits at most `grace` seconds per try for it to end. A process caught in its own exit can
+    survive a first kill, and one stuck in the kernel can survive every kill: after `tries` the runner gives up on
+    it and goes on, rather than wait on it for ever. Returns whether it ended."""
+    for _ in range(tries):
+        try:
+            kill(proc.pid)
+        except (OSError, subprocess.SubprocessError):
+            pass
+        try:
+            proc.kill()  # through the runner's own handle, which keeps every right whatever the tree walk could do
+        except OSError:
+            pass
+        try:
+            proc.wait(timeout=grace)
+            return True
+        except subprocess.TimeoutExpired:
+            continue
+    print(f'[runner] process {proc.pid} did not end after {tries} attempts to stop it: going on without it', file=sys.stderr)
+    return False
+
+
+def run_watched(cmd, env, progress_path, stderr_path, stall=STALL_SECONDS, poll=2.0, limit=None, stop=stop_process):
     """Runs `cmd`, killing it (and its children) when neither its results file (`progress_path`) nor its stderr
-    has grown for `stall` seconds, so one deadlocked page costs one test and a few minutes, not the chunk."""
+    has grown for `stall` seconds, or when it has run for `limit` seconds, so one deadlocked page costs one test
+    and a few minutes, not the chunk. It never waits without bound: a process that cannot be stopped is left
+    behind (`stuck`) and its results so far are returned."""
     with open(stderr_path, 'wb') as err:
         proc = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=err)
-        last, seen = time.time(), (-1, -1)
-        hung = False
+        start = last = time.time()
+        seen = (-1, -1)
+        hung, stuck, reason = False, False, ''
         while proc.poll() is None:
             time.sleep(poll)
             try:
@@ -785,12 +824,17 @@ def run_watched(cmd, env, progress_path, stderr_path, stall=STALL_SECONDS, poll=
                 now = seen
             if now != seen:
                 seen, last = now, time.time()
-            elif time.time() - last > stall:
-                hung = True
-                subprocess.run(['taskkill', '/PID', str(proc.pid), '/T', '/F'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                proc.wait()
+            if time.time() - last > stall:
+                reason = f'no output for {stall:g} s'
+            elif limit is not None and time.time() - start > limit:
+                reason = f'still running after {limit:g} s'
+            else:
+                continue
+            hung = True
+            stuck = not stop(proc)
+            break
     with open(stderr_path, 'rb') as f:
-        return Finished(f.read(), proc.returncode, hung)
+        return Finished(f.read(), None if stuck else proc.returncode, hung, stuck, reason)
 
 
 def run_chunk(exe, chunk, out_path, work, index, https=False):
@@ -800,6 +844,7 @@ def run_chunk(exe, chunk, out_path, work, index, https=False):
     # The test CA is trusted only in a --https run, and only through this variable.
     browser_env(env, EXTRA_ROOT_CERTS=WPT_CA if https else None)
     remaining = list(chunk)
+    restarts = 0
     while remaining:
         list_path = os.path.join(work, f'list-{index}.txt')
         with open(list_path, 'w', encoding='utf-8') as f:
@@ -811,6 +856,10 @@ def run_chunk(exe, chunk, out_path, work, index, https=False):
         # an older binary ignores the extra arguments)
         proc = run_watched([exe, '--wpt', list_path, part] + (['--font', AHEM] if os.path.exists(AHEM) else []), env, part,
                            os.path.join(work, f'stderr-{index}.txt'))
+        if proc.stuck:
+            # The process left behind may still hold its profile's files: the next one gets a profile of its own.
+            restarts += 1
+            browser_env(env, PROFILE_DIR=os.path.join(work, f'profile-{index}-{restarts}'))
         done = {}
         if os.path.exists(part):
             with open(part, encoding='utf-8') as f:
@@ -828,7 +877,7 @@ def run_chunk(exe, chunk, out_path, work, index, https=False):
             if next_remaining and started and started[-1] not in done:
                 crashed = started[-1]
                 tail = proc.stderr.decode('utf-8', 'replace').strip().splitlines()[-3:]
-                label = f'HANG (no output for {STALL_SECONDS} s, process killed)' if proc.hung else 'CRASH'
+                label = f'HANG ({proc.reason}, process {"left running" if proc.stuck else "killed"})' if proc.hung else 'CRASH'
                 out.write(json.dumps({'url': crashed, 'ms': 0, 'result': {'status': 1, 'message': label + ': ' + ' / '.join(tail)[:300], 'tests': []}}) + '\n')
                 next_remaining = [(u, l) for u, l in next_remaining if full_url(u) != crashed]
             elif next_remaining and done:

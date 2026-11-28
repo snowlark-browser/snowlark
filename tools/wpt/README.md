@@ -73,7 +73,10 @@ How it fits together:
 - A file the run cannot start is listed in `results/<name>.notrunnable.json` with the reason (for example the `.h2.`
   files when the wptserve that is running was started without HTTP/2), is not run, and `parity.py` counts it apart from
   failures. A process that prints nothing for five minutes is killed and its current test recorded as a `HANG`; the run
-  goes on.
+  goes on (a reftest process is also stopped once it runs past the sum of its pages' timeouts). The runner never waits
+  without bound for a process it stopped: one that has not ended after three attempts, 30 s each (a process caught in
+  its own exit can be), is left behind with a warning, the results it wrote are kept, and the rest of its list runs in a
+  new process with a profile folder of its own.
 - Machine-wide slots (`SNOWLARK_SLOTS`; `SNOWLARK_WPT_SLOTS` runs at once, 2 by default) can queue concurrent
   WPT runs so they do not oversubscribe a machine;
   `SNOWLARK_NO_SLOTS=1` skips the queue.

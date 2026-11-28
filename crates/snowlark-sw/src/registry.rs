@@ -114,6 +114,16 @@ pub struct RegistrationInfo {
     pub active: Option<VersionInfo>,
 }
 
+/// A script of a version's script resource map (§2.1) other than its main script: a classic
+/// script `importScripts()` fetched, or a module of a module worker's graph, by its request URL.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedScript {
+    pub url: Url,
+    /// Its response's URL (the script's base URL).
+    pub final_url: Url,
+    pub source: Vec<u8>,
+}
+
 /// A rejected job's exception: a `DOMException` name or `TypeError`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JobError {
@@ -188,6 +198,16 @@ pub enum Call {
     ClientGone { client: ClientId },
     /// `clients.claim()` from the version's global scope (§4.3.4).
     Claim { version: VersionId },
+    /// From the version's global scope while it is parsed or installing (§6.3.2 importScripts'
+    /// "perform the fetch" steps 12-14, and a module of its graph): a script fetched and put in
+    /// its script resource map. No answer.
+    Imported {
+        version: VersionId,
+        script: ImportedScript,
+    },
+    /// The same, for a script its map had already (step 5): it joins the set of used scripts.
+    /// No answer.
+    UsedImport { version: VersionId, url: Url },
 }
 
 /// The answer to a call.
@@ -229,6 +249,8 @@ pub enum Notice {
         registration: RegistrationInfo,
         worker_type: WorkerType,
         source: Vec<u8>,
+        /// The rest of its script resource map.
+        imports: Vec<ImportedScript>,
     },
     /// To a runner: fire a lifecycle event at the version's global.
     Dispatch {
@@ -258,6 +280,13 @@ pub enum Effect {
         job: u64,
         request: Box<snowlark_net::Request>,
     },
+    /// Fetch one of the newest worker's imported scripts for a job's byte check; the result goes
+    /// to [`Registry::fetched_import`].
+    FetchImport {
+        job: u64,
+        index: usize,
+        request: Box<snowlark_net::Request>,
+    },
     /// A storage key's stored registrations changed ([`Registry::stored`]).
     Persist(String),
 }
@@ -270,6 +299,8 @@ pub struct StoredRegistration {
     pub script_url: Url,
     pub worker_type: WorkerType,
     pub source: Vec<u8>,
+    /// The rest of its active worker's script resource map.
+    pub imports: Vec<ImportedScript>,
 }
 
 /// The storage key of an origin: its ASCII serialization (storage is not partitioned yet).
@@ -317,6 +348,10 @@ struct Version {
     script_url: Url,
     worker_type: WorkerType,
     source: Vec<u8>,
+    /// The rest of its script resource map (§2.1), in the order the scripts came.
+    imports: Vec<ImportedScript>,
+    /// Its set of used scripts, besides the main one: the imports its install keeps.
+    used: Vec<Url>,
     state: WorkerState,
     skip_waiting: bool,
     running: Running,
@@ -343,6 +378,9 @@ enum Kind {
 enum Stage {
     Queued,
     Fetching,
+    /// The main script is unchanged: the newest worker's imports are being fetched (§8 Update's
+    /// perform the fetch, step 21).
+    CheckingImports,
     Evaluating(VersionId),
     Installing(VersionId),
 }
@@ -362,6 +400,16 @@ struct Job {
     waiters: Vec<(ConnId, CallId)>,
     settled: bool,
     stage: Stage,
+    /// The byte check of imported scripts, while [`Stage::CheckingImports`].
+    check: Option<Box<ImportCheck>>,
+}
+
+/// §8 Update step 21: the main script fetched, unchanged, and the newest worker's imports.
+struct ImportCheck {
+    source: Vec<u8>,
+    /// The newest worker's imports, each with its fetch's good response once it is in.
+    stored: Vec<(ImportedScript, Option<Option<ImportedScript>>)>,
+    changed: bool,
 }
 
 impl Job {
@@ -449,6 +497,8 @@ impl Registry {
                     script_url: s.script_url,
                     worker_type: s.worker_type,
                     source: s.source,
+                    used: s.imports.iter().map(|i| i.url.clone()).collect(),
+                    imports: s.imports,
                     state: WorkerState::Activated,
                     skip_waiting: false,
                     running: Running::Stopped,
@@ -487,6 +537,7 @@ impl Registry {
                     script_url: v.script_url.clone(),
                     worker_type: v.worker_type,
                     source: v.source.clone(),
+                    imports: v.imports.clone(),
                 })
             })
             .collect()
@@ -591,7 +642,11 @@ impl Registry {
             | Call::EventDone { version, .. }
             | Call::SkipWaiting { version }
             | Call::Stopped { version }
-            | Call::Claim { version } => self.versions.get(version).map(|v| v.registration),
+            | Call::Claim { version }
+            | Call::Imported { version, .. }
+            | Call::UsedImport { version, .. } => {
+                self.versions.get(version).map(|v| v.registration)
+            }
             _ => None,
         };
         if named
@@ -664,6 +719,7 @@ impl Registry {
                     waiters: vec![(conn, id)],
                     settled: false,
                     stage: Stage::Queued,
+                    check: None,
                 });
             }
             Call::Update {
@@ -706,6 +762,7 @@ impl Registry {
                     waiters: vec![(conn, id)],
                     settled: false,
                     stage: Stage::Queued,
+                    check: None,
                 });
             }
             Call::Unregister {
@@ -730,6 +787,7 @@ impl Registry {
                     waiters: vec![(conn, id)],
                     settled: false,
                     stage: Stage::Queued,
+                    check: None,
                 });
             }
             Call::GetRegistration { client_url } => {
@@ -789,6 +847,33 @@ impl Registry {
             Call::Claim { version } => {
                 let answer = self.claim(version, now);
                 self.answer(conn, id, Answer::Claimed(answer));
+            }
+            Call::Imported { version, script } => {
+                // (only a parsed or installing worker adds to its map: §6.3.2 step 4)
+                let Some(v) = self.versions.get_mut(&version) else {
+                    return;
+                };
+                if !matches!(v.state, WorkerState::Parsed | WorkerState::Installing) {
+                    return;
+                }
+                if !v.used.contains(&script.url) {
+                    v.used.push(script.url.clone());
+                }
+                match v.imports.iter_mut().find(|s| s.url == script.url) {
+                    Some(s) => *s = script,
+                    None => v.imports.push(script),
+                }
+            }
+            Call::UsedImport { version, url } => {
+                let Some(v) = self.versions.get_mut(&version) else {
+                    return;
+                };
+                if matches!(v.state, WorkerState::Parsed | WorkerState::Installing)
+                    && v.imports.iter().any(|s| s.url == url)
+                    && !v.used.contains(&url)
+                {
+                    v.used.push(url);
+                }
             }
         }
     }
@@ -1109,8 +1194,7 @@ impl Registry {
         if j.stage != Stage::Fetching {
             return;
         }
-        let (key, scope, worker_type, origin_conn) =
-            (j.key.clone(), j.scope.clone(), j.worker_type, j.origin_conn);
+        let (key, scope, worker_type) = (j.key.clone(), j.scope.clone(), j.worker_type);
         let script_url = j.script_url.clone().expect("the job's script");
         let response = match result {
             Ok(r) => r,
@@ -1172,11 +1256,129 @@ impl Registry {
         if let Some(n) = self.newest(&self.registrations[&rid]) {
             let v = &self.versions[&n];
             if v.source == source && v.script_url == script_url && v.worker_type == worker_type {
-                let info = self.info(rid).expect("the registration");
-                self.settle(&qk, || Answer::Registration(Ok(info.clone())));
-                return self.finish_job(&qk);
+                if v.imports.is_empty() {
+                    let info = self.info(rid).expect("the registration");
+                    self.settle(&qk, || Answer::Registration(Ok(info.clone())));
+                    return self.finish_job(&qk);
+                }
+                // Step 21: the imported scripts are checked too (each fetched again; the
+                // modules of a module worker's graph as well, as its classic imports are).
+                let stored = v.imports.clone();
+                let uvc = self.registrations[&rid].update_via_cache;
+                let j = self.job_mut(&qk).expect("the job");
+                let client = std::sync::Arc::new(j.client.clone());
+                let id = j.id;
+                j.stage = Stage::CheckingImports;
+                for (index, s) in stored.iter().enumerate() {
+                    let mut request = snowlark_net::Request::new(s.url.clone());
+                    request.client = Some(client.clone());
+                    request.destination = if worker_type == WorkerType::Module {
+                        snowlark_net::Destination::ServiceWorker
+                    } else {
+                        snowlark_net::Destination::Script
+                    };
+                    if worker_type == WorkerType::Module {
+                        request.mode = snowlark_net::Mode::Cors;
+                    }
+                    request.parser_metadata = snowlark_net::ParserMetadata::NotParserInserted;
+                    request.initiator_type = "other".into();
+                    if uvc == UpdateViaCache::None {
+                        request.cache = snowlark_net::CacheMode::NoCache;
+                    }
+                    self.effects.push(Effect::FetchImport {
+                        job: id,
+                        index,
+                        request: Box::new(request),
+                    });
+                }
+                self.job_mut(&qk).expect("the job").check = Some(Box::new(ImportCheck {
+                    source,
+                    stored: stored.into_iter().map(|s| (s, None)).collect(),
+                    changed: false,
+                }));
+                return;
             }
         }
+        self.new_version(&qk, rid, source, Vec::new(), now);
+    }
+
+    /// §8 Update step 21, one import's fetch: a good response that differs from the stored one
+    /// is an update; a bad one is left out of the check (and of the new worker's map). When the
+    /// last is in, the job ends unchanged or goes on with a new version.
+    pub fn fetched_import(
+        &mut self,
+        job: u64,
+        index: usize,
+        result: Result<snowlark_net::Response, String>,
+        now: Instant,
+    ) {
+        let Some(qk) = self.queue_of_job(job) else {
+            return;
+        };
+        let j = self.job_mut(&qk).expect("the job");
+        if j.stage != Stage::CheckingImports {
+            return;
+        }
+        let Some(check) = j.check.as_mut() else {
+            return;
+        };
+        let Some(entry) = check.stored.get_mut(index) else {
+            return;
+        };
+        let good = result.ok().filter(|r| {
+            r.head.ok()
+                && snowlark_net::mime::extract_mime_type(&r.head.headers)
+                    .is_some_and(|m| m.is_javascript())
+        });
+        let fetched = good.map(|r| ImportedScript {
+            url: entry.0.url.clone(),
+            final_url: r
+                .head
+                .url_list
+                .last()
+                .cloned()
+                .unwrap_or(entry.0.url.clone()),
+            source: r.body_bytes().to_vec(),
+        });
+        if fetched.as_ref().is_some_and(|f| f.source != entry.0.source) {
+            check.changed = true;
+        }
+        entry.1 = Some(fetched);
+        if check.stored.iter().any(|(_, f)| f.is_none()) {
+            return;
+        }
+        let check = j.check.take().expect("the check");
+        let (key, scope) = (j.key.clone(), j.scope.clone());
+        let Some(rid) = self.get_registration(&key, &scope) else {
+            return self.fail_update(&qk, JobError::type_error("The registration is gone"));
+        };
+        if !check.changed {
+            let info = self.info(rid).expect("the registration");
+            self.settle(&qk, || Answer::Registration(Ok(info.clone())));
+            return self.finish_job(&qk);
+        }
+        let imports = check
+            .stored
+            .into_iter()
+            .filter_map(|(_, f)| f.flatten())
+            .collect();
+        self.new_version(&qk, rid, check.source, imports, now);
+    }
+
+    /// §8 Update steps 10-17: a new worker with the job's script and the updated resource map,
+    /// started for evaluation.
+    fn new_version(
+        &mut self,
+        qk: &(String, String),
+        rid: RegistrationId,
+        source: Vec<u8>,
+        imports: Vec<ImportedScript>,
+        now: Instant,
+    ) {
+        let qk = qk.clone();
+        let j = self.job_mut(&qk).expect("the job");
+        let (worker_type, origin_conn) = (j.worker_type, j.origin_conn);
+        let script_url = j.script_url.clone().expect("the job's script");
         let vid = self.id();
         self.versions.insert(
             vid,
@@ -1185,6 +1387,8 @@ impl Registry {
                 script_url,
                 worker_type,
                 source,
+                imports,
+                used: Vec::new(),
                 state: WorkerState::Parsed,
                 skip_waiting: false,
                 running: Running::Stopped,
@@ -1245,6 +1449,7 @@ impl Registry {
             registration: self.info(rid).expect("the registration"),
             worker_type: v.worker_type,
             source: v.source.clone(),
+            imports: v.imports.clone(),
         };
         let v = self.versions.get_mut(&vid).expect("the version");
         v.running = Running::Starting;
@@ -1454,6 +1659,13 @@ impl Registry {
                         self.registrations.remove(&rid);
                     }
                     return self.finish_job(&qk);
+                }
+                // §8 Install steps 13-15: the scripts its evaluation and install did not use
+                // leave its map.
+                if let Some(v) = self.versions.get_mut(&vid) {
+                    let used = std::mem::take(&mut v.used);
+                    v.imports.retain(|s| used.contains(&s.url));
+                    v.used = used;
                 }
                 if let Some(old) = self.registrations[&rid].waiting {
                     self.retire(old);

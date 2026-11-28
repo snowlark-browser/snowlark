@@ -30,6 +30,8 @@ pub enum GraphDone {
     Import(v8::Global<v8::PromiseResolver>),
     /// A module worker's main script (HTML §10.2.4 "run a worker").
     WorkerMain,
+    /// A module service worker's main script (W3C Service Workers §8 Run Service Worker).
+    ServiceWorkerMain,
 }
 
 /// How a module worker's module scripts are fetched (HTML "fetch a module worker script graph"):
@@ -1174,6 +1176,20 @@ impl Engine {
             .borrow_mut()
             .by_url
             .insert(key.to_owned(), ModuleState::Fetching);
+        // A service worker's modules come from its script resource map, or are fetched into it
+        // while it is parsed or installing (as its classic imports are); the result is taken in
+        // a task, as a fetch's is.
+        if self.is_service_worker_global() {
+            let body = self.sw_imported_script(&url, true).ok().map(|s| {
+                let (text, _) = encoding_rs::UTF_8.decode_with_bom_removal(&s.source);
+                (text.into_owned(), s.final_url.to_string())
+            });
+            let key = key.to_owned();
+            self.queue_task(crate::event_loop::TaskSource::Networking, move |e, cx| {
+                e.module_fetched(cx, &key, body, None, None)
+            });
+            return;
+        }
         // (a module fetched without integrity metadata of its own gets its import map's, HTML "get
         // the descendant script fetch options" and "fetch a module script graph")
         if let Some(integrity) = self.import_map_integrity(key) {
@@ -1596,7 +1612,42 @@ impl Engine {
                 }
                 GraphResult::Error(_) | GraphResult::Null => self.worker_load_failed(),
             },
+            GraphDone::ServiceWorkerMain => {
+                let ok = match result {
+                    GraphResult::Module(m) => self.run_service_worker_module(cx, &m),
+                    GraphResult::Error(_) | GraphResult::Null => false,
+                };
+                self.service_worker_evaluated(cx, ok);
+            }
         }
+    }
+
+    /// W3C Service Workers §8 Run Service Worker step 9.5 for a module script: evaluated without
+    /// reporting its error; a graph with top-level await is refused (§8 Update step 8, "Is Async
+    /// Module"). Whether it ran to completion.
+    fn run_service_worker_module(&self, cx: &mut Cx, module: &v8::Global<v8::Module>) -> bool {
+        self.enter_script();
+        let ok = {
+            let scope = cx.scope();
+            v8::tc_scope!(let tc, scope);
+            let m = v8::Local::new(tc, module);
+            let linked = m.get_status() != v8::ModuleStatus::Uninstantiated
+                || snowlark_js::hooks::instantiate(tc, m).unwrap_or(false);
+            let ok = linked && !m.is_graph_async() && {
+                let result = m.evaluate(tc);
+                let rejected = result
+                    .and_then(|v| v8::Local::<v8::Promise>::try_from(v).ok())
+                    .map(|p| {
+                        p.mark_as_handled();
+                        p.state() == v8::PromiseState::Rejected
+                    });
+                rejected == Some(false)
+            };
+            tc.reset();
+            ok
+        };
+        self.leave_script(cx);
+        ok
     }
 
     /// HTML §8.1.4.3 "run a module script": link, evaluate, report a rejection.
@@ -2564,6 +2615,13 @@ pub fn dynamic_import<'s>(
             .current_window(&mut cx)
             .is_some_and(|w| engine.context_of_window(w).is_none())
     };
+    // HTML HostLoadImportedModule step 1: `import()` is refused in a service worker.
+    if engine.is_service_worker_global() {
+        let msg = rt::name(scope, "import() is not allowed in a service worker");
+        let e = v8::Exception::type_error(scope, msg);
+        resolver.reject(scope, e);
+        return Some(promise);
+    }
     if replaced {
         let msg = rt::name(scope, "The document of this realm is gone");
         let e = v8::Exception::type_error(scope, msg);
