@@ -53,6 +53,10 @@ pub(crate) fn op_draw_buffers_webgl<D: Dom, const LO: u16, const HI: u16>(call: 
                 .map(|_| out)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WEBGL_draw_buffersImpl>::draw_buffers_webgl(dom, &mut cx, this, a0)

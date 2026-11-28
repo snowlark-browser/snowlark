@@ -50,6 +50,10 @@ pub(crate) fn op_clip_control_ext<D: Dom, const LO: u16, const HI: u16>(call: rt
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as EXT_clip_controlImpl>::clip_control_ext(dom, &mut cx, this, a0, a1)

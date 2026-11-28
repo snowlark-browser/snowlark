@@ -165,8 +165,10 @@ pub enum GpuDown {
         window: WindowId,
     },
     /// This process's end of a renderer's link for its WebGL contexts (`snowlark_tab::webgl_link`):
-    /// served on a thread of its own until it ends. Its handles are in this process's table.
+    /// served on a thread of its own until it ends. Its handles are in this process's table. `link`
+    /// is the browser's number for it, which a [`GpuUp::WebGlRefused`] names.
     WebGl {
+        link: u32,
         end: snowlark_ipc::LinkEnd,
     },
 }
@@ -195,6 +197,9 @@ pub enum GpuUp {
     Taken { tab: TabId },
     /// A message of tab `tab`'s raster seam failed its checks: its renderer broke a rule.
     Refused { tab: TabId, why: String },
+    /// What came on WebGL link `link` ([`GpuDown::WebGl`]) broke its rules: the link has ended, and
+    /// its renderer is ended.
+    WebGlRefused { link: u32, why: String },
     /// Window `window`'s compositor could not be made, for the reason `why`: the window shows
     /// nothing new until another surface or size is tried.
     NoCompositor { window: WindowId, why: String },
@@ -234,7 +239,11 @@ impl Validate for GpuUp {
             GpuUp::Ready { adapter, .. } if adapter.len() > MAX_ADAPTER => {
                 bad("an adapter name over its cap")
             }
-            GpuUp::Refused { why, .. } | GpuUp::NoCompositor { why, .. } if why.len() > MAX_WHY => {
+            GpuUp::Refused { why, .. }
+            | GpuUp::WebGlRefused { why, .. }
+            | GpuUp::NoCompositor { why, .. }
+                if why.len() > MAX_WHY =>
+            {
                 bad("a reason over its cap")
             }
             GpuUp::Scroll { view: Some(v), .. }
@@ -301,11 +310,27 @@ pub fn run_child(port: GpuChildPort) -> i32 {
     }
     let lose_at = (test == "lose").then(|| Instant::now() + TEST_LOSE_AFTER);
     // WebGL's device opens now, beside the rest, so a renderer's first context does not wait for it
-    // (where renderers' WebGL runs here: `serves_webgl`).
+    // (where renderers' WebGL runs here: `serves_webgl`). A sandboxed one then locks itself down,
+    // as a renderer does: the driver's files are open by then.
     if serves_webgl() {
+        #[cfg(target_os = "linux")]
+        let lock = snowlark_ipc::sandboxed();
+        #[cfg(not(target_os = "linux"))]
+        let lock = false;
         let _ = std::thread::Builder::new()
             .name("snowlark gpu webgl open".into())
-            .spawn(|| drop(snowlark_tab::webgl_link::gpu_backend()));
+            .spawn(move || {
+                #[cfg(target_os = "linux")]
+                if lock {
+                    if let Err(e) = snowlark_tab::webgl_link::lock_down_gpu_process() {
+                        eprintln!("[gpu] the sandbox cannot lock the GPU process down: {e}");
+                        std::process::exit(1);
+                    }
+                    return;
+                }
+                let _ = lock;
+                drop(snowlark_tab::webgl_link::gpu_backend())
+            });
     }
     let mut child = crate::gpu_compositor::Child::new(gpu.clone(), port.clone());
     // (this thread's passes: each message it handles)
@@ -327,7 +352,9 @@ pub fn run_child(port: GpuChildPort) -> i32 {
                     }
                 }
             }
-            Ok(Received::Message(GpuDown::WebGl { end })) => serve_webgl(end),
+            Ok(Received::Message(GpuDown::WebGl { link, end })) => {
+                serve_webgl(link, end, port.clone())
+            }
             Ok(Received::Message(m)) => child.handle(m),
             Ok(Received::Call(m, replier)) => child.call(m, replier),
             Err(Error::Timeout) => {}
@@ -371,8 +398,9 @@ pub fn serves_webgl() -> bool {
 }
 
 /// Serves a renderer's WebGL link on a thread of its own: its contexts run on this process's WebGL
-/// thread. A link that breaks the protocol ends, and the renderer loses its WebGL.
-fn serve_webgl(end: snowlark_ipc::LinkEnd) {
+/// thread. A link that breaks the protocol ends, and the browser is told ([`GpuUp::WebGlRefused`]),
+/// which ends the renderer.
+fn serve_webgl(number: u32, end: snowlark_ipc::LinkEnd, port: GpuChildPort) {
     let spawned = std::thread::Builder::new()
         .name("snowlark gpu webgl link".into())
         .spawn(move || {
@@ -390,7 +418,9 @@ fn serve_webgl(end: snowlark_ipc::LinkEnd) {
                 }
             };
             webgl_link::serve(link, webgl_link::gpu_backend, |why| {
-                eprintln!("[gpu] a renderer's WebGL link broke a rule: {why}")
+                eprintln!("[gpu] a renderer's WebGL link broke a rule: {why}");
+                let why: String = why.chars().take(256).collect();
+                let _ = port.send(&GpuUp::WebGlRefused { link: number, why });
             });
         });
     if let Err(e) = spawned {
@@ -454,8 +484,9 @@ impl snowlark_tab::services::webgl::WebGlLinks for GpuLink {
 impl GpuLink {
     /// A link between the process at `renderer` and the GPU process for its WebGL contexts, once one
     /// is ready (a while at most), whose end the GPU process is given: the other end, for the process
-    /// at `renderer`. `None` with no GPU process.
-    fn webgl_link<O: snowlark_ipc::Wire, I: snowlark_ipc::Wire>(
+    /// at `renderer`. `None` with no GPU process. Should the GPU process find the link breaking its
+    /// rules, the process at `renderer` is ended.
+    fn webgl_link<O: snowlark_ipc::Wire + 'static, I: snowlark_ipc::Wire + 'static>(
         &self,
         renderer: &snowlark_ipc::BrowserEnd<O, I>,
     ) -> Option<snowlark_ipc::LinkEnd> {
@@ -463,9 +494,14 @@ impl GpuLink {
         // (under the GPU link's lock: the end goes to the process the link was made for)
         let made = self.with_port(WEBGL_READY_WAIT, |gpu| {
             let [mine, theirs] = renderer.link(gpu, [RING_UP, RING_DOWN])?;
+            let (bad, alive) = (renderer.clone(), renderer.clone());
+            let link = self.routes().webgl_link(
+                Box::new(move |why| bad.bad_message(&format!("webgl: {why}"))),
+                Box::new(move || alive.is_closed()),
+            );
             // (the GPU process's end goes to it all the same: one that did not get it is ending,
             // and the other's join fails at once)
-            let _ = gpu.send(&GpuDown::WebGl { end: theirs });
+            let _ = gpu.send(&GpuDown::WebGl { link, end: theirs });
             Ok::<_, snowlark_ipc::Error>(mine)
         });
         match made {
@@ -497,11 +533,16 @@ pub fn gpu_launch(crash_dumps: &std::path::Path) -> Launch {
         }
     }
     // On Linux in namespaces of its own, as a renderer (no network, no capability), unless
-    // `SNOWLARK_SANDBOX=0`. It opens the system's GL driver for renderers' WebGL, so it does not lock
-    // itself down: a system call filter for it needs the driver's files opened first.
+    // `SNOWLARK_SANDBOX=0`; once the GL driver opened its files for renderers' WebGL it locks
+    // itself down (`run_child`), so Mesa keeps no shader cache on disk there: it could not open its
+    // files any more.
     #[cfg(target_os = "linux")]
     {
-        launch = launch.sandbox(std::env::var_os("SNOWLARK_SANDBOX").is_none_or(|v| v != "0"));
+        let sandbox = std::env::var_os("SNOWLARK_SANDBOX").is_none_or(|v| v != "0");
+        launch = launch.sandbox(sandbox);
+        if sandbox {
+            launch = launch.env("MESA_SHADER_CACHE_DISABLE", "true");
+        }
     }
     launch
 }
@@ -1901,5 +1942,92 @@ mod webgl_tests {
         }
         host.wait_until(WAIT, |s| launch_number(s) == 2);
         green(&mut gl, 2);
+    }
+
+    /// A sandboxed GPU process on Linux locks itself down once WebGL's device is open (its system
+    /// call filter on, as `/proc` shows), and still compiles, draws and presents for a renderer's
+    /// link afterwards.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_sandboxed_gpu_process_locks_itself_down_and_still_draws() {
+        use snowlark_tab::webgl_link::{draw_once, EstablishLink, WebGlChannel};
+        if let Err(e) = snowlark_tab::webgl_link::gpu_backend() {
+            eprintln!("no WebGL device here ({e}): nothing to test");
+            return;
+        }
+        struct Links(GpuLink, snowlark_ipc::BrowserEnd<(), ()>);
+        impl EstablishLink for Links {
+            fn establish(&self) -> Option<snowlark_ipc::LinkEnd> {
+                self.0.webgl_link(&self.1)
+            }
+        }
+        let host = GpuHost::start(|| {
+            launch()
+                .sandbox(true)
+                .env("MESA_SHADER_CACHE_DISABLE", "true")
+        });
+        assert!(running(&host.wait_until(WAIT, running)));
+        let pid = host.process().expect("a GPU process").pid();
+        let deadline = Instant::now() + WAIT;
+        while !std::fs::read_to_string(format!("/proc/{pid}/status"))
+            .unwrap_or_default()
+            .contains("Seccomp:\t2")
+        {
+            assert!(
+                Instant::now() < deadline,
+                "the GPU process never locked itself down"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let (renderer, _child) = snowlark_ipc::loopback::pair::<(), ()>(0).unwrap();
+        let channel = WebGlChannel::new(Arc::new(Links(host.link(), renderer)));
+        let mut gl = channel.backend().unwrap();
+        for id in 1..=2 {
+            let drawn = draw_once(&mut gl, id).expect("a drawing buffer");
+            assert!(
+                drawn.rgba.chunks(4).any(|p| p == [0, 255, 0, 255]),
+                "nothing green drawn after the lockdown"
+            );
+        }
+    }
+
+    /// A renderer whose WebGL link breaks the link's rules is ended: the GPU process names the link
+    /// to the browser, which ends that renderer and no other.
+    #[test]
+    fn a_renderer_whose_webgl_link_breaks_a_rule_is_ended() {
+        use snowlark_tab::webgl_link::{GlDown, GlUp, Request, CONNECT_WAIT};
+        let host = GpuHost::start(launch);
+        assert!(running(&host.wait_until(WAIT, running)));
+        // (loopback ends stand for two renderers' pipes)
+        let (renderer, _child) = snowlark_ipc::loopback::pair::<(), ()>(0).unwrap();
+        let (other, _other_child) = snowlark_ipc::loopback::pair::<(), ()>(0).unwrap();
+        let link = host.link();
+        let end = link.webgl_link(&renderer).expect("a WebGL link");
+        let other_end = link.webgl_link(&other).expect("a WebGL link");
+        let client =
+            snowlark_ipc::connect_link::<GlUp, GlDown, snowlark_ipc::FromHost>(end, CONNECT_WAIT)
+                .unwrap();
+        let _other_client = snowlark_ipc::connect_link::<GlUp, GlDown, snowlark_ipc::FromHost>(
+            other_end,
+            CONNECT_WAIT,
+        )
+        .unwrap();
+        // A request that waits for an answer, sent as one that does not.
+        let bytes = snowlark_ipc::wire::to_bytes(&Request::Present(1)).unwrap();
+        client
+            .send(&GlUp::Send(snowlark_ipc::Bulk::Inline(bytes)))
+            .unwrap();
+        let deadline = Instant::now() + WAIT;
+        let why = loop {
+            if let Some(why) = renderer.broke() {
+                break why;
+            }
+            assert!(Instant::now() < deadline, "the renderer was never ended");
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert!(why.starts_with("webgl: "), "{why}");
+        assert!(renderer.is_closed());
+        assert_eq!(other.broke(), None);
+        assert!(!other.is_closed());
     }
 }

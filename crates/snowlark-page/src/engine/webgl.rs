@@ -110,7 +110,17 @@ pub struct ContextObj {
     pub limits: Limits,
     pub width: u32,
     pub height: u32,
+    /// The webgl context lost flag (WebGL 1.0 §5.15.2).
     pub lost: bool,
+    /// How it was lost, while it is.
+    lost_by: LostBy,
+    /// The `webglcontextlost` event was canceled: the context may be restored.
+    restore_allowed: bool,
+    /// Restores so far: the objects of an earlier one, or made while lost, are invalidated
+    /// (WebGL 1.0 §5.15.2), as are the extension objects of an earlier one.
+    pub generation: u32,
+    /// The attributes asked for at creation, which a restore makes its drawing buffer with.
+    asked: Attributes,
     /// Errors this side recorded, oldest first (WebGL 1.0 §5.14.3 `getError`).
     pub errors: Vec<u32>,
     next_object: u32,
@@ -168,7 +178,77 @@ pub struct GlObject {
     pub epoch: u64,
     /// A query's target, once it was begun.
     pub target: u32,
+    /// Its context's generation when it was made ([`INVALIDATED`] when made while the context was
+    /// lost): another means it is invalidated.
+    pub generation: u32,
 }
+
+/// The generation of an object made while its context was lost: invalidated from the start
+/// (WebGL 1.0 §5.15.2).
+const INVALIDATED: u32 = u32::MAX;
+
+impl ContextObj {
+    /// A context's state as made, with the initial values of its state (WebGL 1.0 §5.14.1): by
+    /// `getContext`, and again when it is restored.
+    fn made(
+        owner: CanvasOwner,
+        id: ContextId,
+        asked: Attributes,
+        created: snowlark_gl::Created,
+        width: u32,
+        height: u32,
+    ) -> ContextObj {
+        let units = created.limits.max_combined_texture_image_units.clamp(1, 64) as usize;
+        let attribs = created.limits.max_vertex_attribs.clamp(1, 64) as usize;
+        ContextObj {
+            owner,
+            id,
+            attributes: created.attributes,
+            limits: created.limits,
+            width,
+            height,
+            lost: false,
+            lost_by: LostBy::Real,
+            restore_allowed: false,
+            generation: 0,
+            asked,
+            errors: Vec::new(),
+            next_object: 0,
+            array_buffer: None,
+            element_buffer: None,
+            framebuffer: None,
+            renderbuffer: None,
+            program: None,
+            active_unit: 0,
+            textures: vec![[None; 4]; units],
+            gl2: Gl2State::new(&created.limits, units),
+            ext: ExtState::new(created.extensions, created.requestable),
+            attrib_buffers: vec![None; attribs],
+            pack_alignment: 4,
+            unpack_alignment: 4,
+            flip_y: false,
+            premultiply_alpha: false,
+            colorspace_conversion: c::BROWSER_DEFAULT_WEBGL,
+            drawing_buffer_color_space: g::PredefinedColorSpace::Srgb,
+            unpack_color_space: g::PredefinedColorSpace::Srgb,
+            #[cfg(windows)]
+            shared: None,
+            shared_off: false,
+        }
+    }
+}
+
+/// How a context was lost: by the device or the process running it (restored when possible, if the
+/// page lets it), or by `WEBGL_lose_context` (restored only by `restoreContext`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LostBy {
+    Real,
+    Manual,
+}
+
+/// How long after a failed attempt a lost context tries again to be restored (Chromium's one
+/// second between restore attempts).
+const RESTORE_RETRY_MS: f64 = 1000.0;
 
 /// Every WebGL object.
 pub enum WebGlObject {
@@ -187,10 +267,13 @@ pub enum WebGlObject {
         name: String,
     },
     Precision([i32; 3]),
-    /// The object of a WebGL extension (an index in [`webgl_ext::EXTENSIONS`]).
+    /// The object of a WebGL extension (an index in [`webgl_ext::EXTENSIONS`]), of its context's
+    /// generation `generation` (disabled once the context was lost, unless it is
+    /// `WEBGL_lose_context`).
     Extension {
         context: Handle,
         index: usize,
+        generation: u32,
     },
 }
 
@@ -285,6 +368,9 @@ pub struct GlState {
     queue: Vec<(ContextId, Command)>,
     next_context: ContextId,
     pub contexts: FxHashMap<NodeId, Handle>,
+    /// Every context made, with its drawing buffer's id (canvases' and OffscreenCanvases'), to lose
+    /// them all when the process running them ends; one that was collected no longer matches.
+    live: Vec<(Handle, ContextId)>,
     /// Canvases whose drawing buffer changed since the last rendering update.
     pub dirty: Vec<CanvasOwner>,
     /// Microtask checkpoints so far (WebGL 2.0 fences change state only between them).
@@ -598,11 +684,13 @@ impl Engine {
     }
 
     /// WebGL 1.0 §5.14 "validate a WebGL object": `h` must be an object of `kind` made by this
-    /// context (else INVALID_OPERATION) and not deleted (else INVALID_VALUE). Its id.
+    /// context and not invalidated by a loss (else INVALID_OPERATION), and not deleted (else
+    /// INVALID_VALUE). Its id.
     fn gl_check(&self, this: Handle, h: Handle, kind: Kind) -> Option<u32> {
-        let r = self.gl_obj(h, |o| (o.context, o.kind, o.deleted, o.id));
+        let r = self.gl_obj(h, |o| (o.context, o.kind, o.deleted, o.id, o.generation));
+        let generation = self.gl_ctx(this, |c| c.generation);
         match r {
-            Some((ctx, k, deleted, id)) if ctx == this && k == kind => {
+            Some((ctx, k, deleted, id, gen)) if ctx == this && k == kind && gen == generation => {
                 if deleted {
                     self.gl_error(this, c::INVALID_VALUE);
                     None
@@ -792,9 +880,12 @@ impl Engine {
     }
 
     fn gl_create(&self, this: Handle, kind: Kind, shader_type: u32) -> Handle {
-        let id = self.gl_ctx(this, |c| {
+        let (id, generation) = self.gl_ctx(this, |c| {
             c.next_object += 1;
-            c.next_object
+            (
+                c.next_object,
+                if c.lost { INVALIDATED } else { c.generation },
+            )
         });
         self.gl_send(
             this,
@@ -823,6 +914,7 @@ impl Engine {
             }),
             epoch,
             target: 0,
+            generation,
         }))))
     }
 
@@ -877,8 +969,10 @@ impl Engine {
         if self.gl_lost(this) {
             return false;
         }
+        let generation = self.gl_ctx(this, |c| c.generation);
         self.gl_obj(h, |o| {
             o.context == this
+                && o.generation == generation
                 && o.kind == kind
                 && !o.deleted
                 && (o.bound
@@ -945,45 +1039,18 @@ impl Engine {
                 Err(_) => return Ok(None),
             }
         };
-        let units = created.limits.max_combined_texture_image_units.clamp(1, 64) as usize;
-        let attribs = created.limits.max_vertex_attribs.clamp(1, 64) as usize;
         let ctx = self.alloc(Object::WebGl(Box::new(WebGlObject::Context(Box::new(
-            ContextObj {
-                owner: el,
-                id,
-                attributes: created.attributes,
-                limits: created.limits,
-                width: w,
-                height: h,
-                lost: false,
-                errors: Vec::new(),
-                next_object: 0,
-                array_buffer: None,
-                element_buffer: None,
-                framebuffer: None,
-                renderbuffer: None,
-                program: None,
-                active_unit: 0,
-                textures: vec![[None; 4]; units],
-                gl2: Gl2State::new(&created.limits, units),
-                ext: ExtState::new(created.extensions, created.requestable),
-                attrib_buffers: vec![None; attribs],
-                pack_alignment: 4,
-                unpack_alignment: 4,
-                flip_y: false,
-                premultiply_alpha: false,
-                colorspace_conversion: c::BROWSER_DEFAULT_WEBGL,
-                drawing_buffer_color_space: g::PredefinedColorSpace::Srgb,
-                unpack_color_space: g::PredefinedColorSpace::Srgb,
-                #[cfg(windows)]
-                shared: None,
-                shared_off: false,
-            },
+            ContextObj::made(el, id, asked, created, w, h),
         )))));
         let mut gl = self.gl.borrow_mut();
         if let CanvasOwner::Element(el) = el {
             gl.contexts.insert(el, ctx);
         }
+        // (the collected ones dropped now and then)
+        if gl.live.len() >= 64 && gl.live.len().is_power_of_two() {
+            gl.live.retain(|&(h, id)| self.gl_context_is(h, id));
+        }
+        gl.live.push((ctx, id));
         // (the canvas shows its cleared drawing buffer from the next rendering update)
         gl.dirty.push(el);
         drop(gl);
@@ -1016,6 +1083,7 @@ impl Engine {
     /// The rendering update's part for WebGL: the drawing buffers that changed are read back and
     /// handed to the renderer.
     pub(crate) fn flush_webgl(&self) {
+        self.webgl_check_lost();
         let dirty = std::mem::take(&mut self.gl.borrow_mut().dirty);
         if dirty.is_empty() {
             return;
@@ -1034,11 +1102,8 @@ impl Engine {
                 None => return,
             };
             if reset {
-                // WebGL 1.0 §5.15.2: the context is lost; script sees it from now on.
-                self.gl_ctx(h, |c| {
-                    c.lost = true;
-                    c.errors.push(c::CONTEXT_LOST_WEBGL);
-                });
+                // (the device reset it: WebGL 1.0 §5.15.2)
+                self.webgl_lose(h, LostBy::Real);
                 continue;
             }
             // (a canvas in a renderer process's window: its frame on the GPU, no readback)
@@ -1060,6 +1125,233 @@ impl Engine {
                 }
             }
         }
+    }
+
+    /// Whether `h` is still the context whose drawing buffer was `id` (a task that names a context
+    /// does nothing once it was collected or restored meanwhile).
+    fn gl_context_is(&self, h: Handle, id: ContextId) -> bool {
+        matches!(&*self.obj(h), Object::WebGl(o)
+            if matches!(&**o, WebGlObject::Context(c) if c.id == id))
+    }
+
+    /// Whether `this`, a context or an extension object, is lost ([`rt::Host::webgl_context_lost`]):
+    /// a context whose webgl context lost flag is set, or an extension of an earlier generation of
+    /// its context (all but `WEBGL_lose_context` are disabled by a loss, WebGL 1.0 §5.15.2).
+    pub(crate) fn gl_handle_lost(&self, this: Handle) -> bool {
+        let ext = match &*self.obj(this) {
+            Object::WebGl(o) => match &**o {
+                WebGlObject::Context(c) => return c.lost,
+                WebGlObject::Extension {
+                    context,
+                    generation,
+                    ..
+                } => (*context, *generation),
+                _ => return false,
+            },
+            _ => return false,
+        };
+        self.gl_ctx(ext.0, |c| c.lost || c.generation != ext.1)
+    }
+
+    /// The process running the page's contexts ended (a GPU process restart), which the backend tells
+    /// without asking it: each context still running there is lost.
+    fn webgl_check_lost(&self) {
+        let gone = match self.gl.borrow_mut().backend.as_mut() {
+            Some(b) => b.lost(),
+            None => false,
+        };
+        if !gone {
+            return;
+        }
+        let live = std::mem::take(&mut self.gl.borrow_mut().live);
+        let live: Vec<_> = live
+            .into_iter()
+            .filter(|&(h, id)| self.gl_context_is(h, id))
+            .collect();
+        self.gl.borrow_mut().live = live.clone();
+        for (h, _) in live {
+            self.webgl_lose(h, LostBy::Real);
+        }
+    }
+
+    /// WebGL 1.0 §5.15.2 "lose the context" `h`, lost `by` the device or the process running it,
+    /// or by `WEBGL_lose_context` (which, for a context already lost, is INVALID_OPERATION).
+    fn webgl_lose(&self, h: Handle, by: LostBy) {
+        let (id, owner, already) = self.gl_ctx(h, |c| (c.id, c.owner, c.lost));
+        if already {
+            if by == LostBy::Manual {
+                self.gl_error(h, c::INVALID_OPERATION);
+            }
+            return;
+        }
+        // Its drawing buffer and objects go with it (WEBGL_lose_context: an implementation should
+        // destroy them), and its work not sent yet.
+        self.gl.borrow_mut().queue.retain(|(c, _)| *c != id);
+        if let Some(mut b) = self.gl_backend() {
+            b.destroy(id);
+        }
+        // The flag; the objects it made and its extensions (but WEBGL_lose_context) are
+        // invalidated, as of another generation now.
+        self.gl_ctx(h, |c| {
+            c.lost = true;
+            c.lost_by = by;
+            c.restore_allowed = false;
+            c.generation += 1;
+            c.errors = vec![c::CONTEXT_LOST_WEBGL];
+        });
+        self.gl.borrow_mut().dirty.retain(|o| *o != owner);
+        self.queue_task(
+            crate::event_loop::TaskSource::DomManipulation,
+            move |e, cx| e.webgl_lost_event(cx, h, id),
+        );
+    }
+
+    /// The task "lose the context" queues: `webglcontextlost` at the canvas; when it was canceled,
+    /// the context may be restored, which for a context lost by its device or process is tried
+    /// once one can be made ("await a restorable drawing buffer").
+    fn webgl_lost_event(&self, cx: &mut Cx, h: Handle, id: ContextId) {
+        if !self.gl_context_is(h, id) {
+            return;
+        }
+        let (owner, by) = self.gl_ctx(h, |c| (c.owner, c.lost_by));
+        let Some(target) = self.canvas_target(owner) else {
+            return;
+        };
+        let event = self.trusted_event(
+            InterfaceId::WebGLContextEvent,
+            "webglcontextlost",
+            false,
+            true,
+            EventExt::WebGlContext(String::new()),
+        );
+        let canceled = !self.dispatch(cx, event, target, false);
+        if !self.gl_context_is(h, id) {
+            return;
+        }
+        self.gl_ctx(h, |c| c.restore_allowed = canceled);
+        if canceled && by == LostBy::Real {
+            self.webgl_restore_later(h, id, RESTORE_RETRY_MS);
+        }
+    }
+
+    /// The object a canvas's context events are fired at: its element (while it exists) or its
+    /// OffscreenCanvas.
+    fn canvas_target(&self, owner: CanvasOwner) -> Option<Handle> {
+        match owner {
+            CanvasOwner::Element(el) => self.dom().is_alive(el).then(|| super::node_handle(el)),
+            CanvasOwner::Offscreen(o) => Some(o),
+        }
+    }
+
+    /// Tries to restore the context `h` (of drawing buffer `id`) after `ms`.
+    fn webgl_restore_later(&self, h: Handle, id: ContextId, ms: f64) {
+        let steps: crate::event_loop::TaskFn =
+            Box::new(move |e: &Engine, cx: &mut Cx| e.webgl_restore(cx, h, id));
+        self.start_timer(
+            crate::event_loop::TimerHandler::Internal(Some(steps)),
+            ms,
+            false,
+            None,
+        );
+    }
+
+    /// WebGL 1.0 §5.15.3 "restore the drawing buffer" of the context `h` (lost, its drawing buffer
+    /// was `id`): a new one made with the attributes asked for at creation, the context's state as
+    /// made, and `webglcontextrestored` at the canvas. A drawing buffer that cannot be made yet is
+    /// tried again later for a context its device or process lost, and is INVALID_OPERATION for
+    /// one `WEBGL_lose_context` lost.
+    fn webgl_restore(&self, cx: &mut Cx, h: Handle, id: ContextId) {
+        if !self.gl_context_is(h, id) {
+            return;
+        }
+        let (lost, allowed, by, owner, asked) = self.gl_ctx(h, |c| {
+            (c.lost, c.restore_allowed, c.lost_by, c.owner, c.asked)
+        });
+        if !lost || !allowed {
+            return;
+        }
+        let Some(target) = self.canvas_target(owner) else {
+            return;
+        };
+        let (w, hh) = self.source_size(owner);
+        let new_id = {
+            let mut gl = self.gl.borrow_mut();
+            gl.next_context += 1;
+            gl.next_context
+        };
+        let made = match self.gl_backend() {
+            Some(mut b) => b.create_context(new_id, &asked, w, hh).ok(),
+            None => None,
+        };
+        let Some(created) = made else {
+            match by {
+                LostBy::Real => self.webgl_restore_later(h, id, RESTORE_RETRY_MS),
+                LostBy::Manual => self.gl_error(h, c::INVALID_OPERATION),
+            }
+            return;
+        };
+        self.gl_ctx(h, |c| {
+            let mut made = ContextObj::made(owner, new_id, asked, created, w, hh);
+            // (its objects stay invalidated, and new ones never take their ids)
+            made.generation = c.generation;
+            made.next_object = c.next_object;
+            made.drawing_buffer_color_space = c.drawing_buffer_color_space;
+            made.unpack_color_space = c.unpack_color_space;
+            // (WEBGL_lose_context, never disabled, keeps its object)
+            let keep = webgl_ext::index_of("WEBGL_lose_context");
+            made.ext.objects = c
+                .ext
+                .objects
+                .iter()
+                .copied()
+                .filter(|e| e.0 == keep)
+                .collect();
+            *c = made;
+        });
+        let mut gl = self.gl.borrow_mut();
+        for entry in gl.live.iter_mut().filter(|e| e.0 == h) {
+            entry.1 = new_id;
+        }
+        if !gl.dirty.contains(&owner) {
+            gl.dirty.push(owner);
+        }
+        drop(gl);
+        self.render.borrow_mut().dirty = true;
+        let event = self.trusted_event(
+            InterfaceId::WebGLContextEvent,
+            "webglcontextrestored",
+            false,
+            false,
+            EventExt::WebGlContext(String::new()),
+        );
+        self.dispatch(cx, event, target, false);
+    }
+
+    /// `WEBGL_lose_context.loseContext()` on the context `h`.
+    fn webgl_lose_context(&self, h: Handle) {
+        self.webgl_lose(h, LostBy::Manual);
+    }
+
+    /// `WEBGL_lose_context.restoreContext()` on the context `h`: INVALID_OPERATION unless it is
+    /// lost, and (for one lost by `loseContext`) unless its `webglcontextlost` event was canceled;
+    /// else a task restores it.
+    fn webgl_restore_context(&self, h: Handle) {
+        let (lost, allowed, by, id) =
+            self.gl_ctx(h, |c| (c.lost, c.restore_allowed, c.lost_by, c.id));
+        if !lost {
+            self.gl_error(h, c::INVALID_OPERATION);
+            return;
+        }
+        if !allowed {
+            if by == LostBy::Manual {
+                self.gl_error(h, c::INVALID_OPERATION);
+            }
+            return;
+        }
+        self.queue_task(
+            crate::event_loop::TaskSource::DomManipulation,
+            move |e, cx| e.webgl_restore(cx, h, id),
+        );
     }
 
     /// The drawing buffer's pixels now (`toDataURL`), un-premultiplied BGRA... as a frame.
@@ -1487,6 +1779,10 @@ impl WebGLRenderingContextBaseImpl for Engine {
         Ok(())
     }
     fn check_framebuffer_status(&self, _cx: &mut Cx, this: Handle, target: u32) -> rt::Result<u32> {
+        // (FRAMEBUFFER_UNSUPPORTED while the context is lost: WebGL 1.0 §5.14.6)
+        if self.gl_lost(this) {
+            return Ok(0x8CDD);
+        }
         Ok(self
             .gl_query(this, Query::CheckFramebufferStatus(target))
             .map_or(0, |r| r.int() as u32))
@@ -1859,6 +2155,10 @@ impl WebGLRenderingContextBaseImpl for Engine {
         program: Handle,
         name: &str,
     ) -> rt::Result<i32> {
+        // (-1, and no error, while the context is lost)
+        if self.gl_lost(this) {
+            return Ok(-1);
+        }
         let Some(p) = self.gl_check(this, program, Kind::Program) else {
             return Ok(-1);
         };
@@ -2365,6 +2665,10 @@ impl WebGLRenderingContextBaseImpl for Engine {
         index: u32,
         pname: u32,
     ) -> rt::Result<i64> {
+        // (0, and no error, while the context is lost)
+        if self.gl_lost(this) {
+            return Ok(0);
+        }
         if pname != 0x8645 {
             self.gl_error(this, c::INVALID_ENUM);
             return Ok(0);

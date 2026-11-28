@@ -179,6 +179,10 @@ pub(crate) fn op_multi_draw_arrays_webgl<D: Dom, const LO: u16, const HI: u16>(c
             let v = call.arg(5);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WEBGL_multi_drawImpl>::multi_draw_arrays_webgl(
@@ -231,6 +235,10 @@ pub(crate) fn op_multi_draw_elements_webgl<D: Dom, const LO: u16, const HI: u16>
             let v = call.arg(6);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WEBGL_multi_drawImpl>::multi_draw_elements_webgl(
@@ -289,6 +297,10 @@ pub(crate) fn op_multi_draw_arrays_instanced_webgl<D: Dom, const LO: u16, const 
             let v = call.arg(7);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WEBGL_multi_drawImpl>::multi_draw_arrays_instanced_webgl(
@@ -351,6 +363,10 @@ pub(crate) fn op_multi_draw_elements_instanced_webgl<D: Dom, const LO: u16, cons
             let v = call.arg(8);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WEBGL_multi_drawImpl>::multi_draw_elements_instanced_webgl(

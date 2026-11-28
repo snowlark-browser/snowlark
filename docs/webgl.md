@@ -44,7 +44,7 @@ go through the rings (longer ones stream through them). The GPU process serves e
 driving its WebGL thread, and checks what comes: a section, a request over its cap or one sent as the other kind
 ends the link; a drawing buffer over 16384 px a side or past 1024 contexts on a link is refused as the device
 would. A link that ends (the GPU process ended or was started again) leaves every context on it reset
-(`getGraphicsResetStatus`, so the page sees `webglcontextlost`), and the next context asks for a new link. The
+(the backend's `lost`, so the page sees `webglcontextlost`), and the next context asks for a new link. The
 drawing buffer is still read back to the renderer each frame it changes.
 Within the process, every context runs on one thread, the WebGL thread (`thread.rs`), whatever page or page thread
 made it. ANGLE opens one display per process for each kind of device, and all its contexts share that display's
@@ -57,8 +57,8 @@ service and lives as long as the process.
 
 Left for the end state (`docs/process-isolation.md`, M7): Windows renderers on the same link (which the win32k
 lockdown needs), the drawing buffer as a texture the GPU process's compositor samples instead of pixels read back
-(the compositor and the contexts are then in one process, so it is an id, not a shared texture), and contexts
-restored after a GPU process restart. Costs of the link: a round trip per query (tens of microseconds; WebGL pages
+(the compositor and the contexts are then in one process, so it is an id, not a shared texture). After a GPU
+process restart the contexts are restored when the page asks for it (Context loss, below). Costs of the link: a round trip per query (tens of microseconds; WebGL pages
 query rarely in their frame loop, and the client answers most `getParameter` reads about bindings itself), and a
 copy of each batch through the ring.
 ## ANGLE
@@ -192,12 +192,20 @@ ones it can turn on (`GL_REQUESTABLE_EXTENSIONS_ANGLE`, read into `Created::requ
 call, so a page that never asks sees WebGL without it. The objects come from the registry's IDL
 (`[LegacyNoInterfaceObject]`: no interface object on the global). In a WebGL 1.0 context the service calls the
 extension entry points ANGLE keeps apart from ES 3.0's (`glDrawArraysInstancedANGLE`,
-`glBindVertexArrayOES`, `glDrawBuffersEXT`). Not offered yet: the timer queries, `WEBGL_lose_context`,
-`WEBGL_debug_shaders`, the draft extensions and `WEBGL_shader_pixel_local_storage`.
-- **Context loss.** After every presentation the service is asked for the reset status; a reset marks the context
-  lost: every call does nothing, `isContextLost()` is true, `getError()` returns `CONTEXT_LOST_WEBGL` once. The
-  `webglcontextlost` and `webglcontextrestored` events, `WEBGL_lose_context` and restoring the context are stage
-  S3.
+`glBindVertexArrayOES`, `glDrawBuffersEXT`). Not offered yet: the timer queries, `WEBGL_debug_shaders`, the
+draft extensions and `WEBGL_shader_pixel_local_storage`.
+- **Context loss** (WebGL 1.0 §5.15). A context is lost when the device resets it (the reset status, asked after
+  every presentation), when the process running it ends (the backend's `lost`, looked at in each rendering
+  update: a GPU process restart), or by `WEBGL_lose_context.loseContext()`. Losing it destroys its drawing
+  buffer, sets the lost flag, invalidates its objects and extension objects (but `WEBGL_lose_context`'s: each
+  object carries the context's generation, which a loss moves on), and queues a task firing `webglcontextlost`.
+  While lost, the generated bindings answer every method not marked `[WebGLHandlesContextLoss]` with its type's
+  default without running it (`rt::Host::webgl_context_lost`), `getError()` returns `CONTEXT_LOST_WEBGL` once,
+  and objects made meanwhile are invalidated from the start. When the event was canceled, the context is
+  restored: by `restoreContext()` for a context lost by `loseContext()` (INVALID_OPERATION otherwise), and for
+  one its device or process lost a second after the event and again each second until a drawing buffer can be
+  made. Restoring makes a new drawing buffer with the attributes asked for at creation, the context's state as
+  made, and fires `webglcontextrestored`.
 - **Off switch.** `SNOWLARK_WEBGL=off` disables WebGL (null contexts); `SNOWLARK_WEBGL=warp` runs it on Direct3D's
   software rasterizer, which gives the same pixels on every machine.
 

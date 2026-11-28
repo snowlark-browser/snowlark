@@ -122,6 +122,7 @@ mod web_storage;
 mod webgl;
 mod webgl2;
 mod webgl_ext;
+mod webgl_lost;
 mod wheel_legacy;
 mod xpath;
 

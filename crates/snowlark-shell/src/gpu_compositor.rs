@@ -89,6 +89,18 @@ struct RouteTable {
     /// Past the crash limit, each renderer's videos (by the tab the browser names the renderer by)
     /// in the browser's own store: their textures are made there, as without a GPU process.
     videos: HashMap<TabId, Arc<LocalVideos>>,
+    /// The renderers' WebGL links in the GPU process running now, by the browser's number for
+    /// each ([`GpuDown::WebGl`]): what ends a renderer whose link broke a rule.
+    webgl: HashMap<u32, WebGlRoute>,
+    next_webgl: u32,
+}
+
+/// A renderer's WebGL link, as the browser knows it.
+struct WebGlRoute {
+    /// Ends the renderer, for the reason given.
+    refused: Box<dyn Fn(String) + Send + Sync>,
+    /// Whether the renderer has gone (its route is then dropped).
+    gone: Box<dyn Fn() -> bool + Send + Sync>,
 }
 
 /// Renderer `renderer`'s videos in the browser's store of window `window` (`windows`' record of
@@ -433,6 +445,13 @@ impl Routes {
                     (r.refused)(why);
                 }
             }
+            GpuUp::WebGlRefused { link, why } => {
+                drop(table);
+                let route = self.table().webgl.remove(&link);
+                if let Some(r) = route {
+                    (r.refused)(why);
+                }
+            }
             GpuUp::NoCompositor { window, why } => {
                 drop(table);
                 eprintln!("[gpu] a window has no compositor in the GPU process: {why}");
@@ -449,11 +468,30 @@ impl Routes {
         self.table().windows.get(&window)?.no_compositor.clone()
     }
 
-    /// The GPU process ended: every window stops waiting for a frame.
+    /// The GPU process ended: every window stops waiting for a frame, and the renderers' WebGL
+    /// links ended with it.
     pub(crate) fn lost(&self) {
-        for w in self.table().windows.values() {
+        let mut table = self.table();
+        table.webgl.clear();
+        for w in table.windows.values() {
             let _ = w.events.send(CompEvent::Lost);
         }
+    }
+
+    /// A number for a renderer's new WebGL link: `refused` ends that renderer should the GPU process
+    /// find the link breaking a rule ([`GpuUp::WebGlRefused`]); `gone` says it has gone. Routes of
+    /// renderers that have gone are dropped here.
+    pub(crate) fn webgl_link(
+        &self,
+        refused: Box<dyn Fn(String) + Send + Sync>,
+        gone: Box<dyn Fn() -> bool + Send + Sync>,
+    ) -> u32 {
+        let mut table = self.table();
+        table.webgl.retain(|_, r| !(r.gone)());
+        table.next_webgl = table.next_webgl.wrapping_add(1);
+        let link = table.next_webgl;
+        table.webgl.insert(link, WebGlRoute { refused, gone });
+        link
     }
 
     /// Gives a GPU process started after the last ended, at `port`, every window and tab raster
@@ -514,6 +552,7 @@ impl Routes {
                 windows,
                 rasters,
                 videos,
+                ..
             } = &mut *table;
             for w in windows.values_mut().filter(|w| w.local.is_none()) {
                 w.no_compositor = None;
@@ -1372,7 +1411,7 @@ impl Child {
             // (one page: the browser shares it first)
             GpuDown::Passes { .. } => {}
             // (served by `gpu_process::run_child` itself: no compositor's)
-            GpuDown::WebGl { end } => end.close(),
+            GpuDown::WebGl { end, .. } => end.close(),
             GpuDown::Window { window } => {
                 let tx = self.input(window);
                 let Some(rx) = self.waiting.remove(&window) else {

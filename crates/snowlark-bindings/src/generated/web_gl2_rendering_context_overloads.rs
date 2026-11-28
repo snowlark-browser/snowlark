@@ -966,6 +966,9 @@ fn op_buffer_data_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1004,6 +1007,9 @@ fn op_buffer_data_1<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1050,6 +1056,9 @@ fn op_buffer_data_2<'s, D: Dom, const LO: u16, const HI: u16>(
     };
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1166,6 +1175,9 @@ fn op_buffer_sub_data_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1212,6 +1224,9 @@ fn op_buffer_sub_data_1<'s, D: Dom, const LO: u16, const HI: u16>(
     };
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1317,6 +1332,9 @@ fn op_tex_image2_d_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1361,6 +1379,9 @@ fn op_tex_image2_d_1<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1417,6 +1438,9 @@ fn op_tex_image2_d_2<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1473,6 +1497,9 @@ fn op_tex_image2_d_3<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1533,6 +1560,9 @@ fn op_tex_image2_d_4<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1695,6 +1725,9 @@ fn op_tex_sub_image2_d_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1743,6 +1776,9 @@ fn op_tex_sub_image2_d_1<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1799,6 +1835,9 @@ fn op_tex_sub_image2_d_2<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1855,6 +1894,9 @@ fn op_tex_sub_image2_d_3<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1915,6 +1957,9 @@ fn op_tex_sub_image2_d_4<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -2109,6 +2154,9 @@ fn op_compressed_tex_image2_d_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -2173,6 +2221,9 @@ fn op_compressed_tex_image2_d_1<'s, D: Dom, const LO: u16, const HI: u16>(
     };
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -2346,6 +2397,9 @@ fn op_compressed_tex_sub_image2_d_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -2414,6 +2468,9 @@ fn op_compressed_tex_sub_image2_d_1<'s, D: Dom, const LO: u16, const HI: u16>(
     };
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -2595,6 +2652,10 @@ pub(crate) fn op_uniform1fv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform1fv(
@@ -2655,6 +2716,10 @@ pub(crate) fn op_uniform2fv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform2fv(
@@ -2715,6 +2780,10 @@ pub(crate) fn op_uniform3fv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform3fv(
@@ -2775,6 +2844,10 @@ pub(crate) fn op_uniform4fv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform4fv(
@@ -2835,6 +2908,10 @@ pub(crate) fn op_uniform1iv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform1iv(
@@ -2895,6 +2972,10 @@ pub(crate) fn op_uniform2iv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform2iv(
@@ -2955,6 +3036,10 @@ pub(crate) fn op_uniform3iv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform3iv(
@@ -3015,6 +3100,10 @@ pub(crate) fn op_uniform4iv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform4iv(
@@ -3079,6 +3168,10 @@ pub(crate) fn op_uniform_matrix2fv<D: Dom, const LO: u16, const HI: u16>(call: r
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform_matrix2fv(
@@ -3143,6 +3236,10 @@ pub(crate) fn op_uniform_matrix3fv<D: Dom, const LO: u16, const HI: u16>(call: r
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform_matrix3fv(
@@ -3207,6 +3304,10 @@ pub(crate) fn op_uniform_matrix4fv<D: Dom, const LO: u16, const HI: u16>(call: r
                 0
             }
         };
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGL2RenderingContextOverloadsImpl>::uniform_matrix4fv(
@@ -3261,6 +3362,9 @@ fn op_read_pixels_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -3309,6 +3413,9 @@ fn op_read_pixels_1<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -3363,6 +3470,9 @@ fn op_read_pixels_2<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);

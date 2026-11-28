@@ -118,6 +118,10 @@ pub(crate) fn op_draw_arrays_instanced_angle<D: Dom, const LO: u16, const HI: u1
             let v = call.arg(3);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as ANGLE_instanced_arraysImpl>::draw_arrays_instanced_angle(
@@ -164,6 +168,10 @@ pub(crate) fn op_draw_elements_instanced_angle<D: Dom, const LO: u16, const HI: 
             let v = call.arg(4);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as ANGLE_instanced_arraysImpl>::draw_elements_instanced_angle(
@@ -196,6 +204,10 @@ pub(crate) fn op_vertex_attrib_divisor_angle<D: Dom, const LO: u16, const HI: u1
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as ANGLE_instanced_arraysImpl>::vertex_attrib_divisor_angle(

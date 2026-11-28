@@ -437,6 +437,7 @@ pub const SCOPE: &[&str] = &[
     "WEBGL_debug_renderer_info",
     "WEBGL_depth_texture",
     "WEBGL_draw_buffers",
+    "WEBGL_lose_context",
     "WEBGL_multi_draw",
     "WEBGL_polygon_mode",
     "WEBGL_provoking_vertex",
@@ -1021,6 +1022,9 @@ pub struct OverloadPlan {
     pub ret: Type,
     pub method: String,
     pub idl: String,
+    /// A WebGL method that does nothing while its context is lost and returns its type's default
+    /// (WebGL 1.0 §5.14: every one not marked `[WebGLHandlesContextLoss]`).
+    pub webgl_lost: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -2948,6 +2952,24 @@ impl<'m> Plan<'m> {
         }
     }
 
+    /// Whether `owner` is WebGL's (WebGL 1.0 and 2.0, and the extensions of the Khronos registry)
+    /// and its operations lose with their context (WebGL 1.0 §5.14): all but WEBGL_lose_context's,
+    /// the one extension not disabled while the context is lost (§5.15.2).
+    fn webgl_owner(&self, owner: &str) -> bool {
+        if owner == "WEBGL_lose_context" {
+            return false;
+        }
+        let def = self.model.interfaces.get(owner);
+        let file = def
+            .or_else(|| self.model.mixins.get(owner))
+            .map_or("", |d| d.span.file.as_str());
+        let file = file.rsplit(['/', '\\']).next().unwrap_or(file);
+        matches!(file, "webgl1.idl" | "webgl2.idl")
+            || ["ANGLE_", "EXT_", "KHR_", "OES_", "OVR_", "WEBGL_"]
+                .iter()
+                .any(|p| file.starts_with(p))
+    }
+
     fn plan_operation(
         &mut self,
         iface: &str,
@@ -3010,7 +3032,9 @@ impl<'m> Plan<'m> {
             .any(|(_, _, e, _)| has_ext(e, "LegacyUnforgeable"));
         let secure = members.iter().any(|m| m.secure_context());
         let multiple = kept.len() > 1;
-        for (i, (args, ret, _, doc)) in kept.into_iter().enumerate() {
+        let webgl = !is_ctor && !is_static && self.webgl_owner(owner);
+        for (i, (args, ret, ext, doc)) in kept.into_iter().enumerate() {
+            let webgl_lost = webgl && !has_ext(&ext, "WebGLHandlesContextLoss");
             for a in &args {
                 self.collect(&a.ty);
             }
@@ -3089,6 +3113,7 @@ impl<'m> Plan<'m> {
                 ret,
                 method,
                 idl: doc,
+                webgl_lost,
             });
         }
         Some(OpPlan {
@@ -3236,6 +3261,7 @@ impl<'m> Plan<'m> {
                         ret: ret.clone(),
                         method: format!("#getter:{method}"),
                         idl: idl_of(&Member::Operation(o.clone())),
+                        webgl_lost: false,
                     }],
                     ce_reactions: false,
                     unforgeable: false,
@@ -3261,6 +3287,7 @@ impl<'m> Plan<'m> {
                         ret: ret.clone(),
                         method: method.clone(),
                         idl: idl_of(&Member::Operation(o.clone())),
+                        webgl_lost: false,
                     }],
                     ce_reactions: has_ext(&o.ext, "CEReactions"),
                     unforgeable: false,

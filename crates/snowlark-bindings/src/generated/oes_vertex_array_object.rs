@@ -128,6 +128,10 @@ pub(crate) fn op_delete_vertex_array_oes<D: Dom, const LO: u16, const HI: u16>(c
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as OES_vertex_array_objectImpl>::delete_vertex_array_oes(dom, &mut cx, this, a0)
@@ -204,6 +208,10 @@ pub(crate) fn op_bind_vertex_array_oes<D: Dom, const LO: u16, const HI: u16>(cal
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as OES_vertex_array_objectImpl>::bind_vertex_array_oes(dom, &mut cx, this, a0)

@@ -68,6 +68,10 @@ pub(crate) fn op_polygon_offset_clamp_ext<D: Dom, const LO: u16, const HI: u16>(
             let v = call.arg(2);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as EXT_polygon_offset_clampImpl>::polygon_offset_clamp_ext(

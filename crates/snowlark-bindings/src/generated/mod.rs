@@ -1257,6 +1257,8 @@ pub mod webgl_depth_texture;
 pub use webgl_depth_texture::WEBGL_depth_textureImpl;
 pub mod webgl_draw_buffers;
 pub use webgl_draw_buffers::WEBGL_draw_buffersImpl;
+pub mod webgl_lose_context;
+pub use webgl_lose_context::WEBGL_lose_contextImpl;
 pub mod webgl_multi_draw;
 pub use webgl_multi_draw::WEBGL_multi_drawImpl;
 pub mod webgl_polygon_mode;
@@ -2491,72 +2493,74 @@ pub mod ids {
     pub const WEBGL_DEPTH_TEXTURE_END: u16 = 562;
     pub const WEBGL_DRAW_BUFFERS: u16 = 562;
     pub const WEBGL_DRAW_BUFFERS_END: u16 = 563;
-    pub const WEBGL_MULTI_DRAW: u16 = 563;
-    pub const WEBGL_MULTI_DRAW_END: u16 = 564;
-    pub const WEBGL_POLYGON_MODE: u16 = 564;
-    pub const WEBGL_POLYGON_MODE_END: u16 = 565;
-    pub const WEBGL_PROVOKING_VERTEX: u16 = 565;
-    pub const WEBGL_PROVOKING_VERTEX_END: u16 = 566;
-    pub const WEBGL_RENDER_SHARED_EXPONENT: u16 = 566;
-    pub const WEBGL_RENDER_SHARED_EXPONENT_END: u16 = 567;
-    pub const WEBGL_STENCIL_TEXTURING: u16 = 567;
-    pub const WEBGL_STENCIL_TEXTURING_END: u16 = 568;
-    pub const WEB_GL2_RENDERING_CONTEXT: u16 = 568;
-    pub const WEB_GL2_RENDERING_CONTEXT_END: u16 = 569;
-    pub const WEB_GL_ACTIVE_INFO: u16 = 569;
-    pub const WEB_GL_ACTIVE_INFO_END: u16 = 570;
-    pub const WEB_GL_OBJECT: u16 = 570;
-    pub const WEB_GL_OBJECT_END: u16 = 583;
-    pub const WEB_GL_BUFFER: u16 = 571;
-    pub const WEB_GL_BUFFER_END: u16 = 572;
-    pub const WEB_GL_FRAMEBUFFER: u16 = 572;
-    pub const WEB_GL_FRAMEBUFFER_END: u16 = 573;
-    pub const WEB_GL_PROGRAM: u16 = 573;
-    pub const WEB_GL_PROGRAM_END: u16 = 574;
-    pub const WEB_GL_QUERY: u16 = 574;
-    pub const WEB_GL_QUERY_END: u16 = 575;
-    pub const WEB_GL_RENDERBUFFER: u16 = 575;
-    pub const WEB_GL_RENDERBUFFER_END: u16 = 576;
-    pub const WEB_GL_SAMPLER: u16 = 576;
-    pub const WEB_GL_SAMPLER_END: u16 = 577;
-    pub const WEB_GL_SHADER: u16 = 577;
-    pub const WEB_GL_SHADER_END: u16 = 578;
-    pub const WEB_GL_SYNC: u16 = 578;
-    pub const WEB_GL_SYNC_END: u16 = 579;
-    pub const WEB_GL_TEXTURE: u16 = 579;
-    pub const WEB_GL_TEXTURE_END: u16 = 580;
-    pub const WEB_GL_TRANSFORM_FEEDBACK: u16 = 580;
-    pub const WEB_GL_TRANSFORM_FEEDBACK_END: u16 = 581;
-    pub const WEB_GL_VERTEX_ARRAY_OBJECT: u16 = 581;
-    pub const WEB_GL_VERTEX_ARRAY_OBJECT_END: u16 = 582;
-    pub const WEB_GL_VERTEX_ARRAY_OBJECT_OES: u16 = 582;
-    pub const WEB_GL_VERTEX_ARRAY_OBJECT_OES_END: u16 = 583;
-    pub const WEB_GL_RENDERING_CONTEXT: u16 = 583;
-    pub const WEB_GL_RENDERING_CONTEXT_END: u16 = 584;
-    pub const WEB_GL_SHADER_PRECISION_FORMAT: u16 = 584;
-    pub const WEB_GL_SHADER_PRECISION_FORMAT_END: u16 = 585;
-    pub const WEB_GL_UNIFORM_LOCATION: u16 = 585;
-    pub const WEB_GL_UNIFORM_LOCATION_END: u16 = 586;
-    pub const WORKER_LOCATION: u16 = 586;
-    pub const WORKER_LOCATION_END: u16 = 587;
-    pub const WORKER_NAVIGATOR: u16 = 587;
-    pub const WORKER_NAVIGATOR_END: u16 = 588;
-    pub const WRITABLE_STREAM: u16 = 588;
-    pub const WRITABLE_STREAM_END: u16 = 589;
-    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER: u16 = 589;
-    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 590;
-    pub const WRITABLE_STREAM_DEFAULT_WRITER: u16 = 590;
-    pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 591;
-    pub const XML_SERIALIZER: u16 = 591;
-    pub const XML_SERIALIZER_END: u16 = 592;
-    pub const X_PATH_EVALUATOR: u16 = 592;
-    pub const X_PATH_EVALUATOR_END: u16 = 593;
-    pub const X_PATH_EXPRESSION: u16 = 593;
-    pub const X_PATH_EXPRESSION_END: u16 = 594;
-    pub const X_PATH_RESULT: u16 = 594;
-    pub const X_PATH_RESULT_END: u16 = 595;
+    pub const WEBGL_LOSE_CONTEXT: u16 = 563;
+    pub const WEBGL_LOSE_CONTEXT_END: u16 = 564;
+    pub const WEBGL_MULTI_DRAW: u16 = 564;
+    pub const WEBGL_MULTI_DRAW_END: u16 = 565;
+    pub const WEBGL_POLYGON_MODE: u16 = 565;
+    pub const WEBGL_POLYGON_MODE_END: u16 = 566;
+    pub const WEBGL_PROVOKING_VERTEX: u16 = 566;
+    pub const WEBGL_PROVOKING_VERTEX_END: u16 = 567;
+    pub const WEBGL_RENDER_SHARED_EXPONENT: u16 = 567;
+    pub const WEBGL_RENDER_SHARED_EXPONENT_END: u16 = 568;
+    pub const WEBGL_STENCIL_TEXTURING: u16 = 568;
+    pub const WEBGL_STENCIL_TEXTURING_END: u16 = 569;
+    pub const WEB_GL2_RENDERING_CONTEXT: u16 = 569;
+    pub const WEB_GL2_RENDERING_CONTEXT_END: u16 = 570;
+    pub const WEB_GL_ACTIVE_INFO: u16 = 570;
+    pub const WEB_GL_ACTIVE_INFO_END: u16 = 571;
+    pub const WEB_GL_OBJECT: u16 = 571;
+    pub const WEB_GL_OBJECT_END: u16 = 584;
+    pub const WEB_GL_BUFFER: u16 = 572;
+    pub const WEB_GL_BUFFER_END: u16 = 573;
+    pub const WEB_GL_FRAMEBUFFER: u16 = 573;
+    pub const WEB_GL_FRAMEBUFFER_END: u16 = 574;
+    pub const WEB_GL_PROGRAM: u16 = 574;
+    pub const WEB_GL_PROGRAM_END: u16 = 575;
+    pub const WEB_GL_QUERY: u16 = 575;
+    pub const WEB_GL_QUERY_END: u16 = 576;
+    pub const WEB_GL_RENDERBUFFER: u16 = 576;
+    pub const WEB_GL_RENDERBUFFER_END: u16 = 577;
+    pub const WEB_GL_SAMPLER: u16 = 577;
+    pub const WEB_GL_SAMPLER_END: u16 = 578;
+    pub const WEB_GL_SHADER: u16 = 578;
+    pub const WEB_GL_SHADER_END: u16 = 579;
+    pub const WEB_GL_SYNC: u16 = 579;
+    pub const WEB_GL_SYNC_END: u16 = 580;
+    pub const WEB_GL_TEXTURE: u16 = 580;
+    pub const WEB_GL_TEXTURE_END: u16 = 581;
+    pub const WEB_GL_TRANSFORM_FEEDBACK: u16 = 581;
+    pub const WEB_GL_TRANSFORM_FEEDBACK_END: u16 = 582;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT: u16 = 582;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT_END: u16 = 583;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT_OES: u16 = 583;
+    pub const WEB_GL_VERTEX_ARRAY_OBJECT_OES_END: u16 = 584;
+    pub const WEB_GL_RENDERING_CONTEXT: u16 = 584;
+    pub const WEB_GL_RENDERING_CONTEXT_END: u16 = 585;
+    pub const WEB_GL_SHADER_PRECISION_FORMAT: u16 = 585;
+    pub const WEB_GL_SHADER_PRECISION_FORMAT_END: u16 = 586;
+    pub const WEB_GL_UNIFORM_LOCATION: u16 = 586;
+    pub const WEB_GL_UNIFORM_LOCATION_END: u16 = 587;
+    pub const WORKER_LOCATION: u16 = 587;
+    pub const WORKER_LOCATION_END: u16 = 588;
+    pub const WORKER_NAVIGATOR: u16 = 588;
+    pub const WORKER_NAVIGATOR_END: u16 = 589;
+    pub const WRITABLE_STREAM: u16 = 589;
+    pub const WRITABLE_STREAM_END: u16 = 590;
+    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER: u16 = 590;
+    pub const WRITABLE_STREAM_DEFAULT_CONTROLLER_END: u16 = 591;
+    pub const WRITABLE_STREAM_DEFAULT_WRITER: u16 = 591;
+    pub const WRITABLE_STREAM_DEFAULT_WRITER_END: u16 = 592;
+    pub const XML_SERIALIZER: u16 = 592;
+    pub const XML_SERIALIZER_END: u16 = 593;
+    pub const X_PATH_EVALUATOR: u16 = 593;
+    pub const X_PATH_EVALUATOR_END: u16 = 594;
+    pub const X_PATH_EXPRESSION: u16 = 594;
+    pub const X_PATH_EXPRESSION_END: u16 = 595;
+    pub const X_PATH_RESULT: u16 = 595;
+    pub const X_PATH_RESULT_END: u16 = 596;
     /// The number of generated interfaces.
-    pub const COUNT: usize = 594;
+    pub const COUNT: usize = 595;
 }
 
 /// The generated interfaces; the engine names an object's most derived one in `Host::interface_of`.
@@ -3126,38 +3130,39 @@ pub enum InterfaceId {
     WEBGL_debug_renderer_info = 560,
     WEBGL_depth_texture = 561,
     WEBGL_draw_buffers = 562,
-    WEBGL_multi_draw = 563,
-    WEBGL_polygon_mode = 564,
-    WEBGL_provoking_vertex = 565,
-    WEBGL_render_shared_exponent = 566,
-    WEBGL_stencil_texturing = 567,
-    WebGL2RenderingContext = 568,
-    WebGLActiveInfo = 569,
-    WebGLObject = 570,
-    WebGLBuffer = 571,
-    WebGLFramebuffer = 572,
-    WebGLProgram = 573,
-    WebGLQuery = 574,
-    WebGLRenderbuffer = 575,
-    WebGLSampler = 576,
-    WebGLShader = 577,
-    WebGLSync = 578,
-    WebGLTexture = 579,
-    WebGLTransformFeedback = 580,
-    WebGLVertexArrayObject = 581,
-    WebGLVertexArrayObjectOES = 582,
-    WebGLRenderingContext = 583,
-    WebGLShaderPrecisionFormat = 584,
-    WebGLUniformLocation = 585,
-    WorkerLocation = 586,
-    WorkerNavigator = 587,
-    WritableStream = 588,
-    WritableStreamDefaultController = 589,
-    WritableStreamDefaultWriter = 590,
-    XMLSerializer = 591,
-    XPathEvaluator = 592,
-    XPathExpression = 593,
-    XPathResult = 594,
+    WEBGL_lose_context = 563,
+    WEBGL_multi_draw = 564,
+    WEBGL_polygon_mode = 565,
+    WEBGL_provoking_vertex = 566,
+    WEBGL_render_shared_exponent = 567,
+    WEBGL_stencil_texturing = 568,
+    WebGL2RenderingContext = 569,
+    WebGLActiveInfo = 570,
+    WebGLObject = 571,
+    WebGLBuffer = 572,
+    WebGLFramebuffer = 573,
+    WebGLProgram = 574,
+    WebGLQuery = 575,
+    WebGLRenderbuffer = 576,
+    WebGLSampler = 577,
+    WebGLShader = 578,
+    WebGLSync = 579,
+    WebGLTexture = 580,
+    WebGLTransformFeedback = 581,
+    WebGLVertexArrayObject = 582,
+    WebGLVertexArrayObjectOES = 583,
+    WebGLRenderingContext = 584,
+    WebGLShaderPrecisionFormat = 585,
+    WebGLUniformLocation = 586,
+    WorkerLocation = 587,
+    WorkerNavigator = 588,
+    WritableStream = 589,
+    WritableStreamDefaultController = 590,
+    WritableStreamDefaultWriter = 591,
+    XMLSerializer = 592,
+    XPathEvaluator = 593,
+    XPathExpression = 594,
+    XPathResult = 595,
 }
 
 impl InterfaceId {
@@ -3729,6 +3734,7 @@ impl InterfaceId {
             InterfaceId::WEBGL_debug_renderer_info => "WEBGL_debug_renderer_info",
             InterfaceId::WEBGL_depth_texture => "WEBGL_depth_texture",
             InterfaceId::WEBGL_draw_buffers => "WEBGL_draw_buffers",
+            InterfaceId::WEBGL_lose_context => "WEBGL_lose_context",
             InterfaceId::WEBGL_multi_draw => "WEBGL_multi_draw",
             InterfaceId::WEBGL_polygon_mode => "WEBGL_polygon_mode",
             InterfaceId::WEBGL_provoking_vertex => "WEBGL_provoking_vertex",
@@ -4394,6 +4400,7 @@ pub trait Dom:
     + WEBGL_debug_renderer_infoImpl
     + WEBGL_depth_textureImpl
     + WEBGL_draw_buffersImpl
+    + WEBGL_lose_contextImpl
     + WEBGL_multi_drawImpl
     + WEBGL_polygon_modeImpl
     + WEBGL_provoking_vertexImpl
@@ -5077,6 +5084,7 @@ impl<T> Dom for T where
         + WEBGL_debug_renderer_infoImpl
         + WEBGL_depth_textureImpl
         + WEBGL_draw_buffersImpl
+        + WEBGL_lose_contextImpl
         + WEBGL_multi_drawImpl
         + WEBGL_polygon_modeImpl
         + WEBGL_provoking_vertexImpl
@@ -5759,6 +5767,7 @@ macro_rules! for_each_trait {
         $m!(WEBGL_debug_renderer_infoImpl);
         $m!(WEBGL_depth_textureImpl);
         $m!(WEBGL_draw_buffersImpl);
+        $m!(WEBGL_lose_contextImpl);
         $m!(WEBGL_multi_drawImpl);
         $m!(WEBGL_polygon_modeImpl);
         $m!(WEBGL_provoking_vertexImpl);
@@ -7712,6 +7721,8 @@ pub fn init_isolate<D: Dom>(
     st.set_template(ids::WEBGL_DEPTH_TEXTURE, scope, t_webgl_depth_texture);
     let t_webgl_draw_buffers = webgl_draw_buffers::template::<D>(scope, None, &options);
     st.set_template(ids::WEBGL_DRAW_BUFFERS, scope, t_webgl_draw_buffers);
+    let t_webgl_lose_context = webgl_lose_context::template::<D>(scope, None, &options);
+    st.set_template(ids::WEBGL_LOSE_CONTEXT, scope, t_webgl_lose_context);
     let t_webgl_multi_draw = webgl_multi_draw::template::<D>(scope, None, &options);
     st.set_template(ids::WEBGL_MULTI_DRAW, scope, t_webgl_multi_draw);
     let t_webgl_polygon_mode = webgl_polygon_mode::template::<D>(scope, None, &options);
@@ -12231,6 +12242,15 @@ pub fn install_context_for<D: Dom>(
         .template(scope, ids::WEBGL_DRAW_BUFFERS)?
         .get_function(scope)?;
     if let Some(p) = f_webgl_draw_buffers
+        .get(scope, rt::name(scope, "prototype").into())
+        .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
+    {
+        p.delete(scope, rt::name(scope, "constructor").into())?;
+    }
+    let f_webgl_lose_context = st
+        .template(scope, ids::WEBGL_LOSE_CONTEXT)?
+        .get_function(scope)?;
+    if let Some(p) = f_webgl_lose_context
         .get(scope, rt::name(scope, "prototype").into())
         .and_then(|p| v8::Local::<v8::Object>::try_from(p).ok())
     {

@@ -176,7 +176,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
 - **WebGL without video textures or a few extensions; no WebGPU.**
   `getContext('webgl')` and `getContext('webgl2')` give WebGL 1 and WebGL 2 contexts (`docs/webgl.md`), also on
   an `OffscreenCanvas` and in a worker, with the registry's extensions the graphics stack supports, but not yet
-  EXT_disjoint_timer_query, WEBGL_lose_context or WEBGL_debug_shaders; textures do not load from video, and
+  EXT_disjoint_timer_query or WEBGL_debug_shaders; textures do not load from video, and
   `navigator.gpu` is absent. WebGL 2 does not yet upload compressed textures from a pixel unpack buffer, an
   image source into more than one layer of a 3D texture, or a sub-rectangle of an image source
   (`UNPACK_ROW_LENGTH`, `UNPACK_SKIP_*`). WebGL objects are freed only with the page. (ref 117, 700,

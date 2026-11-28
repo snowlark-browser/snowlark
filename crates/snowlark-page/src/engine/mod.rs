@@ -1000,6 +1000,10 @@ impl rt::Host for Engine {
         }
     }
 
+    fn webgl_context_lost(&self, this: Handle) -> bool {
+        self.gl_handle_lost(this)
+    }
+
     fn push_ce_reactions(&self) {
         self.custom.borrow_mut().stack.push(Vec::new());
     }

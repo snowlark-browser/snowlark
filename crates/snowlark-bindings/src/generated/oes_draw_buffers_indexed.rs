@@ -156,6 +156,10 @@ pub(crate) fn op_enablei_oes<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as OES_draw_buffers_indexedImpl>::enablei_oes(dom, &mut cx, this, a0, a1)
@@ -186,6 +190,10 @@ pub(crate) fn op_disablei_oes<D: Dom, const LO: u16, const HI: u16>(call: rt::Ca
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as OES_draw_buffers_indexedImpl>::disablei_oes(dom, &mut cx, this, a0, a1)
@@ -216,6 +224,10 @@ pub(crate) fn op_blend_equationi_oes<D: Dom, const LO: u16, const HI: u16>(call:
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as OES_draw_buffers_indexedImpl>::blend_equationi_oes(dom, &mut cx, this, a0, a1)
@@ -252,6 +264,10 @@ pub(crate) fn op_blend_equation_separatei_oes<D: Dom, const LO: u16, const HI: u
             let v = call.arg(2);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as OES_draw_buffers_indexedImpl>::blend_equation_separatei_oes(
@@ -288,6 +304,10 @@ pub(crate) fn op_blend_funci_oes<D: Dom, const LO: u16, const HI: u16>(call: rt:
             let v = call.arg(2);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as OES_draw_buffers_indexedImpl>::blend_funci_oes(dom, &mut cx, this, a0, a1, a2)
@@ -330,6 +350,10 @@ pub(crate) fn op_blend_func_separatei_oes<D: Dom, const LO: u16, const HI: u16>(
             let v = call.arg(4);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as OES_draw_buffers_indexedImpl>::blend_func_separatei_oes(
@@ -374,6 +398,10 @@ pub(crate) fn op_color_maski_oes<D: Dom, const LO: u16, const HI: u16>(call: rt:
             let v = call.arg(4);
             Some(rt::to_boolean(scope, v))
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as OES_draw_buffers_indexedImpl>::color_maski_oes(

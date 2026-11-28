@@ -82,6 +82,15 @@ pub trait Host {
         let _ = handle;
         None
     }
+
+    /// Whether `this`, a WebGL context or the object of one of its extensions, is lost (WebGL 1.0
+    /// §5.14, §5.15.2: the context's webgl context lost flag is set, or the extension was disabled by
+    /// a loss): its methods not marked `[WebGLHandlesContextLoss]` then return their type's default
+    /// without running.
+    fn webgl_context_lost(&self, this: Handle) -> bool {
+        let _ = this;
+        false
+    }
 }
 
 /// The attribute primitives of an element, for reflected IDL attributes. Names are local names with a

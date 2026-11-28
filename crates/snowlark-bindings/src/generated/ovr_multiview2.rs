@@ -100,6 +100,10 @@ pub(crate) fn op_framebuffer_texture_multiview_ovr<D: Dom, const LO: u16, const 
             let v = call.arg(5);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as OVR_multiview2Impl>::framebuffer_texture_multiview_ovr(

@@ -50,6 +50,10 @@ pub(crate) fn op_polygon_mode_webgl<D: Dom, const LO: u16, const HI: u16>(call: 
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WEBGL_polygon_modeImpl>::polygon_mode_webgl(dom, &mut cx, this, a0, a1)

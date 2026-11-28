@@ -350,6 +350,11 @@ impl Backend for RemoteGl {
             _ => None,
         }
     }
+
+    fn lost(&mut self) -> bool {
+        // (the GPU process ended: the contexts on its link are gone, until a new one links again)
+        !self.ids.is_empty() && self.link.link.is_closed()
+    }
 }
 
 impl Drop for RemoteGl {
@@ -364,6 +369,51 @@ impl Drop for RemoteGl {
 /// as `SNOWLARK_WEBGL` asks: `snowlark_gl::Service::serving`).
 pub fn gpu_backend() -> Result<Box<dyn Backend>, String> {
     snowlark_gl::Service::serving().map(|s| Box::new(s) as Box<dyn Backend>)
+}
+
+/// The sandboxed GPU process's lockdown on Linux (`docs/process-isolation.md` §7): WebGL's device
+/// is opened and a context made, drawn in, presented and destroyed on it, so that the driver has
+/// opened what it needs (its libraries, the device, its configuration); then the renderers' system
+/// call filter goes on every thread, refusing from now on what names a file by its path, makes or
+/// connects a socket, or starts a process. (Chromium's GPU sandbox hands such opens to a broker
+/// process instead; with none here, Mesa's shader disk cache is off in this process.)
+#[cfg(target_os = "linux")]
+pub fn lock_down_gpu_process() -> Result<(), String> {
+    if let Ok(mut b) = gpu_backend() {
+        let _ = draw_once(&mut *b, 1);
+    }
+    snowlark_sandbox::lock_down().map_err(|e| e.to_string())
+}
+
+/// Draws once in a new 4 × 4 context `id` of `b`: a shader pair compiled and linked, a point drawn
+/// green over the drawing buffer, presented, and the context destroyed. The buffer's pixels (RGBA,
+/// some green), or `None` when no context could be made. What the GPU process does before its
+/// lockdown, so the driver has opened the files of its compiler and rasterizer too.
+pub fn draw_once(b: &mut dyn Backend, id: ContextId) -> Option<Readback> {
+    const VERTEX: &str =
+        "void main() { gl_Position = vec4(0.0, 0.0, 0.0, 1.0); gl_PointSize = 64.0; }";
+    const FRAGMENT: &str =
+        "precision mediump float; void main() { gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0); }";
+    b.create_context(id, &Attributes::default(), 4, 4).ok()?;
+    let (vs, fs, program) = (1, 2, 3);
+    b.submit(vec![
+        (id, Command::CreateShader(vs, 0x8B31)),
+        (id, Command::ShaderSource(vs, VERTEX.into())),
+        (id, Command::CompileShader(vs)),
+        (id, Command::CreateShader(fs, 0x8B30)),
+        (id, Command::ShaderSource(fs, FRAGMENT.into())),
+        (id, Command::CompileShader(fs)),
+        (id, Command::Create(gl::Kind::Program, program)),
+        (id, Command::AttachShader(program, vs)),
+        (id, Command::AttachShader(program, fs)),
+        (id, Command::LinkProgram(program)),
+        (id, Command::UseProgram(program)),
+        // (POINTS)
+        (id, Command::DrawArrays(0, 0, 1)),
+    ]);
+    let drawn = b.present(id);
+    b.destroy(id);
+    drawn
 }
 
 /// What the GPU process checks a renderer's link against: a renderer may send only [`GlUp`].

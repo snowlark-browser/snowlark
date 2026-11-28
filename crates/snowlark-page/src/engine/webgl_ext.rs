@@ -368,6 +368,8 @@ pub static EXTENSIONS: &[ExtDef] = &[
         &["GL_EXT_draw_buffers"],
         &["GL_EXT_draw_buffers"],
     ),
+    // (needs nothing of the device: it loses and restores the context itself)
+    ext("WEBGL_lose_context", I::WEBGL_lose_context, BOTH, &[], &[]),
     ext(
         "WEBGL_multi_draw",
         I::WEBGL_multi_draw,
@@ -586,9 +588,11 @@ impl Engine {
                 for r in requests {
                     self.gl_send(this, Command::RequestExtension(r));
                 }
+                let generation = self.gl_ctx(this, |c| c.generation);
                 let h = self.alloc(Object::WebGl(Box::new(WebGlObject::Extension {
                     context: this,
                     index: i,
+                    generation,
                 })));
                 self.gl_ctx(this, |c| c.ext.objects.push((i, h)));
                 h
@@ -881,6 +885,21 @@ impl g::EXT_clip_controlImpl for Engine {
         depth: u32,
     ) -> rt::Result<()> {
         ext_command!(this, self, Command::ClipControl(origin, depth))
+    }
+}
+
+/// WEBGL_lose_context (the Khronos registry): the steps of a lost context, run on purpose.
+impl g::WEBGL_lose_contextImpl for Engine {
+    fn lose_context(&self, _cx: &mut Cx, this: Handle) -> rt::Result<()> {
+        let ctx = self.ext_ctx(this);
+        self.webgl_lose_context(ctx);
+        Ok(())
+    }
+
+    fn restore_context(&self, _cx: &mut Cx, this: Handle) -> rt::Result<()> {
+        let ctx = self.ext_ctx(this);
+        self.webgl_restore_context(ctx);
+        Ok(())
     }
 }
 

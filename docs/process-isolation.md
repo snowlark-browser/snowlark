@@ -168,7 +168,8 @@ drew before. Holding the key around `CopyFrameToVideoSurface` itself makes the c
 **WebGL.** On Linux a renderer's contexts run in the GPU process: the page's WebGL client encodes its calls as
 before, and they cross a link (a pipe and a ring each way, made by the browser at the renderer's request) to a
 thread of the GPU process that runs them on its WebGL thread; queries wait for their answer and the drawing buffer
-is read back to the renderer (`docs/webgl.md`). Windows renderers keep theirs in process until the drawing buffer
+is read back to the renderer (`docs/webgl.md`). What comes on a link is checked there; a link that breaks its
+rules ends, and the GPU process names it to the browser, which ends that renderer. Windows renderers keep theirs in process until the drawing buffer
 becomes a texture the GPU process's compositor samples.
 
 **Canvas.** A sandboxed renderer has no D3D device, so canvas falls back to the software backend (tiny-skia) there;
@@ -390,6 +391,10 @@ Staged, each stage verified with the browser working and single-process mode unc
   machine.
 - **WebGL** in the GPU process: on Linux, where the GPU process runs only that (the window composites in the
   browser there); renderers open no graphics device, about 47 MB and 45 ms of CPU less per renderer in WSL.
+  The GPU process runs in namespaces of its own and, once WebGL's device is open and has compiled and drawn
+  once, locks itself down with the renderers' system call filter (Chromium's GPU sandbox brokers the driver's
+  later file opens instead; there is no broker here, so Mesa keeps no shader cache on disk in it). A link that
+  breaks its rules ends its renderer; contexts lost with a GPU process are restored when the page asks for it.
   Windows: not started (the same link; then the drawing buffer as a texture the compositor samples).
 - **G6** canvas remoted: not started. Exit tests: canvas WPT areas equal on and off, the Speedometer canvas suites at
   or above today's, a canvas page surviving a GPU kill through the context-loss steps.

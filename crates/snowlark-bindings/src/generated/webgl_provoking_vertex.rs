@@ -46,6 +46,10 @@ pub(crate) fn op_provoking_vertex_webgl<D: Dom, const LO: u16, const HI: u16>(ca
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WEBGL_provoking_vertexImpl>::provoking_vertex_webgl(dom, &mut cx, this, a0)

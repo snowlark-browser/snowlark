@@ -150,6 +150,25 @@ impl Plan<'_> {
         format!("let Some(js) = {lec} else {{ return }}; {cache} rv.set(js);")
     }
 
+    /// What a WebGL method whose context is lost returns (WebGL 1.0 §5.14: null for a nullable
+    /// type or `any`, else the type's default), as a `v8::Local<v8::Value>` made in `scope`; `None`
+    /// when the method runs whatever the context's state (not WebGL's, marked
+    /// `[WebGLHandlesContextLoss]`, or a type with no such default, as a promise).
+    fn webgl_lost_value(&self, ov: &OverloadPlan) -> Option<&'static str> {
+        if !ov.webgl_lost {
+            return None;
+        }
+        let t = self.prune(&ov.ret);
+        match &t.kind {
+            TypeKind::Promise(_) => None,
+            _ if t.is_undefined() => Some("v8::undefined(scope).into()"),
+            _ if t.nullable || self.is_any(&t) => Some("v8::null(scope).into()"),
+            TypeKind::Prim(Prim::Boolean) => Some("v8::Boolean::new(scope, false).into()"),
+            TypeKind::Prim(p) if p.is_numeric() => Some("v8::Integer::new(scope, 0).into()"),
+            _ => None,
+        }
+    }
+
     fn ce_push(&self, on: bool) -> &'static str {
         if on {
             "<D as rt::Host>::push_ce_reactions(dom);"
@@ -1359,6 +1378,13 @@ impl Plan<'_> {
         o.push_str("    let v = call.with_scope(|scope, mut rv| {\n");
         let passes = self.emit_args(o, op, ov, "        ", &|i| format!("call.arg({i})"));
         let args_list = passes.iter().map(|p| format!(", {p}")).collect::<String>();
+        if let Some(lost) = self.webgl_lost_value(ov) {
+            writeln!(
+                o,
+                "        if <D as rt::Host>::webgl_context_lost(dom, this) {{ rv.set({lost}); return None; }}"
+            )
+            .unwrap();
+        }
         if let Some(m) = getter_call {
             writeln!(o, "        let v = <D as {tr}>::{m}(dom, this{args_list});").unwrap();
             if index_size {
@@ -1439,6 +1465,13 @@ impl Plan<'_> {
             }
             o.push_str("    v.to_js(scope)\n}\n\n");
             return;
+        }
+        if let Some(lost) = self.webgl_lost_value(ov).filter(|_| has_this) {
+            writeln!(
+                o,
+                "    if <D as rt::Host>::webgl_context_lost(dom, this) {{ return Some({lost}); }}"
+            )
+            .unwrap();
         }
         writeln!(o, "    {}", self.ce_push(op.ce_reactions)).unwrap();
         writeln!(

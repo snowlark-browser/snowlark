@@ -534,6 +534,9 @@ fn op_buffer_data_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -572,6 +575,9 @@ fn op_buffer_data_1<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -681,6 +687,7 @@ pub(crate) fn op_buffer_sub_data<D: Dom, const LO: u16, const HI: u16>(call: rt:
         let a0 = { let v = call.arg(0); rt::to_unsigned_long(scope, v, rt::IntMode::Wrap) }?;
         let a1 = { let v = call.arg(1); rt::to_long_long(scope, v, rt::IntMode::Wrap) }?;
         let a2 = { let v = call.arg(2); ArrayBufferOrSharedArrayBufferOrInt8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView::from_js(scope, v) }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) { rv.set(v8::undefined(scope).into()); return None; }
         let r = { let mut cx = Cx::new(scope); <D as WebGLRenderingContextOverloadsImpl>::buffer_sub_data(dom, &mut cx, this, a0, a1, a2) };
         let v = rt::check(scope, r)?;
         let _ = v;
@@ -707,6 +714,7 @@ pub(crate) fn op_compressed_tex_image2_d<D: Dom, const LO: u16, const HI: u16>(c
         let a4 = { let v = call.arg(4); rt::to_long(scope, v, rt::IntMode::Wrap) }?;
         let a5 = { let v = call.arg(5); rt::to_long(scope, v, rt::IntMode::Wrap) }?;
         let a6 = { let v = call.arg(6); Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView::from_js(scope, v) }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) { rv.set(v8::undefined(scope).into()); return None; }
         let r = { let mut cx = Cx::new(scope); <D as WebGLRenderingContextOverloadsImpl>::compressed_tex_image2_d(dom, &mut cx, this, a0, a1, a2, a3, a4, a5, a6) };
         let v = rt::check(scope, r)?;
         let _ = v;
@@ -735,6 +743,7 @@ pub(crate) fn op_compressed_tex_sub_image2_d<D: Dom, const LO: u16, const HI: u1
         let a5 = { let v = call.arg(5); rt::to_long(scope, v, rt::IntMode::Wrap) }?;
         let a6 = { let v = call.arg(6); rt::to_unsigned_long(scope, v, rt::IntMode::Wrap) }?;
         let a7 = { let v = call.arg(7); Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView::from_js(scope, v) }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) { rv.set(v8::undefined(scope).into()); return None; }
         let r = { let mut cx = Cx::new(scope); <D as WebGLRenderingContextOverloadsImpl>::compressed_tex_sub_image2_d(dom, &mut cx, this, a0, a1, a2, a3, a4, a5, a6, a7) };
         let v = rt::check(scope, r)?;
         let _ = v;
@@ -761,6 +770,7 @@ pub(crate) fn op_read_pixels<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
         let a4 = { let v = call.arg(4); rt::to_unsigned_long(scope, v, rt::IntMode::Wrap) }?;
         let a5 = { let v = call.arg(5); rt::to_unsigned_long(scope, v, rt::IntMode::Wrap) }?;
         let a6 = { let v = call.arg(6); if v.is_null_or_undefined() { Some(None) } else { (Int8ArrayOrInt16ArrayOrInt32ArrayOrUint8ArrayOrUint16ArrayOrUint32ArrayOrUint8ClampedArrayOrBigInt64ArrayOrBigUint64ArrayOrFloat16ArrayOrFloat32ArrayOrFloat64ArrayOrDataView::from_js(scope, v)).map(Some) } }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) { rv.set(v8::undefined(scope).into()); return None; }
         let r = { let mut cx = Cx::new(scope); <D as WebGLRenderingContextOverloadsImpl>::read_pixels(dom, &mut cx, this, a0, a1, a2, a3, a4, a5, a6) };
         let v = rt::check(scope, r)?;
         let _ = v;
@@ -818,6 +828,9 @@ fn op_tex_image2_d_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -862,6 +875,9 @@ fn op_tex_image2_d_1<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -956,6 +972,9 @@ fn op_tex_sub_image2_d_0<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1004,6 +1023,9 @@ fn op_tex_sub_image2_d_1<'s, D: Dom, const LO: u16, const HI: u16>(
     }?;
     let st = rt::state(scope);
     let dom = st.engine::<D>();
+    if <D as rt::Host>::webgl_context_lost(dom, this) {
+        return Some(v8::undefined(scope).into());
+    }
 
     let r = {
         let mut cx = Cx::new(scope);
@@ -1120,6 +1142,10 @@ pub(crate) fn op_uniform1fv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(1);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform1fv(dom, &mut cx, this, a0, a1)
@@ -1162,6 +1188,10 @@ pub(crate) fn op_uniform2fv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(1);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform2fv(dom, &mut cx, this, a0, a1)
@@ -1204,6 +1234,10 @@ pub(crate) fn op_uniform3fv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(1);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform3fv(dom, &mut cx, this, a0, a1)
@@ -1246,6 +1280,10 @@ pub(crate) fn op_uniform4fv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(1);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform4fv(dom, &mut cx, this, a0, a1)
@@ -1288,6 +1326,10 @@ pub(crate) fn op_uniform1iv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(1);
             Int32ArrayOrLongSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform1iv(dom, &mut cx, this, a0, a1)
@@ -1330,6 +1372,10 @@ pub(crate) fn op_uniform2iv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(1);
             Int32ArrayOrLongSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform2iv(dom, &mut cx, this, a0, a1)
@@ -1372,6 +1418,10 @@ pub(crate) fn op_uniform3iv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(1);
             Int32ArrayOrLongSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform3iv(dom, &mut cx, this, a0, a1)
@@ -1414,6 +1464,10 @@ pub(crate) fn op_uniform4iv<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(1);
             Int32ArrayOrLongSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform4iv(dom, &mut cx, this, a0, a1)
@@ -1460,6 +1514,10 @@ pub(crate) fn op_uniform_matrix2fv<D: Dom, const LO: u16, const HI: u16>(call: r
             let v = call.arg(2);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform_matrix2fv(
@@ -1508,6 +1566,10 @@ pub(crate) fn op_uniform_matrix3fv<D: Dom, const LO: u16, const HI: u16>(call: r
             let v = call.arg(2);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform_matrix3fv(
@@ -1556,6 +1618,10 @@ pub(crate) fn op_uniform_matrix4fv<D: Dom, const LO: u16, const HI: u16>(call: r
             let v = call.arg(2);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextOverloadsImpl>::uniform_matrix4fv(

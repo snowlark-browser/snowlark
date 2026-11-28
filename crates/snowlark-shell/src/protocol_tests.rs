@@ -746,6 +746,10 @@ every_variant!(gpu_up: crate::gpu_process::GpuUp, [
         tab: 4,
         why: "lists not as long as the job says".into(),
     },
+    crate::gpu_process::GpuUp::WebGlRefused { .. } => crate::gpu_process::GpuUp::WebGlRefused {
+        link: 2,
+        why: "a WebGL request sent as the other kind".into(),
+    },
     crate::gpu_process::GpuUp::NoCompositor { .. } => crate::gpu_process::GpuUp::NoCompositor {
         window: crate::composite::WindowId(3),
         why: "The desired element already exists.".into(),

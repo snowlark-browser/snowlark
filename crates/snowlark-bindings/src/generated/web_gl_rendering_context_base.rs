@@ -2013,6 +2013,10 @@ pub(crate) fn op_get_supported_extensions<D: Dom, const LO: u16, const HI: u16>(
     let argc = call.length();
     let dom = call.state().engine::<D>();
     let v = call.with_scope(|scope, mut rv| {
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_supported_extensions(dom, &mut cx, this)
@@ -2042,6 +2046,10 @@ pub(crate) fn op_get_extension<D: Dom, const LO: u16, const HI: u16>(call: rt::C
             let v = call.arg(0);
             rt::to_dom_str(scope, v, &mut a0_buf)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_extension(dom, &mut cx, this, &a0)
@@ -2070,6 +2078,10 @@ pub(crate) fn op_active_texture<D: Dom, const LO: u16, const HI: u16>(call: rt::
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::active_texture(dom, &mut cx, this, a0)
@@ -2114,6 +2126,10 @@ pub(crate) fn op_attach_shader<D: Dom, const LO: u16, const HI: u16>(call: rt::C
                 "WebGLShader",
             )
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::attach_shader(dom, &mut cx, this, a0, a1)
@@ -2156,6 +2172,10 @@ pub(crate) fn op_bind_attrib_location<D: Dom, const LO: u16, const HI: u16>(call
             let v = call.arg(2);
             rt::to_dom_str(scope, v, &mut a2_buf)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::bind_attrib_location(
@@ -2200,6 +2220,10 @@ pub(crate) fn op_bind_buffer<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::bind_buffer(dom, &mut cx, this, a0, a1)
@@ -2242,6 +2266,10 @@ pub(crate) fn op_bind_framebuffer<D: Dom, const LO: u16, const HI: u16>(call: rt
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::bind_framebuffer(dom, &mut cx, this, a0, a1)
@@ -2284,6 +2312,10 @@ pub(crate) fn op_bind_renderbuffer<D: Dom, const LO: u16, const HI: u16>(call: r
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::bind_renderbuffer(dom, &mut cx, this, a0, a1)
@@ -2326,6 +2358,10 @@ pub(crate) fn op_bind_texture<D: Dom, const LO: u16, const HI: u16>(call: rt::Ca
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::bind_texture(dom, &mut cx, this, a0, a1)
@@ -2364,6 +2400,10 @@ pub(crate) fn op_blend_color<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
             let v = call.arg(3);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::blend_color(dom, &mut cx, this, a0, a1, a2, a3)
@@ -2390,6 +2430,10 @@ pub(crate) fn op_blend_equation<D: Dom, const LO: u16, const HI: u16>(call: rt::
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::blend_equation(dom, &mut cx, this, a0)
@@ -2420,6 +2464,10 @@ pub(crate) fn op_blend_equation_separate<D: Dom, const LO: u16, const HI: u16>(c
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::blend_equation_separate(
@@ -2452,6 +2500,10 @@ pub(crate) fn op_blend_func<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::blend_func(dom, &mut cx, this, a0, a1)
@@ -2490,6 +2542,10 @@ pub(crate) fn op_blend_func_separate<D: Dom, const LO: u16, const HI: u16>(call:
             let v = call.arg(3);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::blend_func_separate(
@@ -2544,6 +2600,10 @@ pub(crate) fn op_clear<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::clear(dom, &mut cx, this, a0)
@@ -2582,6 +2642,10 @@ pub(crate) fn op_clear_color<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
             let v = call.arg(3);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::clear_color(dom, &mut cx, this, a0, a1, a2, a3)
@@ -2608,6 +2672,10 @@ pub(crate) fn op_clear_depth<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
             let v = call.arg(0);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::clear_depth(dom, &mut cx, this, a0)
@@ -2634,6 +2702,10 @@ pub(crate) fn op_clear_stencil<D: Dom, const LO: u16, const HI: u16>(call: rt::C
             let v = call.arg(0);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::clear_stencil(dom, &mut cx, this, a0)
@@ -2672,6 +2744,10 @@ pub(crate) fn op_color_mask<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(3);
             Some(rt::to_boolean(scope, v))
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::color_mask(dom, &mut cx, this, a0, a1, a2, a3)
@@ -2705,6 +2781,10 @@ pub(crate) fn op_compile_shader<D: Dom, const LO: u16, const HI: u16>(call: rt::
                 "WebGLShader",
             )
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::compile_shader(dom, &mut cx, this, a0)
@@ -2759,6 +2839,10 @@ pub(crate) fn op_copy_tex_image2_d<D: Dom, const LO: u16, const HI: u16>(call: r
             let v = call.arg(7);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::copy_tex_image2_d(
@@ -2815,6 +2899,10 @@ pub(crate) fn op_copy_tex_sub_image2_d<D: Dom, const LO: u16, const HI: u16>(cal
             let v = call.arg(7);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::copy_tex_sub_image2_d(
@@ -2919,6 +3007,10 @@ pub(crate) fn op_create_shader<D: Dom, const LO: u16, const HI: u16>(call: rt::C
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::create_shader(dom, &mut cx, this, a0)
@@ -2964,6 +3056,10 @@ pub(crate) fn op_cull_face<D: Dom, const LO: u16, const HI: u16>(call: rt::Call)
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::cull_face(dom, &mut cx, this, a0)
@@ -3002,6 +3098,10 @@ pub(crate) fn op_delete_buffer<D: Dom, const LO: u16, const HI: u16>(call: rt::C
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::delete_buffer(dom, &mut cx, this, a0)
@@ -3040,6 +3140,10 @@ pub(crate) fn op_delete_framebuffer<D: Dom, const LO: u16, const HI: u16>(call: 
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::delete_framebuffer(dom, &mut cx, this, a0)
@@ -3078,6 +3182,10 @@ pub(crate) fn op_delete_program<D: Dom, const LO: u16, const HI: u16>(call: rt::
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::delete_program(dom, &mut cx, this, a0)
@@ -3116,6 +3224,10 @@ pub(crate) fn op_delete_renderbuffer<D: Dom, const LO: u16, const HI: u16>(call:
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::delete_renderbuffer(dom, &mut cx, this, a0)
@@ -3154,6 +3266,10 @@ pub(crate) fn op_delete_shader<D: Dom, const LO: u16, const HI: u16>(call: rt::C
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::delete_shader(dom, &mut cx, this, a0)
@@ -3192,6 +3308,10 @@ pub(crate) fn op_delete_texture<D: Dom, const LO: u16, const HI: u16>(call: rt::
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::delete_texture(dom, &mut cx, this, a0)
@@ -3218,6 +3338,10 @@ pub(crate) fn op_depth_func<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::depth_func(dom, &mut cx, this, a0)
@@ -3244,6 +3368,10 @@ pub(crate) fn op_depth_mask<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(0);
             Some(rt::to_boolean(scope, v))
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::depth_mask(dom, &mut cx, this, a0)
@@ -3274,6 +3402,10 @@ pub(crate) fn op_depth_range<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
             let v = call.arg(1);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::depth_range(dom, &mut cx, this, a0, a1)
@@ -3318,6 +3450,10 @@ pub(crate) fn op_detach_shader<D: Dom, const LO: u16, const HI: u16>(call: rt::C
                 "WebGLShader",
             )
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::detach_shader(dom, &mut cx, this, a0, a1)
@@ -3344,6 +3480,10 @@ pub(crate) fn op_disable<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::disable(dom, &mut cx, this, a0)
@@ -3370,6 +3510,10 @@ pub(crate) fn op_disable_vertex_attrib_array<D: Dom, const LO: u16, const HI: u1
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::disable_vertex_attrib_array(
@@ -3406,6 +3550,10 @@ pub(crate) fn op_draw_arrays<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
             let v = call.arg(2);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::draw_arrays(dom, &mut cx, this, a0, a1, a2)
@@ -3444,6 +3592,10 @@ pub(crate) fn op_draw_elements<D: Dom, const LO: u16, const HI: u16>(call: rt::C
             let v = call.arg(3);
             rt::to_long_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::draw_elements(dom, &mut cx, this, a0, a1, a2, a3)
@@ -3470,6 +3622,10 @@ pub(crate) fn op_enable<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::enable(dom, &mut cx, this, a0)
@@ -3496,6 +3652,10 @@ pub(crate) fn op_enable_vertex_attrib_array<D: Dom, const LO: u16, const HI: u16
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::enable_vertex_attrib_array(dom, &mut cx, this, a0)
@@ -3515,6 +3675,10 @@ pub(crate) fn op_finish<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
     let argc = call.length();
     let dom = call.state().engine::<D>();
     let v = call.with_scope(|scope, mut rv| {
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::finish(dom, &mut cx, this)
@@ -3534,6 +3698,10 @@ pub(crate) fn op_flush<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
     let argc = call.length();
     let dom = call.state().engine::<D>();
     let v = call.with_scope(|scope, mut rv| {
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::flush(dom, &mut cx, this)
@@ -3584,6 +3752,10 @@ pub(crate) fn op_framebuffer_renderbuffer<D: Dom, const LO: u16, const HI: u16>(
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::framebuffer_renderbuffer(
@@ -3640,6 +3812,10 @@ pub(crate) fn op_framebuffer_texture2_d<D: Dom, const LO: u16, const HI: u16>(ca
             let v = call.arg(4);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::framebuffer_texture2_d(
@@ -3668,6 +3844,10 @@ pub(crate) fn op_front_face<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::front_face(dom, &mut cx, this, a0)
@@ -3694,6 +3874,10 @@ pub(crate) fn op_generate_mipmap<D: Dom, const LO: u16, const HI: u16>(call: rt:
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::generate_mipmap(dom, &mut cx, this, a0)
@@ -3731,6 +3915,10 @@ pub(crate) fn op_get_active_attrib<D: Dom, const LO: u16, const HI: u16>(call: r
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_active_attrib(dom, &mut cx, this, a0, a1)
@@ -3768,6 +3956,10 @@ pub(crate) fn op_get_active_uniform<D: Dom, const LO: u16, const HI: u16>(call: 
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_active_uniform(dom, &mut cx, this, a0, a1)
@@ -3801,6 +3993,10 @@ pub(crate) fn op_get_attached_shaders<D: Dom, const LO: u16, const HI: u16>(call
                 "WebGLProgram",
             )
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_attached_shaders(dom, &mut cx, this, a0)
@@ -3871,6 +4067,10 @@ pub(crate) fn op_get_buffer_parameter<D: Dom, const LO: u16, const HI: u16>(call
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_buffer_parameter(dom, &mut cx, this, a0, a1)
@@ -3899,6 +4099,10 @@ pub(crate) fn op_get_parameter<D: Dom, const LO: u16, const HI: u16>(call: rt::C
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_parameter(dom, &mut cx, this, a0)
@@ -3959,6 +4163,10 @@ pub(crate) fn op_get_framebuffer_attachment_parameter<D: Dom, const LO: u16, con
             let v = call.arg(2);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_framebuffer_attachment_parameter(
@@ -4000,6 +4208,10 @@ pub(crate) fn op_get_program_parameter<D: Dom, const LO: u16, const HI: u16>(cal
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_program_parameter(dom, &mut cx, this, a0, a1)
@@ -4035,6 +4247,10 @@ pub(crate) fn op_get_program_info_log<D: Dom, const LO: u16, const HI: u16>(call
                 "WebGLProgram",
             )
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_program_info_log(dom, &mut cx, this, a0)
@@ -4067,6 +4283,10 @@ pub(crate) fn op_get_renderbuffer_parameter<D: Dom, const LO: u16, const HI: u16
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_renderbuffer_parameter(
@@ -4108,6 +4328,10 @@ pub(crate) fn op_get_shader_parameter<D: Dom, const LO: u16, const HI: u16>(call
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_shader_parameter(dom, &mut cx, this, a0, a1)
@@ -4140,6 +4364,10 @@ pub(crate) fn op_get_shader_precision_format<D: Dom, const LO: u16, const HI: u1
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_shader_precision_format(
@@ -4175,6 +4403,10 @@ pub(crate) fn op_get_shader_info_log<D: Dom, const LO: u16, const HI: u16>(call:
                 "WebGLShader",
             )
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_shader_info_log(dom, &mut cx, this, a0)
@@ -4210,6 +4442,10 @@ pub(crate) fn op_get_shader_source<D: Dom, const LO: u16, const HI: u16>(call: r
                 "WebGLShader",
             )
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_shader_source(dom, &mut cx, this, a0)
@@ -4242,6 +4478,10 @@ pub(crate) fn op_get_tex_parameter<D: Dom, const LO: u16, const HI: u16>(call: r
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_tex_parameter(dom, &mut cx, this, a0, a1)
@@ -4288,6 +4528,10 @@ pub(crate) fn op_get_uniform<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
                 "WebGLUniformLocation",
             )
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_uniform(dom, &mut cx, this, a0, a1)
@@ -4328,6 +4572,10 @@ pub(crate) fn op_get_uniform_location<D: Dom, const LO: u16, const HI: u16>(call
             let v = call.arg(1);
             rt::to_dom_str(scope, v, &mut a1_buf)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_uniform_location(dom, &mut cx, this, a0, &a1)
@@ -4358,6 +4606,10 @@ pub(crate) fn op_get_vertex_attrib<D: Dom, const LO: u16, const HI: u16>(call: r
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::null(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::get_vertex_attrib(dom, &mut cx, this, a0, a1)
@@ -4424,6 +4676,10 @@ pub(crate) fn op_hint<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::hint(dom, &mut cx, this, a0, a1)
@@ -4704,6 +4960,10 @@ pub(crate) fn op_line_width<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(0);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::line_width(dom, &mut cx, this, a0)
@@ -4737,6 +4997,10 @@ pub(crate) fn op_link_program<D: Dom, const LO: u16, const HI: u16>(call: rt::Ca
                 "WebGLProgram",
             )
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::link_program(dom, &mut cx, this, a0)
@@ -4767,6 +5031,10 @@ pub(crate) fn op_pixel_storei<D: Dom, const LO: u16, const HI: u16>(call: rt::Ca
             let v = call.arg(1);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::pixel_storei(dom, &mut cx, this, a0, a1)
@@ -4797,6 +5065,10 @@ pub(crate) fn op_polygon_offset<D: Dom, const LO: u16, const HI: u16>(call: rt::
             let v = call.arg(1);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::polygon_offset(dom, &mut cx, this, a0, a1)
@@ -4835,6 +5107,10 @@ pub(crate) fn op_renderbuffer_storage<D: Dom, const LO: u16, const HI: u16>(call
             let v = call.arg(3);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::renderbuffer_storage(
@@ -4867,6 +5143,10 @@ pub(crate) fn op_sample_coverage<D: Dom, const LO: u16, const HI: u16>(call: rt:
             let v = call.arg(1);
             Some(rt::to_boolean(scope, v))
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::sample_coverage(dom, &mut cx, this, a0, a1)
@@ -4905,6 +5185,10 @@ pub(crate) fn op_scissor<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) {
             let v = call.arg(3);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::scissor(dom, &mut cx, this, a0, a1, a2, a3)
@@ -4943,6 +5227,10 @@ pub(crate) fn op_shader_source<D: Dom, const LO: u16, const HI: u16>(call: rt::C
             let v = call.arg(1);
             rt::to_dom_str(scope, v, &mut a1_buf)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::shader_source(dom, &mut cx, this, a0, &a1)
@@ -4977,6 +5265,10 @@ pub(crate) fn op_stencil_func<D: Dom, const LO: u16, const HI: u16>(call: rt::Ca
             let v = call.arg(2);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::stencil_func(dom, &mut cx, this, a0, a1, a2)
@@ -5015,6 +5307,10 @@ pub(crate) fn op_stencil_func_separate<D: Dom, const LO: u16, const HI: u16>(cal
             let v = call.arg(3);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::stencil_func_separate(
@@ -5043,6 +5339,10 @@ pub(crate) fn op_stencil_mask<D: Dom, const LO: u16, const HI: u16>(call: rt::Ca
             let v = call.arg(0);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::stencil_mask(dom, &mut cx, this, a0)
@@ -5073,6 +5373,10 @@ pub(crate) fn op_stencil_mask_separate<D: Dom, const LO: u16, const HI: u16>(cal
             let v = call.arg(1);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::stencil_mask_separate(dom, &mut cx, this, a0, a1)
@@ -5107,6 +5411,10 @@ pub(crate) fn op_stencil_op<D: Dom, const LO: u16, const HI: u16>(call: rt::Call
             let v = call.arg(2);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::stencil_op(dom, &mut cx, this, a0, a1, a2)
@@ -5145,6 +5453,10 @@ pub(crate) fn op_stencil_op_separate<D: Dom, const LO: u16, const HI: u16>(call:
             let v = call.arg(3);
             rt::to_unsigned_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::stencil_op_separate(
@@ -5181,6 +5493,10 @@ pub(crate) fn op_tex_parameterf<D: Dom, const LO: u16, const HI: u16>(call: rt::
             let v = call.arg(2);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::tex_parameterf(dom, &mut cx, this, a0, a1, a2)
@@ -5215,6 +5531,10 @@ pub(crate) fn op_tex_parameteri<D: Dom, const LO: u16, const HI: u16>(call: rt::
             let v = call.arg(2);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::tex_parameteri(dom, &mut cx, this, a0, a1, a2)
@@ -5257,6 +5577,10 @@ pub(crate) fn op_uniform1f<D: Dom, const LO: u16, const HI: u16>(call: rt::Call)
             let v = call.arg(1);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::uniform1f(dom, &mut cx, this, a0, a1)
@@ -5303,6 +5627,10 @@ pub(crate) fn op_uniform2f<D: Dom, const LO: u16, const HI: u16>(call: rt::Call)
             let v = call.arg(2);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::uniform2f(dom, &mut cx, this, a0, a1, a2)
@@ -5353,6 +5681,10 @@ pub(crate) fn op_uniform3f<D: Dom, const LO: u16, const HI: u16>(call: rt::Call)
             let v = call.arg(3);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::uniform3f(dom, &mut cx, this, a0, a1, a2, a3)
@@ -5407,6 +5739,10 @@ pub(crate) fn op_uniform4f<D: Dom, const LO: u16, const HI: u16>(call: rt::Call)
             let v = call.arg(4);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::uniform4f(dom, &mut cx, this, a0, a1, a2, a3, a4)
@@ -5449,6 +5785,10 @@ pub(crate) fn op_uniform1i<D: Dom, const LO: u16, const HI: u16>(call: rt::Call)
             let v = call.arg(1);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::uniform1i(dom, &mut cx, this, a0, a1)
@@ -5495,6 +5835,10 @@ pub(crate) fn op_uniform2i<D: Dom, const LO: u16, const HI: u16>(call: rt::Call)
             let v = call.arg(2);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::uniform2i(dom, &mut cx, this, a0, a1, a2)
@@ -5545,6 +5889,10 @@ pub(crate) fn op_uniform3i<D: Dom, const LO: u16, const HI: u16>(call: rt::Call)
             let v = call.arg(3);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::uniform3i(dom, &mut cx, this, a0, a1, a2, a3)
@@ -5599,6 +5947,10 @@ pub(crate) fn op_uniform4i<D: Dom, const LO: u16, const HI: u16>(call: rt::Call)
             let v = call.arg(4);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::uniform4i(dom, &mut cx, this, a0, a1, a2, a3, a4)
@@ -5637,6 +5989,10 @@ pub(crate) fn op_use_program<D: Dom, const LO: u16, const HI: u16>(call: rt::Cal
                 .map(Some)
             }
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::use_program(dom, &mut cx, this, a0)
@@ -5670,6 +6026,10 @@ pub(crate) fn op_validate_program<D: Dom, const LO: u16, const HI: u16>(call: rt
                 "WebGLProgram",
             )
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::validate_program(dom, &mut cx, this, a0)
@@ -5700,6 +6060,10 @@ pub(crate) fn op_vertex_attrib1f<D: Dom, const LO: u16, const HI: u16>(call: rt:
             let v = call.arg(1);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::vertex_attrib1f(dom, &mut cx, this, a0, a1)
@@ -5734,6 +6098,10 @@ pub(crate) fn op_vertex_attrib2f<D: Dom, const LO: u16, const HI: u16>(call: rt:
             let v = call.arg(2);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::vertex_attrib2f(dom, &mut cx, this, a0, a1, a2)
@@ -5772,6 +6140,10 @@ pub(crate) fn op_vertex_attrib3f<D: Dom, const LO: u16, const HI: u16>(call: rt:
             let v = call.arg(3);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::vertex_attrib3f(
@@ -5816,6 +6188,10 @@ pub(crate) fn op_vertex_attrib4f<D: Dom, const LO: u16, const HI: u16>(call: rt:
             let v = call.arg(4);
             rt::to_float(scope, v, false)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::vertex_attrib4f(
@@ -5848,6 +6224,10 @@ pub(crate) fn op_vertex_attrib1fv<D: Dom, const LO: u16, const HI: u16>(call: rt
             let v = call.arg(1);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::vertex_attrib1fv(dom, &mut cx, this, a0, a1)
@@ -5878,6 +6258,10 @@ pub(crate) fn op_vertex_attrib2fv<D: Dom, const LO: u16, const HI: u16>(call: rt
             let v = call.arg(1);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::vertex_attrib2fv(dom, &mut cx, this, a0, a1)
@@ -5908,6 +6292,10 @@ pub(crate) fn op_vertex_attrib3fv<D: Dom, const LO: u16, const HI: u16>(call: rt
             let v = call.arg(1);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::vertex_attrib3fv(dom, &mut cx, this, a0, a1)
@@ -5938,6 +6326,10 @@ pub(crate) fn op_vertex_attrib4fv<D: Dom, const LO: u16, const HI: u16>(call: rt
             let v = call.arg(1);
             Float32ArrayOrUnrestrictedFloatSequence::from_js(scope, v)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::vertex_attrib4fv(dom, &mut cx, this, a0, a1)
@@ -5984,6 +6376,10 @@ pub(crate) fn op_vertex_attrib_pointer<D: Dom, const LO: u16, const HI: u16>(cal
             let v = call.arg(5);
             rt::to_long_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::vertex_attrib_pointer(
@@ -6024,6 +6420,10 @@ pub(crate) fn op_viewport<D: Dom, const LO: u16, const HI: u16>(call: rt::Call) 
             let v = call.arg(3);
             rt::to_long(scope, v, rt::IntMode::Wrap)
         }?;
+        if <D as rt::Host>::webgl_context_lost(dom, this) {
+            rv.set(v8::undefined(scope).into());
+            return None;
+        }
         let r = {
             let mut cx = Cx::new(scope);
             <D as WebGLRenderingContextBaseImpl>::viewport(dom, &mut cx, this, a0, a1, a2, a3)

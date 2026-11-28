@@ -451,4 +451,10 @@ pub trait Backend {
     fn read_presented(&mut self, _id: ContextId) -> Option<Readback> {
         None
     }
+    /// Whether every context made so far is gone at once (the process that ran them ended), told
+    /// without asking that process. The contexts then read as reset, and a new context is made on
+    /// whatever runs them next.
+    fn lost(&mut self) -> bool {
+        false
+    }
 }
