@@ -703,7 +703,7 @@ def start_server(h2=True):
                 break
             time.sleep(0.5)
         if proc.poll() is None:
-            proc.terminate()
+            stop_process(proc)
     raise SystemExit(f'wptserve did not start; see {os.path.join(STATE, "results", "wptserve.log")}')
 
 
@@ -1089,7 +1089,9 @@ def run_once(args, areas, name, jobs, baseline, exe):
               f'{ref_total["FAIL"]} fail, {ref_total["TIMEOUT"]} time out, {ref_total["ERROR"]} errors')
     print(f'summary: {summary}')
     if server:
-        server.terminate()
+        # The whole tree: wptserve's parent holds the stash, and sub-servers left behind without it keep port
+        # 8000 open, so the next run would use them and every stash-backed (https generator) test would fail.
+        stop_process(server)
     return results
 
 

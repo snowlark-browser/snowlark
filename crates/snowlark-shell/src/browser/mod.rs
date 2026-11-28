@@ -305,6 +305,8 @@ pub struct Browser {
     /// A press on the site button or the selected address (a drag out of the window once the
     /// pointer moves).
     drag_out: Option<drag_out::DragOutPress>,
+    /// The tab whose page drag the window's drag loop carries ([`TabEvent::StartDrag`]).
+    page_drag: Option<TabId>,
     caret_on: bool,
     suggestions: Vec<Suggestion>,
     selected: Option<usize>,
@@ -596,6 +598,7 @@ impl Browser {
             tab_drag: None,
             address_drag: false,
             drag_out: None,
+            page_drag: None,
             caret_on: true,
             suggestions: Vec::new(),
             selected: None,
@@ -1599,6 +1602,7 @@ impl Browser {
                 TabEvent::Devtools(ev) => self.devtools_event(i, *ev),
                 TabEvent::Find(status) => self.find_status(i, status),
                 TabEvent::ContextMenu(info) => self.show_context_menu(i, *info),
+                TabEvent::StartDrag(d) => self.start_page_drag(window, id, active, &d),
                 TabEvent::Internal(crate::driver::InternalRequest::Settings(q)) => {
                     self.apply_settings(window, &q)
                 }
@@ -2841,7 +2845,7 @@ impl WindowHandler for Browser {
                 self.scrollbar_drag = None;
                 self.address_drag = false;
             }
-            Event::DragOutEnded(_) => self.drag_out_ended(),
+            Event::DragOutEnded(effect) => self.drag_out_ended(effect),
             Event::Wheel {
                 x,
                 y,

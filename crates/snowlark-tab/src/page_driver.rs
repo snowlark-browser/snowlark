@@ -279,6 +279,9 @@ impl PageDriver {
         page.engine().set_shows_hosted_windows(true);
         // (fullscreen is the window's: the page asks it, and it answers)
         page.engine().set_fullscreen_by_embedder(true);
+        // (a drag the page starts is the window's drag loop's: out to other programs and back;
+        // the Linux window has no drag source yet, so drags stay in the page there)
+        page.engine().set_system_drags(cfg!(windows));
         // (a canvas's frame shows when its canvas thread has read it: no rendering update waits)
         page.engine().set_canvas_frames_async(true);
         // (the async Clipboard API reaches the window's clipboard)
@@ -1322,6 +1325,14 @@ impl TabDriver for PageDriver {
                 self.page.drop_dragged(Some(&data), at, page_mods(mods))
             }
         }
+    }
+
+    fn take_drag_out(&mut self) -> Option<snowlark_page::dnd::DragOut> {
+        self.page.engine().take_drag_out()
+    }
+
+    fn drag_out_ended(&mut self, operation: snowlark_page::dnd::DragOperation) {
+        self.page.system_drag_ended(operation);
     }
 
     fn pointer(&mut self, input: Pointer) -> PointerResult {

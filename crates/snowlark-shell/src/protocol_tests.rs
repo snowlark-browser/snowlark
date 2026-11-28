@@ -475,6 +475,7 @@ every_variant!(tab_command: TabCommand, [
         }),
         mods: Modifiers::default(),
     }),
+    TabCommand::DragOutEnded(_) => TabCommand::DragOutEnded(snowlark_page::dnd::DragOperation::Copy),
     TabCommand::Key(_) => TabCommand::Key(key(KeyKind::Down { repeat: false })),
     TabCommand::ScrollContainer(..) => TabCommand::ScrollContainer(node(4), point()),
     TabCommand::SnapScroll(..) => TabCommand::SnapScroll(Some(node(4)), point()),
@@ -538,6 +539,20 @@ fn state() -> TabState {
 every_variant!(tab_event: TabEvent, [
     TabEvent::State(_) => TabEvent::State(state()),
     TabEvent::DragOperation(_) => TabEvent::DragOperation(snowlark_page::dnd::DragOperation::Link),
+    TabEvent::StartDrag(_) => TabEvent::StartDrag(Box::new(snowlark_page::dnd::DragOut {
+        items: vec![("text/uri-list".into(), url().to_string())],
+        allowed: "copyLink".into(),
+        url: Some(url().to_string()),
+        title: "A cat".into(),
+        markup: Some("<img src=\"x\" alt=\"A cat\">".into()),
+        image: Some(snowlark_page::dnd::DraggedImage {
+            stem: "cat".into(),
+            png: vec![0x89, b'P', b'N', b'G'],
+            width: 1,
+            height: 1,
+            bgra: vec![1, 2, 3, 4],
+        }),
+    })),
     TabEvent::Committed { .. } => TabEvent::Committed { url: url(), scroll: point() },
     TabEvent::DocumentUrl { .. } => TabEvent::DocumentUrl { url: url(), navigation: 12 },
     TabEvent::BeginNavigation(_) => TabEvent::BeginNavigation(Box::new(begin_navigation())),

@@ -72,6 +72,9 @@ pub enum TabCommand {
     Pointer(Pointer),
     /// A drag from another program over the page: answered with [`TabEvent::DragOperation`].
     Drag(DragInput),
+    /// The window's drag loop of the page's drag ([`TabEvent::StartDrag`]) ended with the
+    /// operation its target carried out.
+    DragOutEnded(snowlark_page::dnd::DragOperation),
     Key(KeyInput),
     ScrollContainer(NodeId, Point),
     /// A mouse wheel notch over a scroll container (`None`: over the viewport, sent when
@@ -237,6 +240,9 @@ pub enum TabEvent {
     /// The drag operation the page chose for a drag from another program
     /// ([`TabCommand::Drag`]).
     DragOperation(snowlark_page::dnd::DragOperation),
+    /// The page started a drag for the window's drag loop to carry on (out of the window and
+    /// back): answered with [`TabCommand::DragOutEnded`] when the loop ends.
+    StartDrag(Box<snowlark_page::dnd::DragOut>),
     /// The page went to `url` on its own (a link followed in this tab, a form, `location`): a new
     /// session history entry. `scroll` is where the entry it leaves was scrolled to.
     Committed {
@@ -1025,6 +1031,7 @@ pub fn is_input(c: &TabCommand) -> bool {
             | TabCommand::GoInDocument { .. }
             | TabCommand::Pointer(_)
             | TabCommand::Drag(_)
+            | TabCommand::DragOutEnded(_)
             | TabCommand::Key(_)
             | TabCommand::ScrollContainer(..)
             | TabCommand::SnapScroll(..)
@@ -1563,6 +1570,10 @@ impl TabRenderer {
                 self.needs_paint = true;
                 self.event(TabEvent::DragOperation(op));
             }
+            TabCommand::DragOutEnded(op) => {
+                self.driver.drag_out_ended(op);
+                self.needs_paint = true;
+            }
             TabCommand::Pointer(p) => {
                 let r = self.driver.pointer(p);
                 if r.repaint {
@@ -1887,6 +1898,9 @@ impl TabRenderer {
         }
         if let Some(c) = self.driver.take_context_menu() {
             self.event(TabEvent::ContextMenu(Box::new(c)));
+        }
+        if let Some(d) = self.driver.take_drag_out() {
+            self.event(TabEvent::StartDrag(Box::new(d)));
         }
         // (a view's find box searches its own document)
         if let Some(s) = self.driver.take_find_status() {

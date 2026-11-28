@@ -318,3 +318,140 @@ fn a_dnd_events_data_transfer_is_disabled_after_its_dispatch() {
         "0,0,,0"
     );
 }
+
+/// A press on `a` moved past the threshold over `b`, in a page whose drags are the system's.
+fn start_system_drag(page: &mut Page) {
+    let none = Modifiers::default();
+    page.engine().set_system_drags(true);
+    page.pointer_moved(Point::new(50.0, 25.0), none);
+    page.pointer_pressed(Point::new(50.0, 25.0), 0, none, 1);
+    eval(page, "log = []");
+    page.pointer_moved(Point::new(50.0, 125.0), none);
+}
+
+#[test]
+fn a_system_drag_hands_its_store_to_the_embedder_and_drops_back_with_it() {
+    let mut page = page_with(PAGE);
+    let none = Modifiers::default();
+    start_system_drag(&mut page);
+    // `dragstart`, the pointer stream suppressed, and no iteration: the drag loop runs them.
+    assert!(page.dragging());
+    assert_eq!(
+        eval(&mut page, "log.join(' ')"),
+        "pointerout@a pointerleave@a dragstart@a[||none] pointercancel@a pointerout@b \
+         pointerleave@b"
+    );
+    let out = page
+        .engine()
+        .take_drag_out()
+        .expect("the embedder gets the drag");
+    assert_eq!(out.items, [("text/plain".to_string(), "hi".to_string())]);
+    assert_eq!(out.allowed, "copyMove");
+    assert!(out.url.is_none() && out.image.is_none());
+    assert!(page.engine().take_drag_out().is_none());
+    // (the pointer's own input is the drag loop's now)
+    page.pointer_moved(Point::new(50.0, 130.0), none);
+    page.pointer_released(Point::new(50.0, 130.0), 0, none, 1);
+    assert_eq!(eval(&mut page, "log.length"), "6");
+    // The window's drop target over the page: iterations with the page's own store, whatever the
+    // platform's data says.
+    eval(&mut page, "log = []");
+    let theirs = ExternalDrag {
+        text: Some("from the system".into()),
+        allowed: "copyMove".into(),
+        ..Default::default()
+    };
+    let at = Point::new(50.0, 125.0);
+    assert_eq!(page.drag_over(Some(&theirs), at, none), DragOperation::Copy);
+    assert_eq!(
+        page.drop_dragged(Some(&theirs), at, none),
+        DragOperation::Copy
+    );
+    assert_eq!(
+        eval(&mut page, "log.join(' ')"),
+        "drag@a[text/plain||none] dragenter@b[text/plain||copy] dragover@b[text/plain||copy] \
+         drop@b[text/plain|hi|copy]"
+    );
+    // The drag loop's end: `dragend` with what its target did.
+    assert!(page.dragging());
+    eval(&mut page, "log = []");
+    page.system_drag_ended(DragOperation::Copy);
+    assert!(!page.dragging());
+    assert_eq!(
+        eval(&mut page, "log.join(' ')"),
+        "dragend@a[text/plain||copy]"
+    );
+}
+
+#[test]
+fn a_system_drag_that_leaves_the_page_goes_on_until_the_drag_loop_ends() {
+    let mut page = page_with(PAGE);
+    let none = Modifiers::default();
+    start_system_drag(&mut page);
+    assert!(page.engine().take_drag_out().is_some());
+    eval(&mut page, "log = []");
+    page.drag_over(None, Point::new(50.0, 125.0), none);
+    page.drag_leave();
+    assert!(page.dragging());
+    // (back over the page: entered again)
+    page.drag_over(None, Point::new(50.0, 125.0), none);
+    page.drag_leave();
+    page.system_drag_ended(DragOperation::None);
+    assert!(!page.dragging());
+    assert_eq!(
+        eval(&mut page, "log.join(' ')"),
+        "drag@a[text/plain||none] dragenter@b[text/plain||copy] dragover@b[text/plain||copy] \
+         dragleave@b[text/plain||none] drag@a[text/plain||none] dragenter@b[text/plain||copy] \
+         dragover@b[text/plain||copy] dragleave@b[text/plain||none] dragend@a[text/plain||none]"
+    );
+    // A drag whose end never comes is over at the next press.
+    start_system_drag(&mut page);
+    assert!(page.dragging());
+    page.pointer_pressed(Point::new(50.0, 25.0), 0, none, 1);
+    assert!(!page.dragging());
+    assert!(eval(&mut page, "log.join(' ')").ends_with("dragend@a[text/plain||none]"));
+    page.pointer_released(Point::new(50.0, 25.0), 0, none, 1);
+    // A canceled `dragstart` gives the embedder nothing.
+    eval(&mut page, "a.ondragstart = e => e.preventDefault()");
+    start_system_drag(&mut page);
+    assert!(!page.dragging());
+    assert!(page.engine().take_drag_out().is_none());
+}
+
+#[test]
+fn link_and_image_drags_carry_a_title_markup_and_the_images_file() {
+    const PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+    let mut page = page_with(&format!(
+        "<!doctype html><style>body{{margin:0}}a,img{{display:block;width:100px;height:50px}}</style>\
+         <a href='/x?y'> Some <b>link</b>\n text </a>\
+         <img alt='A \"cat\"' src='data:image/png;base64,{PNG}'>"
+    ));
+    let none = Modifiers::default();
+    page.engine().set_system_drags(true);
+    page.pointer_pressed(Point::new(20.0, 25.0), 0, none, 1);
+    page.pointer_moved(Point::new(20.0, 125.0), none);
+    let link = page.engine().take_drag_out().expect("a link drag");
+    assert_eq!(link.url.as_deref(), Some("http://example.test/x?y"));
+    assert_eq!(link.title, "Some link text");
+    assert_eq!(
+        link.markup.as_deref(),
+        Some("<a href=\"http://example.test/x?y\">Some link text</a>")
+    );
+    assert!(link.image.is_none());
+    page.system_drag_ended(DragOperation::Link);
+    page.pointer_pressed(Point::new(20.0, 75.0), 0, none, 1);
+    page.pointer_moved(Point::new(20.0, 175.0), none);
+    let img = page.engine().take_drag_out().expect("an image drag");
+    assert_eq!(img.title, "A \"cat\"");
+    assert!(img
+        .markup
+        .as_deref()
+        .is_some_and(|m| m.starts_with("<img src=\"data:image/png;base64,")
+            && m.ends_with(" alt=\"A &quot;cat&quot;\">")));
+    let file = img.image.expect("the image's file");
+    assert!(file.png.starts_with(b"\x89PNG"));
+    assert_eq!(file.stem, "");
+    // (its picture: the 1x1 image's pixel at three quarters opacity)
+    assert_eq!((file.width, file.height, file.bgra.len()), (1, 1, 4));
+    assert!((1..255).contains(&file.bgra[3]), "{:?}", file.bgra);
+}

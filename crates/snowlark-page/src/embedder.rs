@@ -10,7 +10,9 @@
 //!   whether the document asking may go there (a web page may not open the browser's settings);
 //! - the preferred color scheme (`prefers-color-scheme`) of every rendered document;
 //! - the context menu: a `contextmenu` event nothing canceled asks for the embedder's menu, with
-//!   what is under it ([`Engine::context_target`]).
+//!   what is under it ([`Engine::context_target`]);
+//! - system drags: a drag the page starts goes to the embedder's window, whose drag loop carries it
+//!   to other programs and back over the page ([`crate::dnd`]).
 
 use serde::{Deserialize, Serialize};
 use snowlark_dom::{local_name, NodeId};
@@ -95,6 +97,10 @@ pub struct EmbedderHooks {
     pub schemes: Vec<String>,
     /// The element of a `contextmenu` event that was not canceled, until the embedder takes it.
     pub context_menu: Option<NodeId>,
+    /// Drags the page starts leave it for the system's drag loop ([`Engine::set_system_drags`]).
+    pub system_drags: bool,
+    /// Such a drag, until the embedder takes it ([`Engine::take_drag_out`]).
+    pub drag_out: Option<Box<crate::dnd::DragOut>>,
     /// The system clipboard the embedder lends the page (the async Clipboard API).
     pub clipboard: Option<std::sync::Arc<dyn crate::engine::platform::ClipboardAccess>>,
     /// Each document's last user activation (HTML §6.4.3), as a high resolution time.

@@ -7,7 +7,8 @@
 //! `CF_TEXT`); a link also as `UniformResourceLocatorW` and `UniformResourceLocator` (the shell's
 //! link formats), `text/x-moz-url` (URL and title) and an internet shortcut file
 //! (`FileGroupDescriptorW` and `FileContents`), which a file manager or the desktop makes into a
-//! shortcut. The picture that follows the pointer is the shell's drag image helper's. The data
+//! shortcut; markup as `HTML Format` (`CF_HTML`) and `text/html`; a file made from what is
+//! dragged (an image's) by its contents, in place of the shortcut. The picture that follows the pointer is the shell's drag image helper's. The data
 //! object also keeps what a drop target or the helper stores in it (`SetData`).
 
 use std::cell::RefCell;
@@ -37,11 +38,11 @@ use windows::Win32::System::Ole::{
 use windows::Win32::System::SystemServices::MODIFIERKEYS_FLAGS;
 use windows::Win32::UI::Shell::{
     CLSID_DragDropHelper, IDragSourceHelper, SHCreateMemStream, SHCreateStdEnumFmtEtc, FD_LINKUI,
-    FILEDESCRIPTORW, FILEGROUPDESCRIPTORW, SHDRAGIMAGE,
+    FD_PROGRESSUI, FILEDESCRIPTORW, FILEGROUPDESCRIPTORW, SHDRAGIMAGE,
 };
 
 use crate::drag_data::{
-    shortcut_file_contents, shortcut_file_name, DragImage, DragOut, DropEffect,
+    cf_html, shortcut_file_contents, shortcut_file_name, DragImage, DragOut, DropEffect,
 };
 
 /// One format of the data object: its clipboard format, its index (`FileContents`' file; -1 for
@@ -91,21 +92,40 @@ fn bytesz(s: &str) -> Vec<u8> {
 /// the first it knows).
 pub(crate) fn entries(out: &DragOut) -> Vec<Entry> {
     let mut v = Vec::new();
-    if let Some(link) = &out.link {
-        v.push(Entry::new(
-            registered(w!("text/x-moz-url")),
-            utf16z(&format!("{}\n{}", link.url, link.title)),
-        ));
+    let file_contents = |v: &mut Vec<Entry>, name: &str, flags: u32, bytes: Vec<u8>| {
         v.push(Entry::new(
             registered(w!("FileGroupDescriptorW")),
-            file_group_descriptor(&shortcut_file_name(link)),
+            file_group_descriptor(name, flags),
         ));
         v.push(Entry {
             format: registered(w!("FileContents")),
             index: 0,
             tymed: (TYMED_HGLOBAL.0 | TYMED_ISTREAM.0) as u32,
-            bytes: shortcut_file_contents(&link.url),
+            bytes,
         });
+    };
+    // (a file is the most specific: an image's file, not a shortcut to its address)
+    if let Some(file) = &out.file {
+        file_contents(
+            &mut v,
+            &file.name,
+            FD_PROGRESSUI.0 as u32,
+            file.bytes.clone(),
+        );
+    }
+    if let Some(link) = &out.link {
+        v.push(Entry::new(
+            registered(w!("text/x-moz-url")),
+            utf16z(&format!("{}\n{}", link.url, link.title)),
+        ));
+        if out.file.is_none() {
+            file_contents(
+                &mut v,
+                &shortcut_file_name(link),
+                FD_LINKUI.0 as u32,
+                shortcut_file_contents(&link.url),
+            );
+        }
         v.push(Entry::new(
             registered(w!("UniformResourceLocatorW")),
             utf16z(&link.url),
@@ -115,19 +135,29 @@ pub(crate) fn entries(out: &DragOut) -> Vec<Entry> {
             bytesz(&link.url),
         ));
     }
-    v.push(Entry::new(CF_UNICODETEXT.0, utf16z(&out.text)));
-    v.push(Entry::new(CF_TEXT.0, bytesz(&out.text)));
+    if let Some(html) = &out.html {
+        v.push(Entry::new(registered(w!("HTML Format")), cf_html(html)));
+        v.push(Entry::new(
+            registered(w!("text/html")),
+            html.as_bytes().to_vec(),
+        ));
+    }
+    if !out.text.is_empty() {
+        v.push(Entry::new(CF_UNICODETEXT.0, utf16z(&out.text)));
+        v.push(Entry::new(CF_TEXT.0, bytesz(&out.text)));
+    }
     v
 }
 
-/// A `FILEGROUPDESCRIPTORW` of one file named `name`, shown as a link while dragged.
-fn file_group_descriptor(name: &str) -> Vec<u8> {
+/// A `FILEGROUPDESCRIPTORW` of one file named `name`, with `flags` (`FD_LINKUI`: shown as a
+/// link while dragged; `FD_PROGRESSUI`: a copy shows its progress).
+fn file_group_descriptor(name: &str, flags: u32) -> Vec<u8> {
     let mut file_name = [0u16; 260];
     for (slot, u) in file_name.iter_mut().zip(name.encode_utf16().take(259)) {
         *slot = u;
     }
     let d = FILEDESCRIPTORW {
-        dwFlags: FD_LINKUI.0 as u32,
+        dwFlags: flags,
         cFileName: file_name,
         ..Default::default()
     };
@@ -424,16 +454,22 @@ pub(crate) fn run(out: &DragOut) -> DropEffect {
     }
     let source: IDropSource = Source.into();
     let mut effect = DROPEFFECT_NONE;
+    let allowed = match out.effects {
+        None => DROPEFFECT_COPY | DROPEFFECT_LINK,
+        Some(e) => DROPEFFECT(
+            [
+                (e.copy, DROPEFFECT_COPY),
+                (e.link, DROPEFFECT_LINK),
+                (e.moves, DROPEFFECT_MOVE),
+            ]
+            .into_iter()
+            .filter(|&(on, _)| on)
+            .fold(0, |a, (_, bit)| a | bit.0),
+        ),
+    };
     // SAFETY: OLE is initialized on the window's thread (its drop target's registration); the
     // data object and source live through the call.
-    let hr = unsafe {
-        DoDragDrop(
-            &data,
-            &source,
-            DROPEFFECT_COPY | DROPEFFECT_LINK,
-            &mut effect,
-        )
-    };
+    let hr = unsafe { DoDragDrop(&data, &source, allowed, &mut effect) };
     if hr != DRAGDROP_S_DROP {
         return DropEffect::None;
     }
@@ -498,7 +534,7 @@ mod tests {
                 url: "https://news.example/item?id=1".into(),
                 title: "Y Combinator | Hacker News".into(),
             }),
-            image: None,
+            ..Default::default()
         })
         .into()
     }
@@ -594,6 +630,52 @@ mod tests {
             &get(&data, mine, -1, TYMED_HGLOBAL.0 as u32).unwrap(),
             b"abc"
         ));
+    }
+
+    #[test]
+    fn an_image_drag_offers_its_file_in_place_of_a_shortcut() {
+        use crate::drag_data::DragFile;
+        let e = entries(&DragOut {
+            text: "https://a.example/cat.jpg".into(),
+            link: Some(DragLink {
+                url: "https://a.example/cat.jpg".into(),
+                title: "A cat".into(),
+            }),
+            html: Some("<img src=\"https://a.example/cat.jpg\" alt=\"A cat\">".into()),
+            file: Some(DragFile {
+                name: "cat.png".into(),
+                bytes: b"\x89PNG".to_vec(),
+            }),
+            ..Default::default()
+        });
+        let formats: Vec<u16> = e.iter().map(|e| e.format).collect();
+        let group = registered(w!("FileGroupDescriptorW"));
+        let contents = registered(w!("FileContents"));
+        // The file first, and once: no shortcut beside it.
+        assert_eq!(formats[..2], [group, contents]);
+        assert_eq!(formats.iter().filter(|&&f| f == group).count(), 1);
+        assert_eq!(e[1].bytes, b"\x89PNG");
+        // SAFETY: the bytes are a FILEGROUPDESCRIPTORW (made by `file_group_descriptor`).
+        let g: FILEGROUPDESCRIPTORW =
+            unsafe { std::ptr::read_unaligned(e[0].bytes.as_ptr() as *const _) };
+        let [d] = { g.fgd };
+        assert_eq!({ d.dwFlags }, FD_PROGRESSUI.0 as u32);
+        let name: Vec<u16> = { d.cFileName }
+            .into_iter()
+            .take_while(|&u| u != 0)
+            .collect();
+        assert_eq!(String::from_utf16_lossy(&name), "cat.png");
+        // The URL, the markup and the text follow.
+        assert!(formats.contains(&registered(w!("UniformResourceLocatorW"))));
+        let html = e
+            .iter()
+            .find(|e| e.format == registered(w!("HTML Format")))
+            .unwrap();
+        assert!(String::from_utf8_lossy(&html.bytes).contains("<!--StartFragment--><img src="));
+        assert!(formats.contains(&registered(w!("text/html"))));
+        assert_eq!(formats.last(), Some(&CF_TEXT.0));
+        // (an element drag with no data offers nothing)
+        assert!(entries(&DragOut::default()).is_empty());
     }
 
     #[test]

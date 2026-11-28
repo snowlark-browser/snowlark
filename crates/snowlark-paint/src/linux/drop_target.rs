@@ -6,5 +6,6 @@
 //! `drag` module takes them from the desktop's data device).
 
 pub use crate::drag_data::{
-    shortcut_file_contents, shortcut_file_name, DragData, DragImage, DragLink, DragOut, DropEffect,
+    cf_html, safe_file_name, shortcut_file_contents, shortcut_file_name, DragData, DragFile,
+    DragImage, DragLink, DragOut, DropEffect, DropEffects,
 };

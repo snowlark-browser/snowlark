@@ -269,8 +269,7 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   before they are saved. (ref 542)
 - **Incognito windows are not finished.** They keep nothing on disk, but open the settings, history and bookmark
   pages in themselves rather than in a regular window, and lose bookmarks added in them when they close. (ref 540)
-- Links, images and selected text cannot be dragged out of a page to other programs yet; the address and the site
-  button can (ref 847).
+- Selected text in a page cannot be dragged, within the page or out of it (ref 933).
 - **Certificate viewer.** It shows the certificates the server sent, without the root certificate the system's
   store supplied; a certificate cannot be exported, and a certificate error page cannot show the refused
   certificate. (ref 845)

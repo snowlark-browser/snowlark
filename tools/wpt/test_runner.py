@@ -196,6 +196,27 @@ class Watch(unittest.TestCase):
         self.assertTrue(runner.stop_process(_Unstoppable(proc), grace=0.5, tries=3, kill=second_time_lucky))
         self.assertEqual(len(kills), 2)
 
+    @unittest.skipUnless(os.name == 'nt', 'the tree kill is taskkill /T')
+    def test_stopping_a_process_stops_its_children(self):
+        # As wptserve: a parent whose sub-servers must not outlive it.
+        pid_file = os.path.join(self.dir, 'child.pid')
+        code = ('import subprocess, sys, time\n'
+                f'c = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])\n'
+                f'open({pid_file!r}, "w").write(str(c.pid))\n'
+                'time.sleep(60)\n')
+        parent = subprocess.Popen([sys.executable, '-c', code])
+        for _ in range(100):
+            if os.path.exists(pid_file) and open(pid_file).read():
+                break
+            time.sleep(0.1)
+        child = int(open(pid_file).read())
+        self.assertTrue(runner.stop_process(parent, grace=10))
+        time.sleep(0.5)
+        alive = subprocess.run(['tasklist', '/FI', f'PID eq {child}', '/NH'], capture_output=True, text=True).stdout
+        if str(child) in alive:
+            os.kill(child, 9)
+        self.assertNotIn(str(child), alive)
+
     def test_a_process_past_its_limit_is_stopped_though_it_keeps_writing(self):
         code = 'import sys, time\nfor i in range(300):\n    sys.stderr.write("x\\n"); sys.stderr.flush(); time.sleep(0.1)\n'
         done, _ = self.run_python(code, stall=5, limit=1.5)

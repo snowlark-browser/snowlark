@@ -582,6 +582,14 @@ pub trait TabDriver {
         snowlark_page::dnd::DragOperation::None
     }
 
+    /// A drag the page started for the window's drag loop to carry on.
+    fn take_drag_out(&mut self) -> Option<snowlark_page::dnd::DragOut> {
+        None
+    }
+
+    /// The window's drag loop of the page's drag ended with `operation`.
+    fn drag_out_ended(&mut self, _operation: snowlark_page::dnd::DragOperation) {}
+
     /// What a pointer move held for the page's next rendering update found when it was dispatched
     /// there (a move's [`PointerResult`] is [`PointerResult::held`] until then).
     fn take_held_pointer(&mut self) -> Option<PointerResult> {

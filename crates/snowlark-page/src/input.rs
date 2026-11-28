@@ -1106,6 +1106,8 @@ impl Engine {
         mods: Modifiers,
         clicks: u32,
     ) -> PointerOutcome {
+        // (a press comes after the drag loop of a system drag: one whose end never came is over)
+        self.end_stale_system_drag(cx);
         let top_point = p;
         let hit = self.hit_element(p);
         let target = hit.map(|h| h.element);
