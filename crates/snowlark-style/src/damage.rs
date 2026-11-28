@@ -194,6 +194,12 @@ fn uses_counters(s: &ComputedValues) -> bool {
         }
 }
 
+/// Whether `align-content` is `normal` (with any overflow position).
+fn align_content_is_normal(v: &ComputedValues) -> bool {
+    use style::values::specified::align::AlignFlags;
+    v.get_position().align_content.primary().value() == AlignFlags::NORMAL
+}
+
 /// Whether an element with these values is the containing block of its absolutely and fixed
 /// positioned descendants whatever its `position` (css-position-3 §2.1): a transform or
 /// perspective, `transform-style: preserve-3d` (css-transforms-1 §2, -2 §6), a filter or backdrop
@@ -275,6 +281,9 @@ pub fn classify(old: &ComputedValues, new: &ComputedValues) -> Classification {
         // Becoming or ceasing to be the containing block of positioned descendants: the boxes
         // below find their containing blocks again.
         || establishes_fixed_cb(old) != establishes_fixed_cb(new)
+        // (`align-content` other than `normal` makes a block container establish an independent
+        // formatting context, CSS Box Alignment 3 §5.4, decided when its boxes are generated)
+        || align_content_is_normal(old) != align_content_is_normal(new)
         // (a replaced element's image is chosen when its box is made: CSS Images 3 §5.3)
         || old.get_inherited_box().image_orientation != new.get_inherited_box().image_orientation;
     if reconstruct {

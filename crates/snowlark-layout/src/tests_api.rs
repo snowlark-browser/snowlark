@@ -1351,6 +1351,45 @@ fn align_content_aligns_a_block_containers_content() {
 }
 
 #[test]
+fn align_content_makes_a_block_an_independent_formatting_context() {
+    // CSS Box Alignment 3 §5.4 (css-align/blocks/align-content-block-002.html): a plain block whose
+    // `align-content` is not `normal` establishes an independent formatting context, so its first
+    // child's top margin stays inside it instead of collapsing through; then its content is
+    // aligned. `last baseline` aligns as `end`; `unsafe center` lets content that does not fit
+    // overflow its top, safe (the default) keeps it at the top.
+    let mut t = T::new();
+    let r0 = t.root();
+    let make = |t: &mut T, align: Align, unsafe_: bool, inner: f32| {
+        let b = t.doc.block(r0, |s| {
+            s.height = SizeValue::px(50.0);
+            s.margin[0] = LengthPercentageAuto::px(5.0);
+            s.align_content = align;
+            if unsafe_ {
+                s.align_safety.align_content = OverflowPosition::Unsafe;
+            }
+        });
+        let c = t.doc.block(b, |s| {
+            s.height = SizeValue::px(inner);
+            s.margin[0] = LengthPercentageAuto::px(10.0);
+        });
+        (b, c)
+    };
+    let (start, start_child) = make(&mut t, Align::Start, false, 20.0);
+    let (normal, normal_child) = make(&mut t, Align::Normal, false, 20.0);
+    let (last, last_child) = make(&mut t, Align::LastBaseline, false, 20.0);
+    let (safe, safe_child) = make(&mut t, Align::Center, false, 60.0);
+    let (unsafe_, unsafe_child) = make(&mut t, Align::Center, true, 60.0);
+    let f = t.run(200.0, 600.0);
+    let dy = |b, c| rect(&f, c).y - rect(&f, b).y;
+    assert_eq!(dy(start, start_child), 10.0);
+    assert_eq!(dy(normal, normal_child), 0.0);
+    assert_eq!(dy(last, last_child), 30.0);
+    assert_eq!(dy(safe, safe_child), 10.0);
+    // (70px of margin box in 50px: 10px over, half of it above)
+    assert_eq!(dy(unsafe_, unsafe_child), 0.0);
+}
+
+#[test]
 fn empty_inline_boxes_have_no_outline() {
     // An inline box with no content has no width, so no outline rectangle (CSS UI 4 §5.1 as
     // Chrome draws it); one with text has its outline.

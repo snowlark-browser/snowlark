@@ -1150,6 +1150,32 @@ impl<S: Style> Tree<'_, '_, S> {
                                 };
                             }
                         }
+                        // css-sizing-4 §5.1: a box with a preferred aspect ratio and a definite
+                        // height has the width transferred through the ratio as its min-content and
+                        // max-content widths (taffy's leaf drops the ratio when it measures for the
+                        // content size). As a flex item's content size suggestion (css-flexbox-1
+                        // §4.5) that width still holds the min-content width of its content, the
+                        // automatic minimum size css-sizing-4 §5.1 gives such a box.
+                        if !is_table && known.width.is_none() && definite_h {
+                            if let (Some(r), Some(h)) = (style.aspect_ratio, known.height) {
+                                let transferred = (h * r - inset_h).max(0.0);
+                                let w = if flex_item && avail.width == AvailableSpace::MinContent {
+                                    // (the definite height is the percentage basis of its
+                                    // content's heights, css-flexbox-1 §9.8)
+                                    let saved =
+                                        cx.pct_height_basis.replace((h - inset_v).max(0.0));
+                                    let c = cx.content_sizes(id);
+                                    cx.pct_height_basis = saved;
+                                    transferred.max(c.min)
+                                } else {
+                                    transferred
+                                };
+                                return taffy::Size {
+                                    width: w,
+                                    height: (h - inset_v).max(0.0),
+                                };
+                            }
+                        }
                         let settled = match avail.width {
                             AvailableSpace::Definite(a) if own_width => Some(a.max(0.0)),
                             _ => None,

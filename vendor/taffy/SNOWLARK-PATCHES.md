@@ -88,6 +88,12 @@ the source; `git log -p vendor/taffy` shows the diff.
     is the item's available cross size). A `stretch` main size is the specified size suggestion of the
     automatic minimum (§4.5). Grid and block layout ignore the keyword fields. Upstream took lengths
     only, so the keywords behaved as `auto`.
+16. **A size from the aspect ratio is no specified size suggestion** (`compute/flexbox.rs`,
+    `FlexItem::specified_size`, `determine_flex_base_size`): css-flexbox-1 §4.5's specified size
+    suggestion is the item's own definite preferred main size. `FlexItem::size` also holds a main
+    size transferred from a definite cross size through the aspect ratio, so an item `height: 75px;
+    aspect-ratio: 1` with a child wider than 75px had 75px as its automatic minimum width instead
+    of its content's min-content width.
 
 To move to a newer taffy: replace this directory with the new release, re-apply the changes that upstream
 still lacks, and run `.\dev.ps1 test --release --package snowlark-layout`.

@@ -842,6 +842,49 @@ fn container_item_with_aspect_ratio_has_its_content_as_minimum() {
 }
 
 #[test]
+fn item_with_aspect_ratio_and_definite_height_keeps_its_transferred_width() {
+    // css-flexbox-1 §4.5, css-sizing-4 §5.1: an empty item `height: 75px; aspect-ratio: 1 / 1`
+    // beside a sibling that overflows the line has 75px as its min-content width (its height
+    // through its ratio), so it does not shrink below its 75px flex base size, with or without a
+    // `width`. A child wider than that is still its minimum.
+    for (width, child, expect) in [
+        (None, None, 75.0),
+        (Some(75.0), None, 75.0),
+        (None, Some(120.0), 120.0),
+    ] {
+        let mut t = T::new();
+        let r0 = t.root();
+        let flex = t.doc.block(r0, |s| {
+            s.display = Display::FLEX;
+            s.width = SizeValue::px(300.0);
+        });
+        let sq = t.doc.block(flex, |s| {
+            s.height = SizeValue::px(75.0);
+            if let Some(w) = width {
+                s.width = SizeValue::px(w);
+            }
+            s.aspect_ratio = AspectRatio {
+                auto: false,
+                ratio: Some(1.0),
+            };
+        });
+        if let Some(w) = child {
+            t.doc.block(sq, |s| {
+                s.width = SizeValue::px(w);
+                s.height = SizeValue::px(10.0);
+            });
+        }
+        t.doc.block(flex, |s| s.width = SizeValue::px(400.0));
+        let f = t.run(800.0, 600.0);
+        assert_eq!(
+            rect(&f, sq).width,
+            expect,
+            "width {width:?}, child {child:?}"
+        );
+    }
+}
+
+#[test]
 fn height_from_aspect_ratio_is_a_percentage_basis() {
     // The height the ratio gives a definite width is definite (css-sizing-4 §2.2): a child's
     // `height: 50%` resolves against it, and a column container's child flexes into it.

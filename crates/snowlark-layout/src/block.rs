@@ -808,11 +808,19 @@ pub(crate) fn layout_block_container_box<S: Style>(
             match style.align_content() {
                 Align::Normal if button => free / 2.0,
                 Align::Center | Align::SpaceAround | Align::SpaceEvenly => free / 2.0,
-                Align::End | Align::FlexEnd => free,
+                // (`last baseline` falls back to safe `end`, css-align-3 §9.1)
+                Align::End | Align::FlexEnd | Align::LastBaseline => free,
                 _ => 0.0,
             }
         };
-        if shift > 0.0 && shift.is_finite() {
+        // (`unsafe` lets content that does not fit overflow its start side, css-align-3 §4.4,
+        // except for the distribution values, whose fallback is safe, and `last baseline`)
+        let unsafe_overflow = style.align_safety().align_content == OverflowPosition::Unsafe
+            && matches!(
+                style.align_content(),
+                Align::Center | Align::End | Align::FlexEnd
+            );
+        if (shift > 0.0 || unsafe_overflow && shift < 0.0) && shift.is_finite() {
             for c in &mut children {
                 c.offset.y += shift;
             }

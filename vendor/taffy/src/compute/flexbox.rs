@@ -41,6 +41,10 @@ struct FlexItem {
     /// The raw size style of this item. Used to detect and resolve sizing
     /// keywords (`min-content`, `max-content`, `fit-content`, `fit-content(...)`, and `stretch`)
     size_style: Size<Dimension>,
+    /// Snowlark patch: the item's own preferred size where it is definite, without a size
+    /// transferred through its aspect ratio (`size` has those): the specified size suggestion
+    /// of css-flexbox-1 §4.5
+    specified_size: Size<Option<f32>>,
     /// The minimum allowable size of this item
     min_size: Size<Option<f32>>,
     /// The maximum allowable size of this item
@@ -1083,6 +1087,10 @@ fn generate_anonymous_flex_items(
                     .maybe_apply_aspect_ratio(aspect_ratio)
                     .maybe_add(box_sizing_adjustment),
                 size_style: child_style.size(),
+                specified_size: child_style
+                    .size()
+                    .maybe_resolve(percent_resolution_size, |val, basis| tree.calc(val, basis))
+                    .maybe_add(box_sizing_adjustment),
                 min_size: child_style
                     .min_size()
                     .maybe_resolve(percent_resolution_size, |val, basis| tree.calc(val, basis))
@@ -1487,8 +1495,9 @@ fn determine_flex_base_size(
         let style_min_main_size =
             child.min_size.or(child.overflow.map(Overflow::maybe_into_automatic_min_size).into()).main(dir);
         // Snowlark patch: a `stretch` main size is definite (css-sizing-4 §6.1) when the container's
-        // is, and is then the specified size suggestion (css-flexbox-1 §4.5)
-        let specified_main_size = child.size.main(dir).or_else(|| {
+        // is, and is then the specified size suggestion (css-flexbox-1 §4.5). A main size transferred
+        // from the cross size through the aspect ratio is not a specified size suggestion.
+        let specified_main_size = child.specified_size.main(dir).or_else(|| {
             child.size_style.main(dir).is_stretch().then_some(()).and(
                 percent_resolution_main_size.maybe_sub(child.margin.main_axis_sum(dir)).maybe_max(0.0),
             )

@@ -304,9 +304,11 @@ impl<'a, Src: StyleSource> Builder<'a, Src> {
                 && parent_flow
                 && !b.is_out_of_flow_or_float()
                 && !b.has(flags::ROOT)
-                // (other reasons for a BFC stay: a line-clamp container, layout containment)
+                // (other reasons for a BFC stay: a line-clamp container, layout containment,
+                // `align-content`)
                 && b.style.line_clamp().is_none()
                 && !b.style.layout_containment()
+                && b.style.align_content() == Align::Normal
             {
                 self.tree.b_mut(bb).set(flags::INDEPENDENT, false);
             }
@@ -1305,7 +1307,10 @@ impl<'a, Src: StyleSource> Builder<'a, Src> {
             || style.is_multicol()
             // (and so do layout and paint containment, CSS Contain 2 §3.2, §3.4)
             || style.layout_containment()
-            || style.paint_containment();
+            || style.paint_containment()
+            // (and `align-content` other than `normal` on a block container, CSS Box Alignment 3
+            // §5.4)
+            || style.align_content() != Align::Normal;
         let id = match display {
             Display::None => return None,
             Display::Box { inside, .. } => match inside {

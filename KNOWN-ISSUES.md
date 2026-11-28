@@ -32,8 +32,8 @@ https://github.com/snowlark-browser/snowlark/issues. The reference number at the
   sticky positioning inside a split inline, and 3D transforms in client rects. A sticky box with room to move inside
   another sticky box is painted again at each scroll position instead of being moved by the compositor. (ref 48, 645)
 - **Multi-column layout.** Columns, balancing, spanners, column rules, intrinsic sizes, `break-*` properties, orphans
-  and widows work. Open: a spanner inside a nested multi-column container, `display: flow-root` blocks breaking across
-  columns (they stay whole), and tables with collapsed borders across columns. (ref 217)
+  and widows work. Open: a spanner inside a nested multi-column container, `display: flow-root` blocks (and other blocks with a formatting context of
+  their own, such as `align-content: center` ones) breaking across columns (they stay whole), and tables with collapsed borders across columns. (ref 217)
 - **Tables.** Missing: `baseline-table` handling, merged colspan tracks in auto tables, percentage handling in quirks
   mode and fixed-layout min/max cases, percentage heights of cell content against the final row height, and some
   collapsed-border painting order. (ref 68)

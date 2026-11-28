@@ -31,6 +31,7 @@ const CSS: &str = "<!DOCTYPE html><style>
     #t.position { position: absolute }
     #t.float { float: left }
     #t.overflow { overflow: hidden } #t.overflow.scroll { overflow: scroll }
+    #t.ac { align-content: center } #t.ac.ac2 { align-content: end }
     #t.before::before { content: 'x' }
     #t.before.before-color::before { color: red }
     #t.list { display: list-item; list-style-type: square }
@@ -129,6 +130,10 @@ fn box_generating_properties_are_reconstruct() {
     assert_eq!(own("", "position"), StyleChange::Reconstruct);
     assert_eq!(own("", "float"), StyleChange::Reconstruct);
     assert_eq!(own("", "overflow"), StyleChange::Reconstruct);
+    // (`align-content` leaving `normal` makes a block container a formatting context root, CSS Box
+    // Alignment 3 §5.4; between two other values its boxes stay)
+    assert_eq!(own("", "ac"), StyleChange::Reconstruct);
+    assert_eq!(own("ac", "ac ac2"), StyleChange::Relayout);
 }
 
 #[test]
