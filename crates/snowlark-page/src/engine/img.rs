@@ -86,6 +86,10 @@ pub struct ImgData {
     /// object size width, at the last selection or layout (so the next layout can tell when it
     /// starts being rendered or that width changes).
     pub auto_rendered: bool,
+    /// The media environment's generation (viewport, pixel ratio, color scheme, ...) of the
+    /// document's renderer when the source was last selected (`None` before the first run's
+    /// selection), so a later change of it can select again.
+    pub media_gen: Option<u64>,
 }
 
 /// The engine's image elements.
@@ -281,8 +285,23 @@ impl Engine {
         });
         // 8. Select an image source.
         let auto = self.auto_sizes_width(el);
-        let selected = match self.with_node_renderer(el, |r, _| r.select_image_source(el, auto)) {
-            Some(Some(s)) => s,
+        // (a frame's media queries follow its viewport, its container's size in the parent, which
+        // a selection by `sizes` or a `picture` source's `media` must see as it is now)
+        let base = {
+            let dom = self.dom();
+            self.document_base_url(&dom, dom.node_document(el))
+        };
+        if self.uses_srcset_or_picture(el) {
+            let doc = self.dom().node_document(el);
+            self.sync_frame_viewport(doc);
+        }
+        let selected = match self.with_node_renderer(el, |r, _| {
+            (r.select_image_source(el, auto, &base), r.media_generation())
+        }) {
+            Some((Some(s), media_gen)) => {
+                self.img(el, |d| d.media_gen = Some(media_gen));
+                s
+            }
             _ => {
                 // (no renderer: the `src` alone, at density 1)
                 let src = self
@@ -350,9 +369,13 @@ impl Engine {
         // (a run that may omit events and selects what the current request shows keeps it)
         let shown = omit_events
             && self.img(el, |d| {
+                // (a broken request is not made again for a change that selects its URL again)
                 let keep = d.pending.is_none()
                     && d.current.url == url
-                    && d.current.state == RequestState::CompletelyAvailable;
+                    && matches!(
+                        d.current.state,
+                        RequestState::CompletelyAvailable | RequestState::Broken
+                    );
                 if keep {
                     d.current.density = density;
                 }
@@ -464,6 +487,12 @@ impl Engine {
             if !pending && d.current.url != url {
                 return false;
             }
+            // (a source that a change of the environment selects and that fails to load leaves the
+            // image the element shows, without an event)
+            if pending && !ok && d.omit_events {
+                d.pending = None;
+                return false;
+            }
             // ("upgrade the pending request to the current request")
             if pending {
                 d.current = d.pending.take().expect("pending");
@@ -486,6 +515,8 @@ impl Engine {
             }
             true
         });
+        // (a request that the environment change started and that fails fires no event)
+        let quiet = !ok && self.img(el, |d| d.omit_events);
         if applied {
             self.sync_img_renderer(el);
             if let ImageStatus::Loaded {
@@ -502,7 +533,9 @@ impl Engine {
                     }
                 });
             }
-            self.queue_img_event(el, gen, ok);
+            if !quiet {
+                self.queue_img_event(el, gen, ok);
+            }
             self.settle_decodes(el);
         }
     }
@@ -621,6 +654,28 @@ impl Engine {
                 changed.push(el);
             }
         }
+        // HTML "update the image data" on a change of the environment: an `img` that uses `srcset`
+        // or a `picture` selects again when its document's media environment (viewport size, pixel
+        // ratio, color scheme) is not the one its source was selected in.
+        let elements: Vec<NodeId> = self.images.borrow().elements.keys().copied().collect();
+        for el in elements {
+            if changed.contains(&el)
+                || !self.dom().is_alive(el)
+                || !self.uses_srcset_or_picture(el)
+                || self.img(el, |d| d.updating)
+            {
+                continue;
+            }
+            let Some(seen) = self.img(el, |d| d.media_gen) else {
+                continue;
+            };
+            let Some(now) = self.with_node_renderer(el, |r, _| r.media_generation()) else {
+                continue;
+            };
+            if now != seen {
+                changed.push(el);
+            }
+        }
         for &el in &changed {
             self.update_the_image_data_with(cx, el, true);
         }
@@ -647,6 +702,16 @@ impl Engine {
     /// Whether `el` is rendered within the lazy load root margin of its document's viewport (as
     /// of the last layout): a viewport's size around it, at least 1250 CSS px, as Chromium.
     pub(crate) fn near_viewport(&self, el: NodeId) -> bool {
+        // (a frame that has no box, `display: none`, shows nothing: nothing in it is near)
+        let doc = self.dom().node_document(el);
+        if let Some(container) = self.rendered_container(doc) {
+            if !self
+                .with_node_renderer(container, |r, _| r.geometry(container).is_some())
+                .unwrap_or(false)
+            {
+                return false;
+            }
+        }
         self.with_node_renderer(el, |r, st| {
             r.geometry(el).is_some_and(|g| {
                 let b = g.border_box;

@@ -1155,17 +1155,20 @@ impl Renderer {
     /// absolute URL and its pixel density (`None` without a source); `None` without a document.
     /// `auto` is the size an `auto` source size stands for: the page's, when the `img` allows
     /// auto-sizes (its concrete object size width, or its last auto-sizes width), else `None`.
+    /// `base` is the document base URL the page resolves URLs against (the renderer knows only
+    /// the document's own URL, which is not one for `about:srcdoc` and `about:blank` frames).
     pub fn select_image_source(
         &self,
         img: NodeId,
         auto: Option<f32>,
+        base: &Url,
     ) -> Option<Option<(String, f32)>> {
         let doc = self.doc.as_deref()?;
         let dom = doc.dom.borrow();
         if !dom.is_alive(img) {
             return Some(None);
         }
-        let base = Self::base_url(doc);
+        let base = base.clone();
         let device = doc.engine.stylist().device();
         let quirks = doc.engine.stylist().quirks_mode();
         let url_data = style::stylesheets::UrlExtraData::from(base.clone());
@@ -6401,6 +6404,15 @@ fn collect_style_urls(values: &ServoArc<ComputedValues>, out: &mut Vec<(String, 
         image_urls(image, dark, &mut urls);
     }
     image_urls(&values.get_border().border_image_source, dark, &mut urls);
+    // The images of `cursor` (CSS UI 4 §6.1.1) are fetched for every element, as are those of
+    // `list-style-image` on elements that are not list items: neither affects boxes there.
+    for cursor in values.get_inherited_ui().cursor.images.iter() {
+        image_urls(&cursor.image, dark, &mut urls);
+    }
+    let list_item = values.get_box().display.is_list_item();
+    if !list_item {
+        image_urls(&values.get_list().list_style_image, dark, &mut urls);
+    }
     out.extend(urls.drain(..).map(|u| (u, false)));
     // (a float's shape wraps lines around it: CSS Shapes 1 §3.2)
     if let style::values::generics::basic_shape::GenericShapeOutside::Image(i) =
@@ -6408,7 +6420,7 @@ fn collect_style_urls(values: &ServoArc<ComputedValues>, out: &mut Vec<(String, 
     {
         image_urls(i, dark, &mut urls);
     }
-    if values.get_box().display.is_list_item() {
+    if list_item {
         image_urls(&values.get_list().list_style_image, dark, &mut urls);
     }
     if let GenericContent::Items(items) = &values.get_counters().content {
@@ -6447,6 +6459,15 @@ fn select_img_source(
             s.trim_matches(|c: char| c.is_ascii_whitespace()),
         )
         .map(|u| u.to_string())
+    };
+    // (a candidate that does not resolve stays as written: its request fails, HTML "update the
+    // image data" step 10; so does one the dangling markup mitigation blocks, as an empty URL)
+    let finish = |u: String| {
+        if potentially_dangling(&u) {
+            String::new()
+        } else {
+            resolve(&u).unwrap_or(u)
+        }
     };
     let choose = |srcset: Option<&str>, sizes: Option<&str>, src: Option<&str>| {
         let mut candidates = srcset.map(srcset::parse_srcset).unwrap_or_default();
@@ -6493,7 +6514,7 @@ fn select_img_source(
                     continue;
                 }
                 if let Some((u, d)) = choose(Some(srcset), dom.get_attribute(s, "sizes"), None) {
-                    return Some((resolve(&u).unwrap_or(u), d));
+                    return Some((finish(u), d));
                 }
             }
         }
@@ -6504,9 +6525,19 @@ fn select_img_source(
         attr(local_name!("sizes")),
         attr(local_name!("src")),
     )?;
-    // (a candidate that does not resolve stays as written: its request fails, HTML "update the
-    // image data" step 10)
-    Some((resolve(&u).unwrap_or(u), d))
+    Some((finish(u), d))
+}
+
+/// Whether a URL as written has a tab or newline inside it and a `<` (Fetch's dangling markup
+/// mitigation: such a request is blocked, for the markup after it may be a secret an attacker's
+/// URL swallows; not for a `data:` URL).
+fn potentially_dangling(url: &str) -> bool {
+    let url = url.trim_matches(|c: char| c.is_ascii_whitespace());
+    // (a `data:` URL carries its content: nothing after it is swallowed)
+    let data = url
+        .get(..5)
+        .is_some_and(|s| s.eq_ignore_ascii_case("data:"));
+    !data && url.contains('<') && url.contains(['\n', '\r', '\t'])
 }
 
 /// Adds the counts of a second layout pass to the first's.
@@ -6587,5 +6618,27 @@ pub fn canvas_color(scheme: snowlark_layout::style::ColorScheme) -> Color {
     match scheme {
         snowlark_layout::style::ColorScheme::Light => Color::WHITE,
         snowlark_layout::style::ColorScheme::Dark => Color::rgb(0x12, 0x12, 0x12),
+    }
+}
+
+#[cfg(test)]
+mod dangling_markup_tests {
+    use super::potentially_dangling;
+
+    #[test]
+    fn a_url_with_a_newline_or_tab_and_a_less_than_sign_is_dangling() {
+        assert!(potentially_dangling("/a\nb?x=<"));
+        assert!(potentially_dangling("/a\tb?<c"));
+        assert!(potentially_dangling("/a?<\r=b"));
+    }
+
+    #[test]
+    fn the_others_are_not() {
+        assert!(!potentially_dangling("/a\nb?x=%3C"));
+        assert!(!potentially_dangling("/a?x=<"));
+        assert!(!potentially_dangling("/a\nb"));
+        // (surrounding white space is stripped before the URL is looked at)
+        assert!(!potentially_dangling("\n /a?x=<\n"));
+        assert!(!potentially_dangling("data:image/svg+xml;utf8,\n<svg/>"));
     }
 }

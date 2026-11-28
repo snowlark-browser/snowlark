@@ -2019,6 +2019,36 @@ fn subresources_of_changed_elements_are_discovered() {
     assert_eq!(eval(&mut page, "pi.getBoundingClientRect().width"), "2");
 }
 
+/// HTML "update the image data" when the environment changes: an `img` that selects its source
+/// by `sizes` and widths selects again when the viewport changes size.
+#[test]
+fn srcset_images_select_again_when_the_viewport_changes() {
+    const ONE: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==";
+    const TWO: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGP4z8DwH4QZYAwAR8oH+WdZbrcAAAAASUVORK5CYII=";
+    let net = NetThread::start(NetConfig::default()).unwrap();
+    let mut page = rendered(
+        &net,
+        &format!(
+            "<!doctype html><style>body {{ margin: 0 }}</style>\
+             <img id=i srcset='{TWO} 100w, {ONE} 1w' sizes='(min-width: 450px) 100px, 1px'>"
+        ),
+    );
+    let width = |page: &mut Page| {
+        assert!(page.run_until_settled(Duration::from_secs(5)));
+        page.update_the_rendering();
+        eval(page, "i.naturalWidth")
+    };
+    page.engine()
+        .set_viewport(snowlark_paint::Size::new(300.0, 400.0));
+    assert_eq!(width(&mut page), "1");
+    page.engine()
+        .set_viewport(snowlark_paint::Size::new(500.0, 400.0));
+    assert_eq!(width(&mut page), "2");
+    page.engine()
+        .set_viewport(snowlark_paint::Size::new(300.0, 400.0));
+    assert_eq!(width(&mut page), "1");
+}
+
 /// Resolved values (CSSOM §6.7.2) that need the box: `transform` as the matrix over
 /// the border box (CSS Transforms), `grid-template-*` as the used tracks with their line names (CSS
 /// Grid §7.2.6), and `min-width`/`min-height: auto` as `auto` only for flex and grid items (CSS

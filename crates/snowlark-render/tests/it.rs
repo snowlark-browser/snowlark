@@ -14,6 +14,7 @@ mod incremental;
 mod layers;
 mod render;
 mod shared_dom;
+mod style_image_requests;
 mod svg_paint;
 
 /// `autotests = false` means a file in `tests/` that is not a module above would never run.
